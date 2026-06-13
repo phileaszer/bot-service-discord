@@ -1,0 +1,11 @@
+﻿node_modules/
+.env
+data/service.json
+data/config.json
+database/*.db
+database/*.db-*
+bot.log
+bot.err
+outputs/
+scripts/
+PREMIUM_ROADMAP.md
