@@ -4,8 +4,8 @@
   "description": "Bot Discord multi-serveurs pour suivre les temps de service.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "deploy:commands": "node deploy-commands.js",
+    "start": "node --use-system-ca index.js",
+    "deploy:commands": "node --use-system-ca deploy-commands.js",
     "check": "node --check index.js && node --check deploy-commands.js && node --check database/database.js"
   },
   "keywords": [],

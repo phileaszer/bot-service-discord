@@ -6,6 +6,7 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    ChannelType,
     PermissionsBitField,
     EmbedBuilder,
     MessageFlags,
@@ -1975,6 +1976,207 @@ function parseResetGuildConfirmation(customId) {
     };
 }
 
+const SENTINEL_SELF_ROLES = {
+    announcements: '📡 Sentinel | Annonces',
+    changelog: '🧬 Sentinel | Changelog',
+    beta: '⚡ Sentinel | Early Access',
+    partner: '💎 Sentinel | Partenaire'
+};
+
+const SENTINEL_STAFF_ROLES = [
+    '✦ Sentinel | Fondateur',
+    '◆ Sentinel | Administrateur',
+    '◇ Sentinel | Moderateur',
+    '✚ Sentinel | Support'
+];
+
+function findRoleByName(guild, roleName) {
+    return guild.roles.cache.find(role => role.name === roleName) || null;
+}
+
+function findCategoryByName(guild, names) {
+    return guild.channels.cache.find(channel =>
+        channel.type === ChannelType.GuildCategory && names.includes(channel.name)
+    ) || null;
+}
+
+function sanitizeTicketName(value) {
+    return String(value || 'membre')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40) || 'membre';
+}
+
+function buildTicketOverwrites(guild, member) {
+    const overwrites = [
+        {
+            id: guild.roles.everyone.id,
+            deny: [PermissionsBitField.Flags.ViewChannel]
+        },
+        {
+            id: member.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+                PermissionsBitField.Flags.EmbedLinks
+            ]
+        }
+    ];
+
+    for (const roleName of SENTINEL_STAFF_ROLES) {
+        const role = findRoleByName(guild, roleName);
+
+        if (role) {
+            overwrites.push({
+                id: role.id,
+                allow: [
+                    PermissionsBitField.Flags.ViewChannel,
+                    PermissionsBitField.Flags.SendMessages,
+                    PermissionsBitField.Flags.ReadMessageHistory,
+                    PermissionsBitField.Flags.ManageMessages,
+                    PermissionsBitField.Flags.AttachFiles,
+                    PermissionsBitField.Flags.EmbedLinks
+                ]
+            });
+        }
+    }
+
+    return overwrites;
+}
+
+async function handleSentinelSelfRoleButton(interaction) {
+    const key = interaction.customId.split(':')[1];
+    const roleName = SENTINEL_SELF_ROLES[key];
+
+    if (!roleName) {
+        return interaction.reply({
+            content: 'Role Sentinel inconnu.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const role = findRoleByName(interaction.guild, roleName);
+
+    if (!role) {
+        return interaction.reply({
+            content: `Le role \`${roleName}\` est introuvable sur ce serveur.`,
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (interaction.member.roles.cache.has(role.id)) {
+        await interaction.member.roles.remove(role);
+
+        return interaction.reply({
+            content: `Role retire : ${role}`,
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    await interaction.member.roles.add(role);
+
+    return interaction.reply({
+        content: `Role ajoute : ${role}`,
+        flags: MessageFlags.Ephemeral
+    });
+}
+
+async function handleSentinelTicketButton(interaction) {
+    await interaction.guild.channels.fetch();
+
+    const existingTicket = interaction.guild.channels.cache.find(channel =>
+        channel.type === ChannelType.GuildText
+        && channel.topic === `sentinel-ticket:${interaction.user.id}`
+    );
+
+    if (existingTicket) {
+        return interaction.reply({
+            content: `Tu as deja un ticket ouvert : ${existingTicket}`,
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const supportCategory = findCategoryByName(interaction.guild, [
+        '✦ SENTINEL // SUPPORT',
+        'SENTINEL // SUPPORT'
+    ]);
+    const ticketChannel = await interaction.guild.channels.create({
+        name: `ticket-${sanitizeTicketName(interaction.user.username)}`,
+        type: ChannelType.GuildText,
+        parent: supportCategory?.id || null,
+        topic: `sentinel-ticket:${interaction.user.id}`,
+        permissionOverwrites: buildTicketOverwrites(interaction.guild, interaction.member),
+        reason: 'Creation ticket Sentinel'
+    });
+
+    const embed = new EmbedBuilder()
+        .setColor(SENTINEL_COLORS.primary)
+        .setTitle('Ticket Sentinel')
+        .setDescription([
+            `${interaction.user}, explique ta demande clairement.`,
+            '',
+            '- probleme ou question',
+            '- commande/fonction concernee',
+            '- capture ou message d erreur si disponible',
+            '',
+            'Le support te repondra des que possible.'
+        ].join('\n'))
+        .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('sentinel_ticket:close')
+            .setLabel('Fermer le ticket')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('🔒')
+    );
+
+    await ticketChannel.send({
+        content: `${interaction.user}`,
+        embeds: [embed],
+        components: [row]
+    });
+
+    return interaction.reply({
+        content: `Ticket cree : ${ticketChannel}`,
+        flags: MessageFlags.Ephemeral
+    });
+}
+
+async function handleSentinelTicketCloseButton(interaction) {
+    if (!interaction.channel?.topic?.startsWith('sentinel-ticket:')) {
+        return interaction.reply({
+            content: 'Ce bouton ne peut etre utilise que dans un ticket Sentinel.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (
+        !interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels)
+        && interaction.channel.topic !== `sentinel-ticket:${interaction.user.id}`
+    ) {
+        return interaction.reply({
+            content: 'Tu ne peux fermer que ton ticket, sauf si tu as la permission Gerer les salons.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    await interaction.reply({
+        content: 'Ticket ferme. Suppression dans quelques secondes...',
+        flags: MessageFlags.Ephemeral
+    });
+
+    setTimeout(() => {
+        interaction.channel?.delete('Fermeture ticket Sentinel').catch(() => {});
+    }, 3000);
+}
+
 async function getMemberOption(interaction, optionName) {
     const member = interaction.options.getMember(optionName);
 
@@ -2980,6 +3182,18 @@ client.on(Events.InteractionCreate, async interaction => {
             embeds: [embed],
             flags: MessageFlags.Ephemeral
         });
+    }
+
+    if (interaction.customId.startsWith('sentinel_selfrole:')) {
+        return handleSentinelSelfRoleButton(interaction);
+    }
+
+    if (interaction.customId === 'sentinel_ticket:create') {
+        return handleSentinelTicketButton(interaction);
+    }
+
+    if (interaction.customId === 'sentinel_ticket:close') {
+        return handleSentinelTicketCloseButton(interaction);
     }
 
     if (interaction.customId !== 'toggle_service') return;
