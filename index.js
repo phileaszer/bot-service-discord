@@ -14,6 +14,7 @@ const {
 } = require('discord.js');
 
 const db = require('./database/database');
+const { syncSentinelServer } = require('./server-sync');
 
 const client = new Client({
     intents: [
@@ -2674,8 +2675,20 @@ async function handleModerationMessage(message, language) {
     return true;
 }
 
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
+
+    try {
+        const syncResult = await syncSentinelServer(client);
+
+        if (syncResult.skipped) {
+            console.log(`Synchronisation serveur Sentinel ignoree : ${syncResult.reason}`);
+        } else {
+            console.log(`Synchronisation serveur Sentinel terminee : ${syncResult.created} creation(s), ${syncResult.updated} mise(s) a jour.`);
+        }
+    } catch (error) {
+        console.error('Erreur synchronisation serveur Sentinel :', error);
+    }
 });
 
 client.on(Events.Error, error => {
