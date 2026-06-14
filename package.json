@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node --use-system-ca index.js",
     "deploy:commands": "node --use-system-ca deploy-commands.js",
-    "check": "node --check index.js && node --check deploy-commands.js && node --check database/database.js"
+    "check": "node --check index.js && node --check deploy-commands.js && node --check database/database.js && node --check server-sync.js"
   },
   "keywords": [],
   "author": "",
