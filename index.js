@@ -1984,6 +1984,11 @@ const SENTINEL_SELF_ROLES = {
     partner: '💎 Sentinel | Partenaire'
 };
 
+const SENTINEL_LANGUAGE_ROLES = {
+    fr: '🌐 Sentinel | Français',
+    en: '🌐 Sentinel | English'
+};
+
 const SENTINEL_STAFF_ROLES = [
     '✦ Sentinel | Fondateur',
     '◆ Sentinel | Administrateur',
@@ -2084,6 +2089,46 @@ async function handleSentinelSelfRoleButton(interaction) {
 
     return interaction.reply({
         content: `Role ajoute : ${role}`,
+        flags: MessageFlags.Ephemeral
+    });
+}
+
+async function handleSentinelLanguageButton(interaction) {
+    const language = interaction.customId.split(':')[1];
+    const roleName = SENTINEL_LANGUAGE_ROLES[language];
+
+    if (!roleName) {
+        return interaction.reply({
+            content: 'Langue Sentinel inconnue.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const selectedRole = findRoleByName(interaction.guild, roleName);
+    const otherRole = findRoleByName(
+        interaction.guild,
+        language === 'fr' ? SENTINEL_LANGUAGE_ROLES.en : SENTINEL_LANGUAGE_ROLES.fr
+    );
+
+    if (!selectedRole) {
+        return interaction.reply({
+            content: `Le role \`${roleName}\` est introuvable sur ce serveur.`,
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (otherRole && interaction.member.roles.cache.has(otherRole.id)) {
+        await interaction.member.roles.remove(otherRole);
+    }
+
+    if (!interaction.member.roles.cache.has(selectedRole.id)) {
+        await interaction.member.roles.add(selectedRole);
+    }
+
+    return interaction.reply({
+        content: language === 'fr'
+            ? `Langue configuree : ${selectedRole}. Tu vois maintenant le serveur en francais.`
+            : `Language set: ${selectedRole}. You now see the server in English.`,
         flags: MessageFlags.Ephemeral
     });
 }
@@ -3199,6 +3244,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.customId.startsWith('sentinel_selfrole:')) {
         return handleSentinelSelfRoleButton(interaction);
+    }
+
+    if (interaction.customId.startsWith('sentinel_language:')) {
+        return handleSentinelLanguageButton(interaction);
     }
 
     if (interaction.customId === 'sentinel_ticket:create') {
