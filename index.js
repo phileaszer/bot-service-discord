@@ -2096,7 +2096,6 @@ async function handleSentinelSelfRoleButton(interaction) {
 async function handleSentinelLanguageButton(interaction) {
     const language = interaction.customId.split(':')[1];
     const roleName = SENTINEL_LANGUAGE_ROLES[language];
-    const guild = interaction.guild || await interaction.client.guilds.fetch(interaction.guildId);
 
     if (!roleName) {
         return interaction.reply({
@@ -2105,7 +2104,9 @@ async function handleSentinelLanguageButton(interaction) {
         });
     }
 
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply({ ephemeral: true });
+
+    const guild = interaction.guild || await interaction.client.guilds.fetch(interaction.guildId);
     await guild.roles.fetch();
 
     const member = await guild.members.fetch(interaction.user.id);
@@ -2149,6 +2150,30 @@ async function handleSentinelLanguageButton(interaction) {
         : '\n\nNote: your account has staff/admin permissions, so Discord may still let you see both versions.';
 
     return interaction.editReply(`${baseMessage} ${visibilityMessage}${hasBypassView ? bypassMessage : ''}`);
+}
+
+async function handleSentinelButtonFailure(interaction, error) {
+    console.error(`Erreur bouton ${interaction.customId} :`, error);
+
+    if (!interaction.isRepliable()) {
+        return;
+    }
+
+    const content = 'Une erreur est survenue pendant le traitement du bouton Sentinel.';
+
+    if (interaction.deferred || interaction.replied) {
+        await interaction.editReply(content).catch(() => {});
+        return;
+    }
+
+    await interaction.reply({
+        content,
+        flags: MessageFlags.Ephemeral
+    }).catch(() => {});
+}
+
+function handleSentinelButton(interaction, handler) {
+    return handler(interaction).catch(error => handleSentinelButtonFailure(interaction, error));
 }
 
 async function handleSentinelTicketButton(interaction) {
@@ -2800,7 +2825,7 @@ client.on(Events.InteractionCreate, async interaction => {
         && interaction.customId.startsWith('sentinel_language:')
         && interaction.inGuild()
     ) {
-        return handleSentinelLanguageButton(interaction);
+        return handleSentinelButton(interaction, handleSentinelLanguageButton);
     }
 
     if (!interaction.inCachedGuild()) {
@@ -3197,7 +3222,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.customId.startsWith('set_language:')) {
         if (!hasCommandRoleAccess(interaction.member)) {
-            return handleSentinelLanguageButton(interaction);
+            return handleSentinelButton(interaction, handleSentinelLanguageButton);
         }
 
         const nextLanguage = setGuildLanguage(interaction.guild.id, interaction.customId.split(':')[1]);
@@ -3278,15 +3303,15 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     if (interaction.customId.startsWith('sentinel_selfrole:')) {
-        return handleSentinelSelfRoleButton(interaction);
+        return handleSentinelButton(interaction, handleSentinelSelfRoleButton);
     }
 
     if (interaction.customId === 'sentinel_ticket:create') {
-        return handleSentinelTicketButton(interaction);
+        return handleSentinelButton(interaction, handleSentinelTicketButton);
     }
 
     if (interaction.customId === 'sentinel_ticket:close') {
-        return handleSentinelTicketCloseButton(interaction);
+        return handleSentinelButton(interaction, handleSentinelTicketCloseButton);
     }
 
     if (interaction.customId !== 'toggle_service') return;
