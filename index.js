@@ -2135,11 +2135,20 @@ async function handleSentinelLanguageButton(interaction) {
         return interaction.editReply('Je n arrive pas a modifier ton role de langue. Verifie que mon role Discord est bien au-dessus des roles de langue.');
     }
 
-    return interaction.editReply(
-        language === 'fr'
-            ? `Langue configuree : ${selectedRole}. Tu vois maintenant le serveur en francais.`
-            : `Language set: ${selectedRole}. You now see the server in English.`
-    );
+    const hasBypassView = member.id === guild.ownerId
+        || member.permissions.has(PermissionsBitField.Flags.Administrator)
+        || SENTINEL_STAFF_ROLES.some(staffRoleName => member.roles.cache.some(role => role.name === staffRoleName));
+    const baseMessage = language === 'fr'
+        ? `Langue configuree : ${selectedRole}.`
+        : `Language set: ${selectedRole}.`;
+    const visibilityMessage = language === 'fr'
+        ? 'Les membres sans permission staff voient maintenant la version francaise du serveur.'
+        : 'Members without staff permissions now see the English server view.';
+    const bypassMessage = language === 'fr'
+        ? '\n\nNote : ton compte a des permissions staff/admin, donc Discord peut encore te laisser voir les deux versions.'
+        : '\n\nNote: your account has staff/admin permissions, so Discord may still let you see both versions.';
+
+    return interaction.editReply(`${baseMessage} ${visibilityMessage}${hasBypassView ? bypassMessage : ''}`);
 }
 
 async function handleSentinelTicketButton(interaction) {
