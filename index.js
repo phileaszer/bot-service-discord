@@ -62,6 +62,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
+const SENTINEL_BUILD = 'language-buttons-2026-06-15-v5';
 
 const SUPPORTED_LANGUAGES = new Set(['fr', 'en']);
 const MODERATION_ACTION_LABELS = {
@@ -2107,27 +2108,11 @@ async function handleSentinelLanguageButton(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
     const guild = interaction.guild || await interaction.client.guilds.fetch(interaction.guildId);
-    await guild.roles.fetch();
-
-    const member = await guild.members.fetch(interaction.user.id);
-    const selectedRole = findRoleByName(guild, roleName);
-    const otherRole = findRoleByName(
-        guild,
-        language === 'fr' ? SENTINEL_LANGUAGE_ROLES.en : SENTINEL_LANGUAGE_ROLES.fr
-    );
-
-    if (!selectedRole) {
-        return interaction.editReply(`Le role \`${roleName}\` est introuvable sur ce serveur.`);
-    }
+    let member;
+    let selectedRole;
 
     try {
-        if (otherRole && member.roles.cache.has(otherRole.id)) {
-            await member.roles.remove(otherRole);
-        }
-
-        if (!member.roles.cache.has(selectedRole.id)) {
-            await member.roles.add(selectedRole);
-        }
+        ({ member, selectedRole } = await applySentinelLanguageToMember(guild, interaction.user.id, language));
 
         console.log(`Langue Sentinel appliquee : ${language} pour ${interaction.user.tag} (${interaction.user.id})`);
     } catch (error) {
@@ -2174,6 +2159,33 @@ async function handleSentinelButtonFailure(interaction, error) {
 
 function handleSentinelButton(interaction, handler) {
     return handler(interaction).catch(error => handleSentinelButtonFailure(interaction, error));
+}
+
+async function applySentinelLanguageToMember(guild, userId, language) {
+    await guild.roles.fetch();
+
+    const roleName = SENTINEL_LANGUAGE_ROLES[language];
+    const selectedRole = findRoleByName(guild, roleName);
+    const otherRole = findRoleByName(
+        guild,
+        language === 'fr' ? SENTINEL_LANGUAGE_ROLES.en : SENTINEL_LANGUAGE_ROLES.fr
+    );
+
+    if (!selectedRole) {
+        throw new Error(`Role de langue introuvable : ${roleName}`);
+    }
+
+    const member = await guild.members.fetch(userId);
+
+    if (otherRole && member.roles.cache.has(otherRole.id)) {
+        await member.roles.remove(otherRole);
+    }
+
+    if (!member.roles.cache.has(selectedRole.id)) {
+        await member.roles.add(selectedRole);
+    }
+
+    return { member, selectedRole };
 }
 
 async function handleSentinelTicketButton(interaction) {
@@ -2765,6 +2777,7 @@ async function handleModerationMessage(message, language) {
 
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
+    console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
 
     try {
         const syncResult = await syncSentinelServer(client);
@@ -3397,6 +3410,29 @@ client.on(Events.MessageCreate, async message => {
     const guildId = message.guild.id;
     let language = getGuildLanguage(guildId);
     const content = message.content.trim();
+
+    if (/^!sentinel-build$/i.test(content)) {
+        return message.reply(`Build Sentinel actif : \`${SENTINEL_BUILD}\``);
+    }
+
+    if (/^!(fr|en)$/i.test(content)) {
+        const nextLanguage = /^!fr$/i.test(content) ? 'fr' : 'en';
+
+        try {
+            const { selectedRole } = await applySentinelLanguageToMember(message.guild, message.author.id, nextLanguage);
+            console.log(`Langue Sentinel appliquee par commande texte : ${nextLanguage} pour ${message.author.tag} (${message.author.id})`);
+
+            return message.reply(
+                nextLanguage === 'fr'
+                    ? `Langue configuree : ${selectedRole}.`
+                    : `Language set: ${selectedRole}.`
+            );
+        } catch (error) {
+            console.error('Erreur commande texte langue Sentinel :', error);
+
+            return message.reply('Je n arrive pas a modifier ton role de langue pour le moment.');
+        }
+    }
 
     if (/^!(aide|help)$/i.test(content)) {
         const embed = buildHelpEmbed(message.guild, message.author);
