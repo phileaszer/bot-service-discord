@@ -2096,6 +2096,7 @@ async function handleSentinelSelfRoleButton(interaction) {
 async function handleSentinelLanguageButton(interaction) {
     const language = interaction.customId.split(':')[1];
     const roleName = SENTINEL_LANGUAGE_ROLES[language];
+    const guild = interaction.guild || await interaction.client.guilds.fetch(interaction.guildId);
 
     if (!roleName) {
         return interaction.reply({
@@ -2105,12 +2106,12 @@ async function handleSentinelLanguageButton(interaction) {
     }
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    await interaction.guild.roles.fetch();
+    await guild.roles.fetch();
 
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    const selectedRole = findRoleByName(interaction.guild, roleName);
+    const member = await guild.members.fetch(interaction.user.id);
+    const selectedRole = findRoleByName(guild, roleName);
     const otherRole = findRoleByName(
-        interaction.guild,
+        guild,
         language === 'fr' ? SENTINEL_LANGUAGE_ROLES.en : SENTINEL_LANGUAGE_ROLES.fr
     );
 
@@ -2126,6 +2127,8 @@ async function handleSentinelLanguageButton(interaction) {
         if (!member.roles.cache.has(selectedRole.id)) {
             await member.roles.add(selectedRole);
         }
+
+        console.log(`Langue Sentinel appliquee : ${language} pour ${interaction.user.tag} (${interaction.user.id})`);
     } catch (error) {
         console.error('Erreur bouton langue Sentinel :', error);
 
@@ -2771,6 +2774,14 @@ client.on(Events.GuildCreate, async guild => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    if (
+        interaction.isButton()
+        && interaction.customId.startsWith('sentinel_language:')
+        && interaction.inGuild()
+    ) {
+        return handleSentinelLanguageButton(interaction);
+    }
+
     if (!interaction.inCachedGuild()) {
         if (interaction.isRepliable()) {
             await interaction.reply({
@@ -3250,10 +3261,6 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.customId.startsWith('sentinel_selfrole:')) {
         return handleSentinelSelfRoleButton(interaction);
-    }
-
-    if (interaction.customId.startsWith('sentinel_language:')) {
-        return handleSentinelLanguageButton(interaction);
     }
 
     if (interaction.customId === 'sentinel_ticket:create') {
