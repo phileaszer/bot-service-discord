@@ -1669,11 +1669,11 @@ function buildLanguageButtons(language = 'fr') {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('set_language:fr')
+                .setCustomId('sentinel_language:fr')
                 .setLabel(t(language, 'languageFrench'))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId('set_language:en')
+                .setCustomId('sentinel_language:en')
                 .setLabel(t(language, 'languageEnglish'))
                 .setStyle(ButtonStyle.Secondary)
         )
@@ -2749,6 +2749,14 @@ client.on(Events.Error, error => {
     console.error('Erreur client Discord :', error);
 });
 
+process.on('unhandledRejection', error => {
+    console.error('Promesse non geree :', error);
+});
+
+process.on('uncaughtException', error => {
+    console.error('Exception non geree :', error);
+});
+
 client.on(Events.GuildCreate, async guild => {
     getGuildConfig(guild.id);
 
@@ -2774,6 +2782,10 @@ client.on(Events.GuildCreate, async guild => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    if (interaction.isButton()) {
+        console.log(`Bouton Discord recu : ${interaction.customId} par ${interaction.user.tag} (${interaction.user.id})`);
+    }
+
     if (
         interaction.isButton()
         && interaction.customId.startsWith('sentinel_language:')
@@ -3176,10 +3188,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.customId.startsWith('set_language:')) {
         if (!hasCommandRoleAccess(interaction.member)) {
-            return interaction.reply({
-                content: getCommandRoleAccessDeniedMessage(buttonLanguage),
-                flags: MessageFlags.Ephemeral
-            });
+            return handleSentinelLanguageButton(interaction);
         }
 
         const nextLanguage = setGuildLanguage(interaction.guild.id, interaction.customId.split(':')[1]);
