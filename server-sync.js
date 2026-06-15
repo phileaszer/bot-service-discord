@@ -19,19 +19,19 @@ const ROLES = [
     { name: '◆ Sentinel | Administrateur', color: 0xd91b7d, hoist: true },
     { name: '◇ Sentinel | Moderateur', color: COLORS.violet, hoist: true },
     { name: '✚ Sentinel | Support', color: COLORS.cyan, hoist: true },
-    { name: '⚡ Sentinel | Beta Tester', color: 0x00b8ff, hoist: false },
+    { name: '⚡ Sentinel | Testeur beta', aliases: ['⚡ Sentinel | Beta Tester'], color: 0x00b8ff, hoist: false },
     { name: '◈ Sentinel | Membre', color: 0x2f3136, hoist: false },
     { name: '◌ Sentinel | Nouveau', color: 0x777777, hoist: false },
     { name: '💎 Sentinel | Partenaire', color: COLORS.pink, hoist: false },
-    { name: '⚡ Sentinel | Early Access', color: 0x00b8ff, hoist: false },
+    { name: '⚡ Sentinel | Acces anticipe', aliases: ['⚡ Sentinel | Early Access'], color: 0x00b8ff, hoist: false },
     { name: '📡 Sentinel | Annonces', color: COLORS.cyan, hoist: false },
-    { name: '🧬 Sentinel | Changelog', color: COLORS.violet, hoist: false },
+    { name: '🧬 Sentinel | Journal dev', aliases: ['🧬 Sentinel | Changelog'], color: COLORS.violet, hoist: false },
     { name: '🌐 Sentinel | Français', color: COLORS.pink, hoist: false },
     { name: '🌐 Sentinel | English', color: COLORS.cyan, hoist: false }
 ];
 
 const CATEGORIES = [
-    { key: 'start', name: '✦ SENTINEL // START', kind: 'publicReadOnly' },
+    { key: 'start', name: '✦ SENTINEL // LANGUE', aliases: ['✦ SENTINEL // START'], kind: 'publicReadOnly' },
     { key: 'info', name: '✦ SENTINEL // INFORMATIONS', kind: 'frReadOnly' },
     { key: 'community', name: '✦ SENTINEL // COMMUNAUTE', kind: 'frCommunity' },
     { key: 'support', name: '✦ SENTINEL // SUPPORT', kind: 'frCommunity' },
@@ -46,7 +46,7 @@ const CATEGORIES = [
 ];
 
 const CHANNELS = [
-    { name: '💗｜bienvenue', category: 'start', kind: 'publicReadOnly', topic: 'Choose your Sentinel language // Choisis ta langue Sentinel', panel: 'welcome' },
+    { name: '💗｜bienvenue', category: 'start', kind: 'publicReadOnly', topic: 'Choisis ta langue Sentinel', panel: 'welcome' },
     { name: '🛡｜reglement', category: 'info', kind: 'frReadOnly', topic: 'Reglement Sentinel', panel: 'rules' },
     { name: '📡｜annonces', category: 'info', kind: 'frReadOnly', topic: 'Annonces officielles Sentinel', panel: 'announcements' },
     { name: '💠｜presentation-sentinel', category: 'info', kind: 'frReadOnly', topic: 'Presentation du projet Sentinel', panel: 'presentation' },
@@ -56,7 +56,7 @@ const CHANNELS = [
     { name: '💬｜general', category: 'community', kind: 'frCommunity', topic: 'Discussion generale Sentinel' },
     { name: '👋｜presentations', category: 'community', kind: 'frCommunity', topic: 'Presente-toi a la communaute Sentinel' },
     { name: '💡｜suggestions', category: 'community', kind: 'frCommunity', topic: 'Idees et ameliorations pour Sentinel', panel: 'suggestions' },
-    { name: '🖼｜showcase', category: 'community', kind: 'frCommunity', topic: 'Screenshots, setups et creations communautaires' },
+    { name: '🖼｜showcase', category: 'community', kind: 'frCommunity', topic: 'Captures, configurations et creations communautaires' },
     { name: '🌙｜hors-sujet', category: 'community', kind: 'frCommunity', topic: 'Discussion libre' },
     { name: '🗳｜sondages', category: 'community', kind: 'frCommunity', topic: 'Votes communautaires et priorites Sentinel', panel: 'polls' },
     { name: '🎭｜roles-sentinel', category: 'community', kind: 'frReadOnly', topic: 'Roles et preferences Sentinel', panel: 'roles' },
@@ -91,16 +91,16 @@ const CHANNELS = [
     { name: '⚡｜beta-tests-en', category: 'devEn', kind: 'enCommunity', topic: 'Testing upcoming Sentinel features', panel: 'betaEn' },
     { name: '🔮｜future-ideas', category: 'devEn', kind: 'enCommunity', topic: 'Long-term Sentinel ideas', panel: 'futureIdeasEn' },
     { name: '🧾｜release-notes', category: 'devEn', kind: 'enCommunity', topic: 'Public Sentinel release summaries', panel: 'patchNotesEn' },
-    { name: '🔒｜staff-chat', category: 'staff', kind: 'staff', topic: 'Private staff coordination // Sentinel operations', panel: 'staff' },
-    { name: '📂｜logs', category: 'staff', kind: 'staff', topic: 'Internal logs and moderation traces', panel: 'logs' },
-    { name: '⚠️｜signalements', category: 'staff', kind: 'staff', topic: 'Private report tracking and staff follow-up', panel: 'reports' },
-    { name: '📌｜todo-staff', category: 'staff', kind: 'staff', topic: 'Internal Sentinel staff tasks and follow-ups', panel: 'todo' }
+    { name: '🔒｜staff-chat', category: 'staff', kind: 'staff', topic: 'Coordination privee du staff Sentinel', panel: 'staff' },
+    { name: '📂｜logs', category: 'staff', kind: 'staff', topic: 'Traces internes et moderation Sentinel', panel: 'logs' },
+    { name: '⚠️｜signalements', category: 'staff', kind: 'staff', topic: 'Suivi prive des signalements Sentinel', panel: 'reports' },
+    { name: '📌｜todo-staff', category: 'staff', kind: 'staff', topic: 'Taches internes du staff Sentinel', panel: 'todo' }
 ];
 
 const VOICE_CHANNELS = [
-    { name: '◆ General', category: 'voice', kind: 'frVoice' },
-    { name: '◆ Support', category: 'voice', kind: 'frVoice' },
-    { name: '◆ Beta Test', category: 'voice', kind: 'frVoice' },
+    { name: '◆ Salon general', aliases: ['◆ General'], category: 'voice', kind: 'frVoice' },
+    { name: '◆ Assistance', aliases: ['◆ Support'], category: 'voice', kind: 'frVoice' },
+    { name: '◆ Tests beta', aliases: ['◆ Beta Test'], category: 'voice', kind: 'frVoice' },
     { name: '◆ General EN', category: 'voiceEn', kind: 'enVoice' },
     { name: '◆ Support EN', category: 'voiceEn', kind: 'enVoice' },
     { name: '◆ Beta Test EN', category: 'voiceEn', kind: 'enVoice' }
@@ -361,11 +361,13 @@ async function ensureRoles(guild, result) {
     await guild.roles.fetch();
 
     for (const config of ROLES) {
-        const role = findRole(guild, config.name);
+        const role = findRole(guild, config.name)
+            || (config.aliases || []).map(alias => findRole(guild, alias)).find(Boolean);
 
         if (role) {
             if (role.editable) {
                 await role.edit({
+                    name: config.name,
                     colors: {
                         primaryColor: config.color
                     },
@@ -395,7 +397,8 @@ async function ensureCategories(guild, result) {
     const byKey = new Map();
 
     for (const config of CATEGORIES) {
-        let category = findCategory(guild, config.name);
+        let category = findCategory(guild, config.name)
+            || (config.aliases || []).map(alias => findCategory(guild, alias)).find(Boolean);
 
         if (!category) {
             category = await guild.channels.create({
@@ -406,6 +409,13 @@ async function ensureCategories(guild, result) {
             });
             result.created += 1;
         } else {
+            if (category.name !== config.name) {
+                await category.edit({
+                    name: config.name,
+                    reason: 'Sentinel auto sync'
+                });
+            }
+
             await category.permissionOverwrites.set(overwritesFor(guild, config.kind), 'Sentinel auto sync');
             result.updated += 1;
         }
@@ -449,7 +459,8 @@ async function ensureTextChannels(guild, categories, result) {
 
 async function ensureVoiceChannels(guild, categories, result) {
     for (const config of VOICE_CHANNELS) {
-        let channel = findVoiceChannel(guild, config.name);
+        let channel = findVoiceChannel(guild, config.name)
+            || (config.aliases || []).map(alias => findVoiceChannel(guild, alias)).find(Boolean);
 
         if (!channel) {
             channel = await guild.channels.create({
@@ -462,6 +473,7 @@ async function ensureVoiceChannels(guild, categories, result) {
             result.created += 1;
         } else {
             await channel.edit({
+                name: config.name,
                 parent: categories.get(config.category)?.id || channel.parentId,
                 permissionOverwrites: overwritesFor(guild, config.kind || 'voice'),
                 reason: 'Sentinel auto sync'
@@ -476,14 +488,14 @@ function embed(title, description, color = COLORS.pink) {
         .setColor(color)
         .setTitle(title)
         .setDescription(description)
-        .setFooter({ text: 'Sentinel Community // Performance - Securite - Fiabilite' })
+        .setFooter({ text: 'Sentinel - Performance - Securite - Fiabilite' })
         .setTimestamp();
 }
 
 function panelPayload(panel) {
     const panels = {
         welcome: {
-            embeds: [embed('Sentinel // Choix de la langue', 'Bienvenue sur le serveur officiel Sentinel.\n\nChoisis ta langue pour afficher les salons qui te correspondent.\n\nWelcome to the official Sentinel server.\n\nChoose your language to display the channels made for you.', COLORS.pink)],
+            embeds: [embed('Sentinel - Choix de langue', 'Bienvenue sur le serveur officiel Sentinel.\n\nChoisis ta langue pour afficher les salons qui te correspondent.\n\nWelcome to the official Sentinel server.\n\nChoose your language to display the matching channels.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('sentinel_language:fr').setLabel('Français').setStyle(ButtonStyle.Primary).setEmoji('🇫🇷'),
@@ -504,7 +516,7 @@ function panelPayload(panel) {
             embeds: [embed('Journal dev Sentinel', 'Ce salon suit le travail continu autour de Sentinel.\n\nTu y verras les evolutions en cours, les ajustements techniques, les corrections preparees et les changements qui ne sont pas encore forcement une version officielle.', COLORS.violet)]
         },
         resources: {
-            embeds: [embed('Ressources Sentinel', 'Les liens utiles de Sentinel sont regroupes ici : invitation du bot, documentation, GitHub, guides, changelog et informations importantes.\n\nUn point de depart simple pour retrouver ce dont tu as besoin.', COLORS.cyan)]
+            embeds: [embed('Ressources Sentinel', 'Les liens utiles de Sentinel sont regroupes ici : invitation du bot, documentation, GitHub, guides, journal dev et informations importantes.\n\nUn point de depart simple pour retrouver ce dont tu as besoin.', COLORS.cyan)]
         },
         status: {
             embeds: [embed('Statut Sentinel', '**Etat actuel :** operationnel\n\nLes maintenances, incidents, ralentissements et redemarrages importants seront annonces ici.', COLORS.cyan)]
@@ -600,12 +612,12 @@ function panelPayload(panel) {
             embeds: [embed('Signalements staff', 'Les signalements importants sont centralises ici avec leur contexte, les preuves disponibles et le suivi effectue.', COLORS.dark)]
         },
         roles: {
-            embeds: [embed('Roles Sentinel', 'Choisis les notifications et statuts que tu veux recevoir.\n\nAnnonces, changelog, early access ou partenaire : les boutons te permettent d ajuster ton profil Sentinel en un clic.', COLORS.violet)],
+            embeds: [embed('Roles Sentinel', 'Choisis les notifications et statuts que tu veux recevoir.\n\nAnnonces, journal dev, acces anticipe ou partenaire : les boutons te permettent d ajuster ton profil Sentinel en un clic.', COLORS.violet)],
             components: [
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('sentinel_selfrole:announcements').setLabel('Annonces').setStyle(ButtonStyle.Secondary).setEmoji('📡'),
-                    new ButtonBuilder().setCustomId('sentinel_selfrole:changelog').setLabel('Changelog').setStyle(ButtonStyle.Secondary).setEmoji('🧬'),
-                    new ButtonBuilder().setCustomId('sentinel_selfrole:beta').setLabel('Early Access').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
+                    new ButtonBuilder().setCustomId('sentinel_selfrole:changelog').setLabel('Journal dev').setStyle(ButtonStyle.Secondary).setEmoji('🧬'),
+                    new ButtonBuilder().setCustomId('sentinel_selfrole:beta').setLabel('Acces anticipe').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:partner').setLabel('Partenaire').setStyle(ButtonStyle.Secondary).setEmoji('💎')
                 )
             ]

@@ -1979,8 +1979,8 @@ function parseResetGuildConfirmation(customId) {
 
 const SENTINEL_SELF_ROLES = {
     announcements: '📡 Sentinel | Annonces',
-    changelog: '🧬 Sentinel | Changelog',
-    beta: '⚡ Sentinel | Early Access',
+    changelog: '🧬 Sentinel | Journal dev',
+    beta: '⚡ Sentinel | Acces anticipe',
     partner: '💎 Sentinel | Partenaire'
 };
 
@@ -2104,6 +2104,10 @@ async function handleSentinelLanguageButton(interaction) {
         });
     }
 
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.guild.roles.fetch();
+
+    const member = await interaction.guild.members.fetch(interaction.user.id);
     const selectedRole = findRoleByName(interaction.guild, roleName);
     const otherRole = findRoleByName(
         interaction.guild,
@@ -2111,26 +2115,28 @@ async function handleSentinelLanguageButton(interaction) {
     );
 
     if (!selectedRole) {
-        return interaction.reply({
-            content: `Le role \`${roleName}\` est introuvable sur ce serveur.`,
-            flags: MessageFlags.Ephemeral
-        });
+        return interaction.editReply(`Le role \`${roleName}\` est introuvable sur ce serveur.`);
     }
 
-    if (otherRole && interaction.member.roles.cache.has(otherRole.id)) {
-        await interaction.member.roles.remove(otherRole);
+    try {
+        if (otherRole && member.roles.cache.has(otherRole.id)) {
+            await member.roles.remove(otherRole);
+        }
+
+        if (!member.roles.cache.has(selectedRole.id)) {
+            await member.roles.add(selectedRole);
+        }
+    } catch (error) {
+        console.error('Erreur bouton langue Sentinel :', error);
+
+        return interaction.editReply('Je n arrive pas a modifier ton role de langue. Verifie que mon role Discord est bien au-dessus des roles de langue.');
     }
 
-    if (!interaction.member.roles.cache.has(selectedRole.id)) {
-        await interaction.member.roles.add(selectedRole);
-    }
-
-    return interaction.reply({
-        content: language === 'fr'
+    return interaction.editReply(
+        language === 'fr'
             ? `Langue configuree : ${selectedRole}. Tu vois maintenant le serveur en francais.`
-            : `Language set: ${selectedRole}. You now see the server in English.`,
-        flags: MessageFlags.Ephemeral
-    });
+            : `Language set: ${selectedRole}. You now see the server in English.`
+    );
 }
 
 async function handleSentinelTicketButton(interaction) {
