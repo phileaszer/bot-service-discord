@@ -190,7 +190,7 @@ site/index.html
 Il est statique, bilingue francais/anglais et peut etre ouvert directement dans un navigateur.
 Il est publie avec GitHub Pages via le workflow `.github/workflows/deploy-site.yml`.
 
-URL publique prevue :
+URL publique :
 
 ```text
 https://phileaszer.github.io/bot-service-discord/

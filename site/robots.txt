@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://phileaszer.github.io/bot-service-discord/sitemap.xml
