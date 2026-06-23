@@ -262,6 +262,8 @@ const advancedCommands = [
 
     command('sync-service', 'sync-service', 'Repare les incoherences entre la base et le role de service.', 'Repairs inconsistencies between the database and service role.'),
 
+    command('sync-sentinel', 'sync-sentinel', 'Synchronise les salons, roles et panneaux Sentinel.', 'Synchronizes Sentinel channels, roles and panels.'),
+
     command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d’un membre.', 'Resets a member service hours.')
         .addUserOption(option =>
             option
