@@ -25,6 +25,7 @@ const ROLES = [
     { name: '💎 Sentinel | Partenaire', color: COLORS.pink, hoist: false },
     { name: '⚡ Sentinel | Acces anticipe', aliases: ['⚡ Sentinel | Early Access'], color: 0x00b8ff, hoist: false },
     { name: '📡 Sentinel | Annonces', color: COLORS.cyan, hoist: false },
+    { name: '🛠 Sentinel | Maintenance', color: 0xff4fb8, hoist: false },
     { name: '🧬 Sentinel | Journal dev', aliases: ['🧬 Sentinel | Changelog'], color: COLORS.violet, hoist: false },
     { name: '🌐 Sentinel | Français', color: COLORS.pink, hoist: false },
     { name: '🌐 Sentinel | English', color: COLORS.cyan, hoist: false }
@@ -52,13 +53,14 @@ const CHANNELS = [
     { name: '💠｜presentation-sentinel', category: 'info', kind: 'frReadOnly', topic: 'Presentation du projet Sentinel', panel: 'presentation' },
     { name: '🧬｜journal-dev', aliases: ['🧬｜changelog'], category: 'info', kind: 'frReadOnly', topic: 'Journal technique continu du developpement Sentinel', panel: 'changelog' },
     { name: '📚｜ressources', category: 'info', kind: 'frReadOnly', topic: 'Liens, guides et references Sentinel', panel: 'resources' },
+    { name: '❔｜faq', category: 'info', kind: 'frReadOnly', topic: 'Questions frequentes Sentinel', panel: 'faq' },
     { name: '📌｜statut-sentinel', category: 'info', kind: 'frReadOnly', topic: 'Statut, maintenance et incidents Sentinel', panel: 'status' },
     { name: '💬｜general', category: 'community', kind: 'frCommunity', topic: 'Discussion generale Sentinel' },
     { name: '👋｜presentations', category: 'community', kind: 'frCommunity', topic: 'Presente-toi a la communaute Sentinel' },
     { name: '💡｜suggestions', category: 'community', kind: 'frCommunity', topic: 'Idees et ameliorations pour Sentinel', panel: 'suggestions' },
     { name: '🖼｜showcase', category: 'community', kind: 'frCommunity', topic: 'Captures, configurations et creations communautaires' },
     { name: '🌙｜hors-sujet', category: 'community', kind: 'frCommunity', topic: 'Discussion libre' },
-    { name: '🗳｜sondages', category: 'community', kind: 'frCommunity', topic: 'Votes communautaires et priorites Sentinel', panel: 'polls' },
+    { name: '🗳｜votes-priorites', aliases: ['🗳｜sondages'], category: 'community', kind: 'frCommunity', topic: 'Votes communautaires et priorites Sentinel', panel: 'priorityVotes' },
     { name: '🎭｜roles-sentinel', category: 'community', kind: 'frReadOnly', topic: 'Roles et preferences Sentinel', panel: 'roles' },
     { name: '🔧｜aide-installation', category: 'support', kind: 'frCommunity', topic: 'Aide installation et configuration Sentinel', panel: 'support' },
     { name: '🚨｜bugs', category: 'support', kind: 'frCommunity', topic: 'Signalement de bugs Sentinel', panel: 'bugs' },
@@ -74,13 +76,14 @@ const CHANNELS = [
     { name: '💠｜about-sentinel', category: 'infoEn', kind: 'enReadOnly', topic: 'Sentinel project overview', panel: 'presentationEn' },
     { name: '🧬｜dev-log', category: 'infoEn', kind: 'enReadOnly', topic: 'Continuous Sentinel development log', panel: 'changelogEn' },
     { name: '📚｜resources', category: 'infoEn', kind: 'enReadOnly', topic: 'Sentinel links, guides and references', panel: 'resourcesEn' },
+    { name: '❔｜faq-en', category: 'infoEn', kind: 'enReadOnly', topic: 'Sentinel frequently asked questions', panel: 'faqEn' },
     { name: '📌｜sentinel-status', category: 'infoEn', kind: 'enReadOnly', topic: 'Sentinel status, maintenance and incidents', panel: 'statusEn' },
     { name: '💬｜general-en', category: 'communityEn', kind: 'enCommunity', topic: 'Main Sentinel community chat' },
     { name: '👋｜introductions', category: 'communityEn', kind: 'enCommunity', topic: 'Introduce yourself to the Sentinel community' },
     { name: '💡｜suggestions-en', category: 'communityEn', kind: 'enCommunity', topic: 'Ideas and improvements for Sentinel', panel: 'suggestionsEn' },
     { name: '🖼｜showcase-en', category: 'communityEn', kind: 'enCommunity', topic: 'Screenshots, setups and community creations' },
     { name: '🌙｜off-topic', category: 'communityEn', kind: 'enCommunity', topic: 'Free chat' },
-    { name: '🗳｜polls', category: 'communityEn', kind: 'enCommunity', topic: 'Community votes and Sentinel priorities', panel: 'pollsEn' },
+    { name: '🗳｜priority-votes', aliases: ['🗳｜polls'], category: 'communityEn', kind: 'enCommunity', topic: 'Community votes and Sentinel priorities', panel: 'priorityVotesEn' },
     { name: '🎭｜sentinel-roles', category: 'communityEn', kind: 'enReadOnly', topic: 'Sentinel roles and notification preferences', panel: 'rolesEn' },
     { name: '🔧｜setup-help', category: 'supportEn', kind: 'enCommunity', topic: 'Sentinel setup and configuration help', panel: 'supportEn' },
     { name: '🚨｜bug-reports', category: 'supportEn', kind: 'enCommunity', topic: 'Sentinel bug reports', panel: 'bugsEn' },
@@ -518,11 +521,22 @@ function panelPayload(panel) {
         resources: {
             embeds: [embed('Ressources Sentinel', 'Les liens utiles de Sentinel sont regroupes ici : invitation du bot, documentation, GitHub, guides, journal dev et informations importantes.\n\nUn point de depart simple pour retrouver ce dont tu as besoin.', COLORS.cyan)]
         },
-        status: {
-            embeds: [embed('Statut Sentinel', '**Etat actuel :** operationnel\n\nLes maintenances, incidents, ralentissements et redemarrages importants seront annonces ici.', COLORS.cyan)]
+        faq: {
+            embeds: [embed('FAQ Sentinel', '**Comment inviter Sentinel ?**\nUtilise le lien officiel fourni par le staff. Le bot doit avoir les scopes `bot` et `applications.commands`.\n\n**Quelles permissions sont importantes ?**\nSentinel doit pouvoir gerer les roles, lire les salons utiles, envoyer des messages, creer des tickets et lire l historique des messages.\n\n**Les boutons de langue ne changent pas ma vue staff, pourquoi ?**\nLes comptes administrateurs ou staff peuvent voir plusieurs versions du serveur car Discord leur donne des permissions plus larges.\n\n**Ou demander de l aide ?**\nUtilise les salons support ou ouvre un ticket si la demande est personnelle, sensible ou technique.\n\n**Ou suivre les mises a jour ?**\nLes annonces donnent les informations importantes. Le journal dev suit le travail continu. Les notes de version resument les sorties officielles.', COLORS.cyan)]
         },
-        polls: {
-            embeds: [embed('Sondages Sentinel', 'La communaute peut voter ici sur les prochaines priorites : nouvelles commandes, ameliorations, integrations, ergonomie ou idees de serveur.\n\nTon avis aide Sentinel a avancer dans la bonne direction.', COLORS.violet)]
+        status: {
+            embeds: [embed('Statut Sentinel', '**Etat actuel :** operationnel\n\nCe panneau est mis a jour automatiquement par Sentinel avec la latence, la base SQLite et la derniere synchronisation connue.\n\nLes maintenances, incidents, ralentissements et redemarrages importants seront annonces ici.', COLORS.cyan)]
+        },
+        priorityVotes: {
+            embeds: [embed('Votes priorites Sentinel', 'Choisis ce qui doit passer en priorite pour Sentinel.\n\nChaque bouton enregistre ton intention dans les logs staff. Les votes servent a sentir la direction de la communaute, pas a verrouiller la roadmap.', COLORS.violet)],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('sentinel_vote:stability').setLabel('Stabilite').setStyle(ButtonStyle.Secondary).setEmoji('🛡'),
+                    new ButtonBuilder().setCustomId('sentinel_vote:features').setLabel('Fonctions').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
+                    new ButtonBuilder().setCustomId('sentinel_vote:moderation').setLabel('Moderation').setStyle(ButtonStyle.Secondary).setEmoji('🔎'),
+                    new ButtonBuilder().setCustomId('sentinel_vote:ux').setLabel('Ergonomie').setStyle(ButtonStyle.Secondary).setEmoji('💠')
+                )
+            ]
         },
         suggestions: {
             embeds: [embed('Suggestions Sentinel', 'Les idees pour ameliorer Sentinel passent ici.\n\nTu peux proposer une commande, une option, une integration, une amelioration visuelle ou un changement de fonctionnement. Les meilleures idees sont celles qui rendent le bot plus utile pour toute la communaute.', COLORS.violet)]
@@ -566,11 +580,22 @@ function panelPayload(panel) {
         resourcesEn: {
             embeds: [embed('Sentinel Resources', 'Useful Sentinel links are gathered here: bot invite, documentation, GitHub, guides, changelog and important information.\n\nA simple starting point whenever you need a reference.', COLORS.cyan)]
         },
-        statusEn: {
-            embeds: [embed('Sentinel Status', '**Current status:** operational\n\nMaintenance, incidents, slowdowns and important restarts will be announced here.', COLORS.cyan)]
+        faqEn: {
+            embeds: [embed('Sentinel FAQ', '**How do I invite Sentinel?**\nUse the official invite link shared by the staff. The bot needs the `bot` and `applications.commands` scopes.\n\n**Which permissions matter?**\nSentinel needs to manage roles, read useful channels, send messages, create tickets and read message history.\n\n**Why can staff accounts still see both languages?**\nAdministrator and staff accounts can bypass some channel filters because Discord gives them broader permissions.\n\n**Where do I ask for help?**\nUse support channels or open a ticket for personal, sensitive or technical requests.\n\n**Where do I follow updates?**\nAnnouncements carry important information. The dev log tracks ongoing work. Release notes summarize official releases.', COLORS.cyan)]
         },
-        pollsEn: {
-            embeds: [embed('Sentinel Polls', 'The community can vote here on upcoming priorities: new commands, improvements, integrations, usability or server ideas.\n\nYour feedback helps Sentinel move in the right direction.', COLORS.violet)]
+        statusEn: {
+            embeds: [embed('Sentinel Status', '**Current status:** operational\n\nThis panel is automatically updated by Sentinel with latency, SQLite status and the latest known sync.\n\nMaintenance, incidents, slowdowns and important restarts will be announced here.', COLORS.cyan)]
+        },
+        priorityVotesEn: {
+            embeds: [embed('Sentinel Priority Votes', 'Choose what Sentinel should prioritize next.\n\nEach button records your intent in staff logs. Votes help read the community direction; they do not freeze the roadmap.', COLORS.violet)],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('sentinel_vote:stability').setLabel('Stability').setStyle(ButtonStyle.Secondary).setEmoji('🛡'),
+                    new ButtonBuilder().setCustomId('sentinel_vote:features').setLabel('Features').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
+                    new ButtonBuilder().setCustomId('sentinel_vote:moderation').setLabel('Moderation').setStyle(ButtonStyle.Secondary).setEmoji('🔎'),
+                    new ButtonBuilder().setCustomId('sentinel_vote:ux').setLabel('Usability').setStyle(ButtonStyle.Secondary).setEmoji('💠')
+                )
+            ]
         },
         suggestionsEn: {
             embeds: [embed('Sentinel Suggestions', 'Ideas to improve Sentinel go here.\n\nYou can suggest a command, option, integration, visual improvement or behavior change. The best ideas make the bot more useful for the whole community.', COLORS.violet)]
@@ -612,10 +637,11 @@ function panelPayload(panel) {
             embeds: [embed('Signalements staff', 'Les signalements importants sont centralises ici avec leur contexte, les preuves disponibles et le suivi effectue.', COLORS.dark)]
         },
         roles: {
-            embeds: [embed('Roles Sentinel', 'Choisis les notifications et statuts que tu veux recevoir.\n\nAnnonces, journal dev, acces anticipe ou partenaire : les boutons te permettent d ajuster ton profil Sentinel en un clic.', COLORS.violet)],
+            embeds: [embed('Roles Sentinel', 'Choisis les notifications et statuts que tu veux recevoir.\n\nAnnonces, maintenance, journal dev, acces anticipe ou partenaire : les boutons te permettent d ajuster ton profil Sentinel en un clic.', COLORS.violet)],
             components: [
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('sentinel_selfrole:announcements').setLabel('Annonces').setStyle(ButtonStyle.Secondary).setEmoji('📡'),
+                    new ButtonBuilder().setCustomId('sentinel_selfrole:maintenance').setLabel('Maintenance').setStyle(ButtonStyle.Secondary).setEmoji('🛠'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:changelog').setLabel('Journal dev').setStyle(ButtonStyle.Secondary).setEmoji('🧬'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:beta').setLabel('Acces anticipe').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:partner').setLabel('Partenaire').setStyle(ButtonStyle.Secondary).setEmoji('💎')
@@ -623,10 +649,11 @@ function panelPayload(panel) {
             ]
         },
         rolesEn: {
-            embeds: [embed('Sentinel Roles', 'Choose the notifications and status roles you want.\n\nAnnouncements, changelog, early access or partner: the buttons let you adjust your Sentinel profile in one click.', COLORS.violet)],
+            embeds: [embed('Sentinel Roles', 'Choose the notifications and status roles you want.\n\nAnnouncements, maintenance, changelog, early access or partner: the buttons let you adjust your Sentinel profile in one click.', COLORS.violet)],
             components: [
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('sentinel_selfrole:announcements').setLabel('Announcements').setStyle(ButtonStyle.Secondary).setEmoji('📡'),
+                    new ButtonBuilder().setCustomId('sentinel_selfrole:maintenance').setLabel('Maintenance').setStyle(ButtonStyle.Secondary).setEmoji('🛠'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:changelog').setLabel('Changelog').setStyle(ButtonStyle.Secondary).setEmoji('🧬'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:beta').setLabel('Early Access').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
                     new ButtonBuilder().setCustomId('sentinel_selfrole:partner').setLabel('Partner').setStyle(ButtonStyle.Secondary).setEmoji('💎')
@@ -637,7 +664,8 @@ function panelPayload(panel) {
             embeds: [embed('Support prive', 'Pour une demande personnelle, sensible ou qui demande un vrai suivi, ouvre un ticket prive avec le support Sentinel.\n\nUn espace dedie sera cree pour toi et l equipe pourra te repondre proprement.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('sentinel_ticket:create').setLabel('Ouvrir un ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫')
+                    new ButtonBuilder().setCustomId('sentinel_ticket:create').setLabel('Ouvrir un ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫'),
+                    new ButtonBuilder().setCustomId('sentinel_ticket:bug').setLabel('Signaler un bug').setStyle(ButtonStyle.Danger).setEmoji('🚨')
                 )
             ]
         }
@@ -646,7 +674,8 @@ function panelPayload(panel) {
             embeds: [embed('Private Support', 'For a personal, sensitive or follow-up request, open a private ticket with Sentinel support.\n\nA dedicated space will be created for you and the team will answer properly.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('sentinel_ticket:create').setLabel('Open a ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫')
+                    new ButtonBuilder().setCustomId('sentinel_ticket:create').setLabel('Open a ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫'),
+                    new ButtonBuilder().setCustomId('sentinel_ticket:bug').setLabel('Report a bug').setStyle(ButtonStyle.Danger).setEmoji('🚨')
                 )
             ]
         }

@@ -36,6 +36,7 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'ping',
     'diagnostic',
     'sync-service',
+    'sync-sentinel',
     'reset-heures',
     'reset-hours',
     'reset-heures-all',
@@ -49,6 +50,7 @@ const ADVANCED_TEXT_COMMANDS = [
     /^!ping$/i,
     /^!diagnostic$/i,
     /^!sync-service$/i,
+    /^!sync-sentinel$/i,
     /^!(reset-heures|reset-hours)(?:\s|$)/i,
     /^!(reset-heures-all|reset-hours-all)$/i,
     /^!(resume-service|summary)$/i
@@ -62,7 +64,9 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'language-buttons-2026-06-15-v5';
+const SENTINEL_BUILD = 'community-suite-2026-06-23-v1';
+let lastSentinelServerSync = null;
+let lastSentinelServerSyncResult = null;
 
 const SUPPORTED_LANGUAGES = new Set(['fr', 'en']);
 const MODERATION_ACTION_LABELS = {
@@ -293,6 +297,7 @@ function resolveCommandName(commandName) {
         ping: 'ping',
         diagnostic: 'diagnostic',
         'sync-service': 'sync-service',
+        'sync-sentinel': 'sync-sentinel',
         'reset-heures': 'reset-heures',
         'reset-hours': 'reset-heures',
         'reset-heures-all': 'reset-heures-all',
@@ -1218,6 +1223,36 @@ function getLogChannel(guild) {
     return guild.channels.cache.get(guildConfig.logChannelId);
 }
 
+function findGuildTextChannel(guild, names) {
+    const possibleNames = Array.isArray(names) ? names : [names];
+
+    return guild.channels.cache.find(channel =>
+        channel.type === ChannelType.GuildText && possibleNames.includes(channel.name)
+    ) || null;
+}
+
+function getSentinelStaffLogChannel(guild) {
+    return findGuildTextChannel(guild, SENTINEL_STAFF_LOG_CHANNELS) || getLogChannel(guild);
+}
+
+async function sendSentinelStaffLog(guild, message) {
+    const channel = getSentinelStaffLogChannel(guild);
+
+    if (!channel) {
+        return;
+    }
+
+    await channel.send(message).catch(() => {});
+}
+
+function getSentinelGeneralChannel(guild, language) {
+    return findGuildTextChannel(guild, SENTINEL_GENERAL_CHANNELS[language] || SENTINEL_GENERAL_CHANNELS.fr);
+}
+
+function getSentinelStatusChannel(guild) {
+    return findGuildTextChannel(guild, SENTINEL_STATUS_CHANNELS);
+}
+
 function getServiceRole(guild) {
     const guildConfig = getGuildConfig(guild.id);
 
@@ -1628,6 +1663,118 @@ function buildSyncServiceEmbed(requester, result) {
         );
 }
 
+function buildSyncSentinelEmbed(guild, requester, result) {
+    const description = result.skipped
+        ? `Synchronisation ignoree : **${result.reason}**.`
+        : `Structure Sentinel synchronisee pour **${guild.name}**.`;
+
+    return createSentinelEmbed({
+        color: result.skipped ? SENTINEL_COLORS.warning : SENTINEL_COLORS.success,
+        title: 'Sentinel | Synchronisation serveur',
+        description,
+        requester
+    }).addFields(
+        {
+            name: 'Creations',
+            value: `**${result.created || 0}**`,
+            inline: true
+        },
+        {
+            name: 'Mises a jour',
+            value: `**${result.updated || 0}**`,
+            inline: true
+        }
+    );
+}
+
+async function runSentinelServerSync(guild, requester = client.user) {
+    const result = await syncSentinelServer(client, {
+        enabled: true,
+        guildId: guild.id
+    });
+
+    lastSentinelServerSync = Date.now();
+    lastSentinelServerSyncResult = result;
+    await updateSentinelStatusPanel(guild).catch(() => {});
+    await sendSentinelStaffLog(
+        guild,
+        result.skipped
+            ? `⚠️ Synchronisation Sentinel ignoree : **${result.reason}**.`
+            : `✅ Synchronisation Sentinel terminee : **${result.created}** creation(s), **${result.updated}** mise(s) a jour.`
+    );
+
+    return buildSyncSentinelEmbed(guild, requester, result);
+}
+
+function buildSentinelStatusEmbed(guild, requester = client.user) {
+    let databaseOk = true;
+
+    try {
+        checkDatabase();
+    } catch (error) {
+        databaseOk = false;
+    }
+
+    const syncText = lastSentinelServerSync
+        ? `<t:${Math.floor(lastSentinelServerSync / 1000)}:R>`
+        : 'Pas encore synchronise';
+    const syncDetail = lastSentinelServerSyncResult?.skipped
+        ? `Ignoree : ${lastSentinelServerSyncResult.reason}`
+        : lastSentinelServerSyncResult
+            ? `${lastSentinelServerSyncResult.created} creation(s), ${lastSentinelServerSyncResult.updated} mise(s) a jour`
+            : 'En attente';
+
+    return createSentinelEmbed({
+        color: databaseOk ? SENTINEL_COLORS.success : SENTINEL_COLORS.warning,
+        title: 'Sentinel | Statut',
+        description: `Etat technique de **${guild.name}**.`,
+        requester
+    }).addFields(
+        {
+            name: 'Bot',
+            value: `En ligne\nLatence Discord : **${client.ws.ping}ms**\nBuild : \`${SENTINEL_BUILD}\``,
+            inline: false
+        },
+        {
+            name: 'SQLite',
+            value: databaseOk ? 'OK - base disponible' : 'A verifier - base indisponible',
+            inline: true
+        },
+        {
+            name: 'Derniere synchronisation',
+            value: `${syncText}\n${syncDetail}`,
+            inline: true
+        }
+    );
+}
+
+async function updateSentinelStatusPanel(guild) {
+    const channel = getSentinelStatusChannel(guild);
+
+    if (!channel) {
+        return;
+    }
+
+    const payload = { embeds: [buildSentinelStatusEmbed(guild)] };
+    const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+    const botMessage = messages?.find(message => message.author.id === client.user.id);
+
+    if (botMessage) {
+        await botMessage.edit(payload).catch(() => {});
+        return;
+    }
+
+    await channel.send(payload).catch(() => {});
+}
+
+async function updateAllSentinelStatusPanels() {
+    for (const guild of client.guilds.cache.values()) {
+        await updateSentinelStatusPanel(guild).catch(error => {
+            console.error('Erreur mise a jour statut Sentinel :', error);
+        });
+    }
+}
+
 function buildTopWeekEmbed(requester, classement) {
     if (classement.length === 0) {
         return null;
@@ -1753,7 +1900,7 @@ function buildHelpEmbed(guild, requester) {
                     '`/hours member` or `!hours @member`',
                     '`/top-week` or `!top-week`',
                     '`/summary` or `!summary`',
-                    '`/diagnostic`, `/sync-service`, `/reset-hours`, `/reset-hours-all`, `/ping`'
+                    '`/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-hours`, `/reset-hours-all`, `/ping`'
                 ].join('\n'),
                 inline: false
             });
@@ -1897,6 +2044,7 @@ function buildHelpEmbed(guild, requester) {
                 '`/historique-service [membre] [limite]` ou `!historique-service [@membre] [limite]`',
                 '`/diagnostic` ou `!diagnostic`',
                 '`/sync-service` ou `!sync-service`',
+                '`/sync-sentinel` ou `!sync-sentinel`',
                 '`/reset-heures membre` ou `!reset-heures @membre`',
                 '`/reset-heures-all` ou `!reset-heures-all`',
                 '`/ping` ou `!ping`',
@@ -1980,6 +2128,7 @@ function parseResetGuildConfirmation(customId) {
 
 const SENTINEL_SELF_ROLES = {
     announcements: '📡 Sentinel | Annonces',
+    maintenance: '🛠 Sentinel | Maintenance',
     changelog: '🧬 Sentinel | Journal dev',
     beta: '⚡ Sentinel | Acces anticipe',
     partner: '💎 Sentinel | Partenaire'
@@ -1996,6 +2145,21 @@ const SENTINEL_STAFF_ROLES = [
     '◇ Sentinel | Moderateur',
     '✚ Sentinel | Support'
 ];
+
+const SENTINEL_GENERAL_CHANNELS = {
+    fr: ['💬｜general'],
+    en: ['💬｜general-en']
+};
+
+const SENTINEL_STATUS_CHANNELS = ['📌｜statut-sentinel', '📌｜sentinel-status'];
+const SENTINEL_STAFF_LOG_CHANNELS = ['📂｜logs'];
+
+const SENTINEL_VOTE_LABELS = {
+    stability: { fr: 'Stabilite', en: 'Stability' },
+    features: { fr: 'Fonctions', en: 'Features' },
+    moderation: { fr: 'Moderation', en: 'Moderation' },
+    ux: { fr: 'Ergonomie', en: 'Usability' }
+};
 
 function findRoleByName(guild, roleName) {
     return guild.roles.cache.find(role => role.name === roleName) || null;
@@ -2115,6 +2279,20 @@ async function handleSentinelLanguageButton(interaction) {
         ({ member, selectedRole } = await applySentinelLanguageToMember(guild, interaction.user.id, language));
 
         console.log(`Langue Sentinel appliquee : ${language} pour ${interaction.user.tag} (${interaction.user.id})`);
+        await sendSentinelStaffLog(
+            guild,
+            `🌐 Langue Sentinel : ${interaction.user} a choisi **${language === 'fr' ? 'Francais' : 'English'}**.`
+        );
+
+        const generalChannel = getSentinelGeneralChannel(guild, language);
+
+        if (generalChannel) {
+            await generalChannel.send(
+                language === 'fr'
+                    ? `Bienvenue ${interaction.user} dans la communaute Sentinel.`
+                    : `Welcome ${interaction.user} to the Sentinel community.`
+            ).catch(() => {});
+        }
     } catch (error) {
         console.error('Erreur bouton langue Sentinel :', error);
 
@@ -2190,10 +2368,12 @@ async function applySentinelLanguageToMember(guild, userId, language) {
 
 async function handleSentinelTicketButton(interaction) {
     await interaction.guild.channels.fetch();
+    const ticketType = interaction.customId === 'sentinel_ticket:bug' ? 'bug' : 'support';
+    const ticketLabel = ticketType === 'bug' ? 'bug' : 'support';
 
     const existingTicket = interaction.guild.channels.cache.find(channel =>
         channel.type === ChannelType.GuildText
-        && channel.topic === `sentinel-ticket:${interaction.user.id}`
+        && channel.topic?.startsWith(`sentinel-ticket:${interaction.user.id}`)
     );
 
     if (existingTicket) {
@@ -2208,18 +2388,27 @@ async function handleSentinelTicketButton(interaction) {
         'SENTINEL // SUPPORT'
     ]);
     const ticketChannel = await interaction.guild.channels.create({
-        name: `ticket-${sanitizeTicketName(interaction.user.username)}`,
+        name: `${ticketLabel}-${sanitizeTicketName(interaction.user.username)}`,
         type: ChannelType.GuildText,
         parent: supportCategory?.id || null,
-        topic: `sentinel-ticket:${interaction.user.id}`,
+        topic: `sentinel-ticket:${interaction.user.id}:${ticketType}`,
         permissionOverwrites: buildTicketOverwrites(interaction.guild, interaction.member),
-        reason: 'Creation ticket Sentinel'
+        reason: `Creation ticket Sentinel ${ticketType}`
     });
 
-    const embed = new EmbedBuilder()
-        .setColor(SENTINEL_COLORS.primary)
-        .setTitle('Ticket Sentinel')
-        .setDescription([
+    const description = ticketType === 'bug'
+        ? [
+            `${interaction.user}, merci de completer le signalement avec le plus de precision possible.`,
+            '',
+            '**Commande ou fonction concernee :**',
+            '**Ce que tu as fait :**',
+            '**Resultat obtenu :**',
+            '**Resultat attendu :**',
+            '**Capture, message d erreur ou contexte :**',
+            '',
+            'Le support analysera le bug des que possible.'
+        ]
+        : [
             `${interaction.user}, explique ta demande clairement.`,
             '',
             '- probleme ou question',
@@ -2227,7 +2416,11 @@ async function handleSentinelTicketButton(interaction) {
             '- capture ou message d erreur si disponible',
             '',
             'Le support te repondra des que possible.'
-        ].join('\n'))
+        ];
+    const embed = new EmbedBuilder()
+        .setColor(ticketType === 'bug' ? SENTINEL_COLORS.danger : SENTINEL_COLORS.primary)
+        .setTitle(ticketType === 'bug' ? 'Ticket Sentinel | Bug' : 'Ticket Sentinel | Support')
+        .setDescription(description.join('\n'))
         .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
@@ -2243,6 +2436,7 @@ async function handleSentinelTicketButton(interaction) {
         embeds: [embed],
         components: [row]
     });
+    await sendSentinelStaffLog(interaction.guild, `🎫 Ticket Sentinel ouvert : ${ticketChannel} par ${interaction.user} (${ticketType}).`);
 
     return interaction.reply({
         content: `Ticket cree : ${ticketChannel}`,
@@ -2272,10 +2466,33 @@ async function handleSentinelTicketCloseButton(interaction) {
         content: 'Ticket ferme. Suppression dans quelques secondes...',
         flags: MessageFlags.Ephemeral
     });
+    await sendSentinelStaffLog(interaction.guild, `🔒 Ticket Sentinel ferme : **${interaction.channel.name}** par ${interaction.user}.`);
 
     setTimeout(() => {
         interaction.channel?.delete('Fermeture ticket Sentinel').catch(() => {});
     }, 3000);
+}
+
+async function handleSentinelVoteButton(interaction) {
+    const voteKey = interaction.customId.split(':')[1];
+    const labels = SENTINEL_VOTE_LABELS[voteKey];
+
+    if (!labels) {
+        return interaction.reply({
+            content: 'Vote Sentinel inconnu.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    await sendSentinelStaffLog(
+        interaction.guild,
+        `🗳 Vote priorite Sentinel : ${interaction.user} a vote **${labels.fr} / ${labels.en}**.`
+    );
+
+    return interaction.reply({
+        content: `Vote enregistre : **${labels.fr}**. Merci pour ton retour.`,
+        flags: MessageFlags.Ephemeral
+    });
 }
 
 async function getMemberOption(interaction, optionName) {
@@ -2781,15 +2998,20 @@ client.once(Events.ClientReady, async () => {
 
     try {
         const syncResult = await syncSentinelServer(client);
+        lastSentinelServerSync = Date.now();
+        lastSentinelServerSyncResult = syncResult;
 
         if (syncResult.skipped) {
             console.log(`Synchronisation serveur Sentinel ignoree : ${syncResult.reason}`);
         } else {
             console.log(`Synchronisation serveur Sentinel terminee : ${syncResult.created} creation(s), ${syncResult.updated} mise(s) a jour.`);
         }
+        await updateAllSentinelStatusPanels();
     } catch (error) {
         console.error('Erreur synchronisation serveur Sentinel :', error);
     }
+
+    setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
 });
 
 client.on(Events.Error, error => {
@@ -3070,6 +3292,27 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
+        if (commandName === 'sync-sentinel') {
+            if (!hasCommandRoleAccess(interaction.member)) {
+                return interaction.reply({
+                    content: getCommandRoleAccessDeniedMessage(language),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+            try {
+                const embed = await runSentinelServerSync(interaction.guild, interaction.user);
+
+                return interaction.editReply({ embeds: [embed] });
+            } catch (error) {
+                console.error('Erreur sync-sentinel :', error);
+
+                return interaction.editReply('Impossible de synchroniser la structure Sentinel pour le moment.');
+            }
+        }
+
         if (commandName === 'historique-service') {
             const requestedMember = interaction.options.getMember('membre');
             const isAdvancedServer = isAdvancedGuild(guildId);
@@ -3323,8 +3566,16 @@ client.on(Events.InteractionCreate, async interaction => {
         return handleSentinelButton(interaction, handleSentinelTicketButton);
     }
 
+    if (interaction.customId === 'sentinel_ticket:bug') {
+        return handleSentinelButton(interaction, handleSentinelTicketButton);
+    }
+
     if (interaction.customId === 'sentinel_ticket:close') {
         return handleSentinelButton(interaction, handleSentinelTicketCloseButton);
+    }
+
+    if (interaction.customId.startsWith('sentinel_vote:')) {
+        return handleSentinelButton(interaction, handleSentinelVoteButton);
     }
 
     if (interaction.customId !== 'toggle_service') return;
@@ -3401,6 +3652,25 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
     }
+});
+
+client.on(Events.MessageDelete, async message => {
+    if (!message.guild || message.author?.bot) {
+        return;
+    }
+
+    const content = message.content
+        ? message.content.replace(/\s+/g, ' ').slice(0, 400)
+        : 'Contenu indisponible';
+
+    await sendSentinelStaffLog(
+        message.guild,
+        [
+            `🧹 Message supprime dans ${message.channel || 'un salon inconnu'}.`,
+            `Auteur : ${message.author ? `${message.author.tag} (${message.author.id})` : 'inconnu'}`,
+            `Contenu : ${content}`
+        ].join('\n')
+    );
 });
 
 client.on(Events.MessageCreate, async message => {
@@ -3581,6 +3851,24 @@ client.on(Events.MessageCreate, async message => {
         });
 
         return message.reply({ embeds: [embed] });
+    }
+
+    if (content === '!sync-sentinel') {
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        const pendingMessage = await message.reply('Synchronisation Sentinel en cours...');
+
+        try {
+            const embed = await runSentinelServerSync(message.guild, message.author);
+
+            return pendingMessage.edit({ content: null, embeds: [embed] });
+        } catch (error) {
+            console.error('Erreur sync-sentinel texte :', error);
+
+            return pendingMessage.edit('Impossible de synchroniser la structure Sentinel pour le moment.');
+        }
     }
 
     if (/^!(mes-heures|my-hours)$/i.test(content)) {
