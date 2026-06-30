@@ -14,6 +14,15 @@ const COLORS = {
     dark: 0x101018
 };
 
+const LINKS = {
+    website: 'https://phileaszer.github.io/bot-service-discord/',
+    topgg: 'https://top.gg/bot/1511426423376842922',
+    invite: 'https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands',
+    github: 'https://github.com/phileaszer/bot-service-discord',
+    terms: 'https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md',
+    privacy: 'https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md'
+};
+
 const ROLES = [
     { name: '✦ Sentinel | Fondateur', color: COLORS.pink, hoist: true },
     { name: '◆ Sentinel | Administrateur', color: 0xd91b7d, hoist: true },
@@ -511,22 +520,22 @@ function panelPayload(panel) {
             embeds: [embed('Reglement Sentinel', '**Respect**\nChaque membre doit pouvoir discuter sans pression, provocation ou attaque personnelle.\n\n**Lisibilite**\nLes salons restent propres : pas de spam, flood, mentions abusives ou messages volontairement confus.\n\n**Securite**\nLes failles, abus ou comportements suspects autour de Sentinel se signalent au staff en prive.\n\n**Support**\nLes demandes claires passent plus vite : contexte, commande concernee, capture ou erreur si possible.\n\n**Esprit du serveur**\nPerformance, securite, fiabilite. On garde une communaute utile, calme et bien tenue.', COLORS.cyan)]
         },
         presentation: {
-            embeds: [embed('Sentinel', 'Sentinel est un bot Discord pense pour les serveurs qui veulent rester organises, lisibles et fiables.\n\nIl accompagne la gestion des services, les logs, le support, la moderation et l activite communautaire avec une identite cyber-neon : noir profond, rose Sentinel et cyan electrique.\n\nPerformance. Securite. Fiabilite.', COLORS.pink)]
+            embeds: [embed('Sentinel', `Sentinel est un bot Discord pense pour les serveurs qui veulent rester organises, lisibles et fiables.\n\nIl accompagne la gestion des services, les logs, le support, la moderation, les tickets, la structuration communautaire et le suivi d activite avec une identite cyber-neon : noir profond, rose Sentinel et cyan electrique.\n\nSite officiel : ${LINKS.website}\nPage top.gg : ${LINKS.topgg}\n\nPerformance. Securite. Fiabilite.`, COLORS.pink)]
         },
         announcements: {
             embeds: [embed('Annonces Sentinel', 'Les informations importantes arrivent ici : mises a jour, changements du bot, maintenance, ouvertures de tests et annonces communautaires.\n\nQuand un message apparait dans ce salon, c est qu il merite ton attention.', COLORS.pink)]
         },
         changelog: {
-            embeds: [embed('Journal dev Sentinel', 'Ce salon suit le travail continu autour de Sentinel.\n\nTu y verras les evolutions en cours, les ajustements techniques, les corrections preparees et les changements qui ne sont pas encore forcement une version officielle.', COLORS.violet)]
+            embeds: [embed('Journal dev Sentinel', 'Ce salon suit le travail continu autour de Sentinel.\n\nDernieres lignes de travail :\n- serveur communautaire complet avec roles, tickets et salons bilingues\n- choix de langue par boutons FR/EN\n- serveur de reference sans limite premium\n- publication du site Sentinel sur top.gg\n- outil interne de publication Discord depuis le clavardage de reference\n\nLes entrees ici servent a suivre ce qui evolue avant les notes de version officielles.', COLORS.violet)]
         },
         resources: {
-            embeds: [embed('Ressources Sentinel', 'Les liens utiles de Sentinel sont regroupes ici : invitation du bot, documentation, GitHub, guides, journal dev et informations importantes.\n\nUn point de depart simple pour retrouver ce dont tu as besoin.', COLORS.cyan)]
+            embeds: [embed('Ressources Sentinel', `Tous les liens utiles de Sentinel sont regroupes ici.\n\n**Liens officiels**\nSite : ${LINKS.website}\nTop.gg : ${LINKS.topgg}\nInvitation du bot : ${LINKS.invite}\nGitHub : ${LINKS.github}\nConditions : ${LINKS.terms}\nConfidentialite : ${LINKS.privacy}\n\n**A consulter selon ton besoin**\n- annonces : informations importantes\n- journal dev : suivi technique continu\n- notes de version : changements publics finalises\n- FAQ : installation, permissions, langue, support\n- tickets : aide privee ou signalement de bug`, COLORS.cyan)]
         },
         faq: {
             embeds: [embed('FAQ Sentinel', '**Comment inviter Sentinel ?**\nUtilise le lien officiel fourni par le staff. Le bot doit avoir les scopes `bot` et `applications.commands`.\n\n**Quelles permissions sont importantes ?**\nSentinel doit pouvoir gerer les roles, lire les salons utiles, envoyer des messages, creer des tickets et lire l historique des messages.\n\n**Les boutons de langue ne changent pas ma vue staff, pourquoi ?**\nLes comptes administrateurs ou staff peuvent voir plusieurs versions du serveur car Discord leur donne des permissions plus larges.\n\n**Ou demander de l aide ?**\nUtilise les salons support ou ouvre un ticket si la demande est personnelle, sensible ou technique.\n\n**Ou suivre les mises a jour ?**\nLes annonces donnent les informations importantes. Le journal dev suit le travail continu. Les notes de version resument les sorties officielles.', COLORS.cyan)]
         },
         status: {
-            embeds: [embed('Statut Sentinel', '**Etat actuel :** operationnel\n\nCe panneau est mis a jour automatiquement par Sentinel avec la latence, la base SQLite et la derniere synchronisation connue.\n\nLes maintenances, incidents, ralentissements et redemarrages importants seront annonces ici.', COLORS.cyan)]
+            embeds: [embed('Statut Sentinel', `**Etat actuel :** operationnel\n\nSentinel est publie et accessible via ses points officiels :\nSite : ${LINKS.website}\nTop.gg : ${LINKS.topgg}\nGitHub : ${LINKS.github}\n\nCe panneau est ensuite mis a jour automatiquement par le bot avec la latence, SQLite et la derniere synchronisation connue.\n\nLes maintenances, incidents, ralentissements et redemarrages importants seront annonces ici.`, COLORS.cyan)]
         },
         priorityVotes: {
             embeds: [embed('Votes priorites Sentinel', 'Choisis ce qui doit passer en priorite pour Sentinel.\n\nChaque bouton enregistre ton intention dans les logs staff. Les votes servent a sentir la direction de la communaute, pas a verrouiller la roadmap.', COLORS.violet)],
@@ -543,28 +552,28 @@ function panelPayload(panel) {
             embeds: [embed('Suggestions Sentinel', 'Les idees pour ameliorer Sentinel passent ici.\n\nTu peux proposer une commande, une option, une integration, une amelioration visuelle ou un changement de fonctionnement. Les meilleures idees sont celles qui rendent le bot plus utile pour toute la communaute.', COLORS.violet)]
         },
         support: {
-            embeds: [embed('Aide installation', 'Besoin d aide pour inviter Sentinel, regler les permissions, configurer un salon ou comprendre une commande ?\n\nEnvoie ton probleme avec le plus de contexte possible : ce que tu voulais faire, ce qui bloque, et le message d erreur si tu en as un.', COLORS.dark)]
+            embeds: [embed('Aide installation', `Besoin d aide pour inviter Sentinel, regler les permissions, configurer un salon ou comprendre une commande ?\n\n**Avant de demander**\n1. Verifie que Sentinel est installe comme bot, pas seulement comme integration de commandes.\n2. Place le role Sentinel au-dessus des roles qu il doit gerer.\n3. Verifie que les scopes \`bot\` et \`applications.commands\` sont presents.\n4. Utilise le lien officiel : ${LINKS.invite}\n\n**Pour recevoir de l aide rapidement**\nIndique ce que tu voulais faire, la commande ou le bouton concerne, ce qui bloque, et le message d erreur si tu en as un.`, COLORS.dark)]
         },
         bugs: {
-            embeds: [embed('Signalement de bugs', 'Si Sentinel ne reagit pas comme prevu, tu peux le signaler ici.\n\nAjoute la commande ou la fonction concernee, ce que tu as fait, le resultat obtenu et une capture si possible. Plus le signalement est clair, plus la correction est rapide.', COLORS.dark)]
+            embeds: [embed('Signalement de bugs', 'Si Sentinel ne reagit pas comme prevu, signale-le ici ou ouvre un ticket bug.\n\n**Format conseille**\nCommande ou fonction :\nCe que tu as fait :\nResultat obtenu :\nResultat attendu :\nCapture ou message d erreur :\n\nLes bugs de boutons, permissions, tickets, langues, logs et commandes sont prioritaires sur le serveur de reference.', COLORS.dark)]
         },
         commands: {
-            embeds: [embed('Commandes Sentinel', 'Les commandes principales de Sentinel sont disponibles directement avec `/`.\n\n`/mes-heures` pour consulter ton temps, `/top-service` pour le classement, `/config-voir` pour la configuration, et les commandes admin pour regler les roles, logs et resets.', COLORS.cyan)]
+            embeds: [embed('Commandes Sentinel', 'Les commandes principales de Sentinel sont disponibles avec `/` et plusieurs alias texte.\n\n**Membres**\n`/aide`, `/mes-heures`, `/historique-service`, `/en-service`, `/top-service`\n\n**Serveur de reference**\n`/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-heures`, `/reset-heures-all`\n\n**Moderation**\n`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`, `/sanctions`\n\n**Configuration**\n`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir`, `/config-langue`', COLORS.cyan)]
         },
         supportRequests: {
-            embeds: [embed('Demandes support', 'Les demandes qui demandent un suivi avec le support Sentinel peuvent etre posees ici.\n\nPour une question privee ou sensible, ouvre plutot un ticket dans le salon dedie.', COLORS.dark)]
+            embeds: [embed('Demandes support', 'Les demandes qui demandent un suivi avec le support Sentinel peuvent etre posees ici.\n\nUtilise ce salon pour les questions simples. Pour une demande privee, sensible, longue ou liee a un bug, ouvre un ticket dans le salon dedie.\n\nLe support peut aider sur : installation, permissions, roles, logs, commandes, serveur de reference, top.gg, site officiel et publication Discord.', COLORS.dark)]
         },
         roadmap: {
-            embeds: [embed('Roadmap Sentinel', 'La roadmap donne une vision des prochaines directions de Sentinel : nouvelles fonctions, ameliorations de stabilite, outils de moderation, ergonomie et integrations.\n\nRien n est fige, mais chaque avancee rapproche le bot d une experience plus propre et plus solide.', COLORS.violet)]
+            embeds: [embed('Roadmap Sentinel', 'Priorites actuelles :\n\n**Court terme**\n- stabiliser les boutons et tickets\n- enrichir les panneaux de ressources et statut\n- publier les annonces depuis le clavardage de reference\n- ameliorer la documentation publique\n\n**Moyen terme**\n- statistiques de service plus detaillees\n- meilleurs rapports de moderation\n- workflow de release notes plus propre\n- verification continue des permissions\n\n**Long terme**\n- integrations externes utiles\n- tableau de bord web\n- automatisations de communaute plus fines', COLORS.violet)]
         },
         beta: {
-            embeds: [embed('Beta tests', 'Les tests avances de Sentinel passent ici.\n\nLes fonctionnalites presentees peuvent changer, etre corrigees ou disparaitre avant leur sortie officielle. Les retours precis sont les plus utiles.', COLORS.cyan)]
+            embeds: [embed('Beta tests', 'Les tests avances de Sentinel passent ici.\n\nA tester en priorite :\n- boutons de langue et roles\n- ouverture/fermeture de tickets support et bug\n- votes priorites\n- commandes avancees du serveur de reference\n- publication annonce/changelog/release depuis le clavardage\n- panneaux statut et ressources\n\nLes retours precis sont les plus utiles : action faite, resultat obtenu, resultat attendu, capture si possible.', COLORS.cyan)]
         },
         futureIdeas: {
-            embeds: [embed('Idees futures', 'Cet espace sert a imaginer la suite de Sentinel.\n\nConcepts, envies, automatisations, integrations, interfaces, moderation, premium : tout ce qui peut rendre le bot plus fort peut commencer ici.', COLORS.violet)]
+            embeds: [embed('Idees futures', 'Cet espace sert a imaginer la suite de Sentinel.\n\nPistes ouvertes : tableau de bord web, meilleure page top.gg, systeme de templates serveur, analytics de service, assistants de configuration, notifications de maintenance, workflows de publication et outils staff plus pousses.\n\nUne bonne idee explique le probleme, l utilisateur concerne, et ce que Sentinel devrait simplifier.', COLORS.violet)]
         },
         patchNotes: {
-            embeds: [embed('Notes de version', 'Les notes de version resument ce qui change concretement pour les utilisateurs.\n\nQuand une version sort, tu retrouves ici les ajouts importants, corrections visibles, changements de commandes et informations a retenir.', COLORS.pink)]
+            embeds: [embed('Notes de version', 'Version serveur de reference actuelle :\n\n- site officiel publie\n- page top.gg publiee\n- serveur communautaire bilingue FR/EN\n- boutons de langue fonctionnels\n- tickets support et bug\n- votes priorites\n- salon staff de tests bot\n- toutes les commandes actives sur le serveur de reference\n- outil de publication Discord depuis le clavardage de reference\n\nLes prochaines notes reprendront uniquement les changements finalises.', COLORS.pink)]
         },
         rulesEn: {
             embeds: [embed('Sentinel Rules', '**Respect**\nEvery member should be able to talk without pressure, provocation or personal attacks.\n\n**Clarity**\nKeep channels readable: no spam, flood, abusive mentions or intentionally confusing messages.\n\n**Security**\nReport suspicious behavior, abuse or Sentinel security issues privately to the staff.\n\n**Support**\nClear requests are handled faster: context, command involved, screenshot or error when possible.\n\n**Server spirit**\nPerformance, security, reliability. Keep the community useful, calm and clean.', COLORS.cyan)]
@@ -573,19 +582,19 @@ function panelPayload(panel) {
             embeds: [embed('Sentinel Announcements', 'Important information appears here: updates, bot changes, maintenance, testing openings and community announcements.\n\nWhen a message appears in this channel, it is worth your attention.', COLORS.pink)]
         },
         presentationEn: {
-            embeds: [embed('Sentinel', 'Sentinel is a Discord bot designed for servers that want to stay organized, readable and reliable.\n\nIt supports service management, logs, support, moderation and community activity with a cyber-neon identity: deep black, Sentinel pink and electric cyan.\n\nPerformance. Security. Reliability.', COLORS.pink)]
+            embeds: [embed('Sentinel', `Sentinel is a Discord bot designed for servers that want to stay organized, readable and reliable.\n\nIt supports duty tracking, logs, support, moderation, tickets, community structure and activity tracking with a cyber-neon identity: deep black, Sentinel pink and electric cyan.\n\nOfficial website: ${LINKS.website}\nTop.gg page: ${LINKS.topgg}\n\nPerformance. Security. Reliability.`, COLORS.pink)]
         },
         changelogEn: {
-            embeds: [embed('Sentinel Dev Log', 'This channel follows the continuous work around Sentinel.\n\nYou will find ongoing changes, technical adjustments, prepared fixes and updates that are not necessarily an official release yet.', COLORS.violet)]
+            embeds: [embed('Sentinel Dev Log', 'This channel follows continuous Sentinel work.\n\nRecent work lines:\n- full community server with roles, tickets and bilingual channels\n- FR/EN language button flow\n- reference server without premium restrictions\n- Sentinel website published on top.gg\n- internal Discord publishing tool from the reference chat\n\nEntries here track work before official release notes.', COLORS.violet)]
         },
         resourcesEn: {
-            embeds: [embed('Sentinel Resources', 'Useful Sentinel links are gathered here: bot invite, documentation, GitHub, guides, changelog and important information.\n\nA simple starting point whenever you need a reference.', COLORS.cyan)]
+            embeds: [embed('Sentinel Resources', `All useful Sentinel links are gathered here.\n\n**Official links**\nWebsite: ${LINKS.website}\nTop.gg: ${LINKS.topgg}\nBot invite: ${LINKS.invite}\nGitHub: ${LINKS.github}\nTerms: ${LINKS.terms}\nPrivacy: ${LINKS.privacy}\n\n**Where to look**\n- announcements: important information\n- dev log: continuous technical tracking\n- release notes: finalized public changes\n- FAQ: setup, permissions, language and support\n- tickets: private help or bug reports`, COLORS.cyan)]
         },
         faqEn: {
             embeds: [embed('Sentinel FAQ', '**How do I invite Sentinel?**\nUse the official invite link shared by the staff. The bot needs the `bot` and `applications.commands` scopes.\n\n**Which permissions matter?**\nSentinel needs to manage roles, read useful channels, send messages, create tickets and read message history.\n\n**Why can staff accounts still see both languages?**\nAdministrator and staff accounts can bypass some channel filters because Discord gives them broader permissions.\n\n**Where do I ask for help?**\nUse support channels or open a ticket for personal, sensitive or technical requests.\n\n**Where do I follow updates?**\nAnnouncements carry important information. The dev log tracks ongoing work. Release notes summarize official releases.', COLORS.cyan)]
         },
         statusEn: {
-            embeds: [embed('Sentinel Status', '**Current status:** operational\n\nThis panel is automatically updated by Sentinel with latency, SQLite status and the latest known sync.\n\nMaintenance, incidents, slowdowns and important restarts will be announced here.', COLORS.cyan)]
+            embeds: [embed('Sentinel Status', `**Current status:** operational\n\nSentinel is published and available through its official points:\nWebsite: ${LINKS.website}\nTop.gg: ${LINKS.topgg}\nGitHub: ${LINKS.github}\n\nThis panel is then automatically updated by the bot with latency, SQLite status and the latest known sync.\n\nMaintenance, incidents, slowdowns and important restarts will be announced here.`, COLORS.cyan)]
         },
         priorityVotesEn: {
             embeds: [embed('Sentinel Priority Votes', 'Choose what Sentinel should prioritize next.\n\nEach button records your intent in staff logs. Votes help read the community direction; they do not freeze the roadmap.', COLORS.violet)],
@@ -602,28 +611,28 @@ function panelPayload(panel) {
             embeds: [embed('Sentinel Suggestions', 'Ideas to improve Sentinel go here.\n\nYou can suggest a command, option, integration, visual improvement or behavior change. The best ideas make the bot more useful for the whole community.', COLORS.violet)]
         },
         supportEn: {
-            embeds: [embed('Setup Help', 'Need help inviting Sentinel, setting permissions, configuring a channel or understanding a command?\n\nSend your issue with as much context as possible: what you wanted to do, what is blocking you, and the error message if you have one.', COLORS.dark)]
+            embeds: [embed('Setup Help', `Need help inviting Sentinel, setting permissions, configuring a channel or understanding a command?\n\n**Before asking**\n1. Make sure Sentinel is installed as a bot, not only as a command integration.\n2. Place the Sentinel role above the roles it has to manage.\n3. Make sure the \`bot\` and \`applications.commands\` scopes are present.\n4. Use the official invite link: ${LINKS.invite}\n\n**For faster help**\nExplain what you wanted to do, the command or button involved, what is blocking you and the error message if you have one.`, COLORS.dark)]
         },
         bugsEn: {
-            embeds: [embed('Bug Reports', 'If Sentinel does not behave as expected, report it here.\n\nInclude the command or feature involved, what you did, what happened and a screenshot if possible. Clear reports make fixes faster.', COLORS.dark)]
+            embeds: [embed('Bug Reports', 'If Sentinel does not behave as expected, report it here or open a bug ticket.\n\n**Suggested format**\nCommand or feature:\nWhat you did:\nActual result:\nExpected result:\nScreenshot or error message:\n\nButton, permission, ticket, language, log and command bugs are prioritized on the reference server.', COLORS.dark)]
         },
         commandsEn: {
-            embeds: [embed('Sentinel Commands', 'Sentinel main commands are available directly with `/`.\n\nUse `/mes-heures` to check your time, `/top-service` for the leaderboard, `/config-voir` for configuration, and admin commands for roles, logs and resets.', COLORS.cyan)]
+            embeds: [embed('Sentinel Commands', 'Sentinel main commands are available with `/` and several text aliases.\n\n**Members**\n`/help`, `/my-hours`, `/history`, `/on-duty`, `/top-service`\n\n**Reference server**\n`/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-hours`, `/reset-hours-all`\n\n**Moderation**\n`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`, `/mod-cases`\n\n**Configuration**\n`/config-role`, `/config-channel`, `/config-permissions`, `/config-view`, `/language`', COLORS.cyan)]
         },
         supportRequestsEn: {
-            embeds: [embed('Support Requests', 'Requests that need Sentinel support follow-up can be posted here.\n\nFor private or sensitive issues, open a ticket in the dedicated channel.', COLORS.dark)]
+            embeds: [embed('Support Requests', 'Requests that need Sentinel support follow-up can be posted here.\n\nUse this channel for simple questions. For private, sensitive, long or bug-related requests, open a ticket in the dedicated channel.\n\nSupport can help with setup, permissions, roles, logs, commands, the reference server, top.gg, the official website and Discord publishing.', COLORS.dark)]
         },
         roadmapEn: {
-            embeds: [embed('Sentinel Roadmap', 'The roadmap gives a view of Sentinel next directions: new features, stability improvements, moderation tools, usability and integrations.\n\nNothing is frozen, but every step brings the bot closer to a cleaner and stronger experience.', COLORS.violet)]
+            embeds: [embed('Sentinel Roadmap', 'Current priorities:\n\n**Short term**\n- stabilize buttons and tickets\n- enrich resources and status panels\n- publish announcements from the reference chat\n- improve public documentation\n\n**Mid term**\n- deeper duty statistics\n- better moderation reports\n- cleaner release note workflow\n- continuous permission checks\n\n**Long term**\n- useful external integrations\n- web dashboard\n- server template automation\n- sharper staff tools', COLORS.violet)]
         },
         betaEn: {
-            embeds: [embed('Beta Tests', 'Advanced Sentinel tests happen here.\n\nFeatures shown here may change, be fixed or disappear before public release. Precise feedback is the most useful.', COLORS.cyan)]
+            embeds: [embed('Beta Tests', 'Advanced Sentinel tests happen here.\n\nPriority checks:\n- language buttons and roles\n- support and bug ticket open/close flow\n- priority votes\n- reference server advanced commands\n- announcement/changelog/release publishing from the reference chat\n- status and resources panels\n\nPrecise feedback is best: action, actual result, expected result, screenshot if possible.', COLORS.cyan)]
         },
         futureIdeasEn: {
-            embeds: [embed('Future Ideas', 'This space is for imagining Sentinel future.\n\nConcepts, automations, integrations, interfaces, moderation, premium features: anything that can make the bot stronger can start here.', COLORS.violet)]
+            embeds: [embed('Future Ideas', 'This space is for imagining Sentinel future.\n\nOpen directions: web dashboard, stronger top.gg page, server template system, duty analytics, setup assistants, maintenance notifications, publishing workflows and deeper staff tools.\n\nA strong idea explains the problem, the affected user and what Sentinel should simplify.', COLORS.violet)]
         },
         patchNotesEn: {
-            embeds: [embed('Release Notes', 'Release notes summarize what changes for users.\n\nWhen a version ships, you will find important additions, visible fixes, command changes and key information here.', COLORS.pink)]
+            embeds: [embed('Release Notes', 'Current reference server version:\n\n- official website published\n- top.gg page published\n- bilingual FR/EN community server\n- working language buttons\n- support and bug tickets\n- priority votes\n- staff bot test channel\n- all commands active on the reference server\n- Discord publishing tool from the reference chat\n\nFuture release notes will only list finalized changes.', COLORS.pink)]
         },
         staff: {
             embeds: [embed('Staff Sentinel', 'Coordination interne du staff Sentinel : moderation, support, annonces, priorites et suivi communautaire.', COLORS.dark)]
