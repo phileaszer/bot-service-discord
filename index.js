@@ -25,8 +25,12 @@ const client = new Client({
     ]
 });
 
+const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
 const FREE_HISTORY_LIMIT = 5;
-const ADVANCED_HISTORY_LIMIT = 25;
+const FREE_TOP_LIMIT = 10;
+const REFERENCE_HISTORY_LIMIT = 100;
+const REFERENCE_TOP_LIMIT = 25;
+const ADVANCED_HISTORY_LIMIT = REFERENCE_HISTORY_LIMIT;
 const MAX_TIMEOUT_DURATION = 28 * 24 * 60 * 60 * 1000;
 const ADVANCED_COMMAND_NAMES = new Set([
     'heures',
@@ -424,14 +428,20 @@ function checkDatabase() {
     db.prepare('SELECT 1').get();
 }
 
-function getAdvancedGuildId() {
-    const guildId = String(process.env.GUILD_ID || '').trim();
-
-    return /^\d{17,20}$/.test(guildId) ? guildId : null;
+function getAdvancedGuildIds() {
+    return [
+        SENTINEL_REFERENCE_GUILD_ID,
+        process.env.GUILD_ID,
+        process.env.AUTO_SYNC_GUILD_ID,
+        process.env.SENTINEL_REFERENCE_GUILD_ID
+    ]
+        .flatMap(value => String(value || '').split(','))
+        .map(value => value.trim())
+        .filter(value => /^\d{17,20}$/.test(value));
 }
 
 function isAdvancedGuild(guildId) {
-    return Boolean(guildId && guildId === getAdvancedGuildId());
+    return Boolean(guildId && getAdvancedGuildIds().includes(String(guildId)));
 }
 
 function isAdvancedCommand(commandName) {
@@ -1344,23 +1354,30 @@ function buildMemberHoursEmbed(member, requester, userData) {
     );
 }
 
-function buildTopServiceEmbed(requester, classement) {
+function buildTopServiceEmbed(requester, classement, options = {}) {
     if (classement.length === 0) {
         return null;
     }
 
-    const top10 = classement.slice(0, 10);
+    const displayLimit = options.isReferenceServer ? REFERENCE_TOP_LIMIT : FREE_TOP_LIMIT;
+    const displayedClassement = classement.slice(0, displayLimit);
     const totalServerTime = classement.reduce((acc, user) => acc + user.totalTime, 0);
     const bestUser = classement[0];
 
-    const lines = top10.map((user, index) => (
+    const lines = displayedClassement.map((user, index) => (
         `**${getRankLabel(index)}.** <@${user.userId}> - **${formatDuration(user.totalTime)}**`
     ));
+    const suffix = classement.length > displayedClassement.length
+        ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) classe(s).`
+        : '';
+    const description = options.isReferenceServer
+        ? `${lines.join('\n')}${suffix}`
+        : `${lines.join('\n')}\n\nTop ${FREE_TOP_LIMIT} affiche en version gratuite.`;
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.warning,
         title: 'Sentinel | Classement global',
-        description: `${lines.join('\n')}\n\nTop 10 affiché en version gratuite.`,
+        description,
         requester
     })
         .addFields(
@@ -1783,18 +1800,21 @@ function buildTopWeekEmbed(requester, classement) {
         return null;
     }
 
-    const top10 = classement.slice(0, 10);
+    const displayedClassement = classement.slice(0, REFERENCE_TOP_LIMIT);
     const totalWeekTime = classement.reduce((acc, user) => acc + user.totalTime, 0);
     const bestUser = classement[0];
 
-    const lines = top10.map((user, index) => (
+    const lines = displayedClassement.map((user, index) => (
         `**${getRankLabel(index)}.** <@${user.userId}> - **${formatDuration(user.totalTime)}**`
     ));
+    const suffix = classement.length > displayedClassement.length
+        ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) classe(s).`
+        : '';
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.advanced,
         title: 'Sentinel | Classement hebdomadaire',
-        description: `${lines.join('\n')}\n\nClassement avancé réservé au serveur configuré.`,
+        description: `${lines.join('\n')}${suffix}`,
         requester
     })
         .addFields(
@@ -1956,6 +1976,7 @@ function buildHelpEmbed(guild, requester) {
         '**Utiliser le panneau**',
         '`Prendre / Quitter` commence ou termine le service. Sentinel calcule la duree, met a jour le total et envoie les logs.'
     ];
+    const isReferenceServer = isAdvancedGuild(guild.id);
     const memberUsage = [
         '**Prendre son service**',
         'Clique sur `Prendre / Quitter`. Sentinel ajoute le role de service.',
@@ -1964,14 +1985,20 @@ function buildHelpEmbed(guild, requester) {
         'Clique sur le meme bouton. Sentinel retire le role et sauvegarde le temps.',
         '',
         '**Consulter ses infos**',
-        '`/mes-heures`, `/historique-service`, `/en-service` et `/top-service` affichent le suivi gratuit.'
+        isReferenceServer
+            ? '`/mes-heures`, `/historique-service`, `/en-service`, `/heures`, `/top-service`, `/top-semaine` et `/resume-service` sont disponibles sur ce serveur de reference.'
+            : '`/mes-heures`, `/historique-service`, `/en-service` et `/top-service` affichent le suivi gratuit.'
     ];
     const commandSummary = [
         '`/aide` - ce guide',
         '`/mes-heures` - tes heures',
-        '`/historique-service` - tes 5 dernieres sessions',
+        isReferenceServer
+            ? '`/historique-service [membre] [limite]` - historique et consultation membre'
+            : '`/historique-service` - tes 5 dernieres sessions',
         '`/en-service` - agents actuellement en service',
-        '`/top-service` - top 10 du serveur',
+        isReferenceServer
+            ? '`/top-service`, `/top-semaine`, `/resume-service` - classements et resume complet'
+            : '`/top-service` - top 10 du serveur',
         '`/reset-heures membre` - remettre les heures d une personne a zero',
         '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration'
     ];
@@ -1985,13 +2012,21 @@ function buildHelpEmbed(guild, requester) {
         '`/sanctions membre` - voir les 10 dernieres sanctions',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
-    const freeLimits = [
-        'Historique visible : 5 dernieres sessions personnelles.',
-        'Classement public : top 10 global.',
-        '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
-        'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
-        'Les options avancees ne sont pas ouvertes publiquement pour le moment.'
-    ];
+    const freeLimits = isReferenceServer
+        ? [
+            'Serveur de reference Sentinel : toutes les commandes du bot sont ouvertes ici.',
+            `Historique consultable jusqu a ${REFERENCE_HISTORY_LIMIT} sessions par demande.`,
+            `Classements affiches jusqu a ${REFERENCE_TOP_LIMIT} agents par panneau.`,
+            '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service` et `/sync-sentinel` sont disponibles.',
+            'Les seules limites restantes sont des limites techniques Discord ou de securite.'
+        ]
+        : [
+            'Historique visible : 5 dernieres sessions personnelles.',
+            'Classement public : top 10 global.',
+            '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
+            'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
+            'Les options avancees ne sont pas ouvertes publiquement pour le moment.'
+        ];
     const troubleshooting = [
         'Sentinel ne donne pas le role ? Remonte son role au-dessus du role de service.',
         'Les logs ne partent pas ? Verifie que Sentinel peut voir et ecrire dans le salon.',
@@ -2025,7 +2060,7 @@ function buildHelpEmbed(guild, requester) {
             inline: false
         },
         {
-            name: 'Commandes gratuites',
+            name: isReferenceServer ? 'Commandes disponibles' : 'Commandes gratuites',
             value: commandSummary.join('\n'),
             inline: false
         },
@@ -2035,7 +2070,7 @@ function buildHelpEmbed(guild, requester) {
             inline: false
         },
         {
-            name: 'Limites gratuites',
+            name: isReferenceServer ? 'Serveur de reference' : 'Limites gratuites',
             value: freeLimits.join('\n'),
             inline: false
         }
@@ -2052,9 +2087,9 @@ function buildHelpEmbed(guild, requester) {
                 '`/diagnostic` ou `!diagnostic`',
                 '`/sync-service` ou `!sync-service`',
                 '`/sync-sentinel` ou `!sync-sentinel`',
-                '`/reset-heures-all` ou `!reset-heures-all` - reserve Premium',
+                '`/reset-heures-all` ou `!reset-heures-all`',
                 '`/ping` ou `!ping`',
-                'Historique complet jusqu’à 25 sessions'
+                `Historique jusqu a ${REFERENCE_HISTORY_LIMIT} sessions par demande`
             ].join('\n'),
             inline: false
         });
@@ -3412,7 +3447,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
         if (commandName === 'top-service') {
             const classement = getTopService(guildId);
-            const embed = buildTopServiceEmbed(interaction.user, classement);
+            const embed = buildTopServiceEmbed(interaction.user, classement, {
+                isReferenceServer: isAdvancedGuild(guildId)
+            });
 
             if (!embed) {
                 return interaction.reply({
@@ -3928,7 +3965,9 @@ client.on(Events.MessageCreate, async message => {
 
     if (content === '!top-service') {
         const classement = getTopService(guildId);
-        const embed = buildTopServiceEmbed(message.author, classement);
+        const embed = buildTopServiceEmbed(message.author, classement, {
+            isReferenceServer: isAdvancedGuild(guildId)
+        });
 
         if (!embed) {
             return message.reply(t(language, 'noTop'));

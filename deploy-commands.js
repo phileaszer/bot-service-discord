@@ -294,7 +294,7 @@ const advancedCommands = [
                 .setDescription('Nombre de sessions a afficher')
                 .setDescriptionLocalizations(en('Number of sessions to show'))
                 .setMinValue(1)
-                .setMaxValue(25)
+                .setMaxValue(100)
                 .setRequired(false)
         )
 ];
