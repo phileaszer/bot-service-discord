@@ -95,6 +95,7 @@ const CHANNELS = [
     { name: '🔮｜future-ideas', category: 'devEn', kind: 'enCommunity', topic: 'Long-term Sentinel ideas', panel: 'futureIdeasEn' },
     { name: '🧾｜release-notes', category: 'devEn', kind: 'enCommunity', topic: 'Public Sentinel release summaries', panel: 'patchNotesEn' },
     { name: '🔒｜staff-chat', category: 'staff', kind: 'staff', topic: 'Coordination privee du staff Sentinel', panel: 'staff' },
+    { name: '🧪｜tests-bot', category: 'staff', kind: 'staff', topic: 'Salon staff reserve aux tests bot Sentinel', panel: 'botTests' },
     { name: '📂｜logs', category: 'staff', kind: 'staff', topic: 'Traces internes et moderation Sentinel', panel: 'logs' },
     { name: '⚠️｜signalements', category: 'staff', kind: 'staff', topic: 'Suivi prive des signalements Sentinel', panel: 'reports' },
     { name: '📌｜todo-staff', category: 'staff', kind: 'staff', topic: 'Taches internes du staff Sentinel', panel: 'todo' }
@@ -626,6 +627,9 @@ function panelPayload(panel) {
         },
         staff: {
             embeds: [embed('Staff Sentinel', 'Coordination interne du staff Sentinel : moderation, support, annonces, priorites et suivi communautaire.', COLORS.dark)]
+        },
+        botTests: {
+            embeds: [embed('Tests bot Sentinel', 'Salon interne reserve aux essais staff.\n\nTu peux tester ici les commandes, boutons, reponses, permissions, tickets et comportements experimentaux sans polluer les salons publics.', COLORS.violet)]
         },
         todo: {
             embeds: [embed('Todo staff', '- Bugs a verifier\n- Suggestions a trier\n- Annonces a preparer\n- Tickets sensibles a suivre\n- Roadmap a mettre a jour', COLORS.dark)]
