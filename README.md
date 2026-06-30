@@ -104,7 +104,6 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 | `/top-semaine` | `/top-week` |
 | `/heures` | `/hours` |
 | `/reset-heures` | `/reset-hours` |
-| `/reset-heures-all` | `/reset-hours-all` |
 | `/resume-service` | `/summary` |
 | `/avertir` | `/warn` |
 | `/timeout` | `/timeout` |
@@ -136,8 +135,6 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!hours @member`
 - `!reset-heures @membre`
 - `!reset-hours @member`
-- `!reset-heures-all`
-- `!reset-hours-all`
 - `!avertir @membre raison`
 - `!warn @member reason`
 - `!timeout @membre 10m raison`
@@ -152,6 +149,17 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!clear 10`
 - `!sanctions @membre`
 - `!mod-cases @member`
+
+## Premium a venir
+
+La reinitialisation globale du serveur sera reservee a Sentinel Premium :
+
+- `/reset-heures-all`
+- `/reset-hours-all`
+- `!reset-heures-all`
+- `!reset-hours-all`
+
+En gratuit, la reinitialisation reste disponible membre par membre avec `/reset-heures membre:@membre` ou `/reset-hours member:@member`.
 
 ## Moderation / Moderation
 

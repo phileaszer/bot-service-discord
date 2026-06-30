@@ -37,8 +37,6 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'diagnostic',
     'sync-service',
     'sync-sentinel',
-    'reset-heures',
-    'reset-hours',
     'reset-heures-all',
     'reset-hours-all',
     'resume-service',
@@ -51,7 +49,6 @@ const ADVANCED_TEXT_COMMANDS = [
     /^!diagnostic$/i,
     /^!sync-service$/i,
     /^!sync-sentinel$/i,
-    /^!(reset-heures|reset-hours)(?:\s|$)/i,
     /^!(reset-heures-all|reset-hours-all)$/i,
     /^!(resume-service|summary)$/i
 ];
@@ -97,6 +94,7 @@ const I18N = {
         installCommandsOnly: 'Le lien utilise a probablement installe uniquement les commandes.',
         reinvite: 'Reinvite Sentinel avec ce lien : {inviteUrl}',
         unavailable: 'Cette commande n’est pas disponible sur ce serveur pour le moment.',
+        resetAllPremiumOnly: '⭐ `/reset-heures-all` sera disponible avec l’abonnement Premium Sentinel. En gratuit, utilise `/reset-heures membre:@membre` pour réinitialiser une seule personne.',
         bootstrapRoles: 'Aucun role configure. En amorcage, le proprietaire, les administrateurs et les membres avec Gerer le serveur ou Gerer les roles peuvent configurer Sentinel.',
         accessDenied: '❌ Tu n’as pas accès à cette commande.\nSi aucun rôle de gestion n’est encore configuré, un membre avec `Administrateur`, `Gérer le serveur` ou `Gérer les rôles` peut lancer `/config-permissions action:ajouter role:@role`.',
         languageSet: '✅ La langue de ce serveur est maintenant le français.',
@@ -170,6 +168,7 @@ const I18N = {
         installCommandsOnly: 'The link used probably installed commands only.',
         reinvite: 'Reinvite Sentinel with this link: {inviteUrl}',
         unavailable: 'This command is not available on this server for now.',
+        resetAllPremiumOnly: '⭐ `/reset-hours-all` will be available with Sentinel Premium. On the free plan, use `/reset-hours member:@member` to reset one person.',
         bootstrapRoles: 'No role configured. During setup, the owner, administrators, and members with Manage Server or Manage Roles can configure Sentinel.',
         accessDenied: '❌ You do not have access to this command.\nIf no management role is configured yet, a member with `Administrator`, `Manage Server`, or `Manage Roles` can run `/config-permissions action:add role:@role`.',
         languageSet: '✅ This server language is now French.',
@@ -445,7 +444,11 @@ function isAdvancedTextCommand(content) {
     return ADVANCED_TEXT_COMMANDS.some(pattern => pattern.test(normalizedContent));
 }
 
-function getAdvancedUnavailableMessage(language = 'fr') {
+function getAdvancedUnavailableMessage(language = 'fr', commandName = null) {
+    if (commandName === 'reset-heures-all') {
+        return t(language, 'resetAllPremiumOnly');
+    }
+
     return t(language, 'unavailable');
 }
 
@@ -1870,7 +1873,8 @@ function buildHelpEmbed(guild, requester) {
                 value: [
                     '`/config-role role:@role` sets the service role.',
                     '`/config-channel channel_id:ID` sets the log channel.',
-                    '`/config-view` shows the current configuration.'
+                    '`/config-view` shows the current configuration.',
+                    '`/reset-hours member:@member` resets one member hours.'
                 ].join('\n'),
                 inline: false
             },
@@ -1900,7 +1904,8 @@ function buildHelpEmbed(guild, requester) {
                     '`/hours member` or `!hours @member`',
                     '`/top-week` or `!top-week`',
                     '`/summary` or `!summary`',
-                    '`/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-hours`, `/reset-hours-all`, `/ping`'
+                    '`/diagnostic`, `/sync-service`, `/sync-sentinel`, `/ping`',
+                    '`/reset-hours-all` is reserved for Sentinel Premium.'
                 ].join('\n'),
                 inline: false
             });
@@ -1967,6 +1972,7 @@ function buildHelpEmbed(guild, requester) {
         '`/historique-service` - tes 5 dernieres sessions',
         '`/en-service` - agents actuellement en service',
         '`/top-service` - top 10 du serveur',
+        '`/reset-heures membre` - remettre les heures d une personne a zero',
         '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration'
     ];
     const moderationUsage = [
@@ -1982,6 +1988,7 @@ function buildHelpEmbed(guild, requester) {
     const freeLimits = [
         'Historique visible : 5 dernieres sessions personnelles.',
         'Classement public : top 10 global.',
+        '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
         'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
         'Les options avancees ne sont pas ouvertes publiquement pour le moment.'
     ];
@@ -2045,8 +2052,7 @@ function buildHelpEmbed(guild, requester) {
                 '`/diagnostic` ou `!diagnostic`',
                 '`/sync-service` ou `!sync-service`',
                 '`/sync-sentinel` ou `!sync-sentinel`',
-                '`/reset-heures membre` ou `!reset-heures @membre`',
-                '`/reset-heures-all` ou `!reset-heures-all`',
+                '`/reset-heures-all` ou `!reset-heures-all` - reserve Premium',
                 '`/ping` ou `!ping`',
                 'Historique complet jusqu’à 25 sessions'
             ].join('\n'),
@@ -3090,7 +3096,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
         if (isAdvancedCommand(commandName) && !isAdvancedGuild(guildId)) {
             return interaction.reply({
-                content: getAdvancedUnavailableMessage(language),
+                content: getAdvancedUnavailableMessage(language, commandName),
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -3727,6 +3733,10 @@ client.on(Events.MessageCreate, async message => {
         language = setGuildLanguage(guildId, rawLanguage);
 
         return message.reply(t(language, language === 'en' ? 'languageSetEn' : 'languageSet'));
+    }
+
+    if (/^!(reset-heures-all|reset-hours-all)$/i.test(content) && !isAdvancedGuild(guildId)) {
+        return message.reply(getAdvancedUnavailableMessage(language, 'reset-heures-all'));
     }
 
     if (isAdvancedTextCommand(content) && !isAdvancedGuild(guildId)) {
