@@ -240,6 +240,16 @@ const publicCommands = [
                 .setDescription('Membre a consulter')
                 .setDescriptionLocalizations(en('Member to check'))
                 .setRequired(true)
+        ),
+
+    command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d un membre.', 'Resets a member service hours.')
+        .addUserOption(option =>
+            option
+                .setName('membre')
+                .setNameLocalizations(en('member'))
+                .setDescription('Le membre a reinitialiser')
+                .setDescriptionLocalizations(en('Member to reset'))
+                .setRequired(true)
         )
 ];
 
@@ -263,16 +273,6 @@ const advancedCommands = [
     command('sync-service', 'sync-service', 'Repare les incoherences entre la base et le role de service.', 'Repairs inconsistencies between the database and service role.'),
 
     command('sync-sentinel', 'sync-sentinel', 'Synchronise les salons, roles et panneaux Sentinel.', 'Synchronizes Sentinel channels, roles and panels.'),
-
-    command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d’un membre.', 'Resets a member service hours.')
-        .addUserOption(option =>
-            option
-                .setName('membre')
-                .setNameLocalizations(en('member'))
-                .setDescription('Le membre a reinitialiser')
-                .setDescriptionLocalizations(en('Member to reset'))
-                .setRequired(true)
-        ),
 
     command('reset-heures-all', 'reset-hours-all', 'Reinitialise toutes les heures de service.', 'Resets all service hours.'),
 
