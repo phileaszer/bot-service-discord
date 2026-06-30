@@ -150,6 +150,21 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!sanctions @membre`
 - `!mod-cases @member`
 
+## Publications Discord depuis le clavardage
+
+Les mises a jour du clavardage de reference `019e92a8-2bff-7dc0-9e8e-b4ec8e81b11d` peuvent etre publiees dans les bons salons Discord avec :
+
+```bash
+npm run announce -- --type announcement --title-fr "Titre" --body-fr "Texte" --title-en "Title" --body-en "Text"
+```
+
+Types disponibles :
+
+- `announcement` : `📡｜annonces` et `📡｜announcements`
+- `changelog` : `🧬｜journal-dev` et `🧬｜dev-log`
+- `release` : `🧾｜notes-de-version` et `🧾｜release-notes`
+- `status` : `📌｜statut-sentinel` et `📌｜sentinel-status`
+
 ## Premium a venir
 
 La reinitialisation globale du serveur sera reservee a Sentinel Premium :
