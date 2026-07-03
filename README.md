@@ -150,21 +150,6 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!sanctions @membre`
 - `!mod-cases @member`
 
-## Publications Discord depuis le clavardage
-
-Les mises a jour du clavardage de reference `019e92a8-2bff-7dc0-9e8e-b4ec8e81b11d` peuvent etre publiees dans les bons salons Discord avec :
-
-```bash
-npm run announce -- --type announcement --title-fr "Titre" --body-fr "Texte" --title-en "Title" --body-en "Text"
-```
-
-Types disponibles :
-
-- `announcement` : `📡｜annonces` et `📡｜announcements`
-- `changelog` : `🧬｜journal-dev` et `🧬｜dev-log`
-- `release` : `🧾｜notes-de-version` et `🧾｜release-notes`
-- `status` : `📌｜statut-sentinel` et `📌｜sentinel-status`
-
 ## Premium a venir
 
 La reinitialisation globale du serveur sera reservee a Sentinel Premium :
@@ -202,104 +187,10 @@ English:
 
 Sentinel checks configured roles, Discord permissions, and role hierarchy before applying a moderation action.
 
-## Site web
-
-Le site vitrine de Sentinel se trouve dans :
-
-```text
-site/index.html
-```
-
-Il est statique, bilingue francais/anglais et peut etre ouvert directement dans un navigateur.
-Il est publie avec GitHub Pages via le workflow `.github/workflows/deploy-site.yml`.
-
-URL publique :
-
-```text
-https://phileaszer.github.io/bot-service-discord/
-```
-
-## Installation
-
-```bash
-npm install
-```
-
-## Scripts npm
-
-```bash
-npm start
-npm run deploy:commands
-npm run check
-```
-
-## Variables d'environnement
-
-Copier `.env.example` vers `.env` en local, ou configurer les variables dans Railway :
-
-```env
-TOKEN=
-CLIENT_ID=
-DATABASE_PATH=./database/service.db
-```
-
-`DATABASE_PATH` est optionnel. Par defaut, la base est creee dans `database/service.db`.
-
-Ne jamais publier `.env`.
-
-## Base de donnees
-
-La base SQLite est creee automatiquement si elle n'existe pas. Les tables sont creees au demarrage dans `database/database.js`.
-
-En local, le chemin par defaut est :
-
-```text
-database/service.db
-```
-
-Ce fichier est ignore par Git. Les donnees privees ne doivent pas etre commitees.
-
 ## Permissions
 
 Les commandes de gestion du bot sont accessibles uniquement aux roles configures avec `/config-permissions`.
 Si aucun role de gestion n'est encore configure, les membres avec `Administrateur`, `Gerer le serveur` ou `Gerer les roles` peuvent demarrer la configuration.
 Une fois un role ajoute, ce role devient l'acces normal aux commandes de gestion.
 Le proprietaire du serveur garde un acces de secours pour eviter un blocage complet.
-
-
-## Persistance Railway
-
-Pour eviter de perdre la base SQLite apres un redeploiement Railway, configure un volume persistant et definis `DATABASE_PATH` vers ce volume.
-
-Exemple si le volume est monte sur `/data` :
-
-```env
-DATABASE_PATH=/data/service.db
-```
-
-Sans volume persistant, la base SQLite peut etre recreee vide selon le cycle de vie du conteneur.
-
-## Deploiement des commandes slash
-
-```bash
-node deploy-commands.js
-```
-
-Les commandes slash sont deployees globalement sur tous les serveurs ou le bot est installe.
-
-Si Node rencontre un probleme de certificat sur Windows :
-
-```bash
-node --use-system-ca deploy-commands.js
-```
-
-## Lancement
-
-```bash
-node index.js
-```
-
-## Railway
-
-Configurer les variables d'environnement dans Railway, puis deployer le projet. Pour conserver les donnees, ajoute un volume persistant et configure `DATABASE_PATH` vers le chemin monte.
 
