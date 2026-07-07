@@ -247,9 +247,17 @@ const publicCommands = [
             option
                 .setName('membre')
                 .setNameLocalizations(en('member'))
-                .setDescription('Le membre a reinitialiser')
-                .setDescriptionLocalizations(en('Member to reset'))
-                .setRequired(true)
+                .setDescription('Membre present a reinitialiser')
+                .setDescriptionLocalizations(en('Current member to reset'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si la personne a quitte le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the user left the server'))
+                .setRequired(false)
         )
 ];
 

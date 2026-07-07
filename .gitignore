@@ -16,6 +16,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 outputs/
+.codex-remote-attachments/
 scripts/
 PREMIUM_ROADMAP.md
 .DS_Store
