@@ -98,7 +98,7 @@ const I18N = {
         installCommandsOnly: 'Le lien utilise a probablement installe uniquement les commandes.',
         reinvite: 'Reinvite Sentinel avec ce lien : {inviteUrl}',
         unavailable: 'Cette commande n’est pas disponible sur ce serveur pour le moment.',
-        resetAllPremiumOnly: '⭐ `/reset-heures-all` sera disponible avec l’abonnement Premium Sentinel. En gratuit, utilise `/reset-heures membre:@membre` pour réinitialiser une seule personne.',
+        resetAllPremiumOnly: '⭐ `/reset-heures-all` sera disponible avec l’abonnement Premium Sentinel. En gratuit, utilise `/reset-heures membre:@membre` ou `/reset-heures utilisateur_id:ID` pour réinitialiser une seule personne.',
         bootstrapRoles: 'Aucun role configure. En amorcage, le proprietaire, les administrateurs et les membres avec Gerer le serveur ou Gerer les roles peuvent configurer Sentinel.',
         accessDenied: '❌ Tu n’as pas accès à cette commande.\nSi aucun rôle de gestion n’est encore configuré, un membre avec `Administrateur`, `Gérer le serveur` ou `Gérer les rôles` peut lancer `/config-permissions action:ajouter role:@role`.',
         languageSet: '✅ La langue de ce serveur est maintenant le français.',
@@ -122,6 +122,9 @@ const I18N = {
         noActive: '🟢 Aucun agent n’est actuellement en service sur ce serveur.',
         noTop: '🏆 Aucun temps de service enregistré sur ce serveur pour le moment.',
         noWeek: '📅 Aucun temps de service enregistré cette semaine sur ce serveur.',
+        resetTargetRequired: '❌ Choisis un membre ou indique son ID Discord. Exemple : `/reset-heures utilisateur_id:123456789012345678`.',
+        invalidUserId: '❌ ID utilisateur invalide. Copie uniquement l’ID Discord numérique de la personne.',
+        resetUserNoRecord: '⏱️ Aucun temps de service enregistré pour {target} sur ce serveur.',
         resetUser: '✅ Les heures de service de {member} ont été réinitialisées sur ce serveur.',
         resetConfirm: '⚠️ Confirme la réinitialisation de toutes les heures de service de ce serveur.\nCette action supprimera aussi les sessions enregistrées.',
         resetNotForYou: '❌ Cette confirmation ne t’est pas destinée.',
@@ -172,7 +175,7 @@ const I18N = {
         installCommandsOnly: 'The link used probably installed commands only.',
         reinvite: 'Reinvite Sentinel with this link: {inviteUrl}',
         unavailable: 'This command is not available on this server for now.',
-        resetAllPremiumOnly: '⭐ `/reset-hours-all` will be available with Sentinel Premium. On the free plan, use `/reset-hours member:@member` to reset one person.',
+        resetAllPremiumOnly: '⭐ `/reset-hours-all` will be available with Sentinel Premium. On the free plan, use `/reset-hours member:@member` or `/reset-hours user_id:ID` to reset one person.',
         bootstrapRoles: 'No role configured. During setup, the owner, administrators, and members with Manage Server or Manage Roles can configure Sentinel.',
         accessDenied: '❌ You do not have access to this command.\nIf no management role is configured yet, a member with `Administrator`, `Manage Server`, or `Manage Roles` can run `/config-permissions action:add role:@role`.',
         languageSet: '✅ This server language is now French.',
@@ -196,6 +199,9 @@ const I18N = {
         noActive: '🟢 No agent is currently on duty on this server.',
         noTop: '🏆 No service time has been recorded on this server yet.',
         noWeek: '📅 No service time has been recorded this week on this server.',
+        resetTargetRequired: '❌ Choose a member or provide their Discord ID. Example: `/reset-hours user_id:123456789012345678`.',
+        invalidUserId: '❌ Invalid user ID. Copy only the numeric Discord ID for that user.',
+        resetUserNoRecord: '⏱️ No service time is recorded for {target} on this server.',
         resetUser: '✅ Service hours for {member} have been reset on this server.',
         resetConfirm: '⚠️ Confirm the reset of all service hours on this server.\nThis action will also delete recorded sessions.',
         resetNotForYou: '❌ This confirmation is not for you.',
@@ -600,6 +606,38 @@ function getUserData(guildId, userId) {
     `).get(guildId, userId);
 
     return mapUserData(row);
+}
+
+function hasUserRecord(guildId, userId) {
+    const row = db.prepare(`
+        SELECT 1 AS found
+        FROM service_times
+        WHERE guild_id = ? AND user_id = ?
+        UNION
+        SELECT 1 AS found
+        FROM service_sessions
+        WHERE guild_id = ? AND user_id = ?
+        LIMIT 1
+    `).get(guildId, userId, guildId, userId);
+
+    return Boolean(row);
+}
+
+function normalizeUserId(value) {
+    const rawValue = String(value || '').trim();
+    const match = rawValue.match(/^<@!?(\d{17,20})>$|^(\d{17,20})$/);
+
+    return match ? (match[1] || match[2]) : null;
+}
+
+function formatResetTarget(member, userId, language = 'fr') {
+    if (member) {
+        return `${member}`;
+    }
+
+    return language === 'en'
+        ? `user ID \`${userId}\``
+        : `l'utilisateur ID \`${userId}\``;
 }
 
 function createUserIfMissing(guildId, userId) {
@@ -1894,7 +1932,7 @@ function buildHelpEmbed(guild, requester) {
                     '`/config-role role:@role` sets the service role.',
                     '`/config-channel channel_id:ID` sets the log channel.',
                     '`/config-view` shows the current configuration.',
-                    '`/reset-hours member:@member` resets one member hours.'
+                    '`/reset-hours member:@member` or `user_id:ID` resets one user hours, even after they left.'
                 ].join('\n'),
                 inline: false
             },
@@ -1999,7 +2037,7 @@ function buildHelpEmbed(guild, requester) {
         isReferenceServer
             ? '`/top-service`, `/top-semaine`, `/resume-service` - classements et resume complet'
             : '`/top-service` - top 10 du serveur',
-        '`/reset-heures membre` - remettre les heures d une personne a zero',
+        '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
         '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration'
     ];
     const moderationUsage = [
@@ -3488,11 +3526,32 @@ client.on(Events.InteractionCreate, async interaction => {
             }
 
             const member = interaction.options.getMember('membre');
+            const userId = member?.id || normalizeUserId(interaction.options.getString('utilisateur_id'));
 
-            resetUser(guildId, member.id);
+            if (!userId) {
+                const hasRawUserId = Boolean(String(interaction.options.getString('utilisateur_id') || '').trim());
+
+                return interaction.reply({
+                    content: t(language, hasRawUserId ? 'invalidUserId' : 'resetTargetRequired'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            if (!hasUserRecord(guildId, userId)) {
+                return interaction.reply({
+                    content: t(language, 'resetUserNoRecord', {
+                        target: formatResetTarget(member, userId, language)
+                    }),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            resetUser(guildId, userId);
 
             return interaction.reply({
-                content: t(language, 'resetUser', { member }),
+                content: t(language, 'resetUser', {
+                    member: formatResetTarget(member, userId, language)
+                }),
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -4004,14 +4063,28 @@ client.on(Events.MessageCreate, async message => {
         }
 
         const member = message.mentions.members.first();
+        const rawTarget = content.replace(/^!(reset-heures|reset-hours)\s*/i, '').trim();
+        const userId = member?.id || normalizeUserId(rawTarget);
 
-        if (!member) {
-            return message.reply(language === 'en' ? '❌ You must mention a member. Example: `!reset-hours @member`' : '❌ Tu dois mentionner un membre. Exemple : `!reset-heures @membre`');
+        if (!userId) {
+            return message.reply(language === 'en'
+                ? '❌ Mention a member or provide a Discord ID. Example: `!reset-hours 123456789012345678`'
+                : '❌ Mentionne un membre ou indique son ID Discord. Exemple : `!reset-heures 123456789012345678`');
         }
 
-        resetUser(guildId, member.id);
+        const resolvedMember = member || await fetchMemberSafely(message.guild, userId);
 
-        return message.reply(t(language, 'resetUser', { member }));
+        if (!hasUserRecord(guildId, userId)) {
+            return message.reply(t(language, 'resetUserNoRecord', {
+                target: formatResetTarget(resolvedMember, userId, language)
+            }));
+        }
+
+        resetUser(guildId, userId);
+
+        return message.reply(t(language, 'resetUser', {
+            member: formatResetTarget(resolvedMember, userId, language)
+        }));
     }
 });
 
