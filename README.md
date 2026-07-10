@@ -170,6 +170,8 @@ Ces commandes sont preparees pour Sentinel Premium et ne sont pas ouvertes sur l
 - `/unwarn`
 - `/profil-mod`
 - `/mod-profile`
+- `/tempban`
+- `/unban`
 - `/lock`
 - `/unlock`
 - `/slowmode`
@@ -193,9 +195,9 @@ Francais :
 - `/timeout` rend un membre muet temporairement. Durées valides : `10m`, `2h`, `7d`.
 - `/fin-timeout` retire un timeout actif.
 - `/expulser` retire un membre du serveur.
-- `/bannir` bannit un utilisateur du serveur.
+- `/bannir` bannit un utilisateur du serveur. Si la personne n'est plus sur le serveur, utilise `utilisateur_id`.
 - `/purge` supprime jusqu'a 100 messages recents dans le salon.
-- `/sanctions` affiche les 10 dernieres sanctions d'un membre.
+- `/sanctions` affiche les 10 dernieres sanctions d'un membre ou d'un ID Discord.
 
 Sentinel verifie les roles autorises, les permissions Discord et la hierarchie des roles avant d'appliquer une sanction.
 
@@ -205,7 +207,9 @@ Moderation Premium preparee :
 - `/modifier-cas` corrige la raison d'un cas.
 - `/supprimer-cas` supprime un cas.
 - `/unwarn` retire un avertissement par ID.
-- `/profil-mod` affiche un profil moderation complet.
+- `/profil-mod` affiche un profil moderation complet, meme avec un ID Discord.
+- `/tempban` bannit temporairement un utilisateur avec expiration automatique, meme avec un ID Discord.
+- `/unban` debannit un utilisateur par ID et annule un tempban actif.
 - `/lock`, `/unlock` et `/slowmode` gerent rapidement un salon.
 
 English:
@@ -214,9 +218,9 @@ English:
 - `/timeout` temporarily times out a member. Valid durations: `10m`, `2h`, `7d`.
 - `/untimeout` removes an active timeout.
 - `/kick` removes a member from the server.
-- `/ban` bans a user from the server.
+- `/ban` bans a user from the server. If the user is no longer in the server, use `user_id`.
 - `/clear` deletes up to 100 recent messages in the channel.
-- `/mod-cases` shows the last 10 moderation cases for a member.
+- `/mod-cases` shows the last 10 moderation cases for a member or Discord ID.
 
 Sentinel checks configured roles, Discord permissions, and role hierarchy before applying a moderation action.
 
@@ -226,7 +230,9 @@ Prepared Premium moderation:
 - `/edit-case` edits a case reason.
 - `/delete-case` deletes a case.
 - `/unwarn` removes a warning by ID.
-- `/mod-profile` shows a full moderation profile.
+- `/mod-profile` shows a full moderation profile, including by Discord ID.
+- `/tempban` temporarily bans a user with automatic expiration, including by Discord ID.
+- `/unban` unbans a user by ID and cancels an active tempban.
 - `/lock`, `/unlock`, and `/slowmode` quickly manage a channel.
 
 ## Permissions
