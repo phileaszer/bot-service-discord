@@ -304,6 +304,136 @@ const advancedCommands = [
                 .setMinValue(1)
                 .setMaxValue(100)
                 .setRequired(false)
+        ),
+
+    command('cas', 'case', 'Affiche le detail d un cas de moderation.', 'Shows a moderation case details.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+        .addIntegerOption(option =>
+            option
+                .setName('id')
+                .setDescription('ID du cas')
+                .setDescriptionLocalizations(en('Case ID'))
+                .setMinValue(1)
+                .setRequired(true)
+        ),
+
+    command('modifier-cas', 'edit-case', 'Modifie la raison d un cas de moderation.', 'Edits a moderation case reason.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+        .addIntegerOption(option =>
+            option
+                .setName('id')
+                .setDescription('ID du cas')
+                .setDescriptionLocalizations(en('Case ID'))
+                .setMinValue(1)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Nouvelle raison')
+                .setDescriptionLocalizations(en('New reason'))
+                .setRequired(true)
+        ),
+
+    command('supprimer-cas', 'delete-case', 'Supprime un cas de moderation.', 'Deletes a moderation case.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+        .addIntegerOption(option =>
+            option
+                .setName('id')
+                .setDescription('ID du cas')
+                .setDescriptionLocalizations(en('Case ID'))
+                .setMinValue(1)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison de la suppression')
+                .setDescriptionLocalizations(en('Deletion reason'))
+                .setRequired(false)
+        ),
+
+    command('unwarn', 'unwarn', 'Retire un avertissement par ID de cas.', 'Removes a warning by case ID.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+        .addIntegerOption(option =>
+            option
+                .setName('id')
+                .setDescription('ID du cas avertissement')
+                .setDescriptionLocalizations(en('Warning case ID'))
+                .setMinValue(1)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison du retrait')
+                .setDescriptionLocalizations(en('Removal reason'))
+                .setRequired(false)
+        ),
+
+    command('profil-mod', 'mod-profile', 'Affiche le profil moderation complet d un membre.', 'Shows a member full moderation profile.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+        .addUserOption(option =>
+            option
+                .setName('membre')
+                .setNameLocalizations(en('member'))
+                .setDescription('Membre a consulter')
+                .setDescriptionLocalizations(en('Member to check'))
+                .setRequired(true)
+        )
+        .addIntegerOption(option =>
+            option
+                .setName('limite')
+                .setNameLocalizations(en('limit'))
+                .setDescription('Nombre de cas a afficher')
+                .setDescriptionLocalizations(en('Number of cases to show'))
+                .setMinValue(1)
+                .setMaxValue(25)
+                .setRequired(false)
+        ),
+
+    command('lock', 'lock', 'Verrouille le salon actuel.', 'Locks the current channel.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison du verrouillage')
+                .setDescriptionLocalizations(en('Lock reason'))
+                .setRequired(false)
+        ),
+
+    command('unlock', 'unlock', 'Deverrouille le salon actuel.', 'Unlocks the current channel.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison du deverrouillage')
+                .setDescriptionLocalizations(en('Unlock reason'))
+                .setRequired(false)
+        ),
+
+    command('slowmode', 'slowmode', 'Configure le mode lent du salon actuel.', 'Configures the current channel slowmode.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .addStringOption(option =>
+            option
+                .setName('duree')
+                .setNameLocalizations(en('duration'))
+                .setDescription('Duree, exemple 10s, 5m, 1h ou 0 pour desactiver')
+                .setDescriptionLocalizations(en('Duration, for example 10s, 5m, 1h, or 0 to disable'))
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison du changement')
+                .setDescriptionLocalizations(en('Change reason'))
+                .setRequired(false)
         )
 ];
 
