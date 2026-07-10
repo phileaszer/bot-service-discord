@@ -15,6 +15,7 @@ const {
 
 const db = require('./database/database');
 const { syncSentinelServer } = require('./server-sync');
+const { startDashboardServer } = require('./dashboard');
 
 const client = new Client({
     intents: [
@@ -3896,6 +3897,53 @@ async function handleModerationMessage(message, language) {
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
+
+    startDashboardServer({
+        client,
+        invitePermissions: BOT_INVITE_PERMISSIONS,
+        maxTimeoutDuration: MAX_TIMEOUT_DURATION,
+        maxTempbanDuration: MAX_TEMPBAN_DURATION,
+        helpers: {
+            addCommandRole,
+            addModerationCase,
+            addSession,
+            buildServicePanelComponents,
+            createUserIfMissing,
+            deleteModerationCase,
+            deleteTemporaryBan,
+            formatDuration,
+            getActiveServices,
+            getCommandRoleIds,
+            getGuildConfig,
+            getGuildLanguage,
+            getLogChannel,
+            getModerationCase,
+            getModerationTargetError,
+            getReason,
+            getServiceRole,
+            getServiceSummary,
+            getTemporaryBan,
+            getTopService,
+            getUserData,
+            getUserTargetErrorById,
+            hasCommandRoleAccess,
+            hasModerationAccess,
+            isAdvancedGuild,
+            normalizeUserId,
+            parseDurationToMs,
+            parseSlowmodeToSeconds,
+            removeCommandRole,
+            resetGuild,
+            resetUser,
+            sendModerationLog,
+            setGuildLanguage,
+            syncServiceState,
+            updateGuildConfig,
+            updateModerationCaseReason,
+            updateUserTime,
+            upsertTemporaryBan
+        }
+    });
 
     try {
         const syncResult = await syncSentinelServer(client);

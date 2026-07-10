@@ -3,222 +3,124 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sentinel | Bot Discord de service et de modération</title>
-  <meta name="description" content="Sentinel est un bot Discord bilingue pour gérer les prises de service, les heures, les classements, les logs et la modération.">
+  <title>Sentinel | Bot Discord de service et de moderation</title>
+  <meta name="description" content="Sentinel centralise les prises de service, les heures, les classements, les logs et la moderation Discord.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://phileaszer.github.io/bot-service-discord/">
   <meta property="og:title" content="Sentinel | Bot Discord">
-  <meta property="og:description" content="Suivi de service, statistiques, logs et modération pour communautés Discord.">
+  <meta property="og:description" content="Service, statistiques, logs, moderation et dashboard web pour communautes Discord.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://phileaszer.github.io/bot-service-discord/">
   <meta property="og:image" content="https://phileaszer.github.io/bot-service-discord/assets/sentinel-hero.png">
-  <meta property="og:image:alt" content="Sentinel, bot Discord de service et de modération">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Sentinel | Bot Discord">
-  <meta name="twitter:description" content="Suivi de service, statistiques, logs et modération pour communautés Discord.">
-  <meta name="twitter:image" content="https://phileaszer.github.io/bot-service-discord/assets/sentinel-hero.png">
   <meta name="theme-color" content="#05070c">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="site-header" data-glass>
-    <a class="brand" href="#top" aria-label="Sentinel">
-      <img src="assets/sentinel-mark.png" alt="" width="38" height="38">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Sentinel">
+      <img src="assets/sentinel-mark.png" alt="">
       <span>Sentinel</span>
     </a>
-
     <nav class="nav-links" aria-label="Navigation principale">
-      <a href="#features" data-i18n="navFeatures">Fonctions</a>
-      <a href="#workflow" data-i18n="navWorkflow">Démarrage</a>
-      <a href="#commands" data-i18n="navCommands">Commandes</a>
-      <a href="#security" data-i18n="navSecurity">Sécurité</a>
+      <a href="fonctionnalites.html">Fonctionnalites</a>
+      <a href="commandes.html">Commandes</a>
+      <a href="premium.html">Premium</a>
+      <a href="securite.html">Securite</a>
+      <a href="installation.html">Installation</a>
     </nav>
-
     <div class="header-actions">
-      <button class="language-toggle" type="button" data-language-toggle aria-label="Switch language">EN</button>
-      <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands" data-i18n="invite">Inviter</a>
+      <a class="button button-ghost button-small" href="dashboard.html">Dashboard</a>
+      <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter</a>
     </div>
   </header>
 
-  <main id="top">
-    <section class="hero" aria-labelledby="hero-title">
+  <main>
+    <section class="hero hero-home">
       <div class="hero-backdrop" aria-hidden="true">
         <img class="hero-emblem" src="assets/sentinel-mark.png" alt="">
         <div class="scanlines"></div>
       </div>
-
       <div class="hero-content">
-        <p class="eyebrow" data-i18n="heroEyebrow">Performance · Sécurité · Fiabilité</p>
-        <h1 id="hero-title">Sentinel</h1>
-        <p class="hero-copy" data-i18n="heroCopy">Le bot Discord qui centralise les prises de service, les heures, les classements, les logs et la modération de ton serveur.</p>
-
+        <p class="eyebrow">Performance - Securite - Fiabilite</p>
+        <h1>Sentinel</h1>
+        <p class="hero-copy">Un bot Discord bilingue pour suivre les services, controler les heures, garder des logs propres et moderer un serveur sans perdre de temps.</p>
         <div class="hero-actions">
-          <a class="button" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands" data-i18n="inviteSentinel">Inviter Sentinel</a>
-          <a class="button button-ghost" href="#workflow" data-i18n="seeSetup">Voir le démarrage</a>
+          <a class="button" href="installation.html">Demarrer Sentinel</a>
+          <a class="button button-ghost" href="dashboard.html">Ouvrir le dashboard</a>
         </div>
-
         <dl class="hero-metrics">
-          <div>
-            <dt data-i18n="metricLanguage">Langues</dt>
-            <dd>FR / EN</dd>
-          </div>
-          <div>
-            <dt data-i18n="metricStorage">Stockage</dt>
-            <dd>SQLite</dd>
-          </div>
-          <div>
-            <dt data-i18n="metricAccess">Accès</dt>
-            <dd data-i18n="metricAccessValue">Par rôles</dd>
-          </div>
+          <div><dt>Langues</dt><dd>FR / EN</dd></div>
+          <div><dt>Base</dt><dd>SQLite</dd></div>
+          <div><dt>Acces</dt><dd>Par roles</dd></div>
         </dl>
       </div>
-
-      <div class="hero-preview" aria-label="Aperçu de Sentinel">
-        <img src="assets/sentinel-hero.png" alt="Visuel Sentinel avec identité cyber rose et cyan">
+      <div class="hero-preview">
+        <img src="assets/sentinel-hero.png" alt="Identite visuelle Sentinel">
       </div>
     </section>
 
-    <section class="visual-showcase" aria-label="Direction artistique Sentinel">
+    <section class="visual-showcase">
       <div class="visual-frame">
-        <img src="assets/sentinel-wide-service.png" alt="Bannière Sentinel performance sécurité fiabilité">
+        <img src="assets/sentinel-wide-service.png" alt="Banniere Sentinel">
       </div>
     </section>
 
-    <section class="section section-dark" id="features">
+    <section class="section section-dark">
       <div class="section-inner">
         <div class="section-heading">
-          <p class="eyebrow" data-i18n="featuresEyebrow">Gestion gratuite</p>
-          <h2 data-i18n="featuresTitle">Tout ce qu’il faut pour gérer un serveur actif.</h2>
-          <p data-i18n="featuresCopy">Sentinel reste simple pour les membres, mais solide pour l’équipe qui configure et modère.</p>
+          <p class="eyebrow">Vue d'ensemble</p>
+          <h2>Un vrai centre de controle pour ton Discord.</h2>
+          <p>Sentinel garde la partie gratuite utile pour les petites communautes, et reserve les outils avances aux serveurs qui ont besoin de plus de controle.</p>
         </div>
-
         <div class="feature-grid">
           <article class="feature-card">
             <span class="feature-icon">01</span>
-            <h3 data-i18n="featureServiceTitle">Service</h3>
-            <p data-i18n="featureServiceCopy">Prise et fin de service par bouton, rôle automatique, durée de session et total individuel.</p>
+            <h3>Service</h3>
+            <p>Prise de service, fin de service, role automatique, historique et temps total.</p>
           </article>
           <article class="feature-card">
             <span class="feature-icon">02</span>
-            <h3 data-i18n="featureStatsTitle">Statistiques</h3>
-            <p data-i18n="featureStatsCopy">Heures personnelles, historique limité gratuit, agents actifs et classement top 10.</p>
+            <h3>Statistiques</h3>
+            <p>Heures personnelles, agents actifs, classement top service et vues avancees premium.</p>
           </article>
           <article class="feature-card">
             <span class="feature-icon">03</span>
-            <h3 data-i18n="featureModerationTitle">Modération</h3>
-            <p data-i18n="featureModerationCopy">Avertissements, timeout, fin de timeout, expulsion, bannissement, purge et sanctions.</p>
+            <h3>Moderation</h3>
+            <p>Avertissements, timeout, ban par ID, sanctions, logs et cas premium.</p>
           </article>
           <article class="feature-card">
             <span class="feature-icon">04</span>
-            <h3 data-i18n="featureLogsTitle">Logs</h3>
-            <p data-i18n="featureLogsCopy">Journalisation des services et actions de modération dans le salon choisi par ID.</p>
+            <h3>Dashboard</h3>
+            <p>Actions directes depuis le web avec autorisation Discord et choix du serveur.</p>
           </article>
         </div>
-
-        <div class="poster-showcase">
-          <img src="assets/sentinel-poster.png" alt="Affiche Sentinel bot Discord ultime">
-          <div>
-            <p class="eyebrow" data-i18n="posterEyebrow">Identité Sentinel</p>
-            <h3 data-i18n="posterTitle">Un univers cyber, lisible et immédiatement reconnaissable.</h3>
-            <p data-i18n="posterCopy">La page reprend le contraste noir, les éclats magenta, les lignes cyan et les panneaux techniques de la DA officielle.</p>
-          </div>
-        </div>
       </div>
     </section>
 
-    <section class="section section-flow" id="workflow">
+    <section class="section section-flow">
       <div class="section-inner split-layout">
         <div class="section-heading">
-          <p class="eyebrow" data-i18n="workflowEyebrow">Installation</p>
-          <h2 data-i18n="workflowTitle">Démarrer Sentinel en quelques minutes.</h2>
-          <p data-i18n="workflowCopy">Le bot guide les bases : langue du serveur, rôle de service, salon de logs et rôles autorisés.</p>
+          <p class="eyebrow">Structure</p>
+          <h2>Un site clair, pas une page fourre-tout.</h2>
+          <p>Chaque partie de Sentinel a maintenant sa page dediee : presentation, commandes, premium, securite et installation.</p>
         </div>
-
-        <ol class="steps">
-          <li>
-            <strong data-i18n="stepInviteTitle">Inviter le bot</strong>
-            <span data-i18n="stepInviteCopy">Utilise le lien officiel avec les scopes bot et applications.commands.</span>
-          </li>
-          <li>
-            <strong data-i18n="stepLanguageTitle">Choisir la langue</strong>
-            <span data-i18n="stepLanguageCopy">Sélectionne Français ou English. Le choix reste propre au serveur.</span>
-          </li>
-          <li>
-            <strong data-i18n="stepRoleTitle">Configurer le service</strong>
-            <span data-i18n="stepRoleCopy">Définis le rôle de service, le salon de logs et les rôles qui peuvent gérer Sentinel.</span>
-          </li>
-          <li>
-            <strong data-i18n="stepPanelTitle">Publier le panneau</strong>
-            <span data-i18n="stepPanelCopy">Envoie !service-panel dans le salon où les membres doivent pointer.</span>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="section section-dark" id="commands">
-      <div class="section-inner">
-        <div class="section-heading compact">
-          <p class="eyebrow" data-i18n="commandsEyebrow">Commandes</p>
-          <h2 data-i18n="commandsTitle">Les commandes essentielles.</h2>
-        </div>
-
-        <div class="command-board">
-          <div class="command-column">
-            <h3 data-i18n="serviceCommandsTitle">Service</h3>
-            <ul>
-              <li><code>/mes-heures</code><span data-i18n="cmdMyHours">Voir ses heures</span></li>
-              <li><code>/historique-service</code><span data-i18n="cmdHistory">Voir ses 5 dernières sessions</span></li>
-              <li><code>/en-service</code><span data-i18n="cmdOnDuty">Voir les agents actifs</span></li>
-              <li><code>/top-service</code><span data-i18n="cmdTop">Voir le top 10</span></li>
-            </ul>
-          </div>
-
-          <div class="command-column">
-            <h3 data-i18n="configCommandsTitle">Configuration</h3>
-            <ul>
-              <li><code>/config-langue</code><span data-i18n="cmdLanguage">Choisir la langue</span></li>
-              <li><code>/config-role</code><span data-i18n="cmdRole">Définir le rôle de service</span></li>
-              <li><code>/config-logs</code><span data-i18n="cmdLogs">Définir le salon de logs</span></li>
-              <li><code>/config-permissions</code><span data-i18n="cmdPermissions">Gérer les accès</span></li>
-            </ul>
-          </div>
-
-          <div class="command-column">
-            <h3 data-i18n="moderationCommandsTitle">Modération</h3>
-            <ul>
-              <li><code>/avertir</code><span data-i18n="cmdWarn">Ajouter un avertissement</span></li>
-              <li><code>/timeout</code><span data-i18n="cmdTimeout">Muter temporairement</span></li>
-              <li><code>/bannir</code><span data-i18n="cmdBan">Bannir un utilisateur</span></li>
-              <li><code>/sanctions</code><span data-i18n="cmdCases">Voir les sanctions</span></li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-security" id="security">
-      <div class="section-inner security-band">
-        <div>
-          <p class="eyebrow" data-i18n="securityEyebrow">Sécurité</p>
-          <h2 data-i18n="securityTitle">Des garde-fous avant chaque action.</h2>
-        </div>
-        <div class="security-list">
-          <p data-i18n="securityOne">Accès de gestion par rôles configurés.</p>
-          <p data-i18n="securityTwo">Vérification des permissions Discord natives.</p>
-          <p data-i18n="securityThree">Respect de la hiérarchie des rôles avant modération.</p>
-          <p data-i18n="securityFour">Données stockées serveur par serveur avec SQLite.</p>
+        <div class="link-board">
+          <a href="fonctionnalites.html"><strong>Fonctionnalites</strong><span>Comprendre ce que Sentinel fait au quotidien.</span></a>
+          <a href="commandes.html"><strong>Commandes</strong><span>Voir le detail gratuit, premium et les commandes texte.</span></a>
+          <a href="premium.html"><strong>Premium</strong><span>Voir ce qui sera reserve aux grandes communautes.</span></a>
+          <a href="securite.html"><strong>Securite</strong><span>Permissions, roles, logs, hierarchie Discord.</span></a>
         </div>
       </div>
     </section>
 
     <section class="section final-cta">
       <div class="section-inner">
-        <h2 data-i18n="finalTitle">Prêt à installer Sentinel ?</h2>
-        <p data-i18n="finalCopy">Ajoute le bot, choisis la langue de ton serveur et publie ton premier panneau de service.</p>
+        <h2>Installe Sentinel sur ton serveur.</h2>
+        <p>Invite le bot, choisis la langue, configure les roles, puis gere le reste depuis Discord ou depuis le dashboard.</p>
         <div class="hero-actions center">
-          <a class="button" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands" data-i18n="inviteSentinel">Inviter Sentinel</a>
-          <a class="button button-ghost" href="https://github.com/phileaszer/bot-service-discord#readme" data-i18n="readDocs">Lire la documentation</a>
+          <a class="button" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter Sentinel</a>
+          <a class="button button-ghost" href="installation.html">Voir l'installation</a>
         </div>
       </div>
     </section>
@@ -227,12 +129,10 @@
   <footer class="site-footer">
     <span>Sentinel</span>
     <div>
-      <a href="https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md" data-i18n="terms">Conditions</a>
-      <a href="https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md" data-i18n="privacy">Confidentialité</a>
+      <a href="https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md">Conditions</a>
+      <a href="https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md">Confidentialite</a>
       <a href="https://github.com/phileaszer/bot-service-discord">GitHub</a>
     </div>
   </footer>
-
-  <script src="app.js"></script>
 </body>
 </html>
