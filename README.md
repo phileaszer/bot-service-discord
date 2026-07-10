@@ -87,7 +87,7 @@ Permissions demandees :
 Important : le role Sentinel doit etre place au-dessus du role de service dans la hierarchie des roles Discord.
 Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des membres qu'il doit moderer.
 
-## Commandes slash
+## Commandes slash gratuites
 
 | Francais | English |
 | --- | --- |
@@ -101,10 +101,7 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 | `/mes-heures` | `/my-hours` |
 | `/en-service` | `/on-duty` |
 | `/top-service` | `/top-service` |
-| `/top-semaine` | `/top-week` |
-| `/heures` | `/hours` |
 | `/reset-heures` | `/reset-hours` |
-| `/resume-service` | `/summary` |
 | `/avertir` | `/warn` |
 | `/timeout` | `/timeout` |
 | `/fin-timeout` | `/untimeout` |
@@ -113,7 +110,7 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 | `/purge` | `/clear` |
 | `/sanctions` | `/mod-cases` |
 
-## Commandes texte
+## Commandes texte gratuites
 
 - `!aide`
 - `!help`
@@ -129,10 +126,6 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!en-service`
 - `!on-duty`
 - `!top-service`
-- `!top-semaine`
-- `!top-week`
-- `!heures @membre`
-- `!hours @member`
 - `!reset-heures @membre` ou `!reset-heures ID`
 - `!reset-hours @member` or `!reset-hours ID`
 - `!avertir @membre raison`
@@ -150,16 +143,47 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!sanctions @membre`
 - `!mod-cases @member`
 
-## Premium a venir
+## Premium prepare
 
-La reinitialisation globale du serveur sera reservee a Sentinel Premium :
+Ces commandes sont preparees pour Sentinel Premium et ne sont pas ouvertes sur les serveurs gratuits.
 
 - `/reset-heures-all`
 - `/reset-hours-all`
+- `/heures`
+- `/hours`
+- `/top-semaine`
+- `/top-week`
+- `/resume-service`
+- `/summary`
+- `/historique-service membre limite`
+- `/history member limit`
+- `/diagnostic`
+- `/sync-service`
+- `/sync-sentinel`
+- `/ping`
+- `/cas`
+- `/case`
+- `/modifier-cas`
+- `/edit-case`
+- `/supprimer-cas`
+- `/delete-case`
+- `/unwarn`
+- `/profil-mod`
+- `/mod-profile`
+- `/lock`
+- `/unlock`
+- `/slowmode`
 - `!reset-heures-all`
 - `!reset-hours-all`
+- `!heures @membre`
+- `!hours @member`
+- `!top-semaine`
+- `!top-week`
+- `!resume-service`
+- `!summary`
 
 En gratuit, la reinitialisation reste disponible personne par personne avec `/reset-heures membre:@membre`, `/reset-heures utilisateur_id:ID`, `/reset-hours member:@member` ou `/reset-hours user_id:ID`.
+La moderation gratuite garde les actions essentielles et limite la consultation a `/sanctions`, soit les 10 derniers cas visibles.
 
 ## Moderation / Moderation
 
@@ -175,6 +199,15 @@ Francais :
 
 Sentinel verifie les roles autorises, les permissions Discord et la hierarchie des roles avant d'appliquer une sanction.
 
+Moderation Premium preparee :
+
+- `/cas` affiche le detail d'un cas.
+- `/modifier-cas` corrige la raison d'un cas.
+- `/supprimer-cas` supprime un cas.
+- `/unwarn` retire un avertissement par ID.
+- `/profil-mod` affiche un profil moderation complet.
+- `/lock`, `/unlock` et `/slowmode` gerent rapidement un salon.
+
 English:
 
 - `/warn` records a moderation case without applying a Discord punishment.
@@ -186,6 +219,15 @@ English:
 - `/mod-cases` shows the last 10 moderation cases for a member.
 
 Sentinel checks configured roles, Discord permissions, and role hierarchy before applying a moderation action.
+
+Prepared Premium moderation:
+
+- `/case` shows one case details.
+- `/edit-case` edits a case reason.
+- `/delete-case` deletes a case.
+- `/unwarn` removes a warning by ID.
+- `/mod-profile` shows a full moderation profile.
+- `/lock`, `/unlock`, and `/slowmode` quickly manage a channel.
 
 ## Permissions
 

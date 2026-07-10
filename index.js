@@ -44,7 +44,19 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'reset-heures-all',
     'reset-hours-all',
     'resume-service',
-    'summary'
+    'summary',
+    'cas',
+    'case',
+    'modifier-cas',
+    'edit-case',
+    'supprimer-cas',
+    'delete-case',
+    'unwarn',
+    'profil-mod',
+    'mod-profile',
+    'lock',
+    'unlock',
+    'slowmode'
 ]);
 const ADVANCED_TEXT_COMMANDS = [
     /^!(heures|hours)(?:\s|$)/i,
@@ -77,7 +89,13 @@ const MODERATION_ACTION_LABELS = {
         untimeout: 'Fin du timeout',
         kick: 'Expulsion',
         ban: 'Bannissement',
-        clear: 'Purge'
+        clear: 'Purge',
+        case_edit: 'Modification de cas',
+        case_delete: 'Suppression de cas',
+        unwarn: 'Retrait d avertissement',
+        lock: 'Salon verrouille',
+        unlock: 'Salon deverrouille',
+        slowmode: 'Mode lent'
     },
     en: {
         warn: 'Warning',
@@ -85,7 +103,13 @@ const MODERATION_ACTION_LABELS = {
         untimeout: 'Timeout removed',
         kick: 'Kick',
         ban: 'Ban',
-        clear: 'Purge'
+        clear: 'Purge',
+        case_edit: 'Case edited',
+        case_delete: 'Case deleted',
+        unwarn: 'Warning removed',
+        lock: 'Channel locked',
+        unlock: 'Channel unlocked',
+        slowmode: 'Slowmode'
     }
 };
 
@@ -165,7 +189,21 @@ const I18N = {
         moderationFailed: '❌ L’action de modération a échoué. Vérifie les permissions et la hiérarchie des rôles.',
         moderationNoChannel: '❌ Cette commande doit être utilisée dans un salon textuel.',
         moderationCasesTitle: 'Sentinel | Sanctions',
-        moderationLogTitle: 'Sentinel | Modération'
+        moderationCaseTitle: 'Sentinel | Cas de modération',
+        moderationProfileTitle: 'Sentinel | Profil modération',
+        moderationLogTitle: 'Sentinel | Modération',
+        moderationCaseNotFound: '❌ Aucun cas #{caseId} trouvé sur ce serveur.',
+        moderationCaseEdited: '✅ Le cas #{caseId} a été modifié.',
+        moderationCaseDeleted: '✅ Le cas #{caseId} a été supprimé.',
+        moderationUnwarnOnlyWarn: '❌ `/unwarn` peut seulement retirer un cas de type avertissement.',
+        moderationUnwarnDone: '✅ L’avertissement #{caseId} a été retiré.',
+        moderationProfileEmpty: 'Aucun cas de modération enregistré pour {member}.',
+        moderationLockDone: '🔒 Le salon {channel} est verrouillé.',
+        moderationUnlockDone: '🔓 Le salon {channel} est déverrouillé.',
+        moderationSlowmodeDone: '🐢 Mode lent défini sur **{duration}** dans {channel}.',
+        moderationSlowmodeDisabled: '✅ Mode lent désactivé dans {channel}.',
+        moderationSlowmodeTooLong: '❌ Discord limite le mode lent à 6 heures maximum.',
+        premiumModerationHelp: 'Premium modération : `/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`, `/lock`, `/unlock`, `/slowmode`.'
     },
     en: {
         requestedBy: 'Requested by',
@@ -242,7 +280,21 @@ const I18N = {
         moderationFailed: '❌ Moderation action failed. Check permissions and role hierarchy.',
         moderationNoChannel: '❌ This command must be used in a text channel.',
         moderationCasesTitle: 'Sentinel | Moderation cases',
-        moderationLogTitle: 'Sentinel | Moderation'
+        moderationCaseTitle: 'Sentinel | Moderation case',
+        moderationProfileTitle: 'Sentinel | Moderation profile',
+        moderationLogTitle: 'Sentinel | Moderation',
+        moderationCaseNotFound: '❌ No case #{caseId} found on this server.',
+        moderationCaseEdited: '✅ Case #{caseId} has been edited.',
+        moderationCaseDeleted: '✅ Case #{caseId} has been deleted.',
+        moderationUnwarnOnlyWarn: '❌ `/unwarn` can only remove warning cases.',
+        moderationUnwarnDone: '✅ Warning #{caseId} has been removed.',
+        moderationProfileEmpty: 'No moderation case recorded for {member}.',
+        moderationLockDone: '🔒 Channel {channel} is locked.',
+        moderationUnlockDone: '🔓 Channel {channel} is unlocked.',
+        moderationSlowmodeDone: '🐢 Slowmode set to **{duration}** in {channel}.',
+        moderationSlowmodeDisabled: '✅ Slowmode disabled in {channel}.',
+        moderationSlowmodeTooLong: '❌ Discord limits slowmode to 6 hours maximum.',
+        premiumModerationHelp: 'Premium moderation: `/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`, `/lock`, `/unlock`, `/slowmode`.'
     }
 };
 
@@ -325,7 +377,19 @@ function resolveCommandName(commandName) {
         purge: 'purge',
         clear: 'purge',
         sanctions: 'sanctions',
-        'mod-cases': 'sanctions'
+        'mod-cases': 'sanctions',
+        cas: 'cas',
+        case: 'cas',
+        'modifier-cas': 'modifier-cas',
+        'edit-case': 'modifier-cas',
+        'supprimer-cas': 'supprimer-cas',
+        'delete-case': 'supprimer-cas',
+        unwarn: 'unwarn',
+        'profil-mod': 'profil-mod',
+        'mod-profile': 'profil-mod',
+        lock: 'lock',
+        unlock: 'unlock',
+        slowmode: 'slowmode'
     };
 
     return aliases[commandName] || commandName;
@@ -991,6 +1055,52 @@ function getModerationCases(guildId, userId, limit = 10) {
     `).all(guildId, userId, limit);
 }
 
+function getModerationCase(guildId, caseId) {
+    return db.prepare(`
+        SELECT id, target_user_id, moderator_user_id, action, reason, duration, created_at
+        FROM moderation_cases
+        WHERE guild_id = ? AND id = ?
+    `).get(guildId, caseId);
+}
+
+function updateModerationCaseReason(guildId, caseId, reason) {
+    return db.prepare(`
+        UPDATE moderation_cases
+        SET reason = ?
+        WHERE guild_id = ? AND id = ?
+    `).run(reason, guildId, caseId).changes > 0;
+}
+
+function deleteModerationCase(guildId, caseId) {
+    const caseRow = getModerationCase(guildId, caseId);
+
+    if (!caseRow) {
+        return null;
+    }
+
+    db.prepare(`
+        DELETE FROM moderation_cases
+        WHERE guild_id = ? AND id = ?
+    `).run(guildId, caseId);
+
+    return caseRow;
+}
+
+function getModerationCaseStats(guildId, userId) {
+    const rows = db.prepare(`
+        SELECT action, COUNT(*) AS count
+        FROM moderation_cases
+        WHERE guild_id = ? AND target_user_id = ?
+        GROUP BY action
+    `).all(guildId, userId);
+
+    return rows.reduce((stats, row) => {
+        stats.total += row.count || 0;
+        stats.actions[row.action] = row.count || 0;
+        return stats;
+    }, { total: 0, actions: {} });
+}
+
 function getModerationLabel(action, language = 'fr') {
     const labels = MODERATION_ACTION_LABELS[language] || MODERATION_ACTION_LABELS.fr;
 
@@ -1036,6 +1146,22 @@ function parseDurationToMs(value) {
     };
 
     return amount * multipliers[unit];
+}
+
+function parseSlowmodeToSeconds(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+
+    if (['0', 'off', 'none', 'disable', 'disabled', 'desactiver', 'désactiver', 'non'].includes(normalized)) {
+        return 0;
+    }
+
+    const duration = parseDurationToMs(normalized);
+
+    if (duration === null) {
+        return null;
+    }
+
+    return Math.ceil(duration / 1000);
 }
 
 function hasModerationAccess(member, permissionFlag) {
@@ -1136,6 +1262,87 @@ function buildModerationCasesEmbed(member, requester, cases, language = 'fr') {
         thumbnail: member.user.displayAvatarURL(),
         language
     });
+}
+
+function buildModerationCaseEmbed(caseRow, requester, language = 'fr') {
+    const fields = [
+        {
+            name: language === 'en' ? 'Action' : 'Action',
+            value: getModerationLabel(caseRow.action, language),
+            inline: true
+        },
+        {
+            name: language === 'en' ? 'Target' : 'Cible',
+            value: caseRow.target_user_id ? `<@${caseRow.target_user_id}>` : (language === 'en' ? 'No user target' : 'Aucune cible utilisateur'),
+            inline: true
+        },
+        {
+            name: language === 'en' ? 'Moderator' : 'Modérateur',
+            value: `<@${caseRow.moderator_user_id}>`,
+            inline: true
+        },
+        {
+            name: language === 'en' ? 'Date' : 'Date',
+            value: `<t:${Math.floor(new Date(caseRow.created_at).getTime() / 1000)}:f>`,
+            inline: false
+        },
+        {
+            name: language === 'en' ? 'Reason' : 'Raison',
+            value: caseRow.reason || t(language, 'moderationReasonDefault'),
+            inline: false
+        }
+    ];
+
+    if (caseRow.duration) {
+        fields.push({
+            name: language === 'en' ? 'Duration' : 'Durée',
+            value: formatDuration(caseRow.duration),
+            inline: true
+        });
+    }
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.advanced,
+        title: `${t(language, 'moderationCaseTitle')} #${caseRow.id}`,
+        requester,
+        language
+    }).addFields(fields);
+}
+
+function buildModerationProfileEmbed(member, requester, cases, stats, language = 'fr') {
+    const actionSummary = Object.entries(stats.actions)
+        .sort((a, b) => b[1] - a[1])
+        .map(([action, count]) => `${getModerationLabel(action, language)} : **${count}**`);
+    const caseLines = cases.map(caseRow => {
+        const duration = caseRow.duration ? ` - ${formatDuration(caseRow.duration)}` : '';
+
+        return `**#${caseRow.id}** ${getModerationLabel(caseRow.action, language)}${duration} - <t:${Math.floor(new Date(caseRow.created_at).getTime() / 1000)}:d>`;
+    });
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.advanced,
+        title: t(language, 'moderationProfileTitle'),
+        description: `${language === 'en' ? 'Member' : 'Membre'} : ${member}`,
+        requester,
+        thumbnail: member.user.displayAvatarURL(),
+        language
+    }).addFields(
+        {
+            name: language === 'en' ? 'Total cases' : 'Total des cas',
+            value: `**${stats.total}**`,
+            inline: true
+        },
+        {
+            name: language === 'en' ? 'Breakdown' : 'Répartition',
+            value: actionSummary.length ? actionSummary.join('\n') : '-',
+            inline: false
+        },
+        {
+            name: language === 'en' ? 'Latest cases' : 'Derniers cas',
+            value: caseLines.length ? caseLines.join('\n') : '-',
+            inline: false
+        }
+    );
 }
 
 function buildModerationLogEmbed(guild, requester, caseData, targetLabel, language = 'fr') {
@@ -1963,7 +2170,11 @@ function buildHelpEmbed(guild, requester) {
                     '`/top-week` or `!top-week`',
                     '`/summary` or `!summary`',
                     '`/diagnostic`, `/sync-service`, `/sync-sentinel`, `/ping`',
-                    '`/reset-hours-all` is reserved for Sentinel Premium.'
+                    '`/reset-hours-all` is reserved for Sentinel Premium.',
+                    '',
+                    '**Premium moderation**',
+                    '`/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`',
+                    '`/lock`, `/unlock`, `/slowmode`'
                 ].join('\n'),
                 inline: false
             });
@@ -2050,6 +2261,14 @@ function buildHelpEmbed(guild, requester) {
         '`/sanctions membre` - voir les 10 dernieres sanctions',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
+    const premiumModerationUsage = [
+        '`/cas id` - afficher un dossier de moderation precis',
+        '`/modifier-cas id raison` - corriger la raison d un cas',
+        '`/supprimer-cas id` - supprimer un cas',
+        '`/unwarn id` - retirer un avertissement par ID',
+        '`/profil-mod membre` - voir le profil moderation complet',
+        '`/lock`, `/unlock`, `/slowmode duree` - gerer rapidement un salon'
+    ];
     const freeLimits = isReferenceServer
         ? [
             'Serveur de reference Sentinel : toutes les commandes du bot sont ouvertes ici.',
@@ -2062,6 +2281,7 @@ function buildHelpEmbed(guild, requester) {
             'Historique visible : 5 dernieres sessions personnelles.',
             'Classement public : top 10 global.',
             '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
+            'La moderation gratuite garde les actions essentielles et affiche les 10 derniers cas.',
             'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
             'Les options avancees ne sont pas ouvertes publiquement pour le moment.'
         ];
@@ -2129,6 +2349,11 @@ function buildHelpEmbed(guild, requester) {
                 '`/ping` ou `!ping`',
                 `Historique jusqu a ${REFERENCE_HISTORY_LIMIT} sessions par demande`
             ].join('\n'),
+            inline: false
+        });
+        fields.push({
+            name: 'Moderation Premium',
+            value: premiumModerationUsage.join('\n'),
             inline: false
         });
     }
@@ -2596,7 +2821,15 @@ async function handleModerationInteraction(interaction, commandName, language) {
         'expulser',
         'bannir',
         'purge',
-        'sanctions'
+        'sanctions',
+        'cas',
+        'modifier-cas',
+        'supprimer-cas',
+        'unwarn',
+        'profil-mod',
+        'lock',
+        'unlock',
+        'slowmode'
     ]);
 
     if (!moderationCommands.has(commandName)) {
@@ -2610,7 +2843,15 @@ async function handleModerationInteraction(interaction, commandName, language) {
         expulser: PermissionsBitField.Flags.KickMembers,
         bannir: PermissionsBitField.Flags.BanMembers,
         purge: PermissionsBitField.Flags.ManageMessages,
-        sanctions: PermissionsBitField.Flags.ModerateMembers
+        sanctions: PermissionsBitField.Flags.ModerateMembers,
+        cas: PermissionsBitField.Flags.ModerateMembers,
+        'modifier-cas': PermissionsBitField.Flags.ModerateMembers,
+        'supprimer-cas': PermissionsBitField.Flags.ModerateMembers,
+        unwarn: PermissionsBitField.Flags.ModerateMembers,
+        'profil-mod': PermissionsBitField.Flags.ModerateMembers,
+        lock: PermissionsBitField.Flags.ManageChannels,
+        unlock: PermissionsBitField.Flags.ManageChannels,
+        slowmode: PermissionsBitField.Flags.ManageChannels
     };
     const requiredPermission = permissionByCommand[commandName];
 
@@ -2622,7 +2863,7 @@ async function handleModerationInteraction(interaction, commandName, language) {
         return true;
     }
 
-    if (['timeout', 'fin-timeout', 'expulser', 'bannir', 'purge'].includes(commandName)
+    if (['timeout', 'fin-timeout', 'expulser', 'bannir', 'purge', 'lock', 'unlock', 'slowmode'].includes(commandName)
         && !botHasPermission(interaction.guild, requiredPermission)) {
         await interaction.reply({
             content: t(language, 'moderationBotPermissionMissing'),
@@ -2692,6 +2933,269 @@ async function handleModerationInteraction(interaction, commandName, language) {
 
         await interaction.reply({
             embeds: [buildModerationCasesEmbed(member, interaction.user, cases, language)],
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'cas') {
+        const caseId = interaction.options.getInteger('id');
+        const caseRow = getModerationCase(guildId, caseId);
+
+        if (!caseRow) {
+            await interaction.reply({
+                content: t(language, 'moderationCaseNotFound', { caseId }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        await interaction.reply({
+            embeds: [buildModerationCaseEmbed(caseRow, interaction.user, language)],
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'modifier-cas') {
+        const caseId = interaction.options.getInteger('id');
+        const caseRow = getModerationCase(guildId, caseId);
+
+        if (!caseRow) {
+            await interaction.reply({
+                content: t(language, 'moderationCaseNotFound', { caseId }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const reason = getReason(
+            interaction.options.getString('raison') || interaction.options.getString('reason'),
+            language
+        );
+
+        updateModerationCaseReason(guildId, caseId, reason);
+
+        const caseData = {
+            id: caseId,
+            guildId,
+            targetUserId: caseRow.target_user_id,
+            moderatorUserId: interaction.user.id,
+            action: 'case_edit',
+            reason,
+            duration: null,
+            createdAt: new Date().toISOString()
+        };
+
+        await sendModerationLog(
+            interaction.guild,
+            interaction.user,
+            caseData,
+            caseRow.target_user_id ? `<@${caseRow.target_user_id}>` : `#${caseId}`,
+            language
+        );
+
+        await interaction.reply({
+            content: t(language, 'moderationCaseEdited', { caseId }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'supprimer-cas' || commandName === 'unwarn') {
+        const caseId = interaction.options.getInteger('id');
+        const caseRow = getModerationCase(guildId, caseId);
+
+        if (!caseRow) {
+            await interaction.reply({
+                content: t(language, 'moderationCaseNotFound', { caseId }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (commandName === 'unwarn' && caseRow.action !== 'warn') {
+            await interaction.reply({
+                content: t(language, 'moderationUnwarnOnlyWarn'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        deleteModerationCase(guildId, caseId);
+
+        const reason = getReason(
+            interaction.options.getString('raison') || interaction.options.getString('reason'),
+            language
+        );
+        const action = commandName === 'unwarn' ? 'unwarn' : 'case_delete';
+        const caseData = addModerationCase(
+            guildId,
+            caseRow.target_user_id,
+            interaction.user.id,
+            action,
+            `${language === 'en' ? 'Original case' : 'Cas original'} #${caseId}. ${reason}`,
+            null
+        );
+
+        await sendModerationLog(
+            interaction.guild,
+            interaction.user,
+            caseData,
+            caseRow.target_user_id ? `<@${caseRow.target_user_id}>` : `#${caseId}`,
+            language
+        );
+
+        await interaction.reply({
+            content: commandName === 'unwarn'
+                ? t(language, 'moderationUnwarnDone', { caseId })
+                : t(language, 'moderationCaseDeleted', { caseId }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'profil-mod') {
+        const member = await getMemberOption(interaction, 'membre');
+
+        if (!member) {
+            await interaction.reply({
+                content: t(language, 'moderationMemberRequired'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const limit = clampNumber(interaction.options.getInteger('limite') || interaction.options.getInteger('limit') || 25, 1, 25);
+        const cases = getModerationCases(guildId, member.id, limit);
+
+        if (cases.length === 0) {
+            await interaction.reply({
+                content: t(language, 'moderationProfileEmpty', { member }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const stats = getModerationCaseStats(guildId, member.id);
+
+        await interaction.reply({
+            embeds: [buildModerationProfileEmbed(member, interaction.user, cases, stats, language)],
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (['lock', 'unlock', 'slowmode'].includes(commandName)) {
+        if (!interaction.channel?.isTextBased()) {
+            await interaction.reply({
+                content: t(language, 'moderationNoChannel'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const reason = getReason(
+            interaction.options.getString('raison') || interaction.options.getString('reason'),
+            language
+        );
+
+        try {
+            if (commandName === 'lock') {
+                await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+                    SendMessages: false,
+                    SendMessagesInThreads: false,
+                    CreatePublicThreads: false,
+                    CreatePrivateThreads: false
+                }, { reason });
+            }
+
+            if (commandName === 'unlock') {
+                await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+                    SendMessages: null,
+                    SendMessagesInThreads: null,
+                    CreatePublicThreads: null,
+                    CreatePrivateThreads: null
+                }, { reason });
+            }
+
+            if (commandName === 'slowmode') {
+                if (typeof interaction.channel.setRateLimitPerUser !== 'function') {
+                    await interaction.reply({
+                        content: t(language, 'moderationNoChannel'),
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                const seconds = parseSlowmodeToSeconds(
+                    interaction.options.getString('duree') || interaction.options.getString('duration')
+                );
+
+                if (seconds === null) {
+                    await interaction.reply({
+                        content: t(language, 'moderationDurationInvalid'),
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                if (seconds > 21600) {
+                    await interaction.reply({
+                        content: t(language, 'moderationSlowmodeTooLong'),
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                await interaction.channel.setRateLimitPerUser(seconds, reason);
+            }
+        } catch (error) {
+            console.error('Erreur moderation premium :', error);
+            await interaction.reply({
+                content: t(language, 'moderationFailed'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const slowmodeSeconds = commandName === 'slowmode'
+            ? parseSlowmodeToSeconds(interaction.options.getString('duree') || interaction.options.getString('duration'))
+            : null;
+        const caseData = addModerationCase(
+            guildId,
+            null,
+            interaction.user.id,
+            commandName,
+            `${interaction.channel} - ${reason}`,
+            slowmodeSeconds !== null ? slowmodeSeconds * 1000 : null
+        );
+
+        await sendModerationLog(interaction.guild, interaction.user, caseData, `${interaction.channel}`, language);
+
+        if (commandName === 'lock') {
+            await interaction.reply({
+                content: t(language, 'moderationLockDone', { channel: interaction.channel }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (commandName === 'unlock') {
+            await interaction.reply({
+                content: t(language, 'moderationUnlockDone', { channel: interaction.channel }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        await interaction.reply({
+            content: slowmodeSeconds === 0
+                ? t(language, 'moderationSlowmodeDisabled', { channel: interaction.channel })
+                : t(language, 'moderationSlowmodeDone', {
+                    channel: interaction.channel,
+                    duration: formatDuration(slowmodeSeconds * 1000)
+                }),
             flags: MessageFlags.Ephemeral
         });
         return true;
