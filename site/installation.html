@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Installation | Sentinel</title>
+  <meta name="description" content="Installer et configurer Sentinel sur un serveur Discord.">
+  <meta name="robots" content="index, follow">
+  <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html"><img src="assets/sentinel-mark.png" alt=""><span>Sentinel</span></a>
+    <nav class="nav-links">
+      <a href="fonctionnalites.html">Fonctionnalites</a>
+      <a href="commandes.html">Commandes</a>
+      <a href="premium.html">Premium</a>
+      <a href="securite.html">Securite</a>
+      <a href="installation.html" aria-current="page">Installation</a>
+    </nav>
+    <div class="header-actions">
+      <a class="button button-ghost button-small" href="dashboard.html">Dashboard</a>
+      <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <p class="eyebrow">Installation</p>
+      <h1>Installer Sentinel proprement.</h1>
+      <p>Le bot doit etre ajoute comme bot Discord, pas seulement comme integration de commandes.</p>
+    </section>
+
+    <section class="section section-flow">
+      <div class="section-inner split-layout">
+        <div class="section-heading">
+          <p class="eyebrow">Etapes</p>
+          <h2>Demarrage recommande.</h2>
+          <p>Suis ces etapes dans l'ordre pour eviter les problemes de permissions et de roles.</p>
+        </div>
+        <ol class="steps">
+          <li><strong>Inviter Sentinel</strong><span>Utilise le lien officiel avec les scopes bot et applications.commands.</span></li>
+          <li><strong>Verifier l'integration</strong><span>Dans les integrations Discord, Sentinel doit avoir le badge Bot.</span></li>
+          <li><strong>Placer le role Sentinel</strong><span>Le role du bot doit etre au-dessus du role de service et des roles a moderer.</span></li>
+          <li><strong>Choisir la langue</strong><span>Utilise /config-langue ou le dashboard pour choisir FR ou EN.</span></li>
+          <li><strong>Configurer le service</strong><span>Definis le role de service, le salon de logs et les roles autorises.</span></li>
+          <li><strong>Publier le panneau</strong><span>Envoie !service-panel ou utilise le dashboard.</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section section-dark">
+      <div class="section-inner install-actions">
+        <div>
+          <p class="eyebrow">Action</p>
+          <h2>Tu peux commencer maintenant.</h2>
+          <p>Invite Sentinel, puis ouvre le dashboard pour configurer ton serveur visuellement.</p>
+        </div>
+        <div class="hero-actions">
+          <a class="button" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter Sentinel</a>
+          <a class="button button-ghost" href="dashboard.html">Ouvrir le dashboard</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Sentinel</span>
+    <div><a href="fonctionnalites.html">Fonctionnalites</a><a href="commandes.html">Commandes</a><a href="securite.html">Securite</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Securite | Sentinel</title>
+  <meta name="description" content="Securite, permissions et confidentialite de Sentinel.">
+  <meta name="robots" content="index, follow">
+  <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html"><img src="assets/sentinel-mark.png" alt=""><span>Sentinel</span></a>
+    <nav class="nav-links">
+      <a href="fonctionnalites.html">Fonctionnalites</a>
+      <a href="commandes.html">Commandes</a>
+      <a href="premium.html">Premium</a>
+      <a href="securite.html" aria-current="page">Securite</a>
+      <a href="installation.html">Installation</a>
+    </nav>
+    <div class="header-actions">
+      <a class="button button-ghost button-small" href="dashboard.html">Dashboard</a>
+      <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <p class="eyebrow">Securite</p>
+      <h1>Des garde-fous avant chaque action sensible.</h1>
+      <p>Sentinel respecte les permissions Discord, les roles autorises et la hierarchie du serveur.</p>
+    </section>
+
+    <section class="section section-dark">
+      <div class="section-inner security-grid">
+        <article class="wide-card">
+          <div>
+            <p class="eyebrow">Acces</p>
+            <h2>Gestion par roles autorises.</h2>
+            <p>Les commandes de gestion passent par les roles definis avec Sentinel. Le proprietaire garde un acces de secours pour eviter un blocage complet.</p>
+          </div>
+          <ul class="check-list">
+            <li>/config-permissions</li>
+            <li>Roles dedies staff</li>
+            <li>Amorcage securise</li>
+          </ul>
+        </article>
+
+        <article class="wide-card">
+          <div>
+            <p class="eyebrow">Moderation</p>
+            <h2>Discord garde le dernier mot.</h2>
+            <p>Sentinel ne contourne pas Discord : si la permission ou la hierarchie manque, l'action est refusee.</p>
+          </div>
+          <ul class="check-list">
+            <li>Permission native verifiee</li>
+            <li>Hierarchie des roles respectee</li>
+            <li>Logs de moderation</li>
+          </ul>
+        </article>
+
+        <article class="wide-card">
+          <div>
+            <p class="eyebrow">Donnees</p>
+            <h2>Stockage limite au fonctionnement du bot.</h2>
+            <p>Sentinel stocke les IDs Discord, les temps de service, les sessions et la configuration serveur necessaires a son fonctionnement.</p>
+          </div>
+          <ul class="check-list">
+            <li>SQLite serveur par serveur</li>
+            <li>Pas de vente de donnees</li>
+            <li>Politique de confidentialite disponible</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Sentinel</span>
+    <div><a href="https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md">Conditions</a><a href="https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md">Confidentialite</a><a href="installation.html">Installation</a></div>
+  </footer>
+</body>
+</html>
