@@ -52,6 +52,18 @@ CREATE TABLE IF NOT EXISTS moderation_cases (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS moderation_tempbans (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    moderator_user_id TEXT NOT NULL,
+    reason TEXT,
+    duration INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    case_id INTEGER,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -69,6 +81,9 @@ ON moderation_cases (guild_id, target_user_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_moderation_cases_guild_created
 ON moderation_cases (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_moderation_tempbans_expires
+ON moderation_tempbans (expires_at);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()

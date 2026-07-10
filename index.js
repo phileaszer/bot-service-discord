@@ -32,6 +32,7 @@ const REFERENCE_HISTORY_LIMIT = 100;
 const REFERENCE_TOP_LIMIT = 25;
 const ADVANCED_HISTORY_LIMIT = REFERENCE_HISTORY_LIMIT;
 const MAX_TIMEOUT_DURATION = 28 * 24 * 60 * 60 * 1000;
+const MAX_TEMPBAN_DURATION = 365 * 24 * 60 * 60 * 1000;
 const ADVANCED_COMMAND_NAMES = new Set([
     'heures',
     'hours',
@@ -54,6 +55,8 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'unwarn',
     'profil-mod',
     'mod-profile',
+    'tempban',
+    'unban',
     'lock',
     'unlock',
     'slowmode'
@@ -89,6 +92,9 @@ const MODERATION_ACTION_LABELS = {
         untimeout: 'Fin du timeout',
         kick: 'Expulsion',
         ban: 'Bannissement',
+        tempban: 'Bannissement temporaire',
+        tempban_expired: 'Fin du bannissement temporaire',
+        unban: 'Debannissement',
         clear: 'Purge',
         case_edit: 'Modification de cas',
         case_delete: 'Suppression de cas',
@@ -103,6 +109,9 @@ const MODERATION_ACTION_LABELS = {
         untimeout: 'Timeout removed',
         kick: 'Kick',
         ban: 'Ban',
+        tempban: 'Temporary ban',
+        tempban_expired: 'Temporary ban expired',
+        unban: 'Unban',
         clear: 'Purge',
         case_edit: 'Case edited',
         case_delete: 'Case deleted',
@@ -172,6 +181,7 @@ const I18N = {
         moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
         moderationMemberRequired: '❌ Tu dois choisir un membre du serveur.',
         moderationUserRequired: '❌ Tu dois choisir un utilisateur.',
+        moderationTargetRequired: '❌ Choisis un membre ou indique son ID Discord.',
         moderationReasonDefault: 'Aucune raison indiquée.',
         moderationDurationInvalid: '❌ Durée invalide. Exemples valides : `10m`, `2h`, `7d`.',
         moderationDurationTooLong: '❌ Discord limite les timeouts à 28 jours maximum.',
@@ -184,6 +194,11 @@ const I18N = {
         moderationUntimeout: '✅ Le timeout de {member} a été retiré. Cas #{caseId}.',
         moderationKick: '✅ {member} a été expulsé du serveur. Cas #{caseId}.',
         moderationBan: '✅ {user} a été banni du serveur. Cas #{caseId}.',
+        moderationTempban: '✅ {user} a été banni temporairement jusqu’à {expiresAt}. Cas #{caseId}.',
+        moderationTempbanTooLong: '❌ La durée maximale d’un ban temporaire est de 365 jours.',
+        moderationUnban: '✅ L’utilisateur `{userId}` a été débanni. Cas #{caseId}.',
+        moderationTempbanExpiredReason: 'Expiration automatique du ban temporaire #{caseId}.',
+        moderationTempbanActive: 'ℹ️ Un ban temporaire est déjà programmé pour cet utilisateur jusqu’à {expiresAt}. La nouvelle commande le remplace.',
         moderationClear: '✅ **{count}** message(s) supprimé(s).',
         moderationCasesEmpty: 'Aucune sanction enregistrée pour {member}.',
         moderationFailed: '❌ L’action de modération a échoué. Vérifie les permissions et la hiérarchie des rôles.',
@@ -203,7 +218,7 @@ const I18N = {
         moderationSlowmodeDone: '🐢 Mode lent défini sur **{duration}** dans {channel}.',
         moderationSlowmodeDisabled: '✅ Mode lent désactivé dans {channel}.',
         moderationSlowmodeTooLong: '❌ Discord limite le mode lent à 6 heures maximum.',
-        premiumModerationHelp: 'Premium modération : `/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`, `/lock`, `/unlock`, `/slowmode`.'
+        premiumModerationHelp: 'Premium modération : `/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.'
     },
     en: {
         requestedBy: 'Requested by',
@@ -263,6 +278,7 @@ const I18N = {
         moderationBotPermissionMissing: '❌ Sentinel does not have the required Discord permission for this action.',
         moderationMemberRequired: '❌ You must choose a server member.',
         moderationUserRequired: '❌ You must choose a user.',
+        moderationTargetRequired: '❌ Choose a member or provide their Discord ID.',
         moderationReasonDefault: 'No reason provided.',
         moderationDurationInvalid: '❌ Invalid duration. Valid examples: `10m`, `2h`, `7d`.',
         moderationDurationTooLong: '❌ Discord limits timeouts to 28 days maximum.',
@@ -275,6 +291,11 @@ const I18N = {
         moderationUntimeout: '✅ Timeout removed from {member}. Case #{caseId}.',
         moderationKick: '✅ {member} has been kicked from the server. Case #{caseId}.',
         moderationBan: '✅ {user} has been banned from the server. Case #{caseId}.',
+        moderationTempban: '✅ {user} has been temporarily banned until {expiresAt}. Case #{caseId}.',
+        moderationTempbanTooLong: '❌ Temporary bans are limited to 365 days maximum.',
+        moderationUnban: '✅ User `{userId}` has been unbanned. Case #{caseId}.',
+        moderationTempbanExpiredReason: 'Automatic expiration of temporary ban #{caseId}.',
+        moderationTempbanActive: 'ℹ️ A temporary ban is already scheduled for this user until {expiresAt}. The new command replaces it.',
         moderationClear: '✅ **{count}** message(s) deleted.',
         moderationCasesEmpty: 'No moderation case recorded for {member}.',
         moderationFailed: '❌ Moderation action failed. Check permissions and role hierarchy.',
@@ -294,7 +315,7 @@ const I18N = {
         moderationSlowmodeDone: '🐢 Slowmode set to **{duration}** in {channel}.',
         moderationSlowmodeDisabled: '✅ Slowmode disabled in {channel}.',
         moderationSlowmodeTooLong: '❌ Discord limits slowmode to 6 hours maximum.',
-        premiumModerationHelp: 'Premium moderation: `/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`, `/lock`, `/unlock`, `/slowmode`.'
+        premiumModerationHelp: 'Premium moderation: `/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.'
     }
 };
 
@@ -387,6 +408,8 @@ function resolveCommandName(commandName) {
         unwarn: 'unwarn',
         'profil-mod': 'profil-mod',
         'mod-profile': 'profil-mod',
+        tempban: 'tempban',
+        unban: 'unban',
         lock: 'lock',
         unlock: 'unlock',
         slowmode: 'slowmode'
@@ -1101,6 +1124,60 @@ function getModerationCaseStats(guildId, userId) {
     }, { total: 0, actions: {} });
 }
 
+function getTemporaryBan(guildId, userId) {
+    return db.prepare(`
+        SELECT guild_id, user_id, moderator_user_id, reason, duration, expires_at, case_id, created_at
+        FROM moderation_tempbans
+        WHERE guild_id = ? AND user_id = ?
+    `).get(guildId, userId);
+}
+
+function upsertTemporaryBan(guildId, userId, moderatorUserId, reason, duration, expiresAt, caseId) {
+    db.prepare(`
+        INSERT OR REPLACE INTO moderation_tempbans (
+            guild_id,
+            user_id,
+            moderator_user_id,
+            reason,
+            duration,
+            expires_at,
+            case_id,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        guildId,
+        userId,
+        moderatorUserId,
+        reason || null,
+        duration,
+        expiresAt,
+        caseId || null,
+        new Date().toISOString()
+    );
+}
+
+function deleteTemporaryBan(guildId, userId) {
+    return db.prepare(`
+        DELETE FROM moderation_tempbans
+        WHERE guild_id = ? AND user_id = ?
+    `).run(guildId, userId).changes > 0;
+}
+
+function getExpiredTemporaryBans(now = Date.now()) {
+    return db.prepare(`
+        SELECT guild_id, user_id, moderator_user_id, reason, duration, expires_at, case_id, created_at
+        FROM moderation_tempbans
+        WHERE expires_at <= ?
+        ORDER BY expires_at ASC
+        LIMIT 50
+    `).all(now);
+}
+
+function formatDiscordTime(ms, style = 'f') {
+    return `<t:${Math.floor(ms / 1000)}:${style}>`;
+}
+
 function getModerationLabel(action, language = 'fr') {
     const labels = MODERATION_ACTION_LABELS[language] || MODERATION_ACTION_LABELS.fr;
 
@@ -1233,13 +1310,37 @@ function getUserTargetError(guild, moderatorMember, targetUser, targetMember, la
     return null;
 }
 
+function getUserTargetErrorById(guild, moderatorMember, targetUserId, targetMember, language = 'fr') {
+    if (!targetUserId) {
+        return t(language, 'moderationUserRequired');
+    }
+
+    if (targetUserId === moderatorMember.id) {
+        return t(language, 'moderationSelfDenied');
+    }
+
+    if (targetUserId === guild.ownerId) {
+        return t(language, 'moderationOwnerDenied');
+    }
+
+    if (targetUserId === client.user.id) {
+        return t(language, 'moderationBotDenied');
+    }
+
+    if (targetMember) {
+        return getModerationTargetError(moderatorMember, targetMember, language);
+    }
+
+    return null;
+}
+
 function getReason(value, language = 'fr') {
     const reason = String(value || '').trim();
 
     return reason || t(language, 'moderationReasonDefault');
 }
 
-function buildModerationCasesEmbed(member, requester, cases, language = 'fr') {
+function buildModerationCasesEmbed(member, requester, cases, language = 'fr', userId = null) {
     const lines = cases.map(caseRow => {
         const duration = caseRow.duration
             ? ` - ${formatDuration(caseRow.duration)}`
@@ -1253,15 +1354,19 @@ function buildModerationCasesEmbed(member, requester, cases, language = 'fr') {
             `${language === 'en' ? 'Reason' : 'Raison'} : ${reason}`
         ].join('\n');
     });
+    const targetLabel = member ? `${member}` : formatUserIdLabel(userId, language);
+    const thumbnail = member?.user?.displayAvatarURL();
 
-    return createSentinelEmbed({
+    const embed = createSentinelEmbed({
         color: SENTINEL_COLORS.warning,
         title: t(language, 'moderationCasesTitle'),
-        description: `${language === 'en' ? 'Member' : 'Membre'} : ${member}\n\n${lines.join('\n\n')}`,
+        description: `${language === 'en' ? 'Target' : 'Cible'} : ${targetLabel}\n\n${lines.join('\n\n')}`,
         requester,
-        thumbnail: member.user.displayAvatarURL(),
+        thumbnail,
         language
     });
+
+    return embed;
 }
 
 function buildModerationCaseEmbed(caseRow, requester, language = 'fr') {
@@ -1309,7 +1414,7 @@ function buildModerationCaseEmbed(caseRow, requester, language = 'fr') {
     }).addFields(fields);
 }
 
-function buildModerationProfileEmbed(member, requester, cases, stats, language = 'fr') {
+function buildModerationProfileEmbed(member, requester, cases, stats, language = 'fr', userId = null) {
     const actionSummary = Object.entries(stats.actions)
         .sort((a, b) => b[1] - a[1])
         .map(([action, count]) => `${getModerationLabel(action, language)} : **${count}**`);
@@ -1318,13 +1423,15 @@ function buildModerationProfileEmbed(member, requester, cases, stats, language =
 
         return `**#${caseRow.id}** ${getModerationLabel(caseRow.action, language)}${duration} - <t:${Math.floor(new Date(caseRow.created_at).getTime() / 1000)}:d>`;
     });
+    const targetLabel = member ? `${member}` : formatUserIdLabel(userId, language);
+    const thumbnail = member?.user?.displayAvatarURL();
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.advanced,
         title: t(language, 'moderationProfileTitle'),
-        description: `${language === 'en' ? 'Member' : 'Membre'} : ${member}`,
+        description: `${language === 'en' ? 'Target' : 'Cible'} : ${targetLabel}`,
         requester,
-        thumbnail: member.user.displayAvatarURL(),
+        thumbnail,
         language
     }).addFields(
         {
@@ -1402,6 +1509,46 @@ async function sendModerationLog(guild, requester, caseData, targetLabel, langua
     await logChannel.send({
         embeds: [buildModerationLogEmbed(guild, requester, caseData, targetLabel, language)]
     }).catch(() => {});
+}
+
+async function processExpiredTemporaryBans() {
+    const expiredBans = getExpiredTemporaryBans();
+
+    for (const tempban of expiredBans) {
+        const guild = client.guilds.cache.get(tempban.guild_id)
+            || await client.guilds.fetch(tempban.guild_id).catch(() => null);
+
+        if (!guild) {
+            continue;
+        }
+
+        const language = getGuildLanguage(guild.id);
+        const reason = t(language, 'moderationTempbanExpiredReason', {
+            caseId: tempban.case_id || '?'
+        });
+
+        try {
+            await guild.bans.remove(tempban.user_id, reason);
+        } catch (error) {
+            if (![10007, 10026].includes(error.code)) {
+                console.error('Erreur expiration tempban :', error);
+                continue;
+            }
+        }
+
+        deleteTemporaryBan(guild.id, tempban.user_id);
+
+        const caseData = addModerationCase(
+            guild.id,
+            tempban.user_id,
+            client.user.id,
+            'tempban_expired',
+            reason,
+            null
+        );
+
+        await sendModerationLog(guild, client.user, caseData, `<@${tempban.user_id}>`, language);
+    }
 }
 
 function formatSessionDate(date) {
@@ -2155,6 +2302,7 @@ function buildHelpEmbed(guild, requester) {
                 name: 'Moderation',
                 value: [
                     '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`, `/mod-cases`.',
+                    '`/ban` and `/mod-cases` can use a Discord ID when the user is no longer in the server.',
                     'Text aliases: `!warn`, `!timeout`, `!untimeout`, `!kick`, `!ban`, `!clear`, `!mod-cases`.',
                     'Sentinel checks role hierarchy before applying a sanction.'
                 ].join('\n'),
@@ -2174,6 +2322,7 @@ function buildHelpEmbed(guild, requester) {
                     '',
                     '**Premium moderation**',
                     '`/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`',
+                    '`/tempban duration user` or `user_id`, `/unban user_id`',
                     '`/lock`, `/unlock`, `/slowmode`'
                 ].join('\n'),
                 inline: false
@@ -2256,9 +2405,9 @@ function buildHelpEmbed(guild, requester) {
         '`/timeout membre duree raison` - rendre muet temporairement, exemple `10m`, `2h`, `7d`',
         '`/fin-timeout membre raison` - retirer un timeout',
         '`/expulser membre raison` - expulser un membre',
-        '`/bannir utilisateur raison` - bannir un utilisateur',
+        '`/bannir utilisateur ou utilisateur_id raison` - bannir, meme si la personne n est plus sur le serveur',
         '`/purge nombre` - supprimer jusqu a 100 messages recents',
-        '`/sanctions membre` - voir les 10 dernieres sanctions',
+        '`/sanctions membre ou utilisateur_id` - voir les 10 dernieres sanctions',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
     const premiumModerationUsage = [
@@ -2266,7 +2415,9 @@ function buildHelpEmbed(guild, requester) {
         '`/modifier-cas id raison` - corriger la raison d un cas',
         '`/supprimer-cas id` - supprimer un cas',
         '`/unwarn id` - retirer un avertissement par ID',
-        '`/profil-mod membre` - voir le profil moderation complet',
+        '`/profil-mod membre ou utilisateur_id` - voir le profil moderation complet',
+        '`/tempban duree utilisateur ou utilisateur_id` - bannir temporairement avec expiration automatique',
+        '`/unban utilisateur_id` - debannir par ID et annuler un tempban actif',
         '`/lock`, `/unlock`, `/slowmode duree` - gerer rapidement un salon'
     ];
     const freeLimits = isReferenceServer
@@ -2811,6 +2962,46 @@ async function getMemberOption(interaction, optionName) {
     return user ? await fetchMemberSafely(interaction.guild, user.id) : null;
 }
 
+function getUserIdOption(interaction) {
+    return normalizeUserId(
+        interaction.options.getString('utilisateur_id')
+        || interaction.options.getString('user_id')
+    );
+}
+
+function formatUserIdLabel(userId, language = 'fr') {
+    return language === 'en'
+        ? `user ID \`${userId}\``
+        : `utilisateur ID \`${userId}\``;
+}
+
+async function getMemberOrIdOption(interaction, optionName = 'membre', language = 'fr') {
+    const member = await getMemberOption(interaction, optionName);
+    const userId = member?.id || getUserIdOption(interaction);
+    const fetchedMember = member || (userId ? await fetchMemberSafely(interaction.guild, userId) : null);
+
+    return {
+        member: fetchedMember,
+        userId,
+        label: fetchedMember ? `${fetchedMember}` : (userId ? formatUserIdLabel(userId, language) : null)
+    };
+}
+
+async function getUserOrIdOption(interaction, optionName = 'utilisateur', language = 'fr') {
+    const selectedUser = interaction.options.getUser(optionName)
+        || interaction.options.getUser('user');
+    const userId = selectedUser?.id || getUserIdOption(interaction);
+    const user = selectedUser || (userId ? await client.users.fetch(userId).catch(() => null) : null);
+    const member = userId ? await fetchMemberSafely(interaction.guild, userId) : null;
+
+    return {
+        user,
+        userId,
+        member,
+        label: user ? `${user}` : (userId ? formatUserIdLabel(userId, language) : null)
+    };
+}
+
 async function handleModerationInteraction(interaction, commandName, language) {
     const guildId = interaction.guild.id;
     const moderator = interaction.member;
@@ -2827,6 +3018,8 @@ async function handleModerationInteraction(interaction, commandName, language) {
         'supprimer-cas',
         'unwarn',
         'profil-mod',
+        'tempban',
+        'unban',
         'lock',
         'unlock',
         'slowmode'
@@ -2849,6 +3042,8 @@ async function handleModerationInteraction(interaction, commandName, language) {
         'supprimer-cas': PermissionsBitField.Flags.ModerateMembers,
         unwarn: PermissionsBitField.Flags.ModerateMembers,
         'profil-mod': PermissionsBitField.Flags.ModerateMembers,
+        tempban: PermissionsBitField.Flags.BanMembers,
+        unban: PermissionsBitField.Flags.BanMembers,
         lock: PermissionsBitField.Flags.ManageChannels,
         unlock: PermissionsBitField.Flags.ManageChannels,
         slowmode: PermissionsBitField.Flags.ManageChannels
@@ -2863,7 +3058,7 @@ async function handleModerationInteraction(interaction, commandName, language) {
         return true;
     }
 
-    if (['timeout', 'fin-timeout', 'expulser', 'bannir', 'purge', 'lock', 'unlock', 'slowmode'].includes(commandName)
+    if (['timeout', 'fin-timeout', 'expulser', 'bannir', 'purge', 'tempban', 'unban', 'lock', 'unlock', 'slowmode'].includes(commandName)
         && !botHasPermission(interaction.guild, requiredPermission)) {
         await interaction.reply({
             content: t(language, 'moderationBotPermissionMissing'),
@@ -2911,28 +3106,28 @@ async function handleModerationInteraction(interaction, commandName, language) {
     }
 
     if (commandName === 'sanctions') {
-        const member = await getMemberOption(interaction, 'membre');
+        const target = await getMemberOrIdOption(interaction, 'membre', language);
 
-        if (!member) {
+        if (!target.userId) {
             await interaction.reply({
-                content: t(language, 'moderationMemberRequired'),
+                content: t(language, 'moderationTargetRequired'),
                 flags: MessageFlags.Ephemeral
             });
             return true;
         }
 
-        const cases = getModerationCases(guildId, member.id, 10);
+        const cases = getModerationCases(guildId, target.userId, 10);
 
         if (cases.length === 0) {
             await interaction.reply({
-                content: t(language, 'moderationCasesEmpty', { member }),
+                content: t(language, 'moderationCasesEmpty', { member: target.label }),
                 flags: MessageFlags.Ephemeral
             });
             return true;
         }
 
         await interaction.reply({
-            embeds: [buildModerationCasesEmbed(member, interaction.user, cases, language)],
+            embeds: [buildModerationCasesEmbed(target.member, interaction.user, cases, language, target.userId)],
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -3056,31 +3251,31 @@ async function handleModerationInteraction(interaction, commandName, language) {
     }
 
     if (commandName === 'profil-mod') {
-        const member = await getMemberOption(interaction, 'membre');
+        const target = await getMemberOrIdOption(interaction, 'membre', language);
 
-        if (!member) {
+        if (!target.userId) {
             await interaction.reply({
-                content: t(language, 'moderationMemberRequired'),
+                content: t(language, 'moderationTargetRequired'),
                 flags: MessageFlags.Ephemeral
             });
             return true;
         }
 
         const limit = clampNumber(interaction.options.getInteger('limite') || interaction.options.getInteger('limit') || 25, 1, 25);
-        const cases = getModerationCases(guildId, member.id, limit);
+        const cases = getModerationCases(guildId, target.userId, limit);
 
         if (cases.length === 0) {
             await interaction.reply({
-                content: t(language, 'moderationProfileEmpty', { member }),
+                content: t(language, 'moderationProfileEmpty', { member: target.label }),
                 flags: MessageFlags.Ephemeral
             });
             return true;
         }
 
-        const stats = getModerationCaseStats(guildId, member.id);
+        const stats = getModerationCaseStats(guildId, target.userId);
 
         await interaction.reply({
-            embeds: [buildModerationProfileEmbed(member, interaction.user, cases, stats, language)],
+            embeds: [buildModerationProfileEmbed(target.member, interaction.user, cases, stats, language, target.userId)],
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -3201,10 +3396,9 @@ async function handleModerationInteraction(interaction, commandName, language) {
         return true;
     }
 
-    if (commandName === 'bannir') {
-        const user = interaction.options.getUser('utilisateur');
-        const member = user ? await fetchMemberSafely(interaction.guild, user.id) : null;
-        const targetError = getUserTargetError(interaction.guild, moderator, user, member, language);
+    if (commandName === 'tempban') {
+        const target = await getUserOrIdOption(interaction, 'utilisateur', language);
+        const targetError = getUserTargetErrorById(interaction.guild, moderator, target.userId, target.member, language);
 
         if (targetError) {
             await interaction.reply({
@@ -3214,11 +3408,130 @@ async function handleModerationInteraction(interaction, commandName, language) {
             return true;
         }
 
-        const reason = getReason(interaction.options.getString('raison'), language);
-        const deleteDays = clampNumber(interaction.options.getInteger('jours_messages') || 0, 0, 7);
+        const duration = parseDurationToMs(
+            interaction.options.getString('duree') || interaction.options.getString('duration')
+        );
+
+        if (!duration) {
+            await interaction.reply({
+                content: t(language, 'moderationDurationInvalid'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (duration > MAX_TEMPBAN_DURATION) {
+            await interaction.reply({
+                content: t(language, 'moderationTempbanTooLong'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const reason = getReason(
+            interaction.options.getString('raison') || interaction.options.getString('reason'),
+            language
+        );
+        const deleteDays = clampNumber(interaction.options.getInteger('jours_messages') || interaction.options.getInteger('delete_days') || 0, 0, 7);
+        const previousTempban = getTemporaryBan(guildId, target.userId);
+        const expiresAt = Date.now() + duration;
 
         try {
-            await interaction.guild.members.ban(user.id, {
+            await interaction.guild.members.ban(target.userId, {
+                reason,
+                deleteMessageSeconds: deleteDays * 24 * 60 * 60
+            });
+        } catch (error) {
+            console.error('Erreur tempban :', error);
+            await interaction.reply({
+                content: t(language, 'moderationFailed'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const caseData = addModerationCase(guildId, target.userId, interaction.user.id, 'tempban', reason, duration);
+        upsertTemporaryBan(guildId, target.userId, interaction.user.id, reason, duration, expiresAt, caseData.id);
+        await sendModerationLog(interaction.guild, interaction.user, caseData, target.label, language);
+
+        const notice = previousTempban
+            ? `${t(language, 'moderationTempbanActive', {
+                expiresAt: formatDiscordTime(previousTempban.expires_at)
+            })}\n`
+            : '';
+
+        await interaction.reply({
+            content: `${notice}${t(language, 'moderationTempban', {
+                user: target.label,
+                expiresAt: formatDiscordTime(expiresAt),
+                caseId: caseData.id
+            })}`,
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'unban') {
+        const userId = normalizeUserId(
+            interaction.options.getString('utilisateur_id') || interaction.options.getString('user_id')
+        );
+
+        if (!userId) {
+            await interaction.reply({
+                content: t(language, 'invalidUserId'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const reason = getReason(
+            interaction.options.getString('raison') || interaction.options.getString('reason'),
+            language
+        );
+
+        try {
+            await interaction.guild.bans.remove(userId, reason);
+        } catch (error) {
+            console.error('Erreur unban :', error);
+            await interaction.reply({
+                content: t(language, 'moderationFailed'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        deleteTemporaryBan(guildId, userId);
+
+        const caseData = addModerationCase(guildId, userId, interaction.user.id, 'unban', reason, null);
+        await sendModerationLog(interaction.guild, interaction.user, caseData, `<@${userId}>`, language);
+
+        await interaction.reply({
+            content: t(language, 'moderationUnban', { userId, caseId: caseData.id }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'bannir') {
+        const target = await getUserOrIdOption(interaction, 'utilisateur', language);
+        const targetError = getUserTargetErrorById(interaction.guild, moderator, target.userId, target.member, language);
+
+        if (targetError) {
+            await interaction.reply({
+                content: targetError,
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const reason = getReason(
+            interaction.options.getString('raison') || interaction.options.getString('reason'),
+            language
+        );
+        const deleteDays = clampNumber(interaction.options.getInteger('jours_messages') || interaction.options.getInteger('delete_days') || 0, 0, 7);
+
+        try {
+            await interaction.guild.members.ban(target.userId, {
                 reason,
                 deleteMessageSeconds: deleteDays * 24 * 60 * 60
             });
@@ -3231,11 +3544,11 @@ async function handleModerationInteraction(interaction, commandName, language) {
             return true;
         }
 
-        const caseData = addModerationCase(guildId, user.id, interaction.user.id, 'ban', reason, null);
-        await sendModerationLog(interaction.guild, interaction.user, caseData, `${user}`, language);
+        const caseData = addModerationCase(guildId, target.userId, interaction.user.id, 'ban', reason, null);
+        await sendModerationLog(interaction.guild, interaction.user, caseData, target.label, language);
 
         await interaction.reply({
-            content: t(language, 'moderationBan', { user, caseId: caseData.id }),
+            content: t(language, 'moderationBan', { user: target.label, caseId: caseData.id }),
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -3440,20 +3753,23 @@ async function handleModerationMessage(message, language) {
     const member = await getMemberFromText(message);
 
     if (commandName === 'sanctions') {
-        if (!member) {
-            await message.reply(t(language, 'moderationMemberRequired'));
+        const targetUserId = member?.id || getUserIdFromText(content);
+
+        if (!targetUserId) {
+            await message.reply(t(language, 'moderationTargetRequired'));
             return true;
         }
 
-        const cases = getModerationCases(message.guild.id, member.id, 10);
+        const cases = getModerationCases(message.guild.id, targetUserId, 10);
+        const targetLabel = member ? `${member}` : formatUserIdLabel(targetUserId, language);
 
         if (cases.length === 0) {
-            await message.reply(t(language, 'moderationCasesEmpty', { member }));
+            await message.reply(t(language, 'moderationCasesEmpty', { member: targetLabel }));
             return true;
         }
 
         await message.reply({
-            embeds: [buildModerationCasesEmbed(member, message.author, cases, language)]
+            embeds: [buildModerationCasesEmbed(member, message.author, cases, language, targetUserId)]
         });
         return true;
     }
@@ -3463,7 +3779,8 @@ async function handleModerationMessage(message, language) {
         const targetUser = member?.user
             || message.mentions.users.first()
             || (targetUserId ? await client.users.fetch(targetUserId).catch(() => null) : null);
-        const targetError = getUserTargetError(message.guild, message.member, targetUser, member, language);
+        const resolvedTargetId = targetUser?.id || targetUserId;
+        const targetError = getUserTargetErrorById(message.guild, message.member, resolvedTargetId, member, language);
 
         if (targetError) {
             await message.reply(targetError);
@@ -3473,7 +3790,7 @@ async function handleModerationMessage(message, language) {
         const reason = getReason(args.slice(2).join(' '), language);
 
         try {
-            await message.guild.members.ban(targetUser.id, {
+            await message.guild.members.ban(resolvedTargetId, {
                 reason,
                 deleteMessageSeconds: 0
             });
@@ -3483,9 +3800,10 @@ async function handleModerationMessage(message, language) {
             return true;
         }
 
-        const caseData = addModerationCase(message.guild.id, targetUser.id, message.author.id, 'ban', reason, null);
-        await sendModerationLog(message.guild, message.author, caseData, `${targetUser}`, language);
-        await message.reply(t(language, 'moderationBan', { user: targetUser, caseId: caseData.id }));
+        const targetLabel = targetUser ? `${targetUser}` : formatUserIdLabel(resolvedTargetId, language);
+        const caseData = addModerationCase(message.guild.id, resolvedTargetId, message.author.id, 'ban', reason, null);
+        await sendModerationLog(message.guild, message.author, caseData, targetLabel, language);
+        await message.reply(t(language, 'moderationBan', { user: targetLabel, caseId: caseData.id }));
         return true;
     }
 
@@ -3590,11 +3908,13 @@ client.once(Events.ClientReady, async () => {
             console.log(`Synchronisation serveur Sentinel terminee : ${syncResult.created} creation(s), ${syncResult.updated} mise(s) a jour.`);
         }
         await updateAllSentinelStatusPanels();
+        await processExpiredTemporaryBans();
     } catch (error) {
         console.error('Erreur synchronisation serveur Sentinel :', error);
     }
 
     setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
+    setInterval(processExpiredTemporaryBans, 60 * 1000);
 });
 
 client.on(Events.Error, error => {

@@ -197,7 +197,15 @@ const publicCommands = [
                 .setNameLocalizations(en('user'))
                 .setDescription('Utilisateur a bannir')
                 .setDescriptionLocalizations(en('User to ban'))
-                .setRequired(true)
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si l utilisateur n est plus sur le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the user is no longer on the server'))
+                .setRequired(false)
         )
         .addStringOption(option =>
             option
@@ -239,7 +247,15 @@ const publicCommands = [
                 .setNameLocalizations(en('member'))
                 .setDescription('Membre a consulter')
                 .setDescriptionLocalizations(en('Member to check'))
-                .setRequired(true)
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si la personne a quitte le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the user left the server'))
+                .setRequired(false)
         ),
 
     command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d un membre.', 'Resets a member service hours.')
@@ -382,7 +398,15 @@ const advancedCommands = [
                 .setNameLocalizations(en('member'))
                 .setDescription('Membre a consulter')
                 .setDescriptionLocalizations(en('Member to check'))
-                .setRequired(true)
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si la personne a quitte le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the user left the server'))
+                .setRequired(false)
         )
         .addIntegerOption(option =>
             option
@@ -392,6 +416,70 @@ const advancedCommands = [
                 .setDescriptionLocalizations(en('Number of cases to show'))
                 .setMinValue(1)
                 .setMaxValue(25)
+                .setRequired(false)
+        ),
+
+    command('tempban', 'tempban', 'Bannit temporairement un utilisateur.', 'Temporarily bans a user.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+        .addStringOption(option =>
+            option
+                .setName('duree')
+                .setNameLocalizations(en('duration'))
+                .setDescription('Duree du ban, exemple 1h, 7d ou 30d')
+                .setDescriptionLocalizations(en('Ban duration, for example 1h, 7d, or 30d'))
+                .setRequired(true)
+        )
+        .addUserOption(option =>
+            option
+                .setName('utilisateur')
+                .setNameLocalizations(en('user'))
+                .setDescription('Utilisateur a bannir temporairement')
+                .setDescriptionLocalizations(en('User to temporarily ban'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si l utilisateur n est plus sur le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the user is no longer on the server'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison du ban temporaire')
+                .setDescriptionLocalizations(en('Temporary ban reason'))
+                .setRequired(false)
+        )
+        .addIntegerOption(option =>
+            option
+                .setName('jours_messages')
+                .setNameLocalizations(en('delete_days'))
+                .setDescription('Jours de messages a supprimer, de 0 a 7')
+                .setDescriptionLocalizations(en('Message history days to delete, from 0 to 7'))
+                .setMinValue(0)
+                .setMaxValue(7)
+                .setRequired(false)
+        ),
+
+    command('unban', 'unban', 'Debannit un utilisateur avec son ID Discord.', 'Unbans a user by Discord ID.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord de l utilisateur a debannir')
+                .setDescriptionLocalizations(en('Discord ID of the user to unban'))
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison du debannissement')
+                .setDescriptionLocalizations(en('Unban reason'))
                 .setRequired(false)
         ),
 
