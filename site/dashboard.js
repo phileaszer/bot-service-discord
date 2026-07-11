@@ -6,9 +6,8 @@ let guilds = [];
 let selectedGuildId = null;
 let currentState = null;
 
-const dashboardOrigin = new URL(window.SENTINEL_DASHBOARD_ORIGIN || window.location.origin);
-const publicDashboardHost = window.location.hostname.endsWith('github.io')
-  || (window.location.pathname.endsWith('/dashboard.html') && window.location.hostname !== dashboardOrigin.hostname);
+const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
+  || window.location.hostname.endsWith('github.io');
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
