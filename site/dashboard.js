@@ -210,6 +210,42 @@ function topService(state) {
   `;
 }
 
+function customEmbedQuota(state) {
+  const quota = state.customEmbeds?.quota;
+
+  if (!quota) {
+    return 'Quota indisponible';
+  }
+
+  if (quota.unlimited) {
+    return 'Premium : creation illimitee, modifications illimitees';
+  }
+
+  return `Gratuit : ${quota.used}/${quota.limit} embeds actifs utilises. Restant : ${quota.remaining}. Modifications illimitees.`;
+}
+
+function customEmbedList(state) {
+  const items = state.customEmbeds?.items || [];
+
+  if (items.length === 0) {
+    return '<p class="muted">Aucun embed Sentinel cree depuis ce dashboard ou Discord.</p>';
+  }
+
+  return `
+    <ul class="compact-list embed-list">
+      ${items.map((item) => {
+        const channel = state.channels.find((candidate) => candidate.id === item.channelId);
+        return `
+          <li>
+            <code>${escapeHtml(item.messageId)}</code>
+            <span>${escapeHtml(item.title)} - ${channel ? `#${escapeHtml(channel.name)}` : escapeHtml(item.channelId)}</span>
+          </li>
+        `;
+      }).join('')}
+    </ul>
+  `;
+}
+
 function renderDashboard() {
   const main = $('[data-dashboard-main]');
 
@@ -227,6 +263,7 @@ function renderDashboard() {
   const state = currentState;
   const roleOptions = optionList(state.roles, state.config.serviceRoleId, 'Choisir un role');
   const commandRoleOptions = optionList(state.roles, null, 'Choisir un role autorise');
+  const pingRoleOptions = optionList(state.roles, null, 'Aucun ping de role');
   const channelOptions = optionList(state.channels, state.config.logChannelId, 'Choisir un salon');
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
 
@@ -316,6 +353,53 @@ function renderDashboard() {
         <article>
           <h3>Top service</h3>
           ${topService(state)}
+        </article>
+      </div>
+    </section>
+
+    <section class="dashboard-panel" id="embeds">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Annonces</p>
+          <h2>Embeds Sentinel</h2>
+          <p class="muted">${escapeHtml(customEmbedQuota(state))}</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      <div class="form-grid">
+        <form data-action-form="custom-embed-create">
+          <label>Creer un embed Sentinel</label>
+          <select name="channelId">${channelOptions}</select>
+          <input name="title" placeholder="Titre" maxlength="256" required>
+          <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
+          <input name="color" placeholder="Couleur : rose, cyan, #ff2d9a">
+          <select name="roleId">${pingRoleOptions}</select>
+          <input name="imageUrl" placeholder="Image URL optionnelle">
+          <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
+          <input name="footer" placeholder="Footer optionnel">
+          <button class="button" type="submit">Envoyer l'embed</button>
+        </form>
+        <form data-action-form="custom-embed-edit">
+          <label>Modifier un embed existant</label>
+          <select name="channelId">${channelOptions}</select>
+          <input name="messageId" placeholder="ID du message embed" required>
+          <input name="title" placeholder="Nouveau titre">
+          <textarea name="description" placeholder="Nouveau message"></textarea>
+          <input name="color" placeholder="Nouvelle couleur">
+          <input name="imageUrl" placeholder="Nouvelle image URL, ou retirer">
+          <input name="thumbnailUrl" placeholder="Nouvelle miniature URL, ou retirer">
+          <input name="footer" placeholder="Nouveau footer, ou retirer">
+          <button class="button" type="submit">Modifier sans quota</button>
+        </form>
+        <form data-action-form="custom-embed-delete">
+          <label>Supprimer un embed Sentinel</label>
+          <select name="channelId">${channelOptions}</select>
+          <input name="messageId" placeholder="ID du message embed" required>
+          <button class="button button-ghost" type="submit">Supprimer</button>
+        </form>
+        <article class="inline-form">
+          <label>Embeds geres</label>
+          ${customEmbedList(state)}
         </article>
       </div>
     </section>

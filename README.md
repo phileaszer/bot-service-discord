@@ -13,6 +13,7 @@ Sentinel est un bot Discord multi-serveurs pour suivre les temps de service des 
 - Configuration du role de service et du salon de logs
 - Gestion des roles autorises a administrer le bot
 - Moderation simple : avertissements, timeout, expulsion, bannissement, purge et historique des sanctions
+- Embeds d'annonce sous l'identite de Sentinel : 2 embeds actifs gratuits, modifications illimitees
 - Choix de langue par serveur : francais ou anglais
 - Commandes slash localisees avec les localisations natives Discord
 - Stockage SQLite avec `better-sqlite3`
@@ -109,6 +110,9 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 | `/bannir` | `/ban` |
 | `/purge` | `/clear` |
 | `/sanctions` | `/mod-cases` |
+| `/embed creer` | `/embed create` |
+| `/embed modifier` | `/embed edit` |
+| `/embed supprimer` | `/embed delete` |
 
 ## Commandes texte gratuites
 
@@ -186,6 +190,7 @@ Ces commandes sont preparees pour Sentinel Premium et ne sont pas ouvertes sur l
 
 En gratuit, la reinitialisation reste disponible personne par personne avec `/reset-heures membre:@membre`, `/reset-heures utilisateur_id:ID`, `/reset-hours member:@member` ou `/reset-hours user_id:ID`.
 La moderation gratuite garde les actions essentielles et limite la consultation a `/sanctions`, soit les 10 derniers cas visibles.
+Les embeds Sentinel sont limites a 2 embeds actifs en gratuit. Ils peuvent etre modifies autant de fois que necessaire. Le Premium prepare la creation illimitee.
 
 ## Moderation / Moderation
 
@@ -198,6 +203,9 @@ Francais :
 - `/bannir` bannit un utilisateur du serveur. Si la personne n'est plus sur le serveur, utilise `utilisateur_id`.
 - `/purge` supprime jusqu'a 100 messages recents dans le salon.
 - `/sanctions` affiche les 10 dernieres sanctions d'un membre ou d'un ID Discord.
+- `/embed creer` publie une annonce sous l'identite de Sentinel.
+- `/embed modifier` modifie un embed Sentinel existant sans consommer de quota.
+- `/embed supprimer` supprime un embed Sentinel et libere un emplacement gratuit.
 
 Sentinel verifie les roles autorises, les permissions Discord et la hierarchie des roles avant d'appliquer une sanction.
 
@@ -211,6 +219,7 @@ Moderation Premium preparee :
 - `/tempban` bannit temporairement un utilisateur avec expiration automatique, meme avec un ID Discord.
 - `/unban` debannit un utilisateur par ID et annule un tempban actif.
 - `/lock`, `/unlock` et `/slowmode` gerent rapidement un salon.
+- Creation illimitee d'embeds Sentinel.
 
 English:
 
@@ -221,6 +230,9 @@ English:
 - `/ban` bans a user from the server. If the user is no longer in the server, use `user_id`.
 - `/clear` deletes up to 100 recent messages in the channel.
 - `/mod-cases` shows the last 10 moderation cases for a member or Discord ID.
+- `/embed create` publishes an announcement under Sentinel identity.
+- `/embed edit` edits an existing Sentinel embed without using quota.
+- `/embed delete` deletes a Sentinel embed and frees a free slot.
 
 Sentinel checks configured roles, Discord permissions, and role hierarchy before applying a moderation action.
 
@@ -234,6 +246,7 @@ Prepared Premium moderation:
 - `/tempban` temporarily bans a user with automatic expiration, including by Discord ID.
 - `/unban` unbans a user by ID and cancels an active tempban.
 - `/lock`, `/unlock`, and `/slowmode` quickly manage a channel.
+- Unlimited Sentinel embed creation.
 
 ## Permissions
 
