@@ -416,6 +416,7 @@ h3 {
 .feature-card p,
 .command-column span,
 .steps span,
+.english-note,
 .check-list,
 .muted {
   color: var(--muted);
@@ -497,6 +498,75 @@ h3 {
 .steps strong,
 .steps span {
   grid-column: 2;
+}
+
+.troubleshoot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.troubleshoot-card {
+  min-height: 270px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(160deg, rgba(255, 45, 154, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(9, 13, 22, 0.94));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+}
+
+.troubleshoot-card h3 {
+  margin: 20px 0 12px;
+}
+
+.troubleshoot-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.troubleshoot-card p + p {
+  margin-top: 12px;
+}
+
+.support-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 34px;
+  border: 1px solid rgba(23, 231, 255, 0.46);
+  border-radius: var(--radius);
+  color: var(--cyan);
+  background: rgba(23, 231, 255, 0.08);
+  font-weight: 900;
+}
+
+.english-note {
+  font-size: 0.9rem;
+}
+
+.support-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid rgba(23, 231, 255, 0.32);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(110deg, rgba(23, 231, 255, 0.1), rgba(255, 45, 154, 0.1)),
+    rgba(9, 13, 22, 0.9);
+}
+
+.support-banner p:not(.eyebrow) {
+  max-width: 780px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .command-column {
@@ -1027,9 +1097,11 @@ code {
   .feature-grid,
   .command-page-grid,
   .pricing-grid,
+  .troubleshoot-grid,
   .split-layout,
   .wide-card,
   .install-actions,
+  .support-banner,
   .dashboard-guide-grid,
   .help-band,
   .dashboard-grid,
@@ -1095,6 +1167,10 @@ code {
   .command-column li {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .troubleshoot-card {
+    min-height: 0;
   }
 
   .site-footer,
