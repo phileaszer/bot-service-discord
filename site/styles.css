@@ -661,6 +661,142 @@ code {
   border-radius: 50%;
 }
 
+.guide-hero {
+  align-items: stretch;
+}
+
+.status-card {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  width: min(100%, 360px);
+  min-height: 180px;
+  padding: 22px;
+  border: 1px solid rgba(255, 45, 154, 0.42);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(255, 45, 154, 0.16), rgba(23, 231, 255, 0.08)),
+    rgba(10, 15, 25, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.status-card strong {
+  font-size: 1.3rem;
+}
+
+.status-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.status-pill {
+  display: inline-flex;
+  width: max-content;
+  min-height: 32px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(23, 231, 255, 0.44);
+  border-radius: var(--radius);
+  color: var(--cyan);
+  background: rgba(23, 231, 255, 0.08);
+  font-weight: 900;
+}
+
+.dashboard-guide-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.guide-card {
+  min-height: 100%;
+}
+
+.plain-steps {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: guide-step;
+}
+
+.plain-steps li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-height: 58px;
+}
+
+.plain-steps li::before {
+  counter-increment: guide-step;
+  content: counter(guide-step);
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 45, 154, 0.5);
+  border-radius: var(--radius);
+  color: var(--pink);
+  background: rgba(255, 45, 154, 0.11);
+  font-weight: 900;
+}
+
+.plain-steps strong,
+.plain-steps span {
+  grid-column: 2;
+}
+
+.plain-steps span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.copy-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.copy-list button {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) 1fr;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px;
+  color: var(--text);
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+}
+
+.copy-list button:hover {
+  border-color: rgba(23, 231, 255, 0.44);
+}
+
+.copy-list span {
+  color: var(--muted);
+}
+
+.help-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.help-band p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -894,6 +1030,8 @@ code {
   .split-layout,
   .wide-card,
   .install-actions,
+  .dashboard-guide-grid,
+  .help-band,
   .dashboard-grid,
   .dashboard-hero {
     grid-template-columns: 1fr;
@@ -963,5 +1101,9 @@ code {
   .row-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .copy-list button {
+    grid-template-columns: 1fr;
   }
 }
