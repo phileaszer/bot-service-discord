@@ -32,6 +32,8 @@ const CHANNELS = {
     }
 };
 
+const DEFAULT_PING_ROLE_NAME = '📡 Sentinel | Annonces';
+
 function readArgs(argv) {
     const args = {};
 
@@ -57,14 +59,51 @@ function readArgs(argv) {
     return args;
 }
 
+function valueOrEmpty(value) {
+    return String(value || '').trim();
+}
+
+function normalizeText(value) {
+    return valueOrEmpty(value).replace(/\\n/g, '\n');
+}
+
 function required(args, key) {
-    const value = String(args[key] || '').trim();
+    const value = normalizeText(args[key]);
 
     if (!value) {
         throw new Error(`Argument manquant : --${key}`);
     }
 
     return value;
+}
+
+async function resolvePingRole(guild, args) {
+    if (args['no-ping']) {
+        return null;
+    }
+
+    await guild.roles.fetch();
+
+    const roleId = valueOrEmpty(args['ping-role-id'] || process.env.ANNOUNCE_ROLE_ID);
+    const roleName = valueOrEmpty(args['ping-role'] || process.env.ANNOUNCE_ROLE_NAME || DEFAULT_PING_ROLE_NAME);
+
+    if (roleId) {
+        const role = guild.roles.cache.get(roleId);
+
+        if (!role) {
+            throw new Error(`Role de ping introuvable avec l ID : ${roleId}`);
+        }
+
+        return role;
+    }
+
+    const role = guild.roles.cache.find(currentRole => currentRole.name === roleName);
+
+    if (!role) {
+        throw new Error(`Role de ping introuvable : ${roleName}`);
+    }
+
+    return role;
 }
 
 function buildEmbed({ type, title, body, source }) {
@@ -80,6 +119,26 @@ function buildEmbed({ type, title, body, source }) {
         .setTimestamp();
 
     return embed;
+}
+
+function buildPayload({ type, title, body, source, pingRole }) {
+    const payload = {
+        embeds: [buildEmbed({
+            type,
+            title,
+            body,
+            source
+        })],
+        allowedMentions: pingRole
+            ? { roles: [pingRole.id] }
+            : { parse: [] }
+    };
+
+    if (pingRole) {
+        payload.content = `<@&${pingRole.id}>`;
+    }
+
+    return payload;
 }
 
 async function main() {
@@ -104,8 +163,8 @@ async function main() {
 
     const titleFr = required(args, 'title-fr');
     const bodyFr = required(args, 'body-fr');
-    const titleEn = args['title-en'];
-    const bodyEn = args['body-en'];
+    const titleEn = normalizeText(args['title-en']);
+    const bodyEn = normalizeText(args['body-en']);
     const source = args.source || 'clavardage 019e92a8-2bff-7dc0-9e8e-b4ec8e81b11d';
 
     if (args['dry-run']) {
@@ -115,6 +174,9 @@ async function main() {
             guildId,
             type,
             channels: target,
+            pingRole: args['no-ping']
+                ? null
+                : (args['ping-role-id'] || args['ping-role'] || process.env.ANNOUNCE_ROLE_ID || process.env.ANNOUNCE_ROLE_NAME || DEFAULT_PING_ROLE_NAME),
             fr: { title: titleFr, body: bodyFr },
             en: titleEn && bodyEn ? { title: titleEn, body: bodyEn } : null,
             source
@@ -133,6 +195,7 @@ async function main() {
         try {
             const guild = await client.guilds.fetch(guildId);
             await guild.channels.fetch();
+            const pingRole = await resolvePingRole(guild, args);
 
             const posted = [];
             const frChannel = guild.channels.cache.find(channel => channel.name === target.fr);
@@ -141,29 +204,27 @@ async function main() {
                 throw new Error(`Salon FR introuvable : ${target.fr}`);
             }
 
-            await frChannel.send({
-                embeds: [buildEmbed({
+            await frChannel.send(buildPayload({
                     type,
                     title: titleFr,
                     body: bodyFr,
-                    source
-                })]
-            });
-            posted.push({ language: 'fr', channel: target.fr, id: frChannel.id });
+                    source,
+                    pingRole
+            }));
+            posted.push({ language: 'fr', channel: target.fr, id: frChannel.id, pingedRole: pingRole?.id || null });
 
             if (titleEn && bodyEn && !args['fr-only']) {
                 const enChannel = guild.channels.cache.find(channel => channel.name === target.en);
 
                 if (enChannel) {
-                    await enChannel.send({
-                        embeds: [buildEmbed({
+                    await enChannel.send(buildPayload({
                             type,
                             title: titleEn,
                             body: bodyEn,
-                            source
-                        })]
-                    });
-                    posted.push({ language: 'en', channel: target.en, id: enChannel.id });
+                            source,
+                            pingRole
+                    }));
+                    posted.push({ language: 'en', channel: target.en, id: enChannel.id, pingedRole: pingRole?.id || null });
                 }
             }
 
