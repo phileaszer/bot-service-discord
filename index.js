@@ -29,6 +29,7 @@ const client = new Client({
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
 const FREE_HISTORY_LIMIT = 5;
 const FREE_TOP_LIMIT = 10;
+const FREE_CUSTOM_EMBED_LIMIT = 2;
 const REFERENCE_HISTORY_LIMIT = 100;
 const REFERENCE_TOP_LIMIT = 25;
 const ADVANCED_HISTORY_LIMIT = REFERENCE_HISTORY_LIMIT;
@@ -219,7 +220,20 @@ const I18N = {
         moderationSlowmodeDone: '🐢 Mode lent défini sur **{duration}** dans {channel}.',
         moderationSlowmodeDisabled: '✅ Mode lent désactivé dans {channel}.',
         moderationSlowmodeTooLong: '❌ Discord limite le mode lent à 6 heures maximum.',
-        premiumModerationHelp: 'Premium modération : `/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.'
+        premiumModerationHelp: 'Premium modération : `/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
+        customEmbedBotPermissionMissing: '❌ Sentinel doit pouvoir voir le salon, envoyer des messages et intégrer des liens dans {channel}.',
+        customEmbedMentionPermissionMissing: '❌ Sentinel ne peut pas mentionner ce rôle. Rends le rôle mentionnable ou donne à Sentinel la permission de mentionner les rôles.',
+        customEmbedInvalidColor: '❌ Couleur invalide. Utilise `rose`, `cyan`, `vert`, `rouge`, `violet` ou un code comme `#ff2d9a`.',
+        customEmbedInvalidUrl: '❌ URL invalide pour {field}. Utilise une URL `https://` ou indique `retirer` pendant une modification.',
+        customEmbedTooLarge: '❌ Cet embed est trop long. Garde le titre sous 256 caractères, le message sous 4000 caractères et le total sous 6000 caractères.',
+        customEmbedLimitReached: '⭐ Le gratuit permet **{limit}** embeds Sentinel actifs par serveur. Tu peux modifier tes embeds existants sans limite avec `/embed modifier`, supprimer un embed avec `/embed supprimer`, ou passer Premium pour créer en illimité.',
+        customEmbedCreated: '✅ Embed Sentinel envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
+        customEmbedEdited: '✅ Embed Sentinel `{messageId}` modifié. Les modifications ne consomment pas de quota.',
+        customEmbedDeleted: '✅ Embed Sentinel `{messageId}` supprimé. Son emplacement gratuit est libéré.',
+        customEmbedNotFound: '❌ Aucun embed Sentinel géré ne correspond à ce message dans ce salon.',
+        customEmbedNoEditFields: '❌ Indique au moins un champ à modifier : titre, message, couleur, image, miniature ou footer.',
+        customEmbedQuotaFree: 'Quota gratuit : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
+        customEmbedQuotaUnlimited: 'Quota Premium : embeds illimités.'
     },
     en: {
         requestedBy: 'Requested by',
@@ -316,7 +330,20 @@ const I18N = {
         moderationSlowmodeDone: '🐢 Slowmode set to **{duration}** in {channel}.',
         moderationSlowmodeDisabled: '✅ Slowmode disabled in {channel}.',
         moderationSlowmodeTooLong: '❌ Discord limits slowmode to 6 hours maximum.',
-        premiumModerationHelp: 'Premium moderation: `/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.'
+        premiumModerationHelp: 'Premium moderation: `/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
+        customEmbedBotPermissionMissing: '❌ Sentinel must be able to view the channel, send messages, and embed links in {channel}.',
+        customEmbedMentionPermissionMissing: '❌ Sentinel cannot mention this role. Make the role mentionable or give Sentinel permission to mention roles.',
+        customEmbedInvalidColor: '❌ Invalid color. Use `pink`, `cyan`, `green`, `red`, `purple`, or a code like `#ff2d9a`.',
+        customEmbedInvalidUrl: '❌ Invalid URL for {field}. Use an `https://` URL, or enter `remove` while editing.',
+        customEmbedTooLarge: '❌ This embed is too long. Keep the title under 256 characters, the message under 4000 characters, and the total under 6000 characters.',
+        customEmbedLimitReached: '⭐ Free servers can keep **{limit}** active Sentinel embeds. You can edit existing embeds without limit with `/embed edit`, delete one with `/embed delete`, or upgrade to Premium for unlimited creation.',
+        customEmbedCreated: '✅ Sentinel embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
+        customEmbedEdited: '✅ Sentinel embed `{messageId}` edited. Edits do not use quota.',
+        customEmbedDeleted: '✅ Sentinel embed `{messageId}` deleted. Its free slot is now available.',
+        customEmbedNotFound: '❌ No managed Sentinel embed matches this message in this channel.',
+        customEmbedNoEditFields: '❌ Provide at least one field to edit: title, message, color, image, thumbnail, or footer.',
+        customEmbedQuotaFree: 'Free quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
+        customEmbedQuotaUnlimited: 'Premium quota: unlimited embeds.'
     }
 };
 
@@ -413,7 +440,8 @@ function resolveCommandName(commandName) {
         unban: 'unban',
         lock: 'lock',
         unlock: 'unlock',
-        slowmode: 'slowmode'
+        slowmode: 'slowmode',
+        embed: 'embed'
     };
 
     return aliases[commandName] || commandName;
@@ -1035,6 +1063,133 @@ function getUserSessionCount(guildId, userId) {
     return row?.count || 0;
 }
 
+function getCustomEmbedCount(guildId) {
+    const row = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM custom_embeds
+        WHERE guild_id = ?
+    `).get(guildId);
+
+    return row?.count || 0;
+}
+
+function getCustomEmbedQuota(guildId) {
+    const used = getCustomEmbedCount(guildId);
+
+    if (isAdvancedGuild(guildId)) {
+        return {
+            unlimited: true,
+            used,
+            limit: null,
+            remaining: null
+        };
+    }
+
+    return {
+        unlimited: false,
+        used,
+        limit: FREE_CUSTOM_EMBED_LIMIT,
+        remaining: Math.max(FREE_CUSTOM_EMBED_LIMIT - used, 0)
+    };
+}
+
+function formatCustomEmbedQuota(guildId, language = 'fr') {
+    const quota = getCustomEmbedQuota(guildId);
+
+    if (quota.unlimited) {
+        return t(language, 'customEmbedQuotaUnlimited');
+    }
+
+    return t(language, 'customEmbedQuotaFree', {
+        used: quota.used,
+        limit: quota.limit,
+        remaining: quota.remaining
+    });
+}
+
+function addCustomEmbedRecord(guildId, channelId, messageId, creatorUserId, data) {
+    const now = new Date().toISOString();
+
+    db.prepare(`
+        INSERT INTO custom_embeds (
+            message_id,
+            guild_id,
+            channel_id,
+            creator_user_id,
+            title,
+            description,
+            color,
+            image_url,
+            thumbnail_url,
+            footer,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        messageId,
+        guildId,
+        channelId,
+        creatorUserId,
+        data.title,
+        data.description,
+        data.color || null,
+        data.imageUrl || null,
+        data.thumbnailUrl || null,
+        data.footer || null,
+        now,
+        now
+    );
+}
+
+function getCustomEmbedRecord(guildId, messageId) {
+    return db.prepare(`
+        SELECT message_id, guild_id, channel_id, creator_user_id, title, description, color, image_url, thumbnail_url, footer, created_at, updated_at
+        FROM custom_embeds
+        WHERE guild_id = ? AND message_id = ?
+    `).get(guildId, messageId);
+}
+
+function getCustomEmbeds(guildId) {
+    return db.prepare(`
+        SELECT message_id, guild_id, channel_id, creator_user_id, title, description, color, image_url, thumbnail_url, footer, created_at, updated_at
+        FROM custom_embeds
+        WHERE guild_id = ?
+        ORDER BY datetime(updated_at) DESC, message_id DESC
+    `).all(guildId);
+}
+
+function updateCustomEmbedRecord(guildId, messageId, data) {
+    db.prepare(`
+        UPDATE custom_embeds
+        SET title = ?,
+            description = ?,
+            color = ?,
+            image_url = ?,
+            thumbnail_url = ?,
+            footer = ?,
+            updated_at = ?
+        WHERE guild_id = ? AND message_id = ?
+    `).run(
+        data.title,
+        data.description,
+        data.color || null,
+        data.imageUrl || null,
+        data.thumbnailUrl || null,
+        data.footer || null,
+        new Date().toISOString(),
+        guildId,
+        messageId
+    );
+}
+
+function deleteCustomEmbedRecord(guildId, messageId) {
+    return db.prepare(`
+        DELETE FROM custom_embeds
+        WHERE guild_id = ? AND message_id = ?
+    `).run(guildId, messageId).changes > 0;
+}
+
 function addModerationCase(guildId, targetUserId, moderatorUserId, action, reason, duration = null) {
     const result = db.prepare(`
         INSERT INTO moderation_cases (
@@ -1510,6 +1665,236 @@ async function sendModerationLog(guild, requester, caseData, targetLabel, langua
     await logChannel.send({
         embeds: [buildModerationLogEmbed(guild, requester, caseData, targetLabel, language)]
     }).catch(() => {});
+}
+
+const CUSTOM_EMBED_COLOR_ALIASES = {
+    rose: '#ff2d9a',
+    pink: '#ff2d9a',
+    sentinel: '#ff2d9a',
+    defaut: '#ff2d9a',
+    default: '#ff2d9a',
+    cyan: '#17e7ff',
+    bleu: '#17e7ff',
+    blue: '#17e7ff',
+    vert: '#15f5d1',
+    green: '#15f5d1',
+    rouge: '#ff235a',
+    red: '#ff235a',
+    violet: '#b76cff',
+    purple: '#b76cff'
+};
+const CUSTOM_EMBED_CLEAR_VALUES = new Set(['retirer', 'remove', 'delete', 'supprimer', 'aucun', 'none', 'null', '-']);
+
+function normalizeCustomEmbedColor(value, language = 'fr') {
+    const rawValue = String(value || '').trim().toLowerCase();
+
+    if (!rawValue) {
+        return '#ff2d9a';
+    }
+
+    const aliasedColor = CUSTOM_EMBED_COLOR_ALIASES[rawValue] || rawValue;
+
+    if (!/^#[0-9a-f]{6}$/i.test(aliasedColor)) {
+        throw new Error(t(language, 'customEmbedInvalidColor'));
+    }
+
+    return aliasedColor.toLowerCase();
+}
+
+function customEmbedColorToNumber(value) {
+    return Number.parseInt(normalizeCustomEmbedColor(value).slice(1), 16);
+}
+
+function normalizeCustomEmbedUrl(value, field, language = 'fr', allowClear = false) {
+    const rawValue = String(value || '').trim();
+
+    if (!rawValue) {
+        return null;
+    }
+
+    if (CUSTOM_EMBED_CLEAR_VALUES.has(rawValue.toLowerCase())) {
+        return allowClear ? null : '';
+    }
+
+    try {
+        const parsedUrl = new URL(rawValue);
+
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            throw new Error('Invalid protocol');
+        }
+
+        return parsedUrl.toString();
+    } catch (error) {
+        throw new Error(t(language, 'customEmbedInvalidUrl', { field }));
+    }
+}
+
+function normalizeCustomEmbedOptionalText(value, allowClear = false) {
+    const rawValue = String(value || '').trim();
+
+    if (!rawValue) {
+        return null;
+    }
+
+    if (allowClear && CUSTOM_EMBED_CLEAR_VALUES.has(rawValue.toLowerCase())) {
+        return null;
+    }
+
+    return rawValue;
+}
+
+function mapCustomEmbedRecord(row) {
+    return {
+        title: row.title,
+        description: row.description,
+        color: row.color || '#ff2d9a',
+        imageUrl: row.image_url || null,
+        thumbnailUrl: row.thumbnail_url || null,
+        footer: row.footer || null
+    };
+}
+
+function validateCustomEmbedSize(data, language = 'fr') {
+    const totalLength = [
+        data.title,
+        data.description,
+        data.footer,
+        data.imageUrl,
+        data.thumbnailUrl
+    ].reduce((total, value) => total + String(value || '').length, 0);
+
+    if (
+        String(data.title || '').length > 256
+        || String(data.description || '').length > 4000
+        || String(data.footer || '').length > 2048
+        || totalLength > 6000
+    ) {
+        throw new Error(t(language, 'customEmbedTooLarge'));
+    }
+}
+
+function buildCustomEmbedData(input, existingData = null, language = 'fr') {
+    const data = existingData
+        ? { ...existingData }
+        : {
+            title: normalizeCustomEmbedOptionalText(input.title),
+            description: normalizeCustomEmbedOptionalText(input.description),
+            color: normalizeCustomEmbedColor(input.color, language),
+            imageUrl: null,
+            thumbnailUrl: null,
+            footer: null
+        };
+    let changed = !existingData;
+
+    if (existingData && Object.prototype.hasOwnProperty.call(input, 'title') && input.title !== null && input.title !== undefined) {
+        const title = normalizeCustomEmbedOptionalText(input.title);
+        if (title) {
+            data.title = title;
+            changed = true;
+        }
+    }
+
+    if (existingData && Object.prototype.hasOwnProperty.call(input, 'description') && input.description !== null && input.description !== undefined) {
+        const description = normalizeCustomEmbedOptionalText(input.description);
+        if (description) {
+            data.description = description;
+            changed = true;
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'color') && input.color !== null && input.color !== undefined && String(input.color).trim()) {
+        data.color = normalizeCustomEmbedColor(input.color, language);
+        changed = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'imageUrl') && input.imageUrl !== null && input.imageUrl !== undefined) {
+        data.imageUrl = normalizeCustomEmbedUrl(input.imageUrl, 'image_url', language, Boolean(existingData));
+        changed = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'thumbnailUrl') && input.thumbnailUrl !== null && input.thumbnailUrl !== undefined) {
+        data.thumbnailUrl = normalizeCustomEmbedUrl(input.thumbnailUrl, 'thumbnail_url', language, Boolean(existingData));
+        changed = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'footer') && input.footer !== null && input.footer !== undefined) {
+        data.footer = normalizeCustomEmbedOptionalText(input.footer, Boolean(existingData));
+        changed = true;
+    }
+
+    if (!data.title || !data.description) {
+        throw new Error(t(language, 'customEmbedNoEditFields'));
+    }
+
+    validateCustomEmbedSize(data, language);
+
+    return { data, changed };
+}
+
+function buildCustomAnnouncementEmbed(data, language = 'fr') {
+    const brandIcon = client.user?.displayAvatarURL();
+    const embed = new EmbedBuilder()
+        .setColor(customEmbedColorToNumber(data.color))
+        .setTitle(data.title)
+        .setDescription(data.description)
+        .setFooter({
+            text: data.footer || `Sentinel - ${t(language, 'brand')}`
+        })
+        .setTimestamp();
+
+    if (brandIcon) {
+        embed.setAuthor({
+            name: 'Sentinel',
+            iconURL: brandIcon
+        });
+    }
+
+    if (data.imageUrl) {
+        embed.setImage(data.imageUrl);
+    }
+
+    if (data.thumbnailUrl) {
+        embed.setThumbnail(data.thumbnailUrl);
+    }
+
+    return embed;
+}
+
+function getCustomEmbedChannelError(guild, channel, roleToPing = null, language = 'fr') {
+    if (!channel || !channel.isTextBased()) {
+        return t(language, 'channelNotText');
+    }
+
+    const permissions = channel.permissionsFor(guild.members.me);
+
+    if (!permissions?.has([
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.EmbedLinks
+    ])) {
+        return t(language, 'customEmbedBotPermissionMissing', { channel });
+    }
+
+    if (roleToPing && !roleToPing.mentionable && !permissions.has(PermissionsBitField.Flags.MentionEveryone)) {
+        return t(language, 'customEmbedMentionPermissionMissing');
+    }
+
+    return null;
+}
+
+function buildCustomEmbedPayload(data, roleToPing = null, language = 'fr') {
+    const payload = {
+        embeds: [buildCustomAnnouncementEmbed(data, language)],
+        allowedMentions: roleToPing
+            ? { roles: [roleToPing.id] }
+            : { parse: [] }
+    };
+
+    if (roleToPing) {
+        payload.content = `${roleToPing}`;
+    }
+
+    return payload;
 }
 
 async function processExpiredTemporaryBans() {
@@ -2304,6 +2689,7 @@ function buildHelpEmbed(guild, requester) {
                 value: [
                     '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`, `/mod-cases`.',
                     '`/ban` and `/mod-cases` can use a Discord ID when the user is no longer in the server.',
+                    '`/embed create` sends an announcement as Sentinel. Free servers can keep 2 active embeds; edits are unlimited.',
                     'Text aliases: `!warn`, `!timeout`, `!untimeout`, `!kick`, `!ban`, `!clear`, `!mod-cases`.',
                     'Sentinel checks role hierarchy before applying a sanction.'
                 ].join('\n'),
@@ -2320,6 +2706,7 @@ function buildHelpEmbed(guild, requester) {
                     '`/summary` or `!summary`',
                     '`/diagnostic`, `/sync-service`, `/sync-sentinel`, `/ping`',
                     '`/reset-hours-all` is reserved for Sentinel Premium.',
+                    '`/embed create` is unlimited on Premium/reference servers. `/embed edit` stays unlimited everywhere.',
                     '',
                     '**Premium moderation**',
                     '`/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`',
@@ -2399,7 +2786,8 @@ function buildHelpEmbed(guild, requester) {
             ? '`/top-service`, `/top-semaine`, `/resume-service` - classements et resume complet'
             : '`/top-service` - top 10 du serveur',
         '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
-        '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration'
+        '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration',
+        '`/embed creer` - publier une annonce sous l identite de Sentinel'
     ];
     const moderationUsage = [
         '`/avertir membre raison` - enregistrer un avertissement',
@@ -2409,6 +2797,7 @@ function buildHelpEmbed(guild, requester) {
         '`/bannir utilisateur ou utilisateur_id raison` - bannir, meme si la personne n est plus sur le serveur',
         '`/purge nombre` - supprimer jusqu a 100 messages recents',
         '`/sanctions membre ou utilisateur_id` - voir les 10 dernieres sanctions',
+        '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Sentinel',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
     const premiumModerationUsage = [
@@ -2427,11 +2816,13 @@ function buildHelpEmbed(guild, requester) {
             `Historique consultable jusqu a ${REFERENCE_HISTORY_LIMIT} sessions par demande.`,
             `Classements affiches jusqu a ${REFERENCE_TOP_LIMIT} agents par panneau.`,
             '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service` et `/sync-sentinel` sont disponibles.',
+            'Embeds Sentinel : creation illimitee, modifications illimitees.',
             'Les seules limites restantes sont des limites techniques Discord ou de securite.'
         ]
         : [
             'Historique visible : 5 dernieres sessions personnelles.',
             'Classement public : top 10 global.',
+            `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs gratuits, modifications illimitees.`,
             '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
             'La moderation gratuite garde les actions essentielles et affiche les 10 derniers cas.',
             'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
@@ -3670,6 +4061,191 @@ async function handleModerationInteraction(interaction, commandName, language) {
     return true;
 }
 
+function getCustomEmbedInteractionInput(interaction) {
+    return {
+        title: interaction.options.getString('titre') || interaction.options.getString('title'),
+        description: interaction.options.getString('message'),
+        color: interaction.options.getString('couleur') || interaction.options.getString('color'),
+        imageUrl: interaction.options.getString('image_url'),
+        thumbnailUrl: interaction.options.getString('thumbnail_url'),
+        footer: interaction.options.getString('footer')
+    };
+}
+
+async function fetchManagedCustomEmbedMessage(guildId, channel, messageId) {
+    const record = getCustomEmbedRecord(guildId, messageId);
+
+    if (!record || record.channel_id !== channel.id) {
+        return { record: null, message: null };
+    }
+
+    const message = await channel.messages.fetch(messageId).catch(() => null);
+
+    if (!message || message.author.id !== client.user.id) {
+        deleteCustomEmbedRecord(guildId, messageId);
+        return { record: null, message: null };
+    }
+
+    return { record, message };
+}
+
+async function handleCustomEmbedInteraction(interaction, commandName, language) {
+    if (commandName !== 'embed') {
+        return false;
+    }
+
+    if (!hasCommandRoleAccess(interaction.member)) {
+        await interaction.reply({
+            content: getCommandRoleAccessDeniedMessage(language),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    const guildId = interaction.guild.id;
+    const subcommand = interaction.options.getSubcommand();
+    const channel = interaction.options.getChannel('salon') || interaction.options.getChannel('channel');
+    const channelError = getCustomEmbedChannelError(interaction.guild, channel, null, language);
+
+    if (channelError) {
+        await interaction.reply({
+            content: channelError,
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (subcommand === 'creer') {
+        const quota = getCustomEmbedQuota(guildId);
+
+        if (!quota.unlimited && quota.used >= quota.limit) {
+            await interaction.reply({
+                content: t(language, 'customEmbedLimitReached', { limit: quota.limit }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const roleToPing = interaction.options.getRole('role_a_ping');
+        const roleError = getCustomEmbedChannelError(interaction.guild, channel, roleToPing, language);
+
+        if (roleError) {
+            await interaction.reply({
+                content: roleError,
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        let data;
+
+        try {
+            ({ data } = buildCustomEmbedData(getCustomEmbedInteractionInput(interaction), null, language));
+        } catch (error) {
+            await interaction.reply({
+                content: error.message,
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const sentMessage = await channel.send(buildCustomEmbedPayload(data, roleToPing, language)).catch(() => null);
+
+        if (!sentMessage) {
+            await interaction.reply({
+                content: t(language, 'customEmbedBotPermissionMissing', { channel }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        addCustomEmbedRecord(guildId, channel.id, sentMessage.id, interaction.user.id, data);
+
+        await interaction.reply({
+            content: t(language, 'customEmbedCreated', {
+                channel,
+                messageId: sentMessage.id,
+                quota: formatCustomEmbedQuota(guildId, language)
+            }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    const messageId = normalizeUserId(interaction.options.getString('message_id')) || String(interaction.options.getString('message_id') || '').trim();
+
+    if (!/^\d{17,20}$/.test(messageId)) {
+        await interaction.reply({
+            content: t(language, 'customEmbedNotFound'),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    const { record, message } = await fetchManagedCustomEmbedMessage(guildId, channel, messageId);
+
+    if (!record || !message) {
+        await interaction.reply({
+            content: t(language, 'customEmbedNotFound'),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (subcommand === 'supprimer') {
+        await message.delete().catch(() => {});
+        deleteCustomEmbedRecord(guildId, messageId);
+
+        await interaction.reply({
+            content: t(language, 'customEmbedDeleted', { messageId }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (subcommand === 'modifier') {
+        let nextData;
+        let changed;
+
+        try {
+            ({ data: nextData, changed } = buildCustomEmbedData(
+                getCustomEmbedInteractionInput(interaction),
+                mapCustomEmbedRecord(record),
+                language
+            ));
+        } catch (error) {
+            await interaction.reply({
+                content: error.message,
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (!changed) {
+            await interaction.reply({
+                content: t(language, 'customEmbedNoEditFields'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        await message.edit({
+            content: message.content || null,
+            embeds: [buildCustomAnnouncementEmbed(nextData, language)],
+            allowedMentions: { parse: [] }
+        });
+        updateCustomEmbedRecord(guildId, messageId, nextData);
+
+        await interaction.reply({
+            content: t(language, 'customEmbedEdited', { messageId }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    return true;
+}
+
 function getUserIdFromText(content) {
     const match = /<@!?(\d{17,20})>|(?:^|\s)(\d{17,20})(?:\s|$)/.exec(content);
 
@@ -3905,20 +4481,30 @@ client.once(Events.ClientReady, async () => {
         maxTempbanDuration: MAX_TEMPBAN_DURATION,
         helpers: {
             addCommandRole,
+            addCustomEmbedRecord,
             addModerationCase,
             addSession,
+            buildCustomAnnouncementEmbed,
+            buildCustomEmbedData,
+            buildCustomEmbedPayload,
             buildServicePanelComponents,
             createUserIfMissing,
+            deleteCustomEmbedRecord,
             deleteModerationCase,
             deleteTemporaryBan,
             formatDuration,
+            formatCustomEmbedQuota,
             getActiveServices,
             getCommandRoleIds,
+            getCustomEmbeds,
+            getCustomEmbedQuota,
+            getCustomEmbedRecord,
             getGuildConfig,
             getGuildLanguage,
             getLogChannel,
             getModerationCase,
             getModerationTargetError,
+            getCustomEmbedChannelError,
             getReason,
             getServiceRole,
             getServiceSummary,
@@ -3939,6 +4525,7 @@ client.once(Events.ClientReady, async () => {
             setGuildLanguage,
             syncServiceState,
             updateGuildConfig,
+            updateCustomEmbedRecord,
             updateModerationCaseReason,
             updateUserTime,
             upsertTemporaryBan
@@ -4044,6 +4631,10 @@ client.on(Events.InteractionCreate, async interaction => {
                 content: getAdvancedUnavailableMessage(language, commandName),
                 flags: MessageFlags.Ephemeral
             });
+        }
+
+        if (await handleCustomEmbedInteraction(interaction, commandName, language)) {
+            return;
         }
 
         if (await handleModerationInteraction(interaction, commandName, language)) {

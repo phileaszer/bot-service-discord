@@ -64,6 +64,21 @@ CREATE TABLE IF NOT EXISTS moderation_tempbans (
     PRIMARY KEY (guild_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS custom_embeds (
+    message_id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    creator_user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    color TEXT,
+    image_url TEXT,
+    thumbnail_url TEXT,
+    footer TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -84,6 +99,9 @@ ON moderation_cases (guild_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_moderation_tempbans_expires
 ON moderation_tempbans (expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_custom_embeds_guild
+ON custom_embeds (guild_id);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()

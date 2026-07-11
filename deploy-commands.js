@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const {
+    ChannelType,
     SlashCommandBuilder,
     PermissionFlagsBits,
     REST,
@@ -256,6 +257,172 @@ const publicCommands = [
                 .setDescription('ID Discord si la personne a quitte le serveur')
                 .setDescriptionLocalizations(en('Discord ID if the user left the server'))
                 .setRequired(false)
+        ),
+
+    command('embed', 'embed', 'Cree ou modifie une annonce embed Sentinel.', 'Creates or edits a Sentinel announcement embed.')
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('creer')
+                .setNameLocalizations(en('create'))
+                .setDescription('Cree une annonce embed sous l identite de Sentinel')
+                .setDescriptionLocalizations(en('Creates an announcement embed under Sentinel identity'))
+                .addChannelOption(option =>
+                    option
+                        .setName('salon')
+                        .setNameLocalizations(en('channel'))
+                        .setDescription('Salon ou envoyer l embed')
+                        .setDescriptionLocalizations(en('Channel where the embed will be sent'))
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('titre')
+                        .setNameLocalizations(en('title'))
+                        .setDescription('Titre de l embed')
+                        .setDescriptionLocalizations(en('Embed title'))
+                        .setMaxLength(256)
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('message')
+                        .setDescription('Texte principal de l embed')
+                        .setDescriptionLocalizations(en('Main embed text'))
+                        .setMaxLength(4000)
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('couleur')
+                        .setNameLocalizations(en('color'))
+                        .setDescription('Couleur : rose, cyan, vert, rouge, violet ou #ff2d9a')
+                        .setDescriptionLocalizations(en('Color: pink, cyan, green, red, purple, or #ff2d9a'))
+                        .setRequired(false)
+                )
+                .addRoleOption(option =>
+                    option
+                        .setName('role_a_ping')
+                        .setNameLocalizations(en('role_to_ping'))
+                        .setDescription('Role a mentionner avec l annonce')
+                        .setDescriptionLocalizations(en('Role to mention with the announcement'))
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('image_url')
+                        .setDescription('URL d image principale')
+                        .setDescriptionLocalizations(en('Main image URL'))
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('thumbnail_url')
+                        .setDescription('URL de miniature')
+                        .setDescriptionLocalizations(en('Thumbnail URL'))
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('footer')
+                        .setDescription('Texte de pied de page')
+                        .setDescriptionLocalizations(en('Footer text'))
+                        .setMaxLength(1800)
+                        .setRequired(false)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('modifier')
+                .setNameLocalizations(en('edit'))
+                .setDescription('Modifie un embed Sentinel existant sans consommer de quota')
+                .setDescriptionLocalizations(en('Edits an existing Sentinel embed without using quota'))
+                .addChannelOption(option =>
+                    option
+                        .setName('salon')
+                        .setNameLocalizations(en('channel'))
+                        .setDescription('Salon ou se trouve l embed')
+                        .setDescriptionLocalizations(en('Channel where the embed is located'))
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('message_id')
+                        .setDescription('ID du message embed Sentinel')
+                        .setDescriptionLocalizations(en('Sentinel embed message ID'))
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('titre')
+                        .setNameLocalizations(en('title'))
+                        .setDescription('Nouveau titre')
+                        .setDescriptionLocalizations(en('New title'))
+                        .setMaxLength(256)
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('message')
+                        .setDescription('Nouveau texte principal')
+                        .setDescriptionLocalizations(en('New main text'))
+                        .setMaxLength(4000)
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('couleur')
+                        .setNameLocalizations(en('color'))
+                        .setDescription('Nouvelle couleur ou defaut')
+                        .setDescriptionLocalizations(en('New color or default'))
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('image_url')
+                        .setDescription('Nouvelle image, ou retirer')
+                        .setDescriptionLocalizations(en('New image, or remove'))
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('thumbnail_url')
+                        .setDescription('Nouvelle miniature, ou retirer')
+                        .setDescriptionLocalizations(en('New thumbnail, or remove'))
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('footer')
+                        .setDescription('Nouveau pied de page, ou retirer')
+                        .setDescriptionLocalizations(en('New footer, or remove'))
+                        .setMaxLength(1800)
+                        .setRequired(false)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('supprimer')
+                .setNameLocalizations(en('delete'))
+                .setDescription('Supprime un embed Sentinel et libere son emplacement gratuit')
+                .setDescriptionLocalizations(en('Deletes a Sentinel embed and frees its free slot'))
+                .addChannelOption(option =>
+                    option
+                        .setName('salon')
+                        .setNameLocalizations(en('channel'))
+                        .setDescription('Salon ou se trouve l embed')
+                        .setDescriptionLocalizations(en('Channel where the embed is located'))
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('message_id')
+                        .setDescription('ID du message embed Sentinel')
+                        .setDescriptionLocalizations(en('Sentinel embed message ID'))
+                        .setRequired(true)
+                )
         ),
 
     command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d un membre.', 'Resets a member service hours.')

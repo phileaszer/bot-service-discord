@@ -345,6 +345,7 @@ async function buildGuildState(ctx, guild) {
     const config = ctx.helpers.getGuildConfig(guild.id);
     const summary = ctx.helpers.getServiceSummary(guild.id);
     const commandRoleIds = ctx.helpers.getCommandRoleIds(guild.id);
+    const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id);
     const roles = guild.roles.cache
         .filter(role => !role.managed && role.id !== guild.id)
         .sort((a, b) => b.position - a.position)
@@ -391,7 +392,21 @@ async function buildGuildState(ctx, guild) {
         topService: ctx.helpers.getTopService(guild.id).slice(0, 10).map(user => ({
             ...user,
             totalTimeLabel: ctx.helpers.formatDuration(user.totalTime)
-        }))
+        })),
+        customEmbeds: {
+            quota: customEmbedQuota,
+            items: ctx.helpers.getCustomEmbeds(guild.id).map(item => ({
+                messageId: item.message_id,
+                channelId: item.channel_id,
+                title: item.title,
+                description: item.description,
+                color: item.color,
+                imageUrl: item.image_url,
+                thumbnailUrl: item.thumbnail_url,
+                footer: item.footer,
+                updatedAt: item.updated_at
+            }))
+        }
     };
 }
 
@@ -669,6 +684,124 @@ async function moderationAction(ctx, guild, actor, body) {
     throw createHttpError(400, 'Unknown moderation action.');
 }
 
+async function customEmbedAction(ctx, guild, actor, body) {
+    requireCommandAccess(ctx, actor);
+
+    const language = ctx.helpers.getGuildLanguage(guild.id);
+    const action = body.action;
+    const channel = getTextChannel(guild, body.channelId);
+    const roleToPing = body.roleId ? guild.roles.cache.get(body.roleId) : null;
+
+    if (body.roleId && !roleToPing) {
+        throw createHttpError(400, 'Role not found.');
+    }
+
+    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language);
+
+    if (channelError) {
+        throw createHttpError(403, channelError);
+    }
+
+    if (action === 'custom-embed-create') {
+        const quota = ctx.helpers.getCustomEmbedQuota(guild.id);
+
+        if (!quota.unlimited && quota.used >= quota.limit) {
+            throw createHttpError(402, `Quota gratuit atteint : ${quota.limit} embeds actifs.`);
+        }
+
+        let data;
+
+        try {
+            ({ data } = ctx.helpers.buildCustomEmbedData({
+                title: body.title,
+                description: body.description,
+                color: body.color,
+                imageUrl: body.imageUrl,
+                thumbnailUrl: body.thumbnailUrl,
+                footer: body.footer
+            }, null, language));
+        } catch (error) {
+            throw createHttpError(400, error.message);
+        }
+
+        const sentMessage = await channel
+            .send(ctx.helpers.buildCustomEmbedPayload(data, roleToPing, language))
+            .catch(() => null);
+
+        if (!sentMessage) {
+            throw createHttpError(403, 'Sentinel cannot send this embed in the selected channel.');
+        }
+
+        ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, sentMessage.id, actor.id, data);
+
+        return `Embed Sentinel envoye dans #${channel.name}. ID : ${sentMessage.id}. ${ctx.helpers.formatCustomEmbedQuota(guild.id, language)}`;
+    }
+
+    const messageId = String(body.messageId || '').trim();
+
+    if (!/^\d{17,20}$/.test(messageId)) {
+        throw createHttpError(400, 'Invalid message ID.');
+    }
+
+    const record = ctx.helpers.getCustomEmbedRecord(guild.id, messageId);
+
+    if (!record || record.channel_id !== channel.id) {
+        throw createHttpError(404, 'Sentinel embed not found.');
+    }
+
+    const message = await channel.messages.fetch(messageId).catch(() => null);
+
+    if (!message || message.author.id !== ctx.client.user.id) {
+        ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
+        throw createHttpError(404, 'Sentinel embed not found.');
+    }
+
+    if (action === 'custom-embed-delete') {
+        await message.delete().catch(() => {});
+        ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
+        return `Embed Sentinel ${messageId} supprime.`;
+    }
+
+    if (action === 'custom-embed-edit') {
+        let data;
+        let changed;
+
+        try {
+            ({ data, changed } = ctx.helpers.buildCustomEmbedData({
+                title: body.title || null,
+                description: body.description || null,
+                color: body.color || null,
+                imageUrl: body.imageUrl || null,
+                thumbnailUrl: body.thumbnailUrl || null,
+                footer: body.footer || null
+            }, {
+                title: record.title,
+                description: record.description,
+                color: record.color,
+                imageUrl: record.image_url,
+                thumbnailUrl: record.thumbnail_url,
+                footer: record.footer
+            }, language));
+        } catch (error) {
+            throw createHttpError(400, error.message);
+        }
+
+        if (!changed) {
+            throw createHttpError(400, 'No embed field provided.');
+        }
+
+        await message.edit({
+            content: message.content || null,
+            embeds: [ctx.helpers.buildCustomAnnouncementEmbed(data, language)],
+            allowedMentions: { parse: [] }
+        });
+        ctx.helpers.updateCustomEmbedRecord(guild.id, messageId, data);
+        return `Embed Sentinel ${messageId} modifie.`;
+    }
+
+    throw createHttpError(400, 'Unknown custom embed action.');
+}
+
 async function runDashboardAction(ctx, guild, member, body) {
     const action = body.action;
     const language = ctx.helpers.getGuildLanguage(guild.id);
@@ -750,6 +883,10 @@ async function runDashboardAction(ctx, guild, member, body) {
         requireCommandAccess(ctx, member);
         const result = await ctx.helpers.syncServiceState(guild);
         return `Synchronisation terminee : ${result.closedSessions} session(s) fermee(s), ${result.removedRoles} role(s) retire(s).`;
+    }
+
+    if (['custom-embed-create', 'custom-embed-edit', 'custom-embed-delete'].includes(action)) {
+        return customEmbedAction(ctx, guild, member, body);
     }
 
     return moderationAction(ctx, guild, member, body);
