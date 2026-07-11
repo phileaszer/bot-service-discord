@@ -8,6 +8,13 @@
   <meta name="theme-color" content="#05070c">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    window.SENTINEL_DASHBOARD_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
+
+    if (window.location.hostname.endsWith('github.io')) {
+      window.location.replace(`${window.SENTINEL_DASHBOARD_ORIGIN}/dashboard`);
+    }
+  </script>
 </head>
 <body class="dashboard-body">
   <header class="site-header dashboard-header">
@@ -23,7 +30,7 @@
     </nav>
     <div class="header-actions">
       <button class="button button-small button-ghost" type="button" data-logout hidden>Deconnexion</button>
-      <a class="button button-small" href="/auth/login" data-login>Connexion Discord</a>
+      <a class="button button-small" href="https://bot-service-discord-production.up.railway.app/auth/login" data-login>Connexion Discord</a>
     </div>
   </header>
 
