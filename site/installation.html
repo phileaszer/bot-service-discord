@@ -30,6 +30,10 @@
       <p class="eyebrow">Installation</p>
       <h1>Installer Sentinel proprement.</h1>
       <p>Le bot doit etre ajoute comme bot Discord, pas seulement comme integration de commandes.</p>
+      <div class="hero-actions">
+        <a class="button" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter Sentinel</a>
+        <a class="button button-ghost" href="#depannage">Aide installation</a>
+      </div>
     </section>
 
     <section class="section section-flow">
@@ -47,6 +51,50 @@
           <li><strong>Configurer le service</strong><span>Definis le role de service, le salon de logs et les roles autorises.</span></li>
           <li><strong>Publier le panneau</strong><span>Envoie !service-panel ou utilise le dashboard.</span></li>
         </ol>
+      </div>
+    </section>
+
+    <section class="section" id="depannage">
+      <div class="section-inner">
+        <div class="section-heading">
+          <p class="eyebrow">Depannage / Troubleshooting</p>
+          <h2>Si Discord bloque l'invitation.</h2>
+          <p>Ces points reglent la plupart des soucis quand Sentinel ne rejoint pas le serveur, n'apparait pas comme bot, ou quand le dashboard ne semble pas agir sur le bon serveur.</p>
+        </div>
+        <div class="troubleshoot-grid">
+          <article class="troubleshoot-card">
+            <span class="support-kicker">01</span>
+            <h3>Verifier les droits Discord</h3>
+            <p>La personne qui invite Sentinel doit avoir la permission <strong>Gerer le serveur</strong> ou <strong>Administrateur</strong> sur le serveur choisi.</p>
+            <p class="english-note">EN: the installer needs Manage Server or Administrator permission on the selected guild.</p>
+          </article>
+          <article class="troubleshoot-card">
+            <span class="support-kicker">02</span>
+            <h3>Choisir le bon serveur</h3>
+            <p>Si Discord ouvre directement un serveur qui n'est pas le bon, ferme la fenetre et relance le lien officiel depuis cette page sans lien personnalise.</p>
+            <p class="english-note">EN: if Discord locks the wrong guild, restart from the official invite button on this page.</p>
+          </article>
+          <article class="troubleshoot-card">
+            <span class="support-kicker">03</span>
+            <h3>Confirmer que le bot est bien membre</h3>
+            <p>Dans les integrations Discord, Sentinel doit apparaitre avec le badge <strong>Bot</strong>. Si tu vois seulement Commandes, retire l'integration et reinvite-le.</p>
+            <p class="english-note">EN: Sentinel must show as a Bot integration, not only as slash commands.</p>
+          </article>
+          <article class="troubleshoot-card">
+            <span class="support-kicker">04</span>
+            <h3>Tester apres l'installation</h3>
+            <p>Une fois Sentinel arrive sur le serveur, utilise <code>/ping</code> puis <code>/diagnostic</code> pour verifier la base, les roles et les permissions.</p>
+            <p class="english-note">EN: after inviting, run /ping and /diagnostic to confirm that everything is ready.</p>
+          </article>
+        </div>
+        <div class="support-banner">
+          <div>
+            <p class="eyebrow">Important</p>
+            <h3>Le lien officiel contient deux autorisations.</h3>
+            <p>Sentinel a besoin de <code>bot</code> et <code>applications.commands</code>. Sans les deux, les commandes peuvent apparaitre sans que le bot soit vraiment present sur le serveur.</p>
+          </div>
+          <a class="button button-ghost" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Relancer l'invitation</a>
+        </div>
       </div>
     </section>
 
