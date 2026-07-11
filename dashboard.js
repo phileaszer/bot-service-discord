@@ -178,12 +178,13 @@ async function exchangeCode(req, code) {
         throw createHttpError(503, 'Discord OAuth is not configured. Add CLIENT_SECRET on Railway.');
     }
 
+    const redirectUri = getRedirectUri(req);
     const body = new URLSearchParams({
         client_id: process.env.CLIENT_ID,
         client_secret: process.env.CLIENT_SECRET,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: getRedirectUri(req)
+        redirect_uri: redirectUri
     });
 
     const response = await fetch(`${DISCORD_API}/oauth2/token`, {
@@ -195,6 +196,21 @@ async function exchangeCode(req, code) {
     });
 
     if (!response.ok) {
+        let discordError = {};
+
+        try {
+            discordError = await response.json();
+        } catch (error) {
+            discordError = { error: 'unknown_error' };
+        }
+
+        console.warn('Discord OAuth token exchange failed', {
+            status: response.status,
+            error: discordError.error,
+            errorDescription: discordError.error_description,
+            redirectUri
+        });
+
         throw createHttpError(401, 'Discord authorization failed.');
     }
 
