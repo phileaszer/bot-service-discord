@@ -6,6 +6,10 @@ let guilds = [];
 let selectedGuildId = null;
 let currentState = null;
 
+const dashboardOrigin = new URL(window.SENTINEL_DASHBOARD_ORIGIN || window.location.origin);
+const publicDashboardHost = window.location.hostname.endsWith('github.io')
+  || (window.location.pathname.endsWith('/dashboard.html') && window.location.hostname !== dashboardOrigin.hostname);
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: 'include',
@@ -65,6 +69,47 @@ function setLoading(button, isLoading) {
   button.disabled = isLoading;
   button.dataset.originalText ||= button.textContent;
   button.textContent = isLoading ? 'Envoi...' : button.dataset.originalText;
+}
+
+function showPublicDashboardGuide() {
+  const liveDashboard = $('[data-live-dashboard]');
+  const publicDashboard = $('[data-public-dashboard]');
+  const login = $('[data-login]');
+  const logout = $('[data-logout]');
+  const publicInvite = $('[data-public-invite]');
+
+  if (liveDashboard) {
+    liveDashboard.hidden = true;
+  }
+
+  if (publicDashboard) {
+    publicDashboard.hidden = false;
+  }
+
+  if (login) {
+    login.hidden = true;
+  }
+
+  if (logout) {
+    logout.hidden = true;
+  }
+
+  if (publicInvite) {
+    publicInvite.hidden = false;
+  }
+
+  $$('[data-copy]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const value = button.dataset.copy;
+
+      try {
+        await navigator.clipboard.writeText(value);
+        toast(`Commande copiee : ${value}`);
+      } catch (error) {
+        toast(value, 'success');
+      }
+    });
+  });
 }
 
 function renderUser() {
@@ -468,6 +513,16 @@ async function selectGuild(guildId) {
 }
 
 async function bootstrap() {
+  if (publicDashboardHost) {
+    showPublicDashboardGuide();
+    return;
+  }
+
+  $('[data-live-dashboard]')?.removeAttribute('hidden');
+  $('[data-public-dashboard]')?.setAttribute('hidden', '');
+  $('[data-login]')?.removeAttribute('hidden');
+  $('[data-public-invite]')?.setAttribute('hidden', '');
+
   try {
     const session = await api('/api/session');
     currentUser = session.user;
