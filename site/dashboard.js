@@ -111,6 +111,17 @@ function showPublicDashboardGuide() {
   });
 }
 
+function setGuildDrawerOpen(isOpen) {
+  const drawer = $('[data-guild-drawer]');
+  const backdrop = $('.guild-drawer-backdrop');
+
+  if (!drawer || !backdrop) return;
+
+  drawer.classList.toggle('is-open', isOpen);
+  backdrop.hidden = !isOpen;
+  document.body.classList.toggle('drawer-open', isOpen);
+}
+
 function renderUser() {
   const card = $('[data-user-card]');
   const login = $('[data-login]');
@@ -618,9 +629,26 @@ async function bootstrap() {
 }
 
 document.addEventListener('click', (event) => {
+  if (event.target.closest('[data-open-guild-drawer]')) {
+    setGuildDrawerOpen(true);
+    return;
+  }
+
+  if (event.target.closest('[data-close-guild-drawer]')) {
+    setGuildDrawerOpen(false);
+    return;
+  }
+
   const guildButton = event.target.closest('[data-select-guild]');
   if (guildButton) {
+    setGuildDrawerOpen(false);
     selectGuild(guildButton.dataset.selectGuild);
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    setGuildDrawerOpen(false);
   }
 });
 
