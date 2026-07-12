@@ -165,7 +165,7 @@ async function main() {
     const bodyFr = required(args, 'body-fr');
     const titleEn = normalizeText(args['title-en']);
     const bodyEn = normalizeText(args['body-en']);
-    const source = args.source || 'clavardage 019e92a8-2bff-7dc0-9e8e-b4ec8e81b11d';
+    const source = args.source || 'source staff Sentinel';
 
     if (args['dry-run']) {
         console.log(JSON.stringify({

@@ -2618,11 +2618,11 @@ function buildLanguageButtons(language = 'fr') {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('sentinel_language:fr')
+                .setCustomId('set_language:fr')
                 .setLabel(t(language, 'languageFrench'))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId('sentinel_language:en')
+                .setCustomId('set_language:en')
                 .setLabel(t(language, 'languageEnglish'))
                 .setStyle(ButtonStyle.Secondary)
         )
@@ -3106,7 +3106,31 @@ async function handleSentinelSelfRoleButton(interaction) {
 }
 
 async function handleSentinelLanguageButton(interaction) {
-    const language = interaction.customId.split(':')[1];
+    const language = normalizeLanguage(interaction.customId.split(':')[1]);
+
+    if (!interaction.inCachedGuild()) {
+        return interaction.reply({
+            content: getGuildInstallRequiredMessage(),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (!isAdvancedGuild(interaction.guildId)) {
+        if (!hasCommandRoleAccess(interaction.member)) {
+            return interaction.reply({
+                content: getCommandRoleAccessDeniedMessage(getGuildLanguage(interaction.guildId)),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        const nextLanguage = setGuildLanguage(interaction.guildId, language);
+
+        return interaction.reply({
+            content: t(nextLanguage, nextLanguage === 'en' ? 'languageSetEn' : 'languageSet'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
     const roleName = SENTINEL_LANGUAGE_ROLES[language];
 
     if (!roleName) {
@@ -5043,7 +5067,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.customId.startsWith('set_language:')) {
         if (!hasCommandRoleAccess(interaction.member)) {
-            return handleSentinelButton(interaction, handleSentinelLanguageButton);
+            return interaction.reply({
+                content: getCommandRoleAccessDeniedMessage(buttonLanguage),
+                flags: MessageFlags.Ephemeral
+            });
         }
 
         const nextLanguage = setGuildLanguage(interaction.guild.id, interaction.customId.split(':')[1]);
@@ -5253,20 +5280,13 @@ client.on(Events.MessageCreate, async message => {
     if (/^!(fr|en)$/i.test(content)) {
         const nextLanguage = /^!fr$/i.test(content) ? 'fr' : 'en';
 
-        try {
-            const { selectedRole } = await applySentinelLanguageToMember(message.guild, message.author.id, nextLanguage);
-            console.log(`Langue Sentinel appliquee par commande texte : ${nextLanguage} pour ${message.author.tag} (${message.author.id})`);
-
-            return message.reply(
-                nextLanguage === 'fr'
-                    ? `Langue configuree : ${selectedRole}.`
-                    : `Language set: ${selectedRole}.`
-            );
-        } catch (error) {
-            console.error('Erreur commande texte langue Sentinel :', error);
-
-            return message.reply('Je n arrive pas a modifier ton role de langue pour le moment.');
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
         }
+
+        language = setGuildLanguage(guildId, nextLanguage);
+
+        return message.reply(t(language, language === 'en' ? 'languageSetEn' : 'languageSet'));
     }
 
     if (/^!(aide|help)$/i.test(content)) {

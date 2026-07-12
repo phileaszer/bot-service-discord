@@ -93,34 +93,43 @@
         <p class="eyebrow">Dashboard Sentinel</p>
         <h1>Controle ton bot depuis le web.</h1>
         <p>Connecte-toi avec Discord, choisis un serveur, autorise Sentinel si besoin, puis execute les actions directement sur le Discord selectionne.</p>
+        <div class="dashboard-quick-actions">
+          <button class="button" type="button" data-open-guild-drawer>Choisir un serveur</button>
+        </div>
       </div>
       <div class="dashboard-user" data-user-card>
         <span>Non connecte</span>
       </div>
     </section>
 
-    <section class="dashboard-grid">
-      <aside class="dashboard-panel guild-panel">
+    <section class="dashboard-workspace">
+      <div class="guild-drawer-backdrop" data-close-guild-drawer hidden></div>
+      <aside class="dashboard-panel guild-panel guild-drawer" data-guild-drawer aria-label="Choix du Discord">
         <div class="panel-heading">
-          <p class="eyebrow">Serveurs</p>
-          <h2>Choix du Discord</h2>
+          <div>
+            <p class="eyebrow">Serveurs</p>
+            <h2>Choix du Discord</h2>
+          </div>
+          <button class="drawer-close" type="button" data-close-guild-drawer aria-label="Fermer le volet">X</button>
         </div>
         <div class="guild-list" data-guild-list>
           <p class="muted">Connecte-toi pour afficher tes serveurs.</p>
         </div>
       </aside>
 
-      <section class="dashboard-main" data-dashboard-main>
+      <section class="dashboard-main dashboard-main-full" data-dashboard-main>
         <div class="empty-state">
           <img src="assets/sentinel-mark.png" alt="">
           <h2>Selectionne un serveur</h2>
-          <p>Le dashboard affichera les commandes disponibles selon les permissions et le statut Premium du serveur.</p>
+          <p>Ouvre le volet des serveurs pour choisir le Discord a piloter.</p>
+          <button class="button" type="button" data-open-guild-drawer>Ouvrir le volet</button>
         </div>
       </section>
     </section>
   </main>
 
   <div class="toast-stack" data-toasts></div>
+  <script src="i18n.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
