@@ -304,6 +304,11 @@ h1 {
   text-shadow: 0 0 18px rgba(23, 231, 255, 0.16), 0 0 28px rgba(255, 45, 154, 0.12);
 }
 
+.hero-home h1 {
+  font-size: clamp(3.45rem, 7vw, 4.35rem);
+  line-height: 0.96;
+}
+
 h2 {
   font-size: 2.45rem;
   line-height: 1.08;
@@ -317,12 +322,12 @@ h3 {
 .hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(420px, 1fr);
-  gap: 48px;
-  min-height: min(820px, calc(100vh - 72px));
+  grid-template-columns: minmax(0, 0.82fr) minmax(380px, 0.92fr);
+  gap: clamp(34px, 5vw, 70px);
+  min-height: min(690px, calc(100vh - 72px));
   overflow: hidden;
   align-items: center;
-  padding: 72px max(22px, calc((100vw - 1240px) / 2)) 52px;
+  padding: 76px max(22px, calc((100vw - 1180px) / 2)) 64px;
   border-bottom: 1px solid rgba(234, 242, 255, 0.08);
 }
 
@@ -332,10 +337,11 @@ h3 {
   z-index: -2;
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgba(3, 5, 9, 0.42), rgba(3, 5, 9, 0.86) 48%, rgba(3, 5, 9, 0.98)),
-    linear-gradient(180deg, rgba(255, 45, 154, 0.08), transparent 42%),
-    repeating-linear-gradient(90deg, rgba(23, 231, 255, 0.055) 0 1px, transparent 1px 96px),
-    url("assets/sentinel-wide-service.png") center / cover no-repeat,
+    radial-gradient(circle at 80% 42%, rgba(255, 45, 154, 0.13), transparent 32%),
+    radial-gradient(circle at 15% 18%, rgba(23, 231, 255, 0.1), transparent 28%),
+    linear-gradient(115deg, rgba(3, 5, 9, 0.74), rgba(7, 10, 16, 0.98) 58%, rgba(3, 5, 9, 0.99)),
+    repeating-linear-gradient(90deg, rgba(23, 231, 255, 0.035) 0 1px, transparent 1px 104px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 104px),
     #05060a;
 }
 
@@ -344,26 +350,26 @@ h3 {
   inset: 14% -20% auto 8%;
   height: 2px;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 45, 154, 0.72), transparent, rgba(23, 231, 255, 0.66), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 45, 154, 0.38), transparent, rgba(23, 231, 255, 0.32), transparent);
   box-shadow:
-    0 118px 0 rgba(23, 231, 255, 0.22),
-    0 260px 0 rgba(255, 45, 154, 0.2),
-    320px 338px 0 rgba(157, 108, 255, 0.18);
+    0 118px 0 rgba(23, 231, 255, 0.08),
+    0 260px 0 rgba(255, 45, 154, 0.08),
+    320px 338px 0 rgba(157, 108, 255, 0.08);
 }
 
 .hero-emblem {
   position: absolute;
   right: max(-70px, calc((100vw - 1320px) / 2));
   top: 56px;
-  width: 620px;
-  opacity: 0.12;
+  width: 520px;
+  opacity: 0.055;
   filter: saturate(1.05) drop-shadow(0 0 36px rgba(255, 45, 154, 0.26));
 }
 
 .scanlines {
   position: absolute;
   inset: 0;
-  opacity: 0.32;
+  opacity: 0.18;
   background:
     repeating-linear-gradient(180deg, transparent 0 13px, rgba(255, 255, 255, 0.023) 14px),
     linear-gradient(115deg, transparent 0 66%, rgba(23, 231, 255, 0.08) 66.2%, transparent 66.6%);
@@ -372,7 +378,7 @@ h3 {
 .hero-content {
   position: relative;
   z-index: 2;
-  max-width: 710px;
+  max-width: 660px;
 }
 
 .hero-copy,
@@ -386,9 +392,9 @@ h3 {
 }
 
 .hero-copy {
-  max-width: 670px;
-  margin: 24px 0 0;
-  font-size: 1.08rem;
+  max-width: 600px;
+  margin: 20px 0 0;
+  font-size: 1.02rem;
 }
 
 .hero-actions {
@@ -406,13 +412,13 @@ h3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 150px));
   gap: 12px;
-  margin: 36px 0 0;
+  margin: 30px 0 0;
 }
 
 .hero-metrics div,
 .dashboard-metrics article {
-  min-height: 84px;
-  padding: 16px;
+  min-height: 74px;
+  padding: 14px;
   border: 1px solid rgba(234, 242, 255, 0.12);
   border-radius: var(--radius);
   background:
@@ -439,40 +445,21 @@ h3 {
 .hero-preview {
   position: relative;
   z-index: 1;
-  align-self: end;
-  width: min(100%, 740px);
+  align-self: center;
+  width: min(100%, 600px);
   margin: 0 0 0 auto;
   border: 1px solid rgba(234, 242, 255, 0.18);
   border-radius: var(--radius);
   background: #020305;
   box-shadow:
-    0 0 0 1px rgba(255, 45, 154, 0.14),
-    0 20px 58px rgba(0, 0, 0, 0.46);
+    0 0 0 1px rgba(23, 231, 255, 0.08),
+    0 18px 48px rgba(0, 0, 0, 0.42);
   clip-path: var(--cut);
 }
 
-.hero-preview img,
-.visual-frame img,
-.poster-showcase img {
+.hero-preview img {
+  opacity: 0.96;
   border-radius: var(--radius);
-}
-
-.visual-showcase {
-  padding: 26px max(22px, calc((100vw - 1240px) / 2)) 78px;
-  background: #05060a;
-}
-
-.visual-frame {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 6px;
-  border: 1px solid rgba(234, 242, 255, 0.13);
-  border-radius: var(--radius);
-  background:
-    linear-gradient(90deg, rgba(23, 231, 255, 0.08), transparent 32%, rgba(255, 45, 154, 0.08)),
-    rgba(255, 255, 255, 0.045);
-  box-shadow: var(--shadow);
-  clip-path: var(--cut);
 }
 
 .page-hero {
@@ -1530,6 +1517,10 @@ code {
     line-height: 1;
   }
 
+  .hero-home h1 {
+    font-size: 2.85rem;
+  }
+
   h2 {
     font-size: 2rem;
   }
@@ -1620,10 +1611,14 @@ code {
 
 @media (min-width: 1500px) {
   .hero {
-    min-height: 780px;
+    min-height: 700px;
   }
 
   h1 {
     font-size: 5.1rem;
+  }
+
+  .hero-home h1 {
+    font-size: 4.25rem;
   }
 }
