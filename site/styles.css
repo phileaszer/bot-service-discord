@@ -1047,6 +1047,8 @@ code {
 
 .dashboard-workspace {
   position: relative;
+  display: grid;
+  gap: 18px;
   min-height: 520px;
 }
 
@@ -1070,31 +1072,23 @@ code {
 }
 
 .guild-panel {
-  position: fixed;
-  top: 88px;
-  left: max(16px, calc((100vw - 1420px) / 2));
-  z-index: 42;
-  width: min(420px, calc(100% - 32px));
-  max-height: calc(100vh - 112px);
-  overflow: hidden;
-  transform: translateX(calc(-100% - 34px));
-  transition: transform 220ms ease;
+  display: none;
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  overflow: visible;
 }
 
 .guild-panel.is-open {
-  transform: translateX(0);
+  display: block;
 }
 
 .guild-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(3, 5, 9, 0.64);
-  backdrop-filter: blur(6px);
+  display: none;
 }
 
 .drawer-open {
-  overflow: hidden;
+  overflow: auto;
 }
 
 .guild-panel .panel-heading {
@@ -1119,7 +1113,7 @@ code {
 }
 
 .guild-list {
-  max-height: calc(100vh - 250px);
+  max-height: min(430px, calc(100vh - 280px));
   overflow: auto;
   padding-right: 4px;
 }
@@ -1430,15 +1424,12 @@ code {
     grid-template-columns: repeat(2, 34px);
   }
 
-  .guild-panel {
-    top: 78px;
-    left: 10px;
-    width: calc(100% - 20px);
-    max-height: calc(100vh - 92px);
+  .guild-panel.is-open {
+    max-height: min(560px, calc(100vh - 120px));
   }
 
   .guild-list {
-    max-height: calc(100vh - 228px);
+    max-height: calc(100vh - 250px);
   }
 
   h1 {
@@ -1506,6 +1497,16 @@ code {
   .plan-card,
   .dashboard-panel {
     padding: 18px;
+  }
+
+  .guild-panel {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .guild-panel.is-open {
+    padding-top: 18px;
+    padding-bottom: 18px;
   }
 
   .troubleshoot-card {

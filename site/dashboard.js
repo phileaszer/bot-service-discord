@@ -115,10 +115,19 @@ function setGuildDrawerOpen(isOpen) {
   const drawer = $('[data-guild-drawer]');
   const backdrop = $('.guild-drawer-backdrop');
 
-  if (!drawer || !backdrop) return;
+  if (!drawer) return;
 
   drawer.classList.toggle('is-open', isOpen);
-  backdrop.hidden = !isOpen;
+  drawer.setAttribute('aria-hidden', String(!isOpen));
+
+  if (backdrop) {
+    backdrop.hidden = true;
+  }
+
+  $$('[data-open-guild-drawer]').forEach((button) => {
+    button.setAttribute('aria-expanded', String(isOpen));
+  });
+
   document.body.classList.toggle('drawer-open', isOpen);
 }
 
@@ -630,7 +639,8 @@ async function bootstrap() {
 
 document.addEventListener('click', (event) => {
   if (event.target.closest('[data-open-guild-drawer]')) {
-    setGuildDrawerOpen(true);
+    const drawer = $('[data-guild-drawer]');
+    setGuildDrawerOpen(!drawer?.classList.contains('is-open'));
     return;
   }
 

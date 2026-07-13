@@ -94,7 +94,7 @@
         <h1>Controle ton bot depuis le web.</h1>
         <p>Connecte-toi avec Discord, choisis un serveur, autorise Sentinel si besoin, puis execute les actions directement sur le Discord selectionne.</p>
         <div class="dashboard-quick-actions">
-          <button class="button" type="button" data-open-guild-drawer>Choisir un serveur</button>
+          <button class="button" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Choisir un serveur</button>
         </div>
       </div>
       <div class="dashboard-user" data-user-card>
@@ -104,7 +104,7 @@
 
     <section class="dashboard-workspace">
       <div class="guild-drawer-backdrop" data-close-guild-drawer hidden></div>
-      <aside class="dashboard-panel guild-panel guild-drawer" data-guild-drawer aria-label="Choix du Discord">
+      <aside class="dashboard-panel guild-panel guild-drawer" id="guild-drawer" data-guild-drawer aria-label="Choix du Discord" aria-hidden="true">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Serveurs</p>
@@ -122,7 +122,7 @@
           <img src="assets/sentinel-mark.png" alt="">
           <h2>Selectionne un serveur</h2>
           <p>Ouvre le volet des serveurs pour choisir le Discord a piloter.</p>
-          <button class="button" type="button" data-open-guild-drawer>Ouvrir le volet</button>
+          <button class="button" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Ouvrir le volet</button>
         </div>
       </section>
     </section>
