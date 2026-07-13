@@ -35,6 +35,7 @@
     'Dashboard': 'Dashboard',
     'Conditions': 'Terms',
     'Confidentialite': 'Privacy',
+    'Serveur support': 'Support server',
     'Retour au site': 'Back to site',
     'Cette page n\'existe pas ou a ete deplacee.': 'This page does not exist or has been moved.',
 
