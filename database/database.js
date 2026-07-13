@@ -79,6 +79,36 @@ CREATE TABLE IF NOT EXISTS custom_embeds (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY,
+    username TEXT,
+    global_name TEXT,
+    avatar_url TEXT,
+    last_login_at TEXT,
+    last_seen_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_site_settings (
+    user_id TEXT PRIMARY KEY,
+    site_language TEXT NOT NULL DEFAULT 'fr',
+    last_guild_id TEXT,
+    last_return_url TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dashboard_sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT,
+    token_expires_at INTEGER,
+    ip_hash TEXT,
+    user_agent TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -102,6 +132,12 @@ ON moderation_tempbans (expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_custom_embeds_guild
 ON custom_embeds (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_user
+ON dashboard_sessions (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expires
+ON dashboard_sessions (expires_at);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
@@ -109,6 +145,17 @@ const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
 
 if (!guildConfigColumns.includes('language')) {
     db.prepare("ALTER TABLE guild_configs ADD COLUMN language TEXT NOT NULL DEFAULT 'fr'").run();
+}
+
+const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
+    .map(column => column.name);
+
+if (!dashboardSessionColumns.includes('ip_hash')) {
+    db.prepare('ALTER TABLE dashboard_sessions ADD COLUMN ip_hash TEXT').run();
+}
+
+if (!dashboardSessionColumns.includes('user_agent')) {
+    db.prepare('ALTER TABLE dashboard_sessions ADD COLUMN user_agent TEXT').run();
 }
 
 module.exports = db;

@@ -226,6 +226,37 @@ img {
   opacity: 0.45;
 }
 
+.discord-profile-button {
+  gap: 8px;
+  min-width: 0;
+  max-width: 190px;
+  padding-inline: 10px 14px;
+  color: var(--text);
+}
+
+.discord-profile-button img,
+.discord-profile-fallback {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+.discord-profile-fallback {
+  display: inline-grid;
+  place-items: center;
+  color: #05070c;
+  background: var(--accent-gradient);
+  font-weight: 950;
+}
+
+.discord-profile-button span:last-child {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .eyebrow {
   margin: 0 0 16px;
   color: var(--cyan);
@@ -684,6 +715,37 @@ h3 {
     var(--surface);
   box-shadow: var(--shadow-soft);
   clip-path: var(--cut);
+}
+
+.bot-help-panel {
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
+  align-items: stretch;
+}
+
+.bot-help-panel .hero-actions {
+  margin-top: 22px;
+}
+
+.help-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.help-panel-grid article {
+  min-height: 190px;
+  padding: 18px;
+  border: 1px solid rgba(234, 242, 255, 0.1);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.05), transparent 44%, rgba(255, 45, 154, 0.04)),
+    rgba(255, 255, 255, 0.035);
+  clip-path: var(--cut);
+}
+
+.help-panel-grid p {
+  color: var(--muted);
+  line-height: 1.62;
 }
 
 .troubleshoot-card h3 {
@@ -1390,6 +1452,7 @@ code {
   .troubleshoot-grid,
   .split-layout,
   .wide-card,
+  .bot-help-panel,
   .install-actions,
   .support-banner,
   .dashboard-guide-grid,
@@ -1495,6 +1558,7 @@ code {
   .hero-metrics,
   .dashboard-metrics,
   .form-grid,
+  .help-panel-grid,
   .split-mini {
     grid-template-columns: 1fr;
   }
