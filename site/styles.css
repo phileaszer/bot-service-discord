@@ -148,6 +148,8 @@ img {
 
 .header-actions {
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .language-switch {
@@ -841,7 +843,7 @@ code {
 }
 
 .not-found {
-  min-height: 100vh;
+  min-height: calc(100vh - 72px);
   display: grid;
   place-items: center;
   align-content: center;
@@ -1416,12 +1418,23 @@ code {
     gap: 6px;
   }
 
+  .header-actions .button {
+    width: auto;
+  }
+
   .button-small {
     min-width: 84px;
   }
 
   .language-switch {
     grid-template-columns: repeat(2, 34px);
+  }
+
+  .header-actions .button-small {
+    min-width: auto;
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 0.8rem;
   }
 
   .guild-panel.is-open {

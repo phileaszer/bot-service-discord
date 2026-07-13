@@ -86,7 +86,7 @@ function showPublicDashboardGuide() {
   }
 
   if (login) {
-    login.hidden = true;
+    login.hidden = false;
   }
 
   if (logout) {
