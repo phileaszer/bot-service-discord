@@ -23,7 +23,7 @@
     </nav>
     <div class="header-actions">
       <button class="button button-small button-ghost" type="button" data-logout hidden>Deconnexion</button>
-      <a class="button button-small button-ghost" href="https://bot-service-discord-production.up.railway.app/auth/login" data-login hidden>Connexion Discord</a>
+      <a class="button button-small button-ghost" href="https://bot-service-discord-production.up.railway.app/auth/login" data-login data-discord-login hidden>Connexion Discord</a>
       <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands" data-public-invite>Inviter</a>
     </div>
   </header>
@@ -130,6 +130,7 @@
 
   <div class="toast-stack" data-toasts></div>
   <script src="i18n.js"></script>
+  <script src="auth.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

@@ -607,6 +607,43 @@ function mapUserData(row) {
     };
 }
 
+function saveDiscordUserProfile(user, options = {}) {
+    if (!user?.id) {
+        return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const lastLoginAt = options.markLogin ? timestamp : null;
+
+    db.prepare(`
+        INSERT INTO user_profiles (
+            user_id,
+            username,
+            global_name,
+            avatar_url,
+            last_login_at,
+            last_seen_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            username = excluded.username,
+            global_name = excluded.global_name,
+            avatar_url = excluded.avatar_url,
+            last_login_at = COALESCE(excluded.last_login_at, user_profiles.last_login_at),
+            last_seen_at = excluded.last_seen_at,
+            updated_at = excluded.updated_at
+    `).run(
+        user.id,
+        user.username || null,
+        user.globalName || null,
+        user.displayAvatarURL?.({ extension: 'png', size: 128 }) || null,
+        lastLoginAt,
+        timestamp,
+        timestamp
+    );
+}
+
 function getGuildConfig(guildId) {
     let row = db.prepare(`
         SELECT role_id, log_channel_id, language
@@ -4613,6 +4650,8 @@ client.on(Events.GuildCreate, async guild => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    saveDiscordUserProfile(interaction.user);
+
     if (interaction.isButton()) {
         console.log(`Bouton Discord recu : ${interaction.customId} par ${interaction.user.tag} (${interaction.user.id})`);
     }
@@ -5267,6 +5306,7 @@ client.on(Events.MessageDelete, async message => {
 
 client.on(Events.MessageCreate, async message => {
     if (message.author.bot) return;
+    saveDiscordUserProfile(message.author);
     if (!message.guild) return;
 
     const guildId = message.guild.id;

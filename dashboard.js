@@ -3,6 +3,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { PermissionsBitField } = require('discord.js');
+const db = require('./database/database');
 
 const sessions = new Map();
 const oauthStates = new Map();
@@ -13,6 +14,23 @@ const SESSION_COOKIE = 'sentinel_session';
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
+const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
+const ALLOWED_RETURN_PATHS = new Set([
+    '/',
+    '/index.html',
+    '/dashboard',
+    '/dashboard.html',
+    '/fonctionnalites',
+    '/fonctionnalites.html',
+    '/commandes',
+    '/commandes.html',
+    '/premium',
+    '/premium.html',
+    '/securite',
+    '/securite.html',
+    '/installation',
+    '/installation.html'
+]);
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -34,6 +52,165 @@ function createHttpError(status, message, details = {}) {
     return error;
 }
 
+function nowIso() {
+    return new Date().toISOString();
+}
+
+function normalizeSiteLanguage(value) {
+    return value === 'en' ? 'en' : 'fr';
+}
+
+function truncateText(value, maxLength = 600) {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    return value.slice(0, maxLength);
+}
+
+function getClientIp(req) {
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const forwarded = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    const ip = forwarded?.split(',')[0]?.trim()
+        || req.socket?.remoteAddress
+        || null;
+
+    return ip;
+}
+
+function hashSessionValue(value) {
+    if (!value) {
+        return null;
+    }
+
+    return crypto
+        .createHash('sha256')
+        .update(String(value))
+        .digest('hex');
+}
+
+function getSessionFingerprint(req) {
+    return {
+        ipHash: hashSessionValue(getClientIp(req)),
+        userAgent: truncateText(req.headers['user-agent'] || null, 400)
+    };
+}
+
+function mapUserProfile(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        id: row.user_id,
+        username: row.username,
+        globalName: row.global_name,
+        avatar: row.avatar_url
+    };
+}
+
+function saveUserProfile(profile, options = {}) {
+    if (!profile?.id) {
+        return null;
+    }
+
+    const timestamp = nowIso();
+    const lastLoginAt = options.markLogin ? timestamp : null;
+
+    db.prepare(`
+        INSERT INTO user_profiles (
+            user_id,
+            username,
+            global_name,
+            avatar_url,
+            last_login_at,
+            last_seen_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            username = excluded.username,
+            global_name = excluded.global_name,
+            avatar_url = excluded.avatar_url,
+            last_login_at = COALESCE(excluded.last_login_at, user_profiles.last_login_at),
+            last_seen_at = excluded.last_seen_at,
+            updated_at = excluded.updated_at
+    `).run(
+        profile.id,
+        profile.username || null,
+        profile.globalName || null,
+        profile.avatar || null,
+        lastLoginAt,
+        timestamp,
+        timestamp
+    );
+
+    return getUserProfile(profile.id);
+}
+
+function getUserProfile(userId) {
+    return mapUserProfile(db.prepare(`
+        SELECT user_id, username, global_name, avatar_url
+        FROM user_profiles
+        WHERE user_id = ?
+    `).get(userId));
+}
+
+function getUserSiteSettings(userId) {
+    const row = db.prepare(`
+        SELECT site_language, last_guild_id, last_return_url
+        FROM user_site_settings
+        WHERE user_id = ?
+    `).get(userId);
+
+    if (!row) {
+        const timestamp = nowIso();
+        db.prepare(`
+            INSERT INTO user_site_settings (user_id, site_language, last_guild_id, last_return_url, updated_at)
+            VALUES (?, 'fr', NULL, NULL, ?)
+        `).run(userId, timestamp);
+
+        return {
+            siteLanguage: 'fr',
+            lastGuildId: null,
+            lastReturnUrl: null
+        };
+    }
+
+    return {
+        siteLanguage: normalizeSiteLanguage(row.site_language),
+        lastGuildId: row.last_guild_id || null,
+        lastReturnUrl: row.last_return_url || null
+    };
+}
+
+function updateUserSiteSettings(userId, patch = {}) {
+    const current = getUserSiteSettings(userId);
+    const next = {
+        siteLanguage: Object.prototype.hasOwnProperty.call(patch, 'siteLanguage')
+            ? normalizeSiteLanguage(patch.siteLanguage)
+            : current.siteLanguage,
+        lastGuildId: Object.prototype.hasOwnProperty.call(patch, 'lastGuildId')
+            ? (/^\d{17,20}$/.test(String(patch.lastGuildId || '')) ? String(patch.lastGuildId) : null)
+            : current.lastGuildId,
+        lastReturnUrl: Object.prototype.hasOwnProperty.call(patch, 'lastReturnUrl')
+            ? truncateText(patch.lastReturnUrl, 600)
+            : current.lastReturnUrl
+    };
+
+    db.prepare(`
+        INSERT INTO user_site_settings (user_id, site_language, last_guild_id, last_return_url, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            site_language = excluded.site_language,
+            last_guild_id = excluded.last_guild_id,
+            last_return_url = excluded.last_return_url,
+            updated_at = excluded.updated_at
+    `).run(userId, next.siteLanguage, next.lastGuildId, next.lastReturnUrl, nowIso());
+
+    return next;
+}
+
 function getRequestBaseUrl(req) {
     if (process.env.DASHBOARD_URL) {
         return process.env.DASHBOARD_URL.replace(/\/$/, '');
@@ -48,6 +225,46 @@ function getRequestBaseUrl(req) {
 
 function getRedirectUri(req) {
     return `${getRequestBaseUrl(req)}/auth/callback`;
+}
+
+function normalizeReturnPath(pathname) {
+    let normalizedPath = pathname || '/';
+
+    if (normalizedPath === PUBLIC_SITE_BASE_PATH) {
+        normalizedPath = '/';
+    } else if (normalizedPath.startsWith(`${PUBLIC_SITE_BASE_PATH}/`)) {
+        normalizedPath = normalizedPath.slice(PUBLIC_SITE_BASE_PATH.length);
+    }
+
+    if (!normalizedPath.startsWith('/')) {
+        normalizedPath = `/${normalizedPath}`;
+    }
+
+    return ALLOWED_RETURN_PATHS.has(normalizedPath) ? normalizedPath : '/dashboard';
+}
+
+function getSafeReturnTo(req, value) {
+    const baseUrl = getRequestBaseUrl(req);
+
+    if (!value) {
+        return `${baseUrl}/dashboard`;
+    }
+
+    try {
+        const parsed = new URL(value, baseUrl);
+        const base = new URL(baseUrl);
+        const isSameOrigin = parsed.origin === base.origin;
+        const isGithubPages = parsed.hostname.toLowerCase() === 'phileaszer.github.io';
+
+        if (!isSameOrigin && !isGithubPages) {
+            return `${baseUrl}/dashboard`;
+        }
+
+        const path = normalizeReturnPath(parsed.pathname);
+        return `${baseUrl}${path}${parsed.search}${parsed.hash}`;
+    } catch (error) {
+        return `${baseUrl}/dashboard`;
+    }
 }
 
 function getInviteUrl(ctx, guildId = null) {
@@ -89,6 +306,85 @@ function clearSessionCookie(res) {
     res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
+function saveDashboardSession(sessionId, session, req = null) {
+    const fingerprint = req ? getSessionFingerprint(req) : {};
+
+    db.prepare(`
+        INSERT OR REPLACE INTO dashboard_sessions (
+            session_id,
+            user_id,
+            access_token,
+            refresh_token,
+            token_expires_at,
+            ip_hash,
+            user_agent,
+            created_at,
+            expires_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        sessionId,
+        session.user.id,
+        session.accessToken,
+        session.refreshToken || null,
+        session.tokenExpiresAt || null,
+        fingerprint.ipHash || session.ipHash || null,
+        fingerprint.userAgent || session.userAgent || null,
+        session.createdAt,
+        session.expiresAt
+    );
+}
+
+function loadDashboardSession(sessionId) {
+    const row = db.prepare(`
+        SELECT session_id, user_id, access_token, refresh_token, token_expires_at, ip_hash, user_agent, created_at, expires_at
+        FROM dashboard_sessions
+        WHERE session_id = ?
+    `).get(sessionId);
+
+    if (!row) {
+        return null;
+    }
+
+    const profile = getUserProfile(row.user_id);
+
+    if (!profile) {
+        db.prepare('DELETE FROM dashboard_sessions WHERE session_id = ?').run(sessionId);
+        return null;
+    }
+
+    return {
+        accessToken: row.access_token,
+        refreshToken: row.refresh_token,
+        tokenExpiresAt: row.token_expires_at,
+        ipHash: row.ip_hash,
+        userAgent: row.user_agent,
+        user: profile,
+        createdAt: row.created_at,
+        expiresAt: row.expires_at
+    };
+}
+
+function extendDashboardSession(sessionId, session, req = null) {
+    const fingerprint = req ? getSessionFingerprint(req) : {};
+    const ipHash = fingerprint.ipHash || session.ipHash || null;
+    const userAgent = fingerprint.userAgent || session.userAgent || null;
+
+    session.ipHash = ipHash;
+    session.userAgent = userAgent;
+
+    db.prepare(`
+        UPDATE dashboard_sessions
+        SET expires_at = ?, ip_hash = ?, user_agent = ?
+        WHERE session_id = ?
+    `).run(session.expiresAt, ipHash, userAgent, sessionId);
+}
+
+function deleteDashboardSession(sessionId) {
+    sessions.delete(sessionId);
+    db.prepare('DELETE FROM dashboard_sessions WHERE session_id = ?').run(sessionId);
+}
+
 function getSession(req) {
     const sessionId = parseCookies(req)[SESSION_COOKIE];
 
@@ -96,26 +392,44 @@ function getSession(req) {
         return null;
     }
 
-    const session = sessions.get(sessionId);
+    let session = sessions.get(sessionId);
+
+    if (!session) {
+        session = loadDashboardSession(sessionId);
+
+        if (session) {
+            sessions.set(sessionId, session);
+        }
+    }
 
     if (!session || session.expiresAt <= Date.now()) {
-        sessions.delete(sessionId);
+        deleteDashboardSession(sessionId);
         return null;
     }
 
+    const profile = getUserProfile(session.user.id);
+    if (profile) {
+        session.user = profile;
+    }
+
     session.expiresAt = Date.now() + SESSION_TTL;
+    extendDashboardSession(sessionId, session, req);
     return session;
 }
 
-function createSession(payload) {
+function createSession(payload, req = null) {
     const sessionId = crypto.randomBytes(32).toString('hex');
+    const fingerprint = req ? getSessionFingerprint(req) : {};
     const session = {
         ...payload,
+        ipHash: fingerprint.ipHash || null,
+        userAgent: fingerprint.userAgent || null,
         createdAt: Date.now(),
         expiresAt: Date.now() + SESSION_TTL
     };
 
     sessions.set(sessionId, session);
+    saveDashboardSession(sessionId, session, req);
     return { sessionId, session };
 }
 
@@ -893,13 +1207,11 @@ async function runDashboardAction(ctx, guild, member, body) {
 }
 
 async function handleApi(req, res, ctx, url) {
-    const session = requireSession(req);
-
     if (req.method === 'POST' && url.pathname === '/api/logout') {
         const sessionId = parseCookies(req)[SESSION_COOKIE];
 
         if (sessionId) {
-            sessions.delete(sessionId);
+            deleteDashboardSession(sessionId);
         }
 
         clearSessionCookie(res);
@@ -907,8 +1219,38 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    const session = requireSession(req);
+
     if (req.method === 'GET' && url.pathname === '/api/session') {
-        json(res, 200, { ok: true, user: session.user });
+        json(res, 200, {
+            ok: true,
+            user: session.user,
+            settings: getUserSiteSettings(session.user.id)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/me/settings') {
+        const body = await parseBody(req);
+        const settingsPatch = {};
+
+        if (Object.prototype.hasOwnProperty.call(body, 'siteLanguage')) {
+            settingsPatch.siteLanguage = body.siteLanguage;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(body, 'lastGuildId')) {
+            settingsPatch.lastGuildId = body.lastGuildId;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(body, 'lastReturnUrl')) {
+            settingsPatch.lastReturnUrl = body.lastReturnUrl
+                ? getSafeReturnTo(req, body.lastReturnUrl)
+                : null;
+        }
+
+        const settings = updateUserSiteSettings(session.user.id, settingsPatch);
+
+        json(res, 200, { ok: true, settings });
         return;
     }
 
@@ -949,6 +1291,7 @@ async function handleApi(req, res, ctx, url) {
     const stateMatch = /^\/api\/guilds\/(\d{17,20})\/state$/.exec(url.pathname);
     if (req.method === 'GET' && stateMatch) {
         const { guild } = await getDashboardAccess(ctx, session, stateMatch[1]);
+        updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
         json(res, 200, { ok: true, state: await buildGuildState(ctx, guild) });
         return;
     }
@@ -956,6 +1299,7 @@ async function handleApi(req, res, ctx, url) {
     const actionMatch = /^\/api\/guilds\/(\d{17,20})\/action$/.exec(url.pathname);
     if (req.method === 'POST' && actionMatch) {
         const { guild, member } = await getDashboardAccess(ctx, session, actionMatch[1]);
+        updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
         const body = await parseBody(req);
         const message = await runDashboardAction(ctx, guild, member, body);
         json(res, 200, {
@@ -1010,7 +1354,11 @@ async function handleRequest(req, res, ctx) {
             }
 
             const state = crypto.randomBytes(16).toString('hex');
-            oauthStates.set(state, Date.now() + 10 * 60 * 1000);
+            const returnTo = getSafeReturnTo(req, url.searchParams.get('return_to'));
+            oauthStates.set(state, {
+                expiresAt: Date.now() + 10 * 60 * 1000,
+                returnTo
+            });
             const oauthUrl = new URL('https://discord.com/oauth2/authorize');
             oauthUrl.searchParams.set('client_id', process.env.CLIENT_ID);
             oauthUrl.searchParams.set('redirect_uri', getRedirectUri(req));
@@ -1022,6 +1370,18 @@ async function handleRequest(req, res, ctx) {
             return;
         }
 
+        if (req.method === 'GET' && url.pathname === '/auth/logout') {
+            const sessionId = parseCookies(req)[SESSION_COOKIE];
+
+            if (sessionId) {
+                deleteDashboardSession(sessionId);
+            }
+
+            clearSessionCookie(res);
+            redirect(res, getSafeReturnTo(req, url.searchParams.get('return_to')));
+            return;
+        }
+
         if (req.method === 'GET' && url.pathname === '/auth/callback') {
             const code = url.searchParams.get('code');
             const state = url.searchParams.get('state');
@@ -1030,29 +1390,39 @@ async function handleRequest(req, res, ctx) {
                 throw createHttpError(400, 'Missing Discord authorization code.');
             }
 
-            if (!state || !oauthStates.has(state) || oauthStates.get(state) <= Date.now()) {
+            const stateData = state ? oauthStates.get(state) : null;
+            const stateExpiresAt = typeof stateData === 'number' ? stateData : stateData?.expiresAt;
+
+            if (!state || !stateData || stateExpiresAt <= Date.now()) {
                 throw createHttpError(400, 'Invalid Discord authorization state.');
             }
 
             oauthStates.delete(state);
             const token = await exchangeCode(req, code);
             const user = await discordFetch('/users/@me', token.access_token);
+            const profile = saveUserProfile({
+                id: user.id,
+                username: user.username,
+                globalName: user.global_name,
+                avatar: user.avatar
+                    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+                    : null
+            }, { markLogin: true });
+            const returnTo = typeof stateData === 'number'
+                ? `${getRequestBaseUrl(req)}/dashboard`
+                : stateData.returnTo;
+
+            updateUserSiteSettings(user.id, { lastReturnUrl: returnTo });
+
             const { sessionId } = createSession({
                 accessToken: token.access_token,
                 refreshToken: token.refresh_token,
                 tokenExpiresAt: Date.now() + (token.expires_in * 1000),
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    globalName: user.global_name,
-                    avatar: user.avatar
-                        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-                        : null
-                }
-            });
+                user: profile
+            }, req);
 
             setSessionCookie(res, sessionId);
-            redirect(res, '/dashboard');
+            redirect(res, returnTo);
             return;
         }
 
@@ -1090,11 +1460,15 @@ function cleanupSessions() {
         }
     }
 
-    for (const [state, expiresAt] of oauthStates.entries()) {
+    for (const [state, stateData] of oauthStates.entries()) {
+        const expiresAt = typeof stateData === 'number' ? stateData : stateData.expiresAt;
+
         if (expiresAt <= now) {
             oauthStates.delete(state);
         }
     }
+
+    db.prepare('DELETE FROM dashboard_sessions WHERE expires_at <= ?').run(now);
 }
 
 function startDashboardServer(ctx) {

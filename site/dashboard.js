@@ -5,6 +5,7 @@ let currentUser = null;
 let guilds = [];
 let selectedGuildId = null;
 let currentState = null;
+let currentSettings = null;
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -603,6 +604,8 @@ async function selectGuild(guildId) {
     return;
   }
 
+  window.SentinelAuth?.saveSettings?.({ lastGuildId: guildId });
+
   try {
     await refreshGuildState();
   } catch (error) {
@@ -629,10 +632,19 @@ async function bootstrap() {
   try {
     const session = await api('/api/session');
     currentUser = session.user;
+    currentSettings = session.settings || null;
     renderUser();
     await loadGuilds();
+
+    if (
+      currentSettings?.lastGuildId
+      && guilds.some((guild) => guild.id === currentSettings.lastGuildId && guild.installed)
+    ) {
+      await selectGuild(currentSettings.lastGuildId);
+    }
   } catch (error) {
     currentUser = null;
+    currentSettings = null;
     renderUser();
   }
 }
@@ -668,6 +680,8 @@ $('[data-logout]')?.addEventListener('click', async () => {
   guilds = [];
   selectedGuildId = null;
   currentState = null;
+  currentSettings = null;
+  localStorage.removeItem('sentinel-discord-profile');
   renderUser();
   renderGuilds();
   renderDashboard();

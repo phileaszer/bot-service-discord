@@ -92,6 +92,27 @@
 
     'Les commandes Sentinel, classees par usage.': 'Sentinel commands, sorted by use.',
     'Le gratuit reste volontairement lisible. Le premium ajoute les controles avances utiles aux grandes communautes.': 'The free tier stays intentionally readable. Premium adds advanced controls useful for large communities.',
+    'Panneau d\'aide Discord': 'Discord help panel',
+    'Le mode d\'emploi integre au bot.': 'The built-in bot guide.',
+    'Sur Discord, la commande': 'On Discord, the command',
+    'affiche le tutoriel complet de Sentinel. Depuis le site, tu peux suivre ce deroule pour installer, configurer et utiliser le bot sans connaitre Discord.': 'shows Sentinel full tutorial. From the website, you can follow this flow to install, configure, and use the bot without knowing Discord.',
+    'Copier /aide': 'Copy /help',
+    'Copier /config-voir': 'Copy /config-view',
+    'Copie': 'Copied',
+    'Installer': 'Install',
+    'Invite Sentinel sur ton serveur, puis lance': 'Invite Sentinel to your server, then run',
+    'pour choisir Francais ou English.': 'to choose French or English.',
+    'Configurer': 'Configure',
+    'Definis le role de service avec': 'Set the duty role with',
+    'le salon de logs avec': 'the log channel with',
+    'puis les roles autorises avec': 'then the authorized roles with',
+    'Utiliser': 'Use',
+    'Publie le panneau avec': 'Publish the panel with',
+    'Les membres pourront prendre service, voir leurs heures et suivre les agents actifs.': 'Members will be able to clock in, view their hours, and follow active agents.',
+    'Verifier': 'Check',
+    'Utilise': 'Use',
+    'pour relire la configuration et': 'to review the configuration and',
+    'pour remettre a zero une personne, meme par ID.': 'to reset one person, including by ID.',
     'Service gratuit': 'Free duty tools',
     'Voir ses heures': 'View your hours',
     'Voir ses 5 dernieres sessions': 'View your last 5 sessions',
@@ -506,6 +527,9 @@
   function setLanguage(language) {
     localStorage.setItem(STORAGE_KEY, language);
     applyLanguage(language);
+    window.dispatchEvent(new CustomEvent('sentinel:site-language-change', {
+      detail: { language }
+    }));
   }
 
   let scheduled = false;
