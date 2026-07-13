@@ -125,6 +125,7 @@
     'Definir le salon de logs par ID': 'Set the log channel by ID',
     'Definir les roles autorises': 'Set allowed roles',
     'Verifier la configuration': 'Check configuration',
+    'Afficher le tutoriel dans Discord': 'Show the Discord tutorial',
     'Moderation gratuite': 'Free moderation',
     'Ajouter un avertissement': 'Add a warning',
     'Timeout temporaire': 'Temporary timeout',
