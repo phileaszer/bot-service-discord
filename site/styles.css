@@ -1444,12 +1444,11 @@ code {
   content: "";
 }
 
-.field-help::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 10px);
-  z-index: 20;
+.sentinel-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9999;
   width: min(280px, calc(100vw - 48px));
   padding: 10px 12px;
   color: var(--text);
@@ -1470,25 +1469,33 @@ code {
   clip-path: var(--cut);
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -4px);
+  transform: translateY(-4px);
   transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.field-help::before {
+.sentinel-tooltip::before {
   content: "";
   position: absolute;
   left: 50%;
-  top: calc(100% + 4px);
-  z-index: 21;
+  top: -5px;
+  z-index: -1;
   width: 10px;
   height: 10px;
   border-top: 1px solid rgba(23, 231, 255, 0.28);
   border-left: 1px solid rgba(23, 231, 255, 0.28);
   background: rgba(5, 7, 12, 0.98);
-  opacity: 0;
-  pointer-events: none;
   transform: translateX(-50%) rotate(45deg);
-  transition: opacity 140ms ease;
+}
+
+.sentinel-tooltip.is-above::before {
+  top: auto;
+  bottom: -5px;
+  transform: translateX(-50%) rotate(225deg);
+}
+
+.sentinel-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .field-help:hover,
@@ -1503,18 +1510,6 @@ code {
     0 0 22px rgba(255, 45, 154, 0.28),
     0 0 32px rgba(23, 231, 255, 0.16);
   transform: translateY(-1px);
-}
-
-.field-help:hover::after,
-.field-help:focus-visible::after,
-.field-help:hover::before,
-.field-help:focus-visible::before {
-  opacity: 1;
-}
-
-.field-help:hover::after,
-.field-help:focus-visible::after {
-  transform: translate(-50%, 0);
 }
 
 .dashboard-panel input,
