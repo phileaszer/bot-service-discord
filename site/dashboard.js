@@ -298,12 +298,6 @@ const DASHBOARD_TABS = [
     label: 'Moderation',
     eyebrow: 'Securite',
     title: 'Actions rapides'
-  },
-  {
-    id: 'premium',
-    label: 'Premium',
-    eyebrow: 'Avance',
-    title: 'Outils premium'
   }
 ];
 
@@ -366,6 +360,7 @@ function renderDashboard() {
   const pingRoleOptions = optionList(state.roles, null, 'Aucun ping de role');
   const channelOptions = optionList(state.channels, state.config.logChannelId, 'Choisir un salon');
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
+  const premiumTag = '<span class="premium-tag">Option Premium</span>';
 
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
@@ -448,7 +443,7 @@ function renderDashboard() {
           <button class="button" type="submit">Reset</button>
         </form>
         <form data-action-form="sync-service">
-          <label>Synchronisation service ${state.advanced ? '' : '(Premium)'}</label>
+          <label>Synchronisation service ${premiumTag}</label>
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
         </form>
       </div>
@@ -518,7 +513,8 @@ function renderDashboard() {
     <section class="dashboard-panel" id="moderation">
       <div class="panel-heading">
         <p class="eyebrow">Moderation</p>
-        <h2>Commandes gratuites et Premium</h2>
+        <h2>Commandes de moderation</h2>
+        <p class="muted">Les actions Premium restent visibles ici, avec un badge dedie, pour comprendre ce qui est inclus dans chaque offre.</p>
       </div>
       <div class="form-grid">
         <form data-action-form="warn">
@@ -561,70 +557,69 @@ function renderDashboard() {
         </form>
       </div>
     </section>
-      `)}
 
-      ${tabPanel('premium', `
-    <section class="dashboard-panel premium-panel">
+    <section class="dashboard-panel premium-panel inline-premium-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Premium</p>
+          <p class="eyebrow">Options premium</p>
           <h2>Moderation avancee</h2>
+          <p class="muted">Ces actions servent aux staffs qui gerent beaucoup de salons, de sanctions et de cas moderateur.</p>
         </div>
         ${premiumBadge}
       </div>
       <div class="form-grid">
         <form data-action-form="tempban">
-          <label>Ban temporaire par ID</label>
+          <label>Ban temporaire par ID ${premiumTag}</label>
           <input name="userId" placeholder="ID Discord" required>
           <input name="duration" placeholder="1h, 7d, 30d" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Tempban</button>
         </form>
         <form data-action-form="unban">
-          <label>Debannir par ID</label>
+          <label>Debannir par ID ${premiumTag}</label>
           <input name="userId" placeholder="ID Discord" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unban</button>
         </form>
         <form data-action-form="lock">
-          <label>Verrouiller salon</label>
+          <label>Verrouiller salon ${premiumTag}</label>
           <select name="channelId">${channelOptions}</select>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Lock</button>
         </form>
         <form data-action-form="unlock">
-          <label>Deverrouiller salon</label>
+          <label>Deverrouiller salon ${premiumTag}</label>
           <select name="channelId">${channelOptions}</select>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unlock</button>
         </form>
         <form data-action-form="slowmode">
-          <label>Mode lent</label>
+          <label>Mode lent ${premiumTag}</label>
           <select name="channelId">${channelOptions}</select>
           <input name="duration" placeholder="10s, 5m, 0">
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Slowmode</button>
         </form>
         <form data-action-form="edit-case">
-          <label>Modifier un cas</label>
+          <label>Modifier un cas ${premiumTag}</label>
           <input name="caseId" placeholder="ID du cas" required>
           <input name="reason" placeholder="Nouvelle raison" required>
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Modifier</button>
         </form>
         <form data-action-form="delete-case">
-          <label>Supprimer un cas</label>
+          <label>Supprimer un cas ${premiumTag}</label>
           <input name="caseId" placeholder="ID du cas" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Supprimer</button>
         </form>
         <form data-action-form="unwarn">
-          <label>Retirer un avertissement</label>
+          <label>Retirer un avertissement ${premiumTag}</label>
           <input name="caseId" placeholder="ID du cas avertissement" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unwarn</button>
         </form>
         <form data-action-form="reset-guild">
-          <label>Reset global serveur</label>
+          <label>Reset global serveur ${premiumTag}</label>
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Reset global</button>
         </form>
       </div>
