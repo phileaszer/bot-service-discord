@@ -6,6 +6,7 @@ let guilds = [];
 let selectedGuildId = null;
 let currentState = null;
 let currentSettings = null;
+let activeDashboardTab = 'overview';
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -267,6 +268,84 @@ function customEmbedList(state) {
   `;
 }
 
+const DASHBOARD_TABS = [
+  {
+    id: 'overview',
+    label: 'Vue d ensemble',
+    eyebrow: 'Etat',
+    title: 'Resume serveur'
+  },
+  {
+    id: 'configuration',
+    label: 'Configuration',
+    eyebrow: 'Reglages',
+    title: 'Parametres'
+  },
+  {
+    id: 'service',
+    label: 'Service',
+    eyebrow: 'Equipe',
+    title: 'Prises de service'
+  },
+  {
+    id: 'embeds',
+    label: 'Embeds',
+    eyebrow: 'Annonces',
+    title: 'Messages Sentinel'
+  },
+  {
+    id: 'moderation',
+    label: 'Moderation',
+    eyebrow: 'Securite',
+    title: 'Actions rapides'
+  },
+  {
+    id: 'premium',
+    label: 'Premium',
+    eyebrow: 'Avance',
+    title: 'Outils premium'
+  }
+];
+
+function renderDashboardTabs(state, premiumBadge) {
+  const activeTab = DASHBOARD_TABS.find((tab) => tab.id === activeDashboardTab) || DASHBOARD_TABS[0];
+
+  return `
+    <section class="dashboard-control-panel">
+      <div class="control-summary">
+        <p class="eyebrow">Centre de controle</p>
+        <h2>${escapeHtml(activeTab.title)}</h2>
+        <p>${escapeHtml(state.guild.name)} - ${state.advanced ? 'Premium actif' : 'Mode gratuit'}</p>
+      </div>
+      <div class="control-status">
+        ${premiumBadge}
+        <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
+      </div>
+      <nav class="dashboard-tabs" aria-label="Sections du dashboard">
+        ${DASHBOARD_TABS.map((tab) => `
+          <button
+            type="button"
+            class="dashboard-tab${tab.id === activeDashboardTab ? ' is-active' : ''}"
+            data-dashboard-tab="${tab.id}"
+            aria-pressed="${tab.id === activeDashboardTab ? 'true' : 'false'}"
+          >
+            <span>${escapeHtml(tab.eyebrow)}</span>
+            <strong>${escapeHtml(tab.label)}</strong>
+          </button>
+        `).join('')}
+      </nav>
+    </section>
+  `;
+}
+
+function tabPanel(id, content) {
+  return `
+    <section class="dashboard-tab-panel${id === activeDashboardTab ? ' is-active' : ''}" data-dashboard-tab-panel="${id}" ${id === activeDashboardTab ? '' : 'hidden'}>
+      ${content}
+    </section>
+  `;
+}
+
 function renderDashboard() {
   const main = $('[data-dashboard-main]');
 
@@ -289,6 +368,9 @@ function renderDashboard() {
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
 
   main.innerHTML = `
+    ${renderDashboardTabs(state, premiumBadge)}
+    <div class="dashboard-tab-stage">
+      ${tabPanel('overview', `
     <section class="dashboard-panel server-overview">
       <div class="panel-heading row-heading">
         <div>
@@ -299,7 +381,9 @@ function renderDashboard() {
       </div>
       ${metricCards(state)}
     </section>
+      `)}
 
+      ${tabPanel('configuration', `
     <section class="dashboard-panel" id="configuration">
       <div class="panel-heading">
         <p class="eyebrow">Configuration</p>
@@ -339,7 +423,9 @@ function renderDashboard() {
         </form>
       </div>
     </section>
+      `)}
 
+      ${tabPanel('service', `
     <section class="dashboard-panel" id="service">
       <div class="panel-heading">
         <p class="eyebrow">Service</p>
@@ -377,7 +463,9 @@ function renderDashboard() {
         </article>
       </div>
     </section>
+      `)}
 
+      ${tabPanel('embeds', `
     <section class="dashboard-panel" id="embeds">
       <div class="panel-heading row-heading">
         <div>
@@ -424,7 +512,9 @@ function renderDashboard() {
         </article>
       </div>
     </section>
+      `)}
 
+      ${tabPanel('moderation', `
     <section class="dashboard-panel" id="moderation">
       <div class="panel-heading">
         <p class="eyebrow">Moderation</p>
@@ -471,7 +561,9 @@ function renderDashboard() {
         </form>
       </div>
     </section>
+      `)}
 
+      ${tabPanel('premium', `
     <section class="dashboard-panel premium-panel">
       <div class="panel-heading row-heading">
         <div>
@@ -537,6 +629,8 @@ function renderDashboard() {
         </form>
       </div>
     </section>
+      `)}
+    </div>
   `;
 
   attachDashboardHandlers();
@@ -570,6 +664,19 @@ async function runAction(action, data, button = null) {
 }
 
 function attachDashboardHandlers() {
+  $$('[data-dashboard-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextTab = button.dataset.dashboardTab;
+
+      if (!DASHBOARD_TABS.some((tab) => tab.id === nextTab)) {
+        return;
+      }
+
+      activeDashboardTab = nextTab;
+      renderDashboard();
+    });
+  });
+
   $$('[data-action-form]').forEach((form) => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
