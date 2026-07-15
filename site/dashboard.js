@@ -7,6 +7,9 @@ let selectedGuildId = null;
 let currentState = null;
 let currentSettings = null;
 let activeDashboardTab = 'overview';
+let tooltipHost = null;
+let tooltipPinned = false;
+let tooltipElement = null;
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -131,6 +134,87 @@ function setGuildDrawerOpen(isOpen) {
   });
 
   document.body.classList.toggle('drawer-open', isOpen);
+}
+
+function getTooltipElement() {
+  if (!tooltipElement) {
+    tooltipElement = document.createElement('div');
+    tooltipElement.id = 'sentinel-dashboard-tooltip';
+    tooltipElement.className = 'sentinel-tooltip';
+    tooltipElement.setAttribute('role', 'tooltip');
+    tooltipElement.hidden = true;
+    document.body.appendChild(tooltipElement);
+  }
+
+  return tooltipElement;
+}
+
+function positionTooltip(host) {
+  if (!host || !tooltipElement || tooltipElement.hidden) {
+    return;
+  }
+
+  const margin = 14;
+  const gap = 12;
+  const hostRect = host.getBoundingClientRect();
+  const tooltipRect = tooltipElement.getBoundingClientRect();
+  let left = hostRect.left + (hostRect.width / 2) - (tooltipRect.width / 2);
+  let top = hostRect.bottom + gap;
+  let isAbove = false;
+
+  left = Math.max(margin, Math.min(left, window.innerWidth - tooltipRect.width - margin));
+
+  if (top + tooltipRect.height + margin > window.innerHeight) {
+    top = hostRect.top - tooltipRect.height - gap;
+    isAbove = true;
+  }
+
+  if (top < margin) {
+    top = margin;
+    isAbove = false;
+  }
+
+  tooltipElement.style.left = `${left}px`;
+  tooltipElement.style.top = `${top}px`;
+  tooltipElement.classList.toggle('is-above', isAbove);
+}
+
+function showTooltip(host, { pinned = false } = {}) {
+  const text = host?.getAttribute('data-tooltip');
+
+  if (!host || !text) {
+    return;
+  }
+
+  const tooltip = getTooltipElement();
+  tooltipHost = host;
+  tooltipPinned = pinned;
+  tooltip.textContent = text;
+  tooltip.hidden = false;
+  host.setAttribute('aria-describedby', tooltip.id);
+  positionTooltip(host);
+  tooltip.classList.add('is-visible');
+}
+
+function hideTooltip({ force = false } = {}) {
+  if (tooltipPinned && !force) {
+    return;
+  }
+
+  tooltipPinned = false;
+
+  if (tooltipHost) {
+    tooltipHost.removeAttribute('aria-describedby');
+  }
+
+  tooltipHost = null;
+
+  if (!tooltipElement) {
+    return;
+  }
+
+  tooltipElement.classList.remove('is-visible', 'is-above');
+  tooltipElement.hidden = true;
 }
 
 function renderUser() {
@@ -763,6 +847,23 @@ async function bootstrap() {
 }
 
 document.addEventListener('click', (event) => {
+  const helpButton = event.target.closest('.field-help');
+
+  if (helpButton) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (tooltipHost === helpButton && tooltipPinned) {
+      hideTooltip({ force: true });
+      return;
+    }
+
+    showTooltip(helpButton, { pinned: true });
+    return;
+  }
+
+  hideTooltip({ force: true });
+
   if (event.target.closest('[data-open-guild-drawer]')) {
     const drawer = $('[data-guild-drawer]');
     setGuildDrawerOpen(!drawer?.classList.contains('is-open'));
@@ -781,11 +882,56 @@ document.addEventListener('click', (event) => {
   }
 });
 
+document.addEventListener('mouseover', (event) => {
+  const helpButton = event.target.closest('.field-help');
+
+  if (helpButton) {
+    showTooltip(helpButton);
+  }
+});
+
+document.addEventListener('mouseout', (event) => {
+  const helpButton = event.target.closest('.field-help');
+
+  if (helpButton && !helpButton.contains(event.relatedTarget)) {
+    hideTooltip();
+  }
+});
+
+document.addEventListener('focusin', (event) => {
+  const helpButton = event.target.closest('.field-help');
+
+  if (helpButton) {
+    showTooltip(helpButton);
+  }
+});
+
+document.addEventListener('focusout', (event) => {
+  const helpButton = event.target.closest('.field-help');
+
+  if (helpButton) {
+    hideTooltip();
+  }
+});
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
+    hideTooltip({ force: true });
     setGuildDrawerOpen(false);
   }
 });
+
+window.addEventListener('resize', () => {
+  if (tooltipHost) {
+    positionTooltip(tooltipHost);
+  }
+});
+
+document.addEventListener('scroll', () => {
+  if (tooltipHost) {
+    positionTooltip(tooltipHost);
+  }
+}, true);
 
 $('[data-logout]')?.addEventListener('click', async () => {
   await api('/api/logout', { method: 'POST', body: '{}' }).catch(() => {});
