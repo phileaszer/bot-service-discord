@@ -1424,14 +1424,12 @@ code {
   height: 24px;
   flex: 0 0 auto;
   color: #eaf2ff;
-  border: 1px solid rgba(23, 231, 255, 0.62);
+  border: 1px solid rgba(234, 242, 255, 0.2);
   border-radius: 0;
   background:
-    linear-gradient(135deg, rgba(23, 231, 255, 0.18), transparent 46%, rgba(255, 45, 154, 0.16)),
-    rgba(5, 7, 12, 0.94);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
-    0 0 16px rgba(23, 231, 255, 0.16);
+    linear-gradient(135deg, rgba(234, 242, 255, 0.07), transparent 48%, rgba(255, 45, 154, 0.055)),
+    rgba(5, 7, 12, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   cursor: help;
   font: inherit;
