@@ -13,10 +13,10 @@
   <header class="site-header">
     <a class="brand" href="index.html"><img src="assets/sentinel-mark.png" alt=""><span>Sentinel</span></a>
     <nav class="nav-links">
-      <a href="fonctionnalites.html">Fonctionnalites</a>
+      <a href="fonctionnalites.html">Fonctionnalités</a>
       <a href="commandes.html">Commandes</a>
       <a href="premium.html">Premium</a>
-      <a href="securite.html">Securite</a>
+      <a href="securite.html">Sécurité</a>
       <a href="installation.html" aria-current="page">Installation</a>
     </nav>
     <div class="header-actions">
@@ -30,7 +30,7 @@
     <section class="page-hero">
       <p class="eyebrow">Installation</p>
       <h1>Installer Sentinel proprement.</h1>
-      <p>Le bot doit etre ajoute comme bot Discord, pas seulement comme integration de commandes.</p>
+      <p>Sentinel doit être ajouté comme bot Discord, pas seulement comme intégration de commandes.</p>
       <div class="hero-actions">
         <a class="button" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter Sentinel</a>
         <a class="button button-ghost" href="#depannage">Aide installation</a>
@@ -41,16 +41,16 @@
     <section class="section section-flow">
       <div class="section-inner split-layout">
         <div class="section-heading">
-          <p class="eyebrow">Etapes</p>
-          <h2>Demarrage recommande.</h2>
-          <p>Suis ces etapes dans l'ordre pour eviter les problemes de permissions et de roles.</p>
+          <p class="eyebrow">Étapes</p>
+          <h2>Démarrage recommandé.</h2>
+          <p>Suis ces étapes dans l’ordre pour éviter les problèmes de permissions et de rôles.</p>
         </div>
         <ol class="steps">
           <li><strong>Inviter Sentinel</strong><span>Utilise le lien officiel avec les scopes bot et applications.commands.</span></li>
-          <li><strong>Verifier l'integration</strong><span>Dans les integrations Discord, Sentinel doit avoir le badge Bot.</span></li>
-          <li><strong>Placer le role Sentinel</strong><span>Le role du bot doit etre au-dessus du role de service et des roles a moderer.</span></li>
+          <li><strong>Vérifier l’intégration</strong><span>Dans les intégrations Discord, Sentinel doit afficher le badge Bot.</span></li>
+          <li><strong>Placer le rôle Sentinel</strong><span>Le rôle du bot doit être au-dessus du rôle de service et des rôles à modérer.</span></li>
           <li><strong>Choisir la langue</strong><span>Utilise /config-langue ou le dashboard pour choisir FR ou EN.</span></li>
-          <li><strong>Configurer le service</strong><span>Definis le role de service, le salon de logs et les roles autorises.</span></li>
+          <li><strong>Configurer le service</strong><span>Définis le rôle de service, le salon de logs et les rôles autorisés.</span></li>
           <li><strong>Publier le panneau</strong><span>Envoie !service-panel ou utilise le dashboard.</span></li>
         </ol>
       </div>
@@ -60,23 +60,23 @@
       <div class="section-inner wide-card bot-help-panel">
         <div>
           <p class="eyebrow">Panneau d'aide Discord</p>
-          <h2>Le mode d'emploi integre au bot.</h2>
-          <p>Sur Discord, la commande <code>/aide</code> affiche le tutoriel complet de Sentinel. Depuis le site, tu peux suivre ce deroule pour installer, configurer et utiliser le bot sans connaitre Discord.</p>
+          <h2>Le mode d’emploi intégré au bot.</h2>
+          <p>Sur Discord, la commande <code>/aide</code> affiche le tutoriel complet de Sentinel. Depuis le site, tu peux suivre le même déroulé pour installer, configurer et utiliser le bot sans connaître Discord.</p>
           <div class="hero-actions">
-            <button class="button" type="button" data-copy-command="/aide">Copier /aide</button>
-            <button class="button button-ghost" type="button" data-copy-command="/config-voir">Copier /config-voir</button>
+            <button class="button" type="button" data-copy-command="/aide">Copiér /aide</button>
+            <button class="button button-ghost" type="button" data-copy-command="/config-voir">Copiér /config-voir</button>
           </div>
         </div>
         <div class="help-panel-grid">
           <article>
             <span class="feature-icon">01</span>
             <h3>Installer</h3>
-            <p>Invite Sentinel sur ton serveur, puis lance <code>/config-langue</code> pour choisir Francais ou English.</p>
+            <p>Invite Sentinel sur ton serveur, puis lance <code>/config-langue</code> pour choisir Français ou English.</p>
           </article>
           <article>
             <span class="feature-icon">02</span>
             <h3>Configurer</h3>
-            <p>Definis le role de service avec <code>/config-role</code>, le salon de logs avec <code>/config-logs</code>, puis les roles autorises avec <code>/config-permissions</code>.</p>
+            <p>Définis le rôle de service avec <code>/config-role</code>, le salon de logs avec <code>/config-logs</code>, puis les rôles autorisés avec <code>/config-permissions</code>.</p>
           </article>
           <article>
             <span class="feature-icon">03</span>
@@ -85,8 +85,8 @@
           </article>
           <article>
             <span class="feature-icon">04</span>
-            <h3>Verifier</h3>
-            <p>Utilise <code>/config-voir</code> pour relire la configuration et <code>/reset-heures</code> pour remettre a zero une personne, meme par ID.</p>
+            <h3>Vérifier</h3>
+            <p>Utilise <code>/config-voir</code> pour relire la configuration et <code>/reset-heures</code> pour remettre à zéro une personne, même par ID.</p>
           </article>
         </div>
       </div>
@@ -95,33 +95,33 @@
     <section class="section" id="depannage">
       <div class="section-inner">
         <div class="section-heading">
-          <p class="eyebrow">Depannage / Troubleshooting</p>
+          <p class="eyebrow">Dépannage / Troubleshooting</p>
           <h2>Si Discord bloque l'invitation.</h2>
-          <p>Ces points reglent la plupart des soucis quand Sentinel ne rejoint pas le serveur, n'apparait pas comme bot, ou quand le dashboard ne semble pas agir sur le bon serveur.</p>
+          <p>Ces points règlent la plupart des soucis quand Sentinel ne rejoint pas le serveur, n’apparaît pas comme bot ou quand le dashboard ne semble pas agir sur le bon serveur.</p>
         </div>
         <div class="troubleshoot-grid">
           <article class="troubleshoot-card">
             <span class="support-kicker">01</span>
-            <h3>Verifier les droits Discord</h3>
-            <p>La personne qui invite Sentinel doit avoir la permission <strong>Gerer le serveur</strong> ou <strong>Administrateur</strong> sur le serveur choisi.</p>
+            <h3>Vérifier les droits Discord</h3>
+            <p>La personne qui invite Sentinel doit avoir la permission <strong>Gérer le serveur</strong> ou <strong>Administrateur</strong> sur le serveur choisi.</p>
             <p class="english-note">EN: the installer needs Manage Server or Administrator permission on the selected guild.</p>
           </article>
           <article class="troubleshoot-card">
             <span class="support-kicker">02</span>
             <h3>Choisir le bon serveur</h3>
-            <p>Si Discord ouvre directement un serveur qui n'est pas le bon, ferme la fenetre et relance le lien officiel depuis cette page sans lien personnalise.</p>
+            <p>Si Discord ouvre directement un serveur qui n'est pas le bon, ferme la fenêtre et relance le lien officiel depuis cette page, sans lien personnalisé.</p>
             <p class="english-note">EN: if Discord locks the wrong guild, restart from the official invite button on this page.</p>
           </article>
           <article class="troubleshoot-card">
             <span class="support-kicker">03</span>
             <h3>Confirmer que le bot est bien membre</h3>
-            <p>Dans les integrations Discord, Sentinel doit apparaitre avec le badge <strong>Bot</strong>. Si tu vois seulement Commandes, retire l'integration et reinvite-le.</p>
+            <p>Dans les intégrations Discord, Sentinel doit apparaître avec le badge <strong>Bot</strong>. Si tu vois seulement Commandes, retire l’intégration et réinvite-le.</p>
             <p class="english-note">EN: Sentinel must show as a Bot integration, not only as slash commands.</p>
           </article>
           <article class="troubleshoot-card">
             <span class="support-kicker">04</span>
-            <h3>Tester apres l'installation</h3>
-            <p>Une fois Sentinel arrive sur le serveur, utilise <code>/ping</code> puis <code>/diagnostic</code> pour verifier la base, les roles et les permissions.</p>
+            <h3>Tester après l’installation</h3>
+            <p>Une fois Sentinel arrivé sur le serveur, utilise <code>/ping</code> puis <code>/diagnostic</code> pour vérifier la base, les rôles et les permissions.</p>
             <p class="english-note">EN: after inviting, run /ping and /diagnostic to confirm that everything is ready.</p>
           </article>
         </div>
@@ -129,9 +129,9 @@
           <div>
             <p class="eyebrow">Important</p>
             <h3>Le lien officiel contient deux autorisations.</h3>
-            <p>Sentinel a besoin de <code>bot</code> et <code>applications.commands</code>. Sans les deux, les commandes peuvent apparaitre sans que le bot soit vraiment present sur le serveur.</p>
+            <p>Sentinel a besoin de <code>bot</code> et <code>applications.commands</code>. Sans les deux, les commandes peuvent apparaître sans que le bot soit vraiment présent sur le serveur.</p>
           </div>
-          <a class="button button-ghost" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Relancer l'invitation</a>
+          <a class="button button-ghost" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Relancer l’invitation</a>
         </div>
       </div>
     </section>
@@ -154,7 +154,7 @@
 
   <footer class="site-footer">
     <span>Sentinel</span>
-    <div><a href="fonctionnalites.html">Fonctionnalites</a><a href="commandes.html">Commandes</a><a href="securite.html">Securite</a><a href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a></div>
+    <div><a href="fonctionnalites.html">Fonctionnalités</a><a href="commandes.html">Commandes</a><a href="securite.html">Sécurité</a><a href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a></div>
   </footer>
   <script src="i18n.js"></script>
   <script src="auth.js"></script>

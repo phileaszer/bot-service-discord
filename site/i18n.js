@@ -513,6 +513,153 @@
     '10s, 5m, 0': '10s, 5m, 0'
   };
 
+  Object.assign(en, {
+    'Sentinel | Bot Discord de service et de modération': 'Sentinel | Discord duty and moderation bot',
+    'Fonctionnalités | Sentinel': 'Features | Sentinel',
+    'Sécurité | Sentinel': 'Security | Sentinel',
+    'Sentinel centralise la modération Discord et les prises de service réalistes pour le RP, les équipes staff, les communautés et toute autre organisation.': 'Sentinel centralizes Discord moderation and realistic duty tracking for RP, staff teams, communities, and any other organization.',
+    'Modération, prises de service réalistes, statistiques, logs et dashboard web pour le RP, les équipes staff, les communautés et tout autre usage.': 'Moderation, realistic duty tracking, statistics, logs, and a web dashboard for RP, staff teams, communities, and any other use.',
+    'Fonctionnalités de Sentinel pour le service, les statistiques, les logs et la modération Discord.': 'Sentinel features for duty tracking, statistics, logs, and Discord moderation.',
+    'Fonctionnalités Premium préparées pour Sentinel.': 'Prepared Premium features for Sentinel.',
+    'Sécurité, permissions et confidentialité de Sentinel.': 'Security, permissions, and privacy for Sentinel.',
+    'Cette page n’existe pas ou a été déplacée.': 'This page does not exist or has been moved.',
+    'Performance • Sécurité • Fiabilité': 'Performance • Security • Reliability',
+    'Un bot Discord bilingue pensé pour modérer un serveur et organiser des prises de service réalistes, adaptées au RP, aux équipes staff, aux communautés et à tout autre usage.': 'A bilingual Discord bot built for server moderation and realistic duty tracking, suited for RP, staff teams, communities, and any other use.',
+    'Sentinel réunit deux besoins essentiels : modérer proprement un Discord et gérer des prises de service crédibles pour du RP, une équipe staff, une communauté ou toute autre organisation.': 'Sentinel brings together two essential needs: clean Discord moderation and credible duty tracking for RP, a staff team, a community, or any other organization.',
+    'Prise de service, fin de service, rôle automatique, historique et temps total pour un suivi réaliste.': 'Clock in, clock out, automatic role, history, and total time for realistic tracking.',
+    'Heures personnelles, agents actifs, classement de service et vues avancées Premium.': 'Personal hours, active members, service leaderboard, and Premium advanced views.',
+    'Avertissements, timeouts, bans par ID, sanctions, logs et cas Premium.': 'Warnings, timeouts, ID bans, cases, logs, and Premium case tools.',
+    'Dashboard clair, actions directes et commandes prêtes à utiliser.': 'Clear dashboard, direct actions, and ready-to-use commands.',
+    'Un site clair, rangé par besoin.': 'A clear site, organized by need.',
+    'Chaque partie de Sentinel a sa page dédiée : présentation, commandes, Premium, sécurité et installation.': 'Each Sentinel area has its own page: overview, commands, Premium, security, and setup.',
+    'Voir le détail des commandes gratuites, Premium et texte.': 'See the free, Premium, and text commands in detail.',
+    'Voir ce qui sera réservé aux grandes communautés.': 'See what will be reserved for larger communities.',
+    'Permissions, rôles, logs et hiérarchie Discord.': 'Permissions, roles, logs, and Discord hierarchy.',
+    'Invite le bot, choisis la langue, configure les rôles, puis gère le reste depuis Discord ou le dashboard.': 'Invite the bot, choose the language, configure roles, then manage the rest from Discord or the dashboard.',
+    'Prise et fin de service sans prise de tête.': 'Clock in and out without friction.',
+    'Sentinel vérifie les permissions Discord, respecte la hiérarchie des rôles et garde une trace des sanctions. Les bans peuvent se faire par ID, et le staff peut publier des annonces embed sous l’identité de Sentinel.': 'Sentinel checks Discord permissions, respects role hierarchy, and keeps a record of sanctions. Bans can use a Discord ID, and staff can publish embed announcements under Sentinel identity.',
+    'Le dashboard permet de configurer Sentinel, gérer les services, modérer et publier des embeds d’annonce sans taper de slash command.': 'The dashboard lets you configure Sentinel, manage duty tracking, moderate, and publish announcement embeds without typing slash commands.',
+    'Connexion Discord prête': 'Discord login ready',
+    'Pas besoin de s’y connaître.': 'No technical knowledge needed.',
+    'Si le dashboard web n’est pas disponible, tu peux quand même tout faire depuis Discord avec les commandes ci-dessous.': 'If the web dashboard is unavailable, you can still do everything from Discord with the commands below.',
+    'Tu peux quand même installer, configurer et utiliser Sentinel sans quitter Discord.': 'You can still install, configure, and use Sentinel without leaving Discord.',
+    'Connecte-toi avec Discord, choisis un serveur, autorise Sentinel si besoin, puis exécute les actions directement sur le Discord sélectionné.': 'Log in with Discord, choose a server, authorize Sentinel if needed, then run actions directly on the selected Discord server.',
+    'Journal des actions réalisées depuis le dashboard. Ce serveur affiche uniquement ses propres actions, avec date, utilisateur, cible et résultat.': 'Dashboard action log. This server only shows its own actions, with date, user, target, and result.',
+    'Premium : création illimitée, modifications illimitées.': 'Premium: unlimited creation, unlimited edits.',
+    'Gratuit :': 'Free:',
+    'embeds actifs utilisés. Restant :': 'active embeds used. Remaining:',
+    'Modifications illimitées.': 'Unlimited edits.',
+    'Aucun embed Sentinel créé depuis ce dashboard ou Discord.': 'No Sentinel embed created from this dashboard or Discord.',
+    'Rôle de service': 'Duty role',
+    'Rôle autorisé ajouté': 'Allowed role added',
+    'Rôle autorisé retiré': 'Allowed role removed',
+    'Embed créé': 'Embed created',
+    'Embed modifié': 'Embed edited',
+    'Embed supprimé': 'Embed deleted',
+    'Déban': 'Unban',
+    'Cas modifié': 'Case edited',
+    'Cas supprimé': 'Case deleted',
+    'Langue du serveur': 'Server language',
+    'Choisit la langue utilisée par Sentinel sur ce serveur uniquement. Les réponses Discord et le dashboard suivront ce choix.': 'Choose the language Sentinel uses on this server only. Discord replies and the dashboard will follow this choice.',
+    'Rôle ajouté automatiquement quand un membre prend son service, puis retiré quand il termine.': 'Role automatically added when a member clocks in, then removed when they clock out.',
+    'Salon où Sentinel publie les prises de service, fins de service, durées et actions importantes.': 'Channel where Sentinel posts clock-ins, clock-outs, durations, and important actions.',
+    'Ces rôles peuvent utiliser les commandes de gestion et agir depuis le dashboard, selon les permissions Discord du serveur.': 'These roles can use management commands and act from the dashboard, depending on the server Discord permissions.',
+    'Ajouter un rôle autorisé': 'Add an allowed role',
+    'Ajoute un rôle staff à la liste des rôles autorisés à configurer et gérer Sentinel.': 'Adds a staff role to the roles allowed to configure and manage Sentinel.',
+    'Actions immédiates': 'Immediate actions',
+    'Démarre manuellement le service d’un membre avec son ID Discord et applique le rôle de service si possible.': 'Manually starts duty for a member with their Discord ID and applies the duty role when possible.',
+    'Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son total.': 'Stops a member current duty session, calculates the duration, and adds it to their total.',
+    'Remet à zéro les heures d’une seule personne avec son ID Discord, même si elle a quitté le serveur.': 'Resets one person hours with their Discord ID, even if they left the server.',
+    'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et la base de données.': 'Premium option: repairs inconsistencies between on-duty members, Discord roles, and the database.',
+    'Publie une annonce propre sous l’identité de Sentinel dans le salon choisi. Le gratuit garde un nombre limité d’embeds actifs.': 'Publishes a clean announcement under Sentinel identity in the selected channel. Free servers keep a limited number of active embeds.',
+    'Modifie un embed Sentinel déjà envoyé avec son ID de message. Les modifications ne consomment pas de quota.': 'Edits an already sent Sentinel embed with its message ID. Edits do not consume quota.',
+    'Supprime un embed géré par Sentinel et libère son emplacement gratuit si le serveur n’est pas Premium.': 'Deletes an embed managed by Sentinel and frees its free slot if the server is not Premium.',
+    'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard. Copie leur ID pour les gérer.': 'Lists embeds Sentinel can still edit or delete from the dashboard. Copy their ID to manage them.',
+    'Ajoute un avertissement au dossier de modération d’un utilisateur et l’enregistre dans les logs.': 'Adds a warning to a user moderation file and records it in the logs.',
+    'Rend temporairement muet un membre présent sur le serveur pendant la durée indiquée.': 'Temporarily mutes a member currently on the server for the chosen duration.',
+    'Retire un timeout actif sur un membre présent et garde une trace de l’action.': 'Removes an active timeout from a current member and keeps an action record.',
+    'Bannit un utilisateur avec son ID Discord, même s’il n’est plus présent sur le serveur.': 'Bans a user with their Discord ID, even if they are no longer on the server.',
+    'Option Premium : bannit un utilisateur pour une durée précise, puis Sentinel le débannit automatiquement.': 'Premium option: bans a user for a precise duration, then Sentinel automatically unbans them.',
+    'Débannir par ID': 'Unban by ID',
+    'Option Premium : retire le bannissement d’un utilisateur avec son ID Discord, même s’il n’est plus dans le serveur.': 'Premium option: removes a user ban with their Discord ID, even if they are no longer in the server.',
+    'Option Premium : bloque l’envoi de messages dans un salon pour calmer une situation ou préparer une annonce.': 'Premium option: blocks sending messages in a channel to calm a situation or prepare an announcement.',
+    'Déverrouiller salon': 'Unlock channel',
+    'Option Premium : remet un salon verrouillé en mode normal pour permettre aux membres de reparler.': 'Premium option: returns a locked channel to normal so members can talk again.',
+    'Option Premium : impose un délai entre deux messages pour ralentir un salon trop actif.': 'Premium option: adds a delay between messages to slow down an overly active channel.',
+    'Option Premium : corrige ou précise la raison d’un dossier de modération déjà enregistré.': 'Premium option: corrects or clarifies the reason of an already recorded moderation case.',
+    'Option Premium : retire un dossier de modération créé par erreur ou devenu invalide.': 'Premium option: removes a moderation case created by mistake or no longer valid.',
+    'Option Premium : annule un avertissement précis sans effacer toute l’histoire de modération du membre.': 'Premium option: cancels one precise warning without erasing the member full moderation history.',
+    'Option Premium : remet à zéro toutes les heures de service du serveur avec une action globale réservée aux grands nettoyages.': 'Premium option: resets every duty hour on the server with a global action reserved for major cleanups.'
+  });
+
+  Object.assign(en, {
+    'Sentinel | Bot Discord': 'Sentinel | Discord Bot',
+    'Invite Sentinel': 'Invite Sentinel',
+    'Choisis la langue': 'Choose the language',
+    ', puis sélectionne Français ou English.': ', then select Français or English.',
+    'Choisis le rôle de service': 'Choose the duty role',
+    'Choisis le salon de logs': 'Choose the log channel',
+    'Ajoute les rôles autorisés': 'Add the allowed roles',
+    'Publie le panneau': 'Publish the panel',
+    'Définir le salon de logs': 'Set the log channel',
+    'Si l’hébergement du dashboard est coupé, Sentinel continue de fonctionner dans Discord. Cette page évite les erreurs techniques et te donne les actions à faire tout de suite.': 'If dashboard hosting is down, Sentinel still works inside Discord. This page avoids technical errors and gives you the actions to run right away.',
+    'La version gratuite garde l’essentiel. Le Premium ajoute les contrôles avancés utiles aux grandes communautés.': 'The free version keeps the essentials. Premium adds advanced controls useful for large communities.',
+    'Réinitialiser une personne, même par ID': 'Reset one person, including by ID',
+    'Consulter les heures d’un autre membre': 'View another member hours',
+    'Classement de la semaine': 'Weekly leaderboard',
+    'Résumé complet du serveur': 'Full server summary',
+    'Profil de modération complet': 'Full moderation profile',
+    'Commandes gratuites et Premium de Sentinel pour Discord.': 'Free and Premium Sentinel commands for Discord.',
+    'Sentinel doit être ajouté comme bot Discord, pas seulement comme intégration de commandes.': 'Sentinel must be added as a Discord bot, not only as a command integration.',
+    'Dans les intégrations Discord, Sentinel doit afficher le badge Bot.': 'In Discord integrations, Sentinel must show the Bot badge.',
+    'affiche le tutoriel complet de Sentinel. Depuis le site, tu peux suivre le même déroulé pour installer, configurer et utiliser le bot sans connaître Discord.': 'shows the full Sentinel tutorial. From the site, you can follow the same flow to install, configure, and use the bot without knowing Discord.',
+    ', le salon de logs avec': ', the log channel with',
+    ', puis les rôles autorisés avec': ', then the allowed roles with',
+    '. Les membres pourront prendre service, voir leurs heures et suivre les agents actifs.': '. Members will be able to clock in, view their hours, and follow active agents.',
+    'Ces points règlent la plupart des soucis quand Sentinel ne rejoint pas le serveur, n’apparaît pas comme bot ou quand le dashboard ne semble pas agir sur le bon serveur.': 'These checks solve most issues when Sentinel does not join the server, does not appear as a bot, or when the dashboard does not seem to act on the right server.',
+    'Si Discord ouvre directement un serveur qui n\'est pas le bon, ferme la fenêtre et relance le lien officiel depuis cette page, sans lien personnalisé.': 'If Discord directly opens the wrong server, close the window and restart from the official link on this page, without a custom link.',
+    '. Si tu vois seulement Commandes, retire l’intégration et réinvite-le.': '. If you only see Commands, remove the integration and invite it again.',
+    '. Sans les deux, les commandes peuvent apparaître sans que le bot soit vraiment présent sur le serveur.': '. Without both, commands may appear without the bot truly being present on the server.',
+    'Le gratuit reste utile. Le Premium devient un outil de staff.': 'Free stays useful. Premium becomes a staff tool.',
+    'Sentinel Premium est pensé pour les serveurs actifs, avec beaucoup de membres, beaucoup d’actions et un besoin de contrôle plus précis.': 'Sentinel Premium is built for active servers with many members, many actions, and a need for more precise control.',
+    'Pour les grandes communautés': 'For large communities',
+    'Le Premium doit apporter du contrôle, pas seulement retirer du gratuit.': 'Premium should add control, not just remove free features.',
+    'La logique est simple : le gratuit doit faire tourner un serveur. Le Premium doit faire gagner du temps aux staffs exigeants.': 'The logic is simple: free should run a server. Premium should save time for demanding staff teams.',
+    'Base prête pour les rapports hebdomadaires, mensuels et les exports.': 'Foundation ready for weekly reports, monthly reports, and exports.',
+    'Les commandes de gestion passent par les rôles définis dans Sentinel. Le propriétaire garde un accès de secours pour éviter tout blocage.': 'Management commands go through roles defined in Sentinel. The owner keeps fallback access to avoid a full lockout.',
+    'Rôles dédiés au staff': 'Staff-only roles',
+    'Démarrage sécurisé': 'Secure startup',
+    'Sentinel ne contourne pas Discord : si une permission ou la hiérarchie manque, l’action est refusée.': 'Sentinel does not bypass Discord: if a permission or hierarchy is missing, the action is refused.',
+    'Permission Discord vérifiée': 'Discord permission checked',
+    'Sentinel stocke uniquement les IDs Discord, les temps de service, les sessions et la configuration serveur nécessaires à son fonctionnement.': 'Sentinel only stores Discord IDs, duty times, sessions, and server configuration needed to work.'
+  });
+
+  let normalizedTranslations = null;
+
+  function normalizeTranslationKey(value) {
+    return String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/…/g, '...')
+      .replace(/[–—]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getNormalizedTranslation(value) {
+    if (!normalizedTranslations) {
+      normalizedTranslations = new Map();
+
+      for (const [key, translated] of [...Object.entries(en), ...Object.entries(placeholderEn)]) {
+        normalizedTranslations.set(normalizeTranslationKey(key), translated);
+      }
+    }
+
+    return normalizedTranslations.get(normalizeTranslationKey(value));
+  }
+
   function currentLanguage() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'fr' || saved === 'en') return saved;
@@ -523,17 +670,20 @@
     if (language === 'fr') return value;
     const exact = en[value] || placeholderEn[value];
     if (exact) return exact;
+    const normalized = getNormalizedTranslation(value);
+    if (normalized) return normalized;
+    const normalizedValue = normalizeTranslationKey(value);
 
-    let match = /^Gratuit : (\d+)\/(\d+) embeds actifs utilises\. Restant : (\d+)\. Modifications illimitees\.$/.exec(value);
+    let match = /^Gratuit : (\d+)\/(\d+) embeds actifs utilises\. Restant : (\d+)\. Modifications illimitees\.$/.exec(normalizedValue);
     if (match) return `Free: ${match[1]}/${match[2]} active embeds used. Remaining: ${match[3]}. Unlimited edits.`;
 
-    match = /^Commande copiee : (.+)$/.exec(value);
+    match = /^Commande copiee : (.+)$/.exec(normalizedValue);
     if (match) return `Command copied: ${match[1]}`;
 
-    match = /^#(.+) - (.+)$/.exec(value);
+    match = /^#(.+) - (.+)$/.exec(normalizedValue);
     if (match) return `#${match[1]} - ${match[2]}`;
 
-    match = /^(\d+) entree\(s\) affichee\(s\)$/.exec(value);
+    match = /^(\d+) entree\(s\) affichee\(s\)$/.exec(normalizedValue);
     if (match) return `${match[1]} displayed entr${match[1] === '1' ? 'y' : 'ies'}`;
 
     return value;

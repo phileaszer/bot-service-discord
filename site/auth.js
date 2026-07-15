@@ -90,7 +90,7 @@
       logout.className = 'button button-ghost button-small discord-logout-button';
       logout.href = logoutUrl();
       logout.dataset.discordLogout = 'true';
-      logout.textContent = 'Deconnexion';
+      logout.textContent = 'Déconnexion';
       host.insertBefore(logout, link.nextSibling);
     });
 
@@ -193,7 +193,7 @@
 
         try {
           await navigator.clipboard.writeText(value);
-          button.textContent = 'Copie';
+          button.textContent = 'Copié';
         } catch (error) {
           button.textContent = value;
         }
