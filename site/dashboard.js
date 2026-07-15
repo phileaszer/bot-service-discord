@@ -10,6 +10,8 @@ let activeDashboardTab = 'overview';
 let tooltipHost = null;
 let tooltipPinned = false;
 let tooltipElement = null;
+let auditScope = 'server';
+let auditFilters = {};
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -352,6 +354,148 @@ function customEmbedList(state) {
   `;
 }
 
+const AUDIT_ACTION_LABELS = {
+  'set-language': 'Langue',
+  'set-service-role': 'Role de service',
+  'set-log-channel': 'Salon de logs',
+  'publish-service-panel': 'Panneau de service',
+  'add-command-role': 'Role autorise ajoute',
+  'remove-command-role': 'Role autorise retire',
+  'start-service': 'Prise de service',
+  'end-service': 'Fin de service',
+  'reset-user': 'Reset utilisateur',
+  'reset-guild': 'Reset global',
+  'sync-service': 'Synchronisation',
+  'custom-embed-create': 'Embed cree',
+  'custom-embed-edit': 'Embed modifie',
+  'custom-embed-delete': 'Embed supprime',
+  warn: 'Avertissement',
+  timeout: 'Timeout',
+  untimeout: 'Fin timeout',
+  kick: 'Expulsion',
+  ban: 'Ban',
+  tempban: 'Ban temporaire',
+  unban: 'Deban',
+  purge: 'Purge',
+  lock: 'Lock',
+  unlock: 'Unlock',
+  slowmode: 'Mode lent',
+  'edit-case': 'Cas modifie',
+  'delete-case': 'Cas supprime',
+  unwarn: 'Avertissement retire'
+};
+
+function auditActionOptions(selectedAction = '') {
+  const options = ['<option value="">Toutes les actions</option>'];
+
+  for (const [value, label] of Object.entries(AUDIT_ACTION_LABELS)) {
+    options.push(`<option value="${escapeHtml(value)}"${value === selectedAction ? ' selected' : ''}>${escapeHtml(label)}</option>`);
+  }
+
+  return options.join('');
+}
+
+function formatAuditDate(value) {
+  if (!value) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat(document.documentElement.lang === 'en' ? 'en-US' : 'fr-FR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(new Date(value));
+}
+
+function auditStatusLabel(status) {
+  return status === 'failed' ? 'Echec' : 'Succes';
+}
+
+function auditLogList(state) {
+  const items = state.auditLogs?.items || [];
+
+  if (items.length === 0) {
+    return '<p class="muted">Aucune action dashboard trouvee pour ces filtres.</p>';
+  }
+
+  return `
+    <ul class="audit-list">
+      ${items.map((item) => `
+        <li class="audit-item audit-${escapeHtml(item.status)}">
+          <div>
+            <span class="audit-meta">${escapeHtml(formatAuditDate(item.createdAt))} - ${escapeHtml(item.guildName || item.guildId || '')}</span>
+            <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
+            <p>${escapeHtml(item.summary)}</p>
+          </div>
+          <div class="audit-side">
+            <span class="audit-status">${escapeHtml(auditStatusLabel(item.status))}</span>
+            <code>${escapeHtml(item.actorUsername || item.actorUserId)}</code>
+            ${item.targetId ? `<small>${escapeHtml(item.targetType || 'cible')} : ${escapeHtml(item.targetId)}</small>` : ''}
+          </div>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+function renderAuditPanel(state) {
+  const auditLogs = state.auditLogs || {};
+  const canViewGlobal = Boolean(auditLogs.canViewGlobal);
+  const currentScope = canViewGlobal ? auditScope : 'server';
+
+  return `
+    <section class="dashboard-panel" id="audit">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Journal</p>
+          <h2>Audit dashboard</h2>
+          <p class="muted">Historique des actions faites depuis le site. Chaque serveur voit son propre journal, et la vue globale reste reservee a la creatrice.</p>
+        </div>
+        <span class="premium-badge">Premium securite</span>
+      </div>
+      <form class="audit-filters" data-audit-filter>
+        <div class="audit-field">
+          ${labelHelp('Auteur', 'Filtre les actions faites par un utilisateur precis avec son ID Discord.')}
+          <input name="actorUserId" placeholder="ID Discord auteur" value="${escapeHtml(auditFilters.actorUserId || '')}">
+        </div>
+        <div class="audit-field">
+          ${labelHelp('Cible', 'Filtre les actions qui concernent un membre, role, salon, message ou cas precis.')}
+          <input name="targetId" placeholder="ID cible" value="${escapeHtml(auditFilters.targetId || '')}">
+        </div>
+        <div class="audit-field">
+          ${labelHelp('Action', 'Filtre par type d action dashboard : reset, ban, embed, configuration, etc.')}
+          <select name="action">${auditActionOptions(auditFilters.action || '')}</select>
+        </div>
+        <div class="audit-field">
+          ${labelHelp('Statut', 'Affiche seulement les actions reussies, echouees, ou les deux.')}
+          <select name="status">
+            <option value=""${!auditFilters.status ? ' selected' : ''}>Tous les statuts</option>
+            <option value="success"${auditFilters.status === 'success' ? ' selected' : ''}>Succes</option>
+            <option value="failed"${auditFilters.status === 'failed' ? ' selected' : ''}>Echec</option>
+          </select>
+        </div>
+        <div class="audit-field">
+          ${labelHelp('Limite', 'Nombre maximum de lignes affichees. Les serveurs Premium et la creatrice ont une limite plus haute.')}
+          <input name="limit" type="number" min="1" max="100" value="${escapeHtml(auditFilters.limit || auditLogs.limit || 25)}">
+        </div>
+        <div class="audit-actions">
+          <button class="button" type="submit">Filtrer le journal</button>
+          <button class="button button-ghost" type="button" data-audit-reset>Reinitialiser</button>
+          ${canViewGlobal ? `
+            <button class="button button-ghost" type="button" data-audit-scope="${currentScope === 'global' ? 'server' : 'global'}">
+              ${currentScope === 'global' ? 'Vue serveur' : 'Vue globale creatrice'}
+            </button>
+          ` : ''}
+        </div>
+      </form>
+      <div class="audit-scope-note">
+        <span>${currentScope === 'global' ? 'Vue globale privee creatrice' : 'Vue serveur uniquement'}</span>
+        <small>${escapeHtml((state.auditLogs?.items || []).length)} entree(s) affichee(s)</small>
+      </div>
+      ${auditLogList(state)}
+    </section>
+  `;
+}
+
 function helpTip(text) {
   const safeText = escapeHtml(text);
 
@@ -386,6 +530,12 @@ const DASHBOARD_TABS = [
     label: 'Embeds',
     eyebrow: 'Annonces',
     title: 'Messages Sentinel'
+  },
+  {
+    id: 'audit',
+    label: 'Journal',
+    eyebrow: 'Audit',
+    title: 'Traces dashboard'
   },
   {
     id: 'moderation',
@@ -604,6 +754,8 @@ function renderDashboard() {
     </section>
       `)}
 
+      ${tabPanel('audit', renderAuditPanel(state))}
+
       ${tabPanel('moderation', `
     <section class="dashboard-panel" id="moderation">
       <div class="panel-heading">
@@ -753,6 +905,35 @@ async function runAction(action, data, button = null) {
   }
 }
 
+async function loadAuditLogs(filters = auditFilters, scope = auditScope, button = null) {
+  if (!currentState) return;
+
+  setLoading(button, true);
+
+  try {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(filters || {})) {
+      if (value !== undefined && value !== null && String(value).trim()) {
+        params.set(key, String(value).trim());
+      }
+    }
+
+    const endpoint = scope === 'global' && currentState.auditLogs?.canViewGlobal
+      ? `/api/audit/global?${params}`
+      : `/api/guilds/${selectedGuildId}/audit?${params}`;
+    const payload = await api(endpoint);
+    auditScope = scope === 'global' && payload.auditLogs?.canViewGlobal ? 'global' : 'server';
+    auditFilters = { ...filters };
+    currentState.auditLogs = payload.auditLogs;
+    renderDashboard();
+  } catch (error) {
+    toast(error.message, 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 function attachDashboardHandlers() {
   $$('[data-dashboard-tab]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -781,6 +962,29 @@ function attachDashboardHandlers() {
       runAction(button.dataset.actionClick, { roleId: button.dataset.roleId }, button);
     });
   });
+
+  $$('[data-audit-filter]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = $('button[type="submit"]', form);
+      loadAuditLogs(formData(form), auditScope, button);
+    });
+  });
+
+  $$('[data-audit-reset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      auditFilters = {};
+      auditScope = 'server';
+      loadAuditLogs({}, 'server', button);
+    });
+  });
+
+  $$('[data-audit-scope]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextScope = button.dataset.auditScope === 'global' ? 'global' : 'server';
+      loadAuditLogs(auditFilters, nextScope, button);
+    });
+  });
 }
 
 async function loadGuilds() {
@@ -791,6 +995,8 @@ async function loadGuilds() {
 
 async function selectGuild(guildId) {
   selectedGuildId = guildId;
+  auditScope = 'server';
+  auditFilters = {};
   renderGuilds();
 
   const guild = guilds.find((item) => item.id === guildId);
