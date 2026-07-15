@@ -360,6 +360,36 @@
     'Options premium': 'Premium options',
     'Option Premium': 'Premium option',
     'Ces actions servent aux staffs qui gerent beaucoup de salons, de sanctions et de cas moderateur.': 'These actions are made for staff teams managing many channels, sanctions, and moderation cases.',
+    'Ajouter un role autorise': 'Add an authorized role',
+    'Choisit la langue utilisee par Sentinel sur ce serveur uniquement. Les reponses Discord et le dashboard suivront ce choix.': 'Chooses the language used by Sentinel on this server only. Discord replies and the dashboard will follow this setting.',
+    'Role ajoute automatiquement quand un membre prend son service, puis retire quand il termine.': 'Role automatically added when a member starts duty, then removed when they end duty.',
+    'Salon ou Sentinel publie les prises de service, fins de service, durees et actions importantes.': 'Channel where Sentinel posts duty starts, duty ends, durations, and important actions.',
+    'Envoie dans le salon choisi le bouton que les membres utiliseront pour prendre ou finir leur service.': 'Sends the button members use to start or end duty in the selected channel.',
+    'Ces roles peuvent utiliser les commandes de gestion et agir depuis le dashboard selon les permissions Discord du serveur.': 'These roles can use management commands and act from the dashboard according to the server Discord permissions.',
+    'Ajoute un role staff a la liste des roles autorises a configurer et gerer Sentinel.': 'Adds a staff role to the list of roles allowed to configure and manage Sentinel.',
+    'Demarre manuellement le service d un membre avec son ID Discord et applique le role de service si possible.': 'Manually starts duty for a member with their Discord ID and applies the duty role when possible.',
+    'Arrete le service en cours d un membre, calcule la duree et ajoute ce temps a son total.': 'Ends a member current duty session, calculates the duration, and adds it to their total.',
+    'Remet a zero les heures d une seule personne avec son ID Discord, meme si elle a quitte le serveur.': 'Resets one person hours with their Discord ID, even if they left the server.',
+    'Option Premium : repare les incoherences entre les membres en service, les roles Discord et la base de donnees.': 'Premium option: fixes inconsistencies between members on duty, Discord roles, and the database.',
+    'Publie une annonce propre sous l identite de Sentinel dans le salon choisi. Le gratuit garde un nombre limite d embeds actifs.': 'Publishes a clean announcement as Sentinel in the selected channel. Free servers keep a limited number of active embeds.',
+    'Modifie un embed Sentinel deja envoye avec son ID de message. Les modifications ne consomment pas de quota.': 'Edits an existing Sentinel embed using its message ID. Edits do not consume quota.',
+    'Supprime un embed gere par Sentinel et libere son emplacement gratuit si le serveur n est pas Premium.': 'Deletes a Sentinel-managed embed and frees its free slot if the server is not Premium.',
+    'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard. Copie leur ID pour les gerer.': 'Lists embeds Sentinel can still edit or delete from the dashboard. Copy their ID to manage them.',
+    'Ajoute un avertissement au dossier de moderation d un utilisateur et l enregistre dans les logs.': 'Adds a warning to a user moderation record and logs it.',
+    'Rend temporairement muet un membre present sur le serveur pendant la duree indiquee.': 'Temporarily mutes a member currently on the server for the chosen duration.',
+    'Retire un timeout actif sur un membre present et garde une trace de l action.': 'Removes an active timeout from a present member and keeps a record of the action.',
+    'Retire un membre du serveur sans le bannir. Il pourra revenir avec une nouvelle invitation.': 'Removes a member from the server without banning them. They can return with a new invite.',
+    'Bannit un utilisateur avec son ID Discord, meme s il n est plus present sur le serveur.': 'Bans a user with their Discord ID, even if they are no longer on the server.',
+    'Supprime rapidement un nombre defini de messages recents dans le salon choisi.': 'Quickly deletes a chosen number of recent messages in the selected channel.',
+    'Option Premium : bannit un utilisateur pour une duree precise, puis Sentinel le debannit automatiquement.': 'Premium option: bans a user for a precise duration, then Sentinel automatically unbans them.',
+    'Option Premium : retire le bannissement d un utilisateur avec son ID Discord, meme s il n est plus dans le serveur.': 'Premium option: removes a user ban with their Discord ID, even if they are no longer in the server.',
+    'Option Premium : bloque l envoi de messages dans un salon pour calmer une situation ou preparer une annonce.': 'Premium option: blocks message sending in a channel to calm a situation or prepare an announcement.',
+    'Option Premium : remet un salon verrouille en mode normal pour permettre aux membres de reparler.': 'Premium option: restores a locked channel to normal so members can speak again.',
+    'Option Premium : impose un delai entre deux messages pour ralentir un salon trop actif.': 'Premium option: applies a delay between messages to slow down an overly active channel.',
+    'Option Premium : corrige ou precise la raison d un dossier de moderation deja enregistre.': 'Premium option: corrects or clarifies the reason of an existing moderation record.',
+    'Option Premium : retire un dossier de moderation cree par erreur ou devenu invalide.': 'Premium option: removes a moderation record created by mistake or no longer valid.',
+    'Option Premium : annule un avertissement precis sans effacer toute l histoire de moderation du membre.': 'Premium option: cancels one specific warning without deleting the member full moderation history.',
+    'Option Premium : remet a zero toutes les heures de service du serveur avec une action globale reservee aux grands nettoyages.': 'Premium option: resets all server duty hours with a global action reserved for major cleanups.',
     'Avertir par ID': 'Warn by ID',
     'Timeout': 'Timeout',
     'Fin timeout': 'End timeout',
@@ -499,8 +529,8 @@
   }
 
   function translateAttributes(language) {
-    const attrs = ['placeholder', 'aria-label', 'alt', 'content'];
-    document.querySelectorAll('[placeholder], [aria-label], [alt], meta[content]').forEach((element) => {
+    const attrs = ['placeholder', 'aria-label', 'alt', 'content', 'data-tooltip'];
+    document.querySelectorAll('[placeholder], [aria-label], [alt], meta[content], [data-tooltip]').forEach((element) => {
       attrs.forEach((attr) => {
         if (!element.hasAttribute(attr)) return;
         const key = `i18nOriginal${attr.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())}`;

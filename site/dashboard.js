@@ -268,6 +268,16 @@ function customEmbedList(state) {
   `;
 }
 
+function helpTip(text) {
+  const safeText = escapeHtml(text);
+
+  return `<button class="field-help" type="button" data-tooltip="${safeText}" aria-label="${safeText}">?</button>`;
+}
+
+function labelHelp(label, help, addon = '') {
+  return `<label><span>${escapeHtml(label)}</span>${addon} ${helpTip(help)}</label>`;
+}
+
 const DASHBOARD_TABS = [
   {
     id: 'overview',
@@ -386,7 +396,7 @@ function renderDashboard() {
       </div>
       <div class="form-grid">
         <form data-action-form="set-language">
-          <label>Langue du serveur</label>
+          ${labelHelp('Langue du serveur', 'Choisit la langue utilisee par Sentinel sur ce serveur uniquement. Les reponses Discord et le dashboard suivront ce choix.')}
           <select name="language">
             <option value="fr"${state.config.language === 'fr' ? ' selected' : ''}>Francais</option>
             <option value="en"${state.config.language === 'en' ? ' selected' : ''}>English</option>
@@ -394,25 +404,26 @@ function renderDashboard() {
           <button class="button" type="submit">Mettre a jour</button>
         </form>
         <form data-action-form="set-service-role">
-          <label>Role de service</label>
+          ${labelHelp('Role de service', 'Role ajoute automatiquement quand un membre prend son service, puis retire quand il termine.')}
           <select name="roleId">${roleOptions}</select>
           <button class="button" type="submit">Configurer</button>
         </form>
         <form data-action-form="set-log-channel">
-          <label>Salon de logs</label>
+          ${labelHelp('Salon de logs', 'Salon ou Sentinel publie les prises de service, fins de service, durees et actions importantes.')}
           <select name="channelId">${channelOptions}</select>
           <button class="button" type="submit">Configurer</button>
         </form>
         <form data-action-form="publish-service-panel">
-          <label>Publier le panneau de service</label>
+          ${labelHelp('Publier le panneau de service', 'Envoie dans le salon choisi le bouton que les membres utiliseront pour prendre ou finir leur service.')}
           <select name="channelId">${channelOptions}</select>
           <button class="button" type="submit">Publier</button>
         </form>
       </div>
       <div class="command-roles">
-        <h3>Roles autorises a gerer Sentinel</h3>
+        <h3>Roles autorises a gerer Sentinel ${helpTip('Ces roles peuvent utiliser les commandes de gestion et agir depuis le dashboard selon les permissions Discord du serveur.')}</h3>
         <div class="role-chip-row">${commandRoleList(state)}</div>
         <form class="inline-form" data-action-form="add-command-role">
+          ${labelHelp('Ajouter un role autorise', 'Ajoute un role staff a la liste des roles autorises a configurer et gerer Sentinel.')}
           <select name="roleId">${commandRoleOptions}</select>
           <button class="button button-small" type="submit">Ajouter</button>
         </form>
@@ -428,22 +439,22 @@ function renderDashboard() {
       </div>
       <div class="form-grid">
         <form data-action-form="start-service">
-          <label>Prendre le service pour un membre</label>
+          ${labelHelp('Prendre le service pour un membre', 'Demarre manuellement le service d un membre avec son ID Discord et applique le role de service si possible.')}
           <input name="userId" placeholder="ID Discord du membre" required>
           <button class="button" type="submit">Prendre service</button>
         </form>
         <form data-action-form="end-service">
-          <label>Finir le service pour un membre</label>
+          ${labelHelp('Finir le service pour un membre', 'Arrete le service en cours d un membre, calcule la duree et ajoute ce temps a son total.')}
           <input name="userId" placeholder="ID Discord du membre" required>
           <button class="button" type="submit">Fin service</button>
         </form>
         <form data-action-form="reset-user">
-          <label>Reset heures individuel</label>
+          ${labelHelp('Reset heures individuel', 'Remet a zero les heures d une seule personne avec son ID Discord, meme si elle a quitte le serveur.')}
           <input name="userId" placeholder="ID Discord, meme si la personne est partie" required>
           <button class="button" type="submit">Reset</button>
         </form>
         <form data-action-form="sync-service">
-          <label>Synchronisation service ${premiumTag}</label>
+          ${labelHelp('Synchronisation service', 'Option Premium : repare les incoherences entre les membres en service, les roles Discord et la base de donnees.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
         </form>
       </div>
@@ -472,7 +483,7 @@ function renderDashboard() {
       </div>
       <div class="form-grid">
         <form data-action-form="custom-embed-create">
-          <label>Creer un embed Sentinel</label>
+          ${labelHelp('Creer un embed Sentinel', 'Publie une annonce propre sous l identite de Sentinel dans le salon choisi. Le gratuit garde un nombre limite d embeds actifs.')}
           <select name="channelId">${channelOptions}</select>
           <input name="title" placeholder="Titre" maxlength="256" required>
           <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
@@ -484,7 +495,7 @@ function renderDashboard() {
           <button class="button" type="submit">Envoyer l'embed</button>
         </form>
         <form data-action-form="custom-embed-edit">
-          <label>Modifier un embed existant</label>
+          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel deja envoye avec son ID de message. Les modifications ne consomment pas de quota.')}
           <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <input name="title" placeholder="Nouveau titre">
@@ -496,13 +507,13 @@ function renderDashboard() {
           <button class="button" type="submit">Modifier sans quota</button>
         </form>
         <form data-action-form="custom-embed-delete">
-          <label>Supprimer un embed Sentinel</label>
+          ${labelHelp('Supprimer un embed Sentinel', 'Supprime un embed gere par Sentinel et libere son emplacement gratuit si le serveur n est pas Premium.')}
           <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <button class="button button-ghost" type="submit">Supprimer</button>
         </form>
         <article class="inline-form">
-          <label>Embeds geres</label>
+          ${labelHelp('Embeds geres', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard. Copie leur ID pour les gerer.')}
           ${customEmbedList(state)}
         </article>
       </div>
@@ -518,39 +529,39 @@ function renderDashboard() {
       </div>
       <div class="form-grid">
         <form data-action-form="warn">
-          <label>Avertir par ID</label>
+          ${labelHelp('Avertir par ID', 'Ajoute un avertissement au dossier de moderation d un utilisateur et l enregistre dans les logs.')}
           <input name="userId" placeholder="ID Discord" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Avertir</button>
         </form>
         <form data-action-form="timeout">
-          <label>Timeout</label>
+          ${labelHelp('Timeout', 'Rend temporairement muet un membre present sur le serveur pendant la duree indiquee.')}
           <input name="userId" placeholder="ID Discord du membre present" required>
           <input name="duration" placeholder="10m, 2h, 7d" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Timeout</button>
         </form>
         <form data-action-form="untimeout">
-          <label>Fin timeout</label>
+          ${labelHelp('Fin timeout', 'Retire un timeout actif sur un membre present et garde une trace de l action.')}
           <input name="userId" placeholder="ID Discord du membre present" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Retirer</button>
         </form>
         <form data-action-form="kick">
-          <label>Expulser</label>
+          ${labelHelp('Expulser', 'Retire un membre du serveur sans le bannir. Il pourra revenir avec une nouvelle invitation.')}
           <input name="userId" placeholder="ID Discord du membre present" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Expulser</button>
         </form>
         <form data-action-form="ban">
-          <label>Bannir par ID</label>
+          ${labelHelp('Bannir par ID', 'Bannit un utilisateur avec son ID Discord, meme s il n est plus present sur le serveur.')}
           <input name="userId" placeholder="ID Discord, meme hors serveur" required>
           <input name="reason" placeholder="Raison">
           <input name="deleteDays" type="number" min="0" max="7" placeholder="Jours messages">
           <button class="button" type="submit">Bannir</button>
         </form>
         <form data-action-form="purge">
-          <label>Purge messages</label>
+          ${labelHelp('Purge messages', 'Supprime rapidement un nombre defini de messages recents dans le salon choisi.')}
           <select name="channelId">${channelOptions}</select>
           <input name="count" type="number" min="1" max="100" value="10">
           <button class="button" type="submit">Purger</button>
@@ -569,57 +580,57 @@ function renderDashboard() {
       </div>
       <div class="form-grid">
         <form data-action-form="tempban">
-          <label>Ban temporaire par ID ${premiumTag}</label>
+          ${labelHelp('Ban temporaire par ID', 'Option Premium : bannit un utilisateur pour une duree precise, puis Sentinel le debannit automatiquement.', ` ${premiumTag}`)}
           <input name="userId" placeholder="ID Discord" required>
           <input name="duration" placeholder="1h, 7d, 30d" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Tempban</button>
         </form>
         <form data-action-form="unban">
-          <label>Debannir par ID ${premiumTag}</label>
+          ${labelHelp('Debannir par ID', 'Option Premium : retire le bannissement d un utilisateur avec son ID Discord, meme s il n est plus dans le serveur.', ` ${premiumTag}`)}
           <input name="userId" placeholder="ID Discord" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unban</button>
         </form>
         <form data-action-form="lock">
-          <label>Verrouiller salon ${premiumTag}</label>
+          ${labelHelp('Verrouiller salon', 'Option Premium : bloque l envoi de messages dans un salon pour calmer une situation ou preparer une annonce.', ` ${premiumTag}`)}
           <select name="channelId">${channelOptions}</select>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Lock</button>
         </form>
         <form data-action-form="unlock">
-          <label>Deverrouiller salon ${premiumTag}</label>
+          ${labelHelp('Deverrouiller salon', 'Option Premium : remet un salon verrouille en mode normal pour permettre aux membres de reparler.', ` ${premiumTag}`)}
           <select name="channelId">${channelOptions}</select>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unlock</button>
         </form>
         <form data-action-form="slowmode">
-          <label>Mode lent ${premiumTag}</label>
+          ${labelHelp('Mode lent', 'Option Premium : impose un delai entre deux messages pour ralentir un salon trop actif.', ` ${premiumTag}`)}
           <select name="channelId">${channelOptions}</select>
           <input name="duration" placeholder="10s, 5m, 0">
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Slowmode</button>
         </form>
         <form data-action-form="edit-case">
-          <label>Modifier un cas ${premiumTag}</label>
+          ${labelHelp('Modifier un cas', 'Option Premium : corrige ou precise la raison d un dossier de moderation deja enregistre.', ` ${premiumTag}`)}
           <input name="caseId" placeholder="ID du cas" required>
           <input name="reason" placeholder="Nouvelle raison" required>
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Modifier</button>
         </form>
         <form data-action-form="delete-case">
-          <label>Supprimer un cas ${premiumTag}</label>
+          ${labelHelp('Supprimer un cas', 'Option Premium : retire un dossier de moderation cree par erreur ou devenu invalide.', ` ${premiumTag}`)}
           <input name="caseId" placeholder="ID du cas" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Supprimer</button>
         </form>
         <form data-action-form="unwarn">
-          <label>Retirer un avertissement ${premiumTag}</label>
+          ${labelHelp('Retirer un avertissement', 'Option Premium : annule un avertissement precis sans effacer toute l histoire de moderation du membre.', ` ${premiumTag}`)}
           <input name="caseId" placeholder="ID du cas avertissement" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unwarn</button>
         </form>
         <form data-action-form="reset-guild">
-          <label>Reset global serveur ${premiumTag}</label>
+          ${labelHelp('Reset global serveur', 'Option Premium : remet a zero toutes les heures de service du serveur avec une action globale reservee aux grands nettoyages.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Reset global</button>
         </form>
       </div>
