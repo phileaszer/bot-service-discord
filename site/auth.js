@@ -205,7 +205,52 @@
     });
   }
 
+  function initHeaderMenu() {
+    const header = document.querySelector('.site-header');
+    const nav = header?.querySelector('.nav-links');
+    const actions = header?.querySelector('.header-actions');
+
+    if (!header || !nav || !actions || header.querySelector('[data-nav-toggle]')) {
+      return;
+    }
+
+    if (!nav.id) {
+      nav.id = 'site-navigation';
+    }
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'button button-small button-ghost nav-toggle';
+    toggle.dataset.navToggle = 'true';
+    toggle.setAttribute('aria-controls', nav.id);
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = 'Menu';
+    actions.prepend(toggle);
+
+    function setOpen(isOpen) {
+      header.classList.toggle('is-nav-open', isOpen);
+      toggle.setAttribute('aria-expanded', String(isOpen));
+    }
+
+    toggle.addEventListener('click', () => {
+      setOpen(!header.classList.contains('is-nav-open'));
+    });
+
+    nav.addEventListener('click', (event) => {
+      if (event.target.closest('a')) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    });
+  }
+
   function init() {
+    initHeaderMenu();
     decorateLoginLinks();
     attachCopyCommands();
     loadSession();
