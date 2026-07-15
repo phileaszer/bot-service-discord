@@ -1780,26 +1780,36 @@ code {
   .nav-links {
     grid-column: 1 / -1;
     grid-row: 2;
-    justify-self: end;
+    justify-self: stretch;
     width: 100%;
     max-width: 100%;
-    margin-top: 2px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
+    margin-top: 8px;
+    padding: 10px;
+    overflow: visible;
+    border-color: rgba(23, 231, 255, 0.2);
+    background:
+      linear-gradient(135deg, rgba(23, 231, 255, 0.1), transparent 42%, rgba(255, 45, 154, 0.08)),
+      rgba(7, 10, 16, 0.96);
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.3);
   }
 
   .site-header:not(.is-nav-open) .nav-links {
     display: none;
   }
 
-  .nav-links::-webkit-scrollbar {
-    height: 5px;
+  .site-header.is-nav-open .nav-links {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
-  .nav-links::-webkit-scrollbar-thumb {
-    background: rgba(23, 231, 255, 0.34);
-    border-radius: var(--radius);
+  .nav-links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    text-align: center;
+    border: 1px solid rgba(234, 242, 255, 0.08);
+    background: rgba(255, 255, 255, 0.025);
   }
 
   .header-actions {
@@ -1819,6 +1829,9 @@ code {
   .site-header.is-nav-open .nav-toggle {
     border-color: rgba(23, 231, 255, 0.58);
     color: var(--text);
+    background:
+      linear-gradient(135deg, rgba(23, 231, 255, 0.18), rgba(255, 45, 154, 0.08)),
+      rgba(10, 15, 23, 0.92);
     box-shadow: inset 0 -2px 0 rgba(23, 231, 255, 0.55), 0 0 24px rgba(23, 231, 255, 0.1);
   }
 
@@ -1908,7 +1921,8 @@ code {
   }
 
   .site-header.is-nav-open .nav-links {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .header-actions .button {

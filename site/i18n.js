@@ -32,6 +32,8 @@
     'Installation': 'Setup',
     'Inviter': 'Invite',
     'Inviter Sentinel': 'Invite Sentinel',
+    'Menu': 'Menu',
+    'Fermer': 'Close',
     'Dashboard': 'Dashboard',
     'Conditions': 'Terms',
     'Confidentialite': 'Privacy',
