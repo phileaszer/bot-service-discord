@@ -230,6 +230,7 @@
     function setOpen(isOpen) {
       header.classList.toggle('is-nav-open', isOpen);
       toggle.setAttribute('aria-expanded', String(isOpen));
+      toggle.textContent = isOpen ? 'Fermer' : 'Menu';
     }
 
     toggle.addEventListener('click', () => {
