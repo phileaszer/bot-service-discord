@@ -15,6 +15,12 @@ const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
+const CREATOR_USER_IDS = new Set(
+    String(process.env.SENTINEL_CREATOR_USER_ID || process.env.CREATOR_USER_ID || '')
+        .split(/[,\s]+/)
+        .map(value => value.trim())
+        .filter(Boolean)
+);
 const ALLOWED_RETURN_PATHS = new Set([
     '/',
     '/index.html',
@@ -68,6 +74,10 @@ function truncateText(value, maxLength = 600) {
     return value.slice(0, maxLength);
 }
 
+function isCreatorUser(userId) {
+    return Boolean(userId && CREATOR_USER_IDS.has(String(userId)));
+}
+
 function getClientIp(req) {
     const forwardedFor = req.headers['x-forwarded-for'];
     const forwarded = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
@@ -94,6 +104,186 @@ function getSessionFingerprint(req) {
         ipHash: hashSessionValue(getClientIp(req)),
         userAgent: truncateText(req.headers['user-agent'] || null, 400)
     };
+}
+
+function normalizeAuditValue(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    return truncateText(String(value), 500);
+}
+
+function getAuditTarget(body = {}) {
+    const targetChecks = [
+        ['user', body.userId],
+        ['role', body.roleId],
+        ['channel', body.channelId],
+        ['message', body.messageId],
+        ['case', body.caseId]
+    ];
+
+    for (const [targetType, targetId] of targetChecks) {
+        const normalized = normalizeAuditValue(targetId);
+
+        if (normalized) {
+            return { targetType, targetId: normalized };
+        }
+    }
+
+    return { targetType: null, targetId: null };
+}
+
+function sanitizeAuditDetails(body = {}) {
+    const allowedKeys = [
+        'language',
+        'roleId',
+        'channelId',
+        'userId',
+        'messageId',
+        'caseId',
+        'duration',
+        'count',
+        'deleteDays',
+        'title',
+        'color',
+        'imageUrl',
+        'thumbnailUrl',
+        'footer',
+        'reason'
+    ];
+    const details = {};
+
+    for (const key of allowedKeys) {
+        if (!Object.prototype.hasOwnProperty.call(body, key)) {
+            continue;
+        }
+
+        const value = normalizeAuditValue(body[key]);
+
+        if (value !== null) {
+            details[key] = value;
+        }
+    }
+
+    return details;
+}
+
+function mapAuditLog(row) {
+    if (!row) {
+        return null;
+    }
+
+    let details = {};
+
+    try {
+        details = row.details ? JSON.parse(row.details) : {};
+    } catch (error) {
+        details = {};
+    }
+
+    return {
+        id: row.id,
+        guildId: row.guild_id,
+        guildName: row.guild_name,
+        actorUserId: row.actor_user_id,
+        actorUsername: row.actor_username,
+        action: row.action,
+        status: row.status,
+        targetType: row.target_type,
+        targetId: row.target_id,
+        summary: row.summary,
+        details,
+        source: row.source,
+        createdAt: row.created_at
+    };
+}
+
+function addDashboardAuditLog({ guild, actor, body, status, summary }) {
+    const action = normalizeAuditValue(body?.action) || 'unknown';
+    const { targetType, targetId } = getAuditTarget(body);
+    const details = sanitizeAuditDetails(body);
+
+    db.prepare(`
+        INSERT INTO dashboard_audit_logs (
+            guild_id,
+            guild_name,
+            actor_user_id,
+            actor_username,
+            action,
+            status,
+            target_type,
+            target_id,
+            summary,
+            details,
+            source,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        guild.id,
+        truncateText(guild.name || null, 200),
+        actor?.id || 'unknown',
+        truncateText(actor?.user?.tag || actor?.user?.username || actor?.displayName || null, 200),
+        action,
+        status,
+        targetType,
+        targetId,
+        truncateText(summary || 'Action dashboard Sentinel.', 800),
+        JSON.stringify(details),
+        'dashboard',
+        nowIso()
+    );
+}
+
+function buildAuditQuery({ guildId = null, actorUserId = null, targetId = null, action = null, status = null, limit = 25 } = {}) {
+    const where = [];
+    const params = [];
+
+    if (guildId) {
+        where.push('guild_id = ?');
+        params.push(guildId);
+    }
+
+    if (actorUserId) {
+        where.push('actor_user_id = ?');
+        params.push(actorUserId);
+    }
+
+    if (targetId) {
+        where.push('target_id = ?');
+        params.push(targetId);
+    }
+
+    if (action) {
+        where.push('action = ?');
+        params.push(action);
+    }
+
+    if (status) {
+        where.push('status = ?');
+        params.push(status);
+    }
+
+    const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
+    params.push(safeLimit);
+
+    return {
+        sql: `
+            SELECT id, guild_id, guild_name, actor_user_id, actor_username, action, status, target_type, target_id, summary, details, source, created_at
+            FROM dashboard_audit_logs
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+            ORDER BY datetime(created_at) DESC, id DESC
+            LIMIT ?
+        `,
+        params
+    };
+}
+
+function getDashboardAuditLogs(filters) {
+    const query = buildAuditQuery(filters);
+
+    return db.prepare(query.sql).all(...query.params).map(mapAuditLog);
 }
 
 function mapUserProfile(row) {
@@ -652,7 +842,7 @@ function getTextChannel(guild, channelId) {
     return channel;
 }
 
-async function buildGuildState(ctx, guild) {
+async function buildGuildState(ctx, guild, session = null) {
     await guild.roles.fetch().catch(() => null);
     await guild.channels.fetch().catch(() => null);
 
@@ -660,6 +850,8 @@ async function buildGuildState(ctx, guild) {
     const summary = ctx.helpers.getServiceSummary(guild.id);
     const commandRoleIds = ctx.helpers.getCommandRoleIds(guild.id);
     const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id);
+    const canViewGlobalAudit = isCreatorUser(session?.user?.id);
+    const auditLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 50 : 10;
     const roles = guild.roles.cache
         .filter(role => !role.managed && role.id !== guild.id)
         .sort((a, b) => b.position - a.position)
@@ -720,6 +912,14 @@ async function buildGuildState(ctx, guild) {
                 footer: item.footer,
                 updatedAt: item.updated_at
             }))
+        },
+        auditLogs: {
+            canViewGlobal: canViewGlobalAudit,
+            limit: auditLimit,
+            items: getDashboardAuditLogs({
+                guildId: guild.id,
+                limit: auditLimit
+            })
         }
     };
 }
@@ -1292,7 +1492,54 @@ async function handleApi(req, res, ctx, url) {
     if (req.method === 'GET' && stateMatch) {
         const { guild } = await getDashboardAccess(ctx, session, stateMatch[1]);
         updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
-        json(res, 200, { ok: true, state: await buildGuildState(ctx, guild) });
+        json(res, 200, { ok: true, state: await buildGuildState(ctx, guild, session) });
+        return;
+    }
+
+    const auditMatch = /^\/api\/guilds\/(\d{17,20})\/audit$/.exec(url.pathname);
+    if (req.method === 'GET' && auditMatch) {
+        const { guild } = await getDashboardAccess(ctx, session, auditMatch[1]);
+        const canViewGlobalAudit = isCreatorUser(session.user.id);
+        const maxLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 100 : 10;
+        const limit = Math.min(Number(url.searchParams.get('limit')) || maxLimit, maxLimit);
+
+        json(res, 200, {
+            ok: true,
+            auditLogs: {
+                canViewGlobal: canViewGlobalAudit,
+                limit: maxLimit,
+                items: getDashboardAuditLogs({
+                    guildId: guild.id,
+                    actorUserId: normalizeAuditValue(url.searchParams.get('actorUserId')),
+                    targetId: normalizeAuditValue(url.searchParams.get('targetId')),
+                    action: normalizeAuditValue(url.searchParams.get('action')),
+                    status: normalizeAuditValue(url.searchParams.get('status')),
+                    limit
+                })
+            }
+        });
+        return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/audit/global') {
+        if (!isCreatorUser(session.user.id)) {
+            throw createHttpError(403, 'Global audit is reserved for the Sentinel creator.');
+        }
+
+        json(res, 200, {
+            ok: true,
+            auditLogs: {
+                canViewGlobal: true,
+                limit: 100,
+                items: getDashboardAuditLogs({
+                    actorUserId: normalizeAuditValue(url.searchParams.get('actorUserId')),
+                    targetId: normalizeAuditValue(url.searchParams.get('targetId')),
+                    action: normalizeAuditValue(url.searchParams.get('action')),
+                    status: normalizeAuditValue(url.searchParams.get('status')),
+                    limit: Math.min(Number(url.searchParams.get('limit')) || 100, 100)
+                })
+            }
+        });
         return;
     }
 
@@ -1301,11 +1548,40 @@ async function handleApi(req, res, ctx, url) {
         const { guild, member } = await getDashboardAccess(ctx, session, actionMatch[1]);
         updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
         const body = await parseBody(req);
-        const message = await runDashboardAction(ctx, guild, member, body);
+        const auditActor = member || {
+            id: session.user.id,
+            user: {
+                tag: session.user.username,
+                username: session.user.username
+            },
+            displayName: session.user.globalName || session.user.username
+        };
+        let message;
+
+        try {
+            message = await runDashboardAction(ctx, guild, member, body);
+            addDashboardAuditLog({
+                guild,
+                actor: auditActor,
+                body,
+                status: 'success',
+                summary: message
+            });
+        } catch (error) {
+            addDashboardAuditLog({
+                guild,
+                actor: auditActor,
+                body,
+                status: 'failed',
+                summary: error.message || 'Action dashboard echouee.'
+            });
+            throw error;
+        }
+
         json(res, 200, {
             ok: true,
             message,
-            state: await buildGuildState(ctx, guild)
+            state: await buildGuildState(ctx, guild, session)
         });
         return;
     }

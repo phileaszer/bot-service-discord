@@ -109,6 +109,22 @@ CREATE TABLE IF NOT EXISTS dashboard_sessions (
     expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS dashboard_audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    guild_name TEXT,
+    actor_user_id TEXT NOT NULL,
+    actor_username TEXT,
+    action TEXT NOT NULL,
+    status TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    summary TEXT NOT NULL,
+    details TEXT,
+    source TEXT NOT NULL DEFAULT 'dashboard',
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -138,6 +154,18 @@ ON dashboard_sessions (user_id);
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expires
 ON dashboard_sessions (expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_audit_guild_created
+ON dashboard_audit_logs (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_audit_actor_created
+ON dashboard_audit_logs (actor_user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_audit_target_created
+ON dashboard_audit_logs (target_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_audit_action_created
+ON dashboard_audit_logs (action, created_at);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
