@@ -1241,7 +1241,7 @@ code {
 .dashboard-tabs {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1451,7 +1451,8 @@ code {
 
 .role-chip,
 .premium-badge,
-.free-badge {
+.free-badge,
+.premium-tag {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1483,6 +1484,21 @@ code {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.06);
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+.premium-tag {
+  min-height: 26px;
+  margin-left: 8px;
+  padding: 4px 8px;
+  color: var(--pink);
+  font-size: 0.72rem;
+  border: 1px solid rgba(255, 45, 154, 0.42);
+  background: rgba(255, 45, 154, 0.09);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+.inline-premium-panel {
+  border-color: rgba(255, 45, 154, 0.22);
 }
 
 .split-mini {
