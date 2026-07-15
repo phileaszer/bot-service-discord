@@ -31,11 +31,15 @@
 
 html {
   scroll-behavior: smooth;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
   color: var(--text);
   background:
     linear-gradient(180deg, rgba(255, 45, 154, 0.065), transparent 360px),
@@ -943,7 +947,7 @@ code {
 
 .dashboard-hero h1 {
   max-width: 760px;
-  font-size: 3.05rem;
+  font-size: clamp(2.2rem, 4.6vw, 3.05rem);
   line-height: 1.04;
 }
 
@@ -1764,8 +1768,32 @@ code {
 }
 
 @media (max-width: 1100px) {
+  .site-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
   .nav-links {
-    display: none;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .nav-links::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .nav-links::-webkit-scrollbar-thumb {
+    background: rgba(23, 231, 255, 0.34);
+    border-radius: var(--radius);
+  }
+
+  .header-actions {
+    align-self: start;
   }
 
   .hero {
@@ -1824,14 +1852,33 @@ code {
   .site-header {
     min-height: 68px;
     padding: 12px 16px;
+    grid-template-columns: 1fr;
+  }
+
+  .brand {
+    min-width: 0;
+    order: 1;
   }
 
   .brand span {
-    display: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .header-actions {
+    order: 2;
+    justify-self: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
     gap: 6px;
+  }
+
+  .nav-links {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+    order: 3;
   }
 
   .header-actions .button {
@@ -1844,6 +1891,10 @@ code {
 
   .language-switch {
     grid-template-columns: repeat(2, 34px);
+  }
+
+  .discord-profile-button {
+    max-width: min(100%, 210px);
   }
 
   .header-actions .button-small {
@@ -1909,6 +1960,12 @@ code {
   }
 
   .button {
+    width: 100%;
+  }
+
+  .dashboard-quick-actions .button,
+  .dashboard-control-panel .button,
+  .dashboard-user {
     width: 100%;
   }
 
