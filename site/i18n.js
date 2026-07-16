@@ -633,7 +633,55 @@
     'Démarrage sécurisé': 'Secure startup',
     'Sentinel ne contourne pas Discord : si une permission ou la hiérarchie manque, l’action est refusée.': 'Sentinel does not bypass Discord: if a permission or hierarchy is missing, the action is refused.',
     'Permission Discord vérifiée': 'Discord permission checked',
-    'Sentinel stocke uniquement les IDs Discord, les temps de service, les sessions et la configuration serveur nécessaires à son fonctionnement.': 'Sentinel only stores Discord IDs, duty times, sessions, and server configuration needed to work.'
+    'Sentinel stocke uniquement les IDs Discord, les temps de service, les sessions et la configuration serveur nécessaires à son fonctionnement.': 'Sentinel only stores Discord IDs, duty times, sessions, and server configuration needed to work.',
+    'Accueil': 'Home',
+    'État': 'Status',
+    'Accueil serveur': 'Server home',
+    'Assistant': 'Assistant',
+    'Guide': 'Guide',
+    'Configuration guidée': 'Guided setup',
+    'Vue rapide de la configuration, des agents et des dernières actions Sentinel.': 'Quick view of configuration, agents, and latest Sentinel actions.',
+    'Langue du serveur': 'Server language',
+    'Salon de logs': 'Log channel',
+    'Rôles autorisés': 'Allowed roles',
+    'Agents enregistrés': 'Registered agents',
+    'État global': 'Overall status',
+    'Configuration prête': 'Configuration ready',
+    'À faire': 'To do',
+    'OK': 'OK',
+    'Non configuré': 'Not configured',
+    'Aucun rôle': 'No role',
+    'À vérifier avant utilisation': 'Check before use',
+    'Configure le rôle de service avant de publier le panneau.': 'Configure the duty role before publishing the panel.',
+    'Le rôle de service configuré n’existe plus sur Discord.': 'The configured duty role no longer exists on Discord.',
+    'Configure un salon de logs pour suivre les prises de service et les actions importantes.': 'Configure a log channel to track duty actions and important actions.',
+    'Le salon de logs configuré n’existe plus ou n’est plus textuel.': 'The configured log channel no longer exists or is no longer text-based.',
+    'Ajoute au moins un rôle autorisé pour déléguer la gestion de Sentinel au staff.': 'Add at least one allowed role to delegate Sentinel management to staff.',
+    'Ouvrir l’assistant': 'Open assistant',
+    'Actions récentes': 'Recent actions',
+    'Aucune action récente depuis le dashboard.': 'No recent dashboard action.',
+    'Configurer Sentinel en 4 étapes': 'Configure Sentinel in 4 steps',
+    'Suis ces étapes dans l’ordre. Chaque validation met directement à jour ce serveur Discord.': 'Follow these steps in order. Each validation directly updates this Discord server.',
+    'Choisir la langue': 'Choose the language',
+    'Définit la langue utilisée par Sentinel sur ce serveur.': 'Sets the language used by Sentinel on this server.',
+    'Valider la langue': 'Validate language',
+    'Choisir le rôle de service': 'Choose the duty role',
+    'Ce rôle sera ajouté quand un membre prend son service, puis retiré à la fin.': 'This role will be added when a member clocks in, then removed at the end.',
+    'Configurer le rôle': 'Configure role',
+    'Choisir le salon de logs': 'Choose the log channel',
+    'Sentinel y publiera les prises de service, fins de service et actions importantes.': 'Sentinel will post duty starts, duty ends, and important actions there.',
+    'Configurer les logs': 'Configure logs',
+    'Ajouter les rôles autorisés': 'Add allowed roles',
+    'Ces rôles pourront gérer Sentinel depuis Discord et depuis le dashboard.': 'These roles will be able to manage Sentinel from Discord and from the dashboard.',
+    'Autoriser ce rôle': 'Allow this role',
+    'Prêt': 'Ready',
+    'À configurer': 'To configure',
+    'Aucun rôle choisi': 'No role selected',
+    'Aucun salon choisi': 'No channel selected',
+    'Aucun rôle staff autorisé': 'No allowed staff role',
+    'Configuration complète. Tu peux publier le panneau de service ou gérer le serveur depuis les autres onglets.': 'Configuration complete. You can publish the duty panel or manage the server from the other tabs.',
+    'Quand les 4 étapes sont prêtes, Sentinel peut être utilisé proprement par le staff et les membres.': 'When all 4 steps are ready, Sentinel can be used cleanly by staff and members.',
+    'Voir les réglages avancés': 'View advanced settings'
   });
 
   let normalizedTranslations = null;
@@ -687,6 +735,12 @@
 
     match = /^(\d+) entree\(s\) affichee\(s\)$/.exec(normalizedValue);
     if (match) return `${match[1]} displayed entr${match[1] === '1' ? 'y' : 'ies'}`;
+
+    match = /^Actuel : (.+)$/.exec(normalizedValue);
+    if (match) return `Current: ${match[1]}`;
+
+    match = /^(\d+)\/4 etapes pretes$/.exec(normalizedValue);
+    if (match) return `${match[1]}/4 steps ready`;
 
     return value;
   }

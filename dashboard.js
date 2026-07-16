@@ -913,6 +913,10 @@ async function buildGuildState(ctx, guild, session = null) {
                 updatedAt: item.updated_at
             }))
         },
+        recentActions: getDashboardAuditLogs({
+            guildId: guild.id,
+            limit: 5
+        }),
         auditLogs: {
             canViewGlobal: canViewGlobalAudit,
             limit: auditLimit,

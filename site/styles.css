@@ -1249,7 +1249,7 @@ code {
 .dashboard-tabs {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 10px;
 }
 
@@ -1392,6 +1392,196 @@ code {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.config-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.config-status-card,
+.home-block,
+.setup-step {
+  border: 1px solid rgba(234, 242, 255, 0.11);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.045), transparent 48%),
+    rgba(255, 255, 255, 0.04);
+  clip-path: var(--cut);
+}
+
+.config-status-card {
+  display: grid;
+  gap: 7px;
+  min-height: 100px;
+  padding: 14px;
+}
+
+.config-status-card span,
+.setup-step-heading p,
+.setup-step-heading small,
+.recent-action-list span {
+  color: var(--muted);
+}
+
+.config-status-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-status-card small,
+.setup-step-heading strong {
+  width: max-content;
+  padding: 4px 8px;
+  color: #05070c;
+  font-size: 0.72rem;
+  font-weight: 950;
+  background: var(--cyan);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+
+.config-status-card.is-warning small,
+.setup-step.is-pending .setup-step-heading strong {
+  color: var(--text);
+  background: rgba(255, 45, 154, 0.42);
+}
+
+.server-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.home-block {
+  padding: 16px;
+}
+
+.home-block h3,
+.setup-step h3 {
+  margin-bottom: 8px;
+}
+
+.dashboard-alert {
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.dashboard-alert strong {
+  color: var(--text);
+}
+
+.dashboard-alert p,
+.dashboard-alert ul {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.dashboard-alert ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 18px;
+}
+
+.recent-action-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-action-list li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(234, 242, 255, 0.08);
+}
+
+.recent-action-list li:last-child {
+  border-bottom: 0;
+}
+
+.recent-action-list p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.setup-progress {
+  display: inline-grid;
+  place-items: center;
+  min-width: 56px;
+  min-height: 42px;
+  color: #05070c;
+  font-weight: 950;
+  background: var(--accent-gradient);
+  clip-path: var(--cut);
+}
+
+.setup-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.setup-step {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.setup-step.is-done {
+  border-color: rgba(21, 245, 209, 0.35);
+}
+
+.setup-step-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.setup-step-heading p,
+.setup-step-heading small {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.setup-index {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--cyan);
+  border: 1px solid rgba(23, 231, 255, 0.35);
+  background: rgba(23, 231, 255, 0.08);
+  font-weight: 950;
+  clip-path: var(--cut);
+}
+
+.setup-step form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.setup-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  color: var(--muted);
+}
+
+.setup-footer p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .form-grid {
@@ -1878,6 +2068,10 @@ code {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .server-home-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2018,8 +2212,17 @@ code {
   .dashboard-tabs,
   .form-grid,
   .help-panel-grid,
-  .split-mini {
+  .split-mini,
+  .setup-step form {
     grid-template-columns: 1fr;
+  }
+
+  .setup-step-heading {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .setup-step-heading strong {
+    grid-column: 2;
   }
 
   .command-column li {
