@@ -266,13 +266,27 @@ function renderGuilds() {
   `).join('');
 }
 
+function statusBadge(label, isReady, tone = '') {
+  return `<span class="status-badge ${isReady ? 'is-ready' : 'is-warning'} ${tone}">${escapeHtml(label)}</span>`;
+}
+
 function metricCards(state) {
+  const metrics = [
+    ['Agents', state.summary.registeredUsers, 'Enregistrés'],
+    ['En service', state.summary.activeCount, 'Actifs maintenant'],
+    ['Total', state.summary.totalServiceTime, 'Cumul serveur'],
+    ['Semaine', state.summary.weeklyServiceTime, '7 derniers jours']
+  ];
+
   return `
-    <div class="dashboard-metrics">
-      <article><span>Agents</span><strong>${state.summary.registeredUsers}</strong></article>
-      <article><span>En service</span><strong>${state.summary.activeCount}</strong></article>
-      <article><span>Total</span><strong>${state.summary.totalServiceTime}</strong></article>
-      <article><span>Semaine</span><strong>${state.summary.weeklyServiceTime}</strong></article>
+    <div class="dashboard-metrics dashboard-kpis">
+      ${metrics.map(([label, value, detail]) => `
+        <article class="dashboard-kpi">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </article>
+      `).join('')}
     </div>
   `;
 }
@@ -342,7 +356,7 @@ function configStatusCards(state) {
   const status = dashboardConfigStatus(state);
   const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
 
-  const cards = [
+  const rows = [
     {
       label: 'Langue du serveur',
       value: languageLabel,
@@ -378,14 +392,25 @@ function configStatusCards(state) {
   ];
 
   return `
-    <div class="config-status-grid">
-      ${cards.map((card) => `
-        <article class="config-status-card ${card.ready ? 'is-ready' : 'is-warning'}">
-          <span>${escapeHtml(card.label)}</span>
-          <strong>${escapeHtml(card.value)}</strong>
-          <small>${escapeHtml(statusText(card.ready))}</small>
-        </article>
-      `).join('')}
+    <div class="table-shell config-table-shell">
+      <table class="dashboard-table config-table">
+        <thead>
+          <tr>
+            <th>Élément</th>
+            <th>Valeur</th>
+            <th>État</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr class="${row.ready ? 'is-ready' : 'is-warning'}">
+              <td>${escapeHtml(row.label)}</td>
+              <td>${escapeHtml(row.value)}</td>
+              <td>${statusBadge(statusText(row.ready), row.ready)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
     </div>
   `;
 }
@@ -421,38 +446,62 @@ function recentActions(state, limit = 5) {
   }
 
   return `
-    <ul class="recent-action-list">
+    <div class="table-shell">
+      <table class="dashboard-table recent-action-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Action</th>
+            <th>Résumé</th>
+          </tr>
+        </thead>
+        <tbody>
       ${items.map((item) => `
-        <li>
-          <span>${escapeHtml(formatAuditDate(item.createdAt))}</span>
-          <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
-          <p>${escapeHtml(item.summary)}</p>
-        </li>
+          <tr>
+            <td>${escapeHtml(formatAuditDate(item.createdAt))}</td>
+            <td><strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong></td>
+            <td>${escapeHtml(item.summary)}</td>
+          </tr>
       `).join('')}
-    </ul>
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
 function renderServerHome(state, premiumBadge) {
+  const status = dashboardConfigStatus(state);
+
   return `
-    <section class="dashboard-panel server-home">
-      <div class="panel-heading row-heading">
+    <section class="dashboard-panel server-home pro-dashboard-home">
+      <div class="dashboard-command-bar">
         <div>
           <p class="eyebrow">Accueil serveur</p>
           <h2>${escapeHtml(state.guild.name)}</h2>
-          <p class="muted">Vue rapide de la configuration, des agents et des dernières actions Sentinel.</p>
         </div>
-        ${premiumBadge}
+        <div class="command-bar-status">
+          ${statusBadge(status.ready ? 'Opérationnel' : `${status.completedSteps}/4 à finaliser`, status.ready)}
+          ${premiumBadge}
+        </div>
       </div>
       ${metricCards(state)}
-      ${configStatusCards(state)}
-      <div class="server-home-grid">
+      <div class="server-home-grid pro-home-grid">
+        <article class="home-block home-block-config">
+          <div class="home-block-heading">
+            <h3>Configuration</h3>
+            <button class="button button-small button-ghost" type="button" data-dashboard-tab="configuration">Ouvrir</button>
+          </div>
+          ${configStatusCards(state)}
+        </article>
         <article class="home-block">
           <h3>Alertes</h3>
           ${configAlerts(state)}
         </article>
         <article class="home-block">
-          <h3>Actions récentes</h3>
+          <div class="home-block-heading">
+            <h3>Actions récentes</h3>
+            <button class="button button-small button-ghost" type="button" data-dashboard-tab="audit">Audit</button>
+          </div>
           ${recentActions(state)}
         </article>
       </div>
@@ -1081,39 +1130,40 @@ function auditLogList(state) {
   }
 
   return `
-    <ul class="audit-list">
+    <div class="table-shell audit-table-shell">
+      <table class="dashboard-table audit-table">
+        <thead>
+          <tr>
+            <th>Origine</th>
+            <th>Action</th>
+            <th>Auteur</th>
+            <th>Cible</th>
+            <th>Serveur</th>
+            <th>Date</th>
+            <th>Résultat</th>
+          </tr>
+        </thead>
+        <tbody>
       ${items.map((item) => `
-        <li class="audit-item audit-${escapeHtml(item.status)}">
-          <div class="audit-main">
-            <div class="audit-head">
-              <span class="audit-source">${escapeHtml(auditSourceLabel(item.source))}</span>
-              <span class="audit-status">${escapeHtml(auditStatusLabel(item.status))}</span>
-              <span class="audit-date">${escapeHtml(formatAuditDate(item.createdAt))}</span>
-            </div>
-            <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
-            <p>${escapeHtml(item.summary)}</p>
-            <dl class="audit-detail-grid">
-              <div>
-                <dt>Acteur</dt>
-                <dd>${escapeHtml(auditActorLabel(item))}</dd>
-              </div>
-              <div>
-                <dt>${escapeHtml(auditTargetTypeLabel(item.targetType))}</dt>
-                <dd>${escapeHtml(auditTargetLabel(item, state))}</dd>
-              </div>
-              <div>
-                <dt>Serveur</dt>
-                <dd>${escapeHtml(item.guildName || item.guildId || '-')}</dd>
-              </div>
-              <div>
-                <dt>Résultat</dt>
-                <dd>${escapeHtml(auditStatusLabel(item.status))}</dd>
-              </div>
-            </dl>
-          </div>
-        </li>
+          <tr class="audit-${escapeHtml(item.status)}">
+            <td>${statusBadge(auditSourceLabel(item.source), true, item.source === 'discord' ? 'is-discord' : 'is-site')}</td>
+            <td>
+              <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
+              <small>${escapeHtml(item.summary)}</small>
+            </td>
+            <td>${escapeHtml(auditActorLabel(item))}</td>
+            <td>
+              <span>${escapeHtml(auditTargetTypeLabel(item.targetType))}</span>
+              <small>${escapeHtml(auditTargetLabel(item, state))}</small>
+            </td>
+            <td>${escapeHtml(item.guildName || item.guildId || '-')}</td>
+            <td>${escapeHtml(formatAuditDate(item.createdAt))}</td>
+            <td>${statusBadge(auditStatusLabel(item.status), item.status !== 'failed')}</td>
+          </tr>
       `).join('')}
-    </ul>
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -1126,9 +1176,9 @@ function renderAuditPanel(state) {
     <section class="dashboard-panel" id="audit">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Journal</p>
-          <h2>Logs / Audit</h2>
-          <p class="muted">Journal des actions Sentinel faites depuis le site ou depuis Discord, avec l’auteur, la cible, la date et le résultat.</p>
+          <p class="eyebrow">Audit</p>
+          <h2>Journal des actions</h2>
+          <p class="muted">Qui a fait quoi, où, quand, et avec quel résultat.</p>
         </div>
         <span class="premium-badge">Premium sécurité</span>
       </div>
@@ -1194,14 +1244,8 @@ const DASHBOARD_TABS = [
   {
     id: 'overview',
     label: 'Accueil',
-    eyebrow: 'État',
+    eyebrow: 'Vue',
     title: 'Accueil serveur'
-  },
-  {
-    id: 'setup',
-    label: 'Assistant',
-    eyebrow: 'Guide',
-    title: 'Configuration guidée'
   },
   {
     id: 'configuration',
@@ -1216,22 +1260,28 @@ const DASHBOARD_TABS = [
     title: 'Prises de service'
   },
   {
-    id: 'embeds',
-    label: 'Embeds',
-    eyebrow: 'Annonces',
-    title: 'Messages Sentinel'
-  },
-  {
-    id: 'audit',
-    label: 'Journal',
-    eyebrow: 'Audit',
-    title: 'Traces dashboard'
-  },
-  {
     id: 'moderation',
     label: 'Modération',
     eyebrow: 'Sécurité',
     title: 'Actions rapides'
+  },
+  {
+    id: 'embeds',
+    label: 'Annonces',
+    eyebrow: 'Embeds',
+    title: 'Messages Sentinel'
+  },
+  {
+    id: 'audit',
+    label: 'Audit',
+    eyebrow: 'Journal',
+    title: 'Journal des actions'
+  },
+  {
+    id: 'setup',
+    label: 'Assistant',
+    eyebrow: 'Guide',
+    title: 'Configuration guidée'
   }
 ];
 
@@ -1243,7 +1293,7 @@ function renderDashboardTabs(state, premiumBadge) {
       <div class="control-summary">
         <p class="eyebrow">Centre de contrôle</p>
         <h2>${escapeHtml(activeTab.title)}</h2>
-        <p>${escapeHtml(state.guild.name)} - ${state.advanced ? 'Premium actif' : 'Mode gratuit'}</p>
+        <p>${escapeHtml(state.guild.name)}</p>
       </div>
       <div class="control-status">
         ${premiumBadge}
@@ -1308,7 +1358,7 @@ function renderDashboard() {
       ${tabPanel('service', renderServicePanel(state, premiumBadge, premiumTag))}
 
       ${tabPanel('embeds', `
-    <section class="dashboard-panel" id="embeds">
+    <section class="dashboard-panel module-panel announcements-panel" id="embeds">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Annonces</p>
@@ -1317,7 +1367,7 @@ function renderDashboard() {
         </div>
         ${premiumBadge}
       </div>
-      <div class="form-grid">
+      <div class="form-grid module-form-grid">
         <form data-action-form="custom-embed-create">
           ${labelHelp('Créer un embed Sentinel', 'Publie une annonce propre sous l’identité de Sentinel dans le salon choisi. Le gratuit garde un nombre limité d’embeds actifs.')}
           <select name="channelId">${channelOptions}</select>
@@ -1359,13 +1409,13 @@ function renderDashboard() {
       ${tabPanel('audit', renderAuditPanel(state))}
 
       ${tabPanel('moderation', `
-    <section class="dashboard-panel" id="moderation">
+    <section class="dashboard-panel module-panel moderation-panel" id="moderation">
       <div class="panel-heading">
         <p class="eyebrow">Modération</p>
         <h2>Commandes de modération</h2>
         <p class="muted">Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoute les contrôles avancés pour les gros staffs.</p>
       </div>
-      <div class="form-grid">
+      <div class="form-grid module-form-grid">
         <form data-action-form="warn">
           ${labelHelp('Avertir par ID', 'Ajoute un avertissement au dossier de modération d’un utilisateur et l’enregistre dans les logs.')}
           <input name="userId" placeholder="ID Discord" required>
@@ -1411,7 +1461,7 @@ function renderDashboard() {
       </div>
     </section>
 
-    <section class="dashboard-panel premium-panel inline-premium-panel">
+    <section class="dashboard-panel premium-panel inline-premium-panel module-panel">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Options premium</p>
@@ -1420,7 +1470,7 @@ function renderDashboard() {
         </div>
         ${premiumBadge}
       </div>
-      <div class="form-grid">
+      <div class="form-grid module-form-grid">
         <form data-action-form="tempban">
           ${labelHelp('Ban temporaire par ID', 'Option Premium : bannit un utilisateur pour une durée précise, puis Sentinel le débannit automatiquement.', ` ${premiumTag}`)}
           <input name="userId" placeholder="ID Discord" required>

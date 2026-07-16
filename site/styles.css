@@ -475,6 +475,17 @@ h3 {
   font-size: 1.15rem;
 }
 
+.dashboard-kpi {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-kpi small {
+  color: var(--soft);
+  font-weight: 800;
+  font-size: 0.76rem;
+}
+
 .hero-preview {
   position: relative;
   z-index: 1;
@@ -1056,9 +1067,9 @@ code {
 }
 
 .dashboard-shell {
-  width: min(1420px, calc(100% - 32px));
+  width: min(1520px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 34px 0 80px;
+  padding: 22px 0 80px;
 }
 
 .dashboard-hero {
@@ -1066,12 +1077,12 @@ code {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 22px;
   align-items: end;
-  padding: 38px 0 24px;
+  padding: 22px 0 18px;
 }
 
 .dashboard-hero h1 {
   max-width: 760px;
-  font-size: clamp(2.2rem, 4.6vw, 3.05rem);
+  font-size: clamp(1.75rem, 3.2vw, 2.35rem);
   line-height: 1.04;
 }
 
@@ -1084,11 +1095,13 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 52px;
+  min-height: 48px;
   padding: 10px 14px;
   border: 1px solid rgba(234, 242, 255, 0.13);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.05), transparent),
+    rgba(255, 255, 255, 0.045);
 }
 
 .dashboard-user img {
@@ -1330,10 +1343,10 @@ code {
 
 .dashboard-control-panel {
   display: grid;
-  grid-template-columns: minmax(240px, 0.8fr) auto;
-  gap: 18px;
-  align-items: end;
-  padding: 18px;
+  grid-template-columns: minmax(240px, 0.68fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
   border: 1px solid rgba(234, 242, 255, 0.14);
   border-radius: var(--radius);
   background:
@@ -1346,11 +1359,11 @@ code {
 
 .control-summary {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .control-summary h2 {
-  font-size: clamp(1.65rem, 2vw, 2.45rem);
+  font-size: clamp(1.35rem, 1.8vw, 2rem);
   line-height: 1;
 }
 
@@ -1369,16 +1382,16 @@ code {
 .dashboard-tabs {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
 }
 
 .dashboard-tab {
   position: relative;
   display: grid;
   gap: 4px;
-  min-height: 70px;
-  padding: 12px 14px;
+  min-height: 62px;
+  padding: 11px 12px;
   color: var(--muted);
   text-align: left;
   border: 1px solid rgba(234, 242, 255, 0.11);
@@ -1424,7 +1437,7 @@ code {
 }
 
 .dashboard-tab strong {
-  font-size: 0.98rem;
+  font-size: 0.92rem;
 }
 
 .dashboard-tab-stage {
@@ -1567,6 +1580,127 @@ code {
 .setup-step.is-pending .setup-step-heading strong {
   color: var(--text);
   background: rgba(255, 45, 154, 0.42);
+}
+
+.dashboard-command-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dashboard-command-bar h2 {
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
+}
+
+.command-bar-status,
+.home-block-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 5px 9px;
+  color: #05070c;
+  font-size: 0.74rem;
+  font-weight: 950;
+  white-space: nowrap;
+  background: var(--accent-gradient);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+.status-badge.is-warning {
+  color: var(--text);
+  border: 1px solid rgba(255, 45, 154, 0.4);
+  background: rgba(255, 45, 154, 0.18);
+}
+
+.status-badge.is-site,
+.status-badge.is-discord {
+  color: var(--cyan);
+  border: 1px solid rgba(23, 231, 255, 0.26);
+  background: rgba(23, 231, 255, 0.08);
+}
+
+.status-badge.is-discord {
+  color: var(--violet);
+  border-color: rgba(157, 108, 255, 0.34);
+  background: rgba(157, 108, 255, 0.09);
+}
+
+.pro-home-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+}
+
+.home-block-config {
+  grid-row: span 2;
+}
+
+.table-shell {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid rgba(234, 242, 255, 0.08);
+  border-radius: var(--radius);
+  background: rgba(5, 7, 12, 0.28);
+}
+
+.dashboard-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+  padding: 11px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(234, 242, 255, 0.075);
+}
+
+.dashboard-table th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.dashboard-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.dashboard-table td {
+  color: var(--text);
+}
+
+.dashboard-table td:nth-child(2),
+.dashboard-table small {
+  color: var(--muted);
+}
+
+.dashboard-table strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.config-table {
+  min-width: 520px;
+}
+
+.config-table td:nth-child(2) {
+  color: var(--text);
+  font-weight: 850;
 }
 
 .server-home-grid {
@@ -2136,6 +2270,41 @@ code {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.audit-table {
+  min-width: 1040px;
+}
+
+.audit-table td:nth-child(2) {
+  min-width: 220px;
+}
+
+.audit-table td:nth-child(3),
+.audit-table td:nth-child(4),
+.audit-table td:nth-child(5) {
+  max-width: 210px;
+}
+
+.audit-table td span,
+.audit-table td small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audit-table tr.audit-failed td {
+  background: rgba(255, 45, 154, 0.035);
+}
+
+.module-panel .panel-heading {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(234, 242, 255, 0.08);
+}
+
+.module-form-grid form,
+.module-form-grid .inline-form {
+  min-height: 100%;
 }
 
 .split-mini {
@@ -2725,6 +2894,25 @@ code {
   .audit-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .dashboard-command-bar,
+  .command-bar-status,
+  .home-block-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home-block-config {
+    grid-row: auto;
+  }
+
+  .dashboard-table {
+    min-width: 620px;
+  }
+
+  .audit-table {
+    min-width: 980px;
   }
 
   .audit-actions .button {
