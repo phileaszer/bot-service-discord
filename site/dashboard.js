@@ -726,6 +726,7 @@ const AUDIT_ACTION_LABELS = {
   'publish-service-panel': 'Panneau de service',
   'add-command-role': 'Rôle autorisé ajouté',
   'remove-command-role': 'Rôle autorisé retiré',
+  'toggle-service': 'Bouton service',
   'start-service': 'Prise de service',
   'end-service': 'Fin de service',
   'reset-user': 'Reset utilisateur',
@@ -760,6 +761,18 @@ function auditActionOptions(selectedAction = '') {
   return options.join('');
 }
 
+function auditSourceOptions(selectedSource = '') {
+  const options = [
+    ['', 'Toutes les origines'],
+    ['dashboard', 'Site'],
+    ['discord', 'Discord']
+  ];
+
+  return options
+    .map(([value, label]) => `<option value="${escapeHtml(value)}"${value === selectedSource ? ' selected' : ''}>${escapeHtml(label)}</option>`)
+    .join('');
+}
+
 function formatAuditDate(value) {
   if (!value) {
     return '';
@@ -775,26 +788,94 @@ function auditStatusLabel(status) {
   return status === 'failed' ? 'Échec' : 'Succès';
 }
 
+function auditSourceLabel(source) {
+  if (source === 'discord') {
+    return 'Discord';
+  }
+
+  return 'Site';
+}
+
+function auditTargetTypeLabel(type) {
+  const labels = {
+    user: 'Membre',
+    channel: 'Salon',
+    role: 'Rôle',
+    message: 'Message',
+    case: 'Cas',
+    guild: 'Serveur'
+  };
+
+  return labels[type] || 'Cible';
+}
+
+function auditTargetLabel(item, state) {
+  if (!item.targetId) {
+    return 'Aucune cible';
+  }
+
+  if (item.targetType === 'role') {
+    const role = resolveRole(state, item.targetId);
+    return role ? `@${role.name}` : `Rôle ${item.targetId}`;
+  }
+
+  if (item.targetType === 'channel') {
+    const channel = resolveChannel(state, item.targetId);
+    return channel ? `#${channel.name}` : `Salon ${item.targetId}`;
+  }
+
+  if (item.targetType === 'guild') {
+    return item.guildName || item.guildId || item.targetId;
+  }
+
+  return item.targetId;
+}
+
+function auditActorLabel(item) {
+  if (item.actorUsername && item.actorUserId) {
+    return `${item.actorUsername} (${item.actorUserId})`;
+  }
+
+  return item.actorUsername || item.actorUserId || 'Inconnu';
+}
+
 function auditLogList(state) {
   const items = state.auditLogs?.items || [];
 
   if (items.length === 0) {
-    return '<p class="muted">Aucune action dashboard trouvée avec ces filtres.</p>';
+    return '<p class="muted">Aucune action trouvée avec ces filtres.</p>';
   }
 
   return `
     <ul class="audit-list">
       ${items.map((item) => `
         <li class="audit-item audit-${escapeHtml(item.status)}">
-          <div>
-            <span class="audit-meta">${escapeHtml(formatAuditDate(item.createdAt))} - ${escapeHtml(item.guildName || item.guildId || '')}</span>
+          <div class="audit-main">
+            <div class="audit-head">
+              <span class="audit-source">${escapeHtml(auditSourceLabel(item.source))}</span>
+              <span class="audit-status">${escapeHtml(auditStatusLabel(item.status))}</span>
+              <span class="audit-date">${escapeHtml(formatAuditDate(item.createdAt))}</span>
+            </div>
             <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
             <p>${escapeHtml(item.summary)}</p>
-          </div>
-          <div class="audit-side">
-            <span class="audit-status">${escapeHtml(auditStatusLabel(item.status))}</span>
-            <code>${escapeHtml(item.actorUsername || item.actorUserId)}</code>
-            ${item.targetId ? `<small>${escapeHtml(item.targetType || 'cible')} : ${escapeHtml(item.targetId)}</small>` : ''}
+            <dl class="audit-detail-grid">
+              <div>
+                <dt>Acteur</dt>
+                <dd>${escapeHtml(auditActorLabel(item))}</dd>
+              </div>
+              <div>
+                <dt>${escapeHtml(auditTargetTypeLabel(item.targetType))}</dt>
+                <dd>${escapeHtml(auditTargetLabel(item, state))}</dd>
+              </div>
+              <div>
+                <dt>Serveur</dt>
+                <dd>${escapeHtml(item.guildName || item.guildId || '-')}</dd>
+              </div>
+              <div>
+                <dt>Résultat</dt>
+                <dd>${escapeHtml(auditStatusLabel(item.status))}</dd>
+              </div>
+            </dl>
           </div>
         </li>
       `).join('')}
@@ -812,8 +893,8 @@ function renderAuditPanel(state) {
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Journal</p>
-          <h2>Audit dashboard</h2>
-          <p class="muted">Journal des actions réalisées depuis le dashboard. Ce serveur affiche uniquement ses propres actions, avec date, utilisateur, cible et résultat.</p>
+          <h2>Logs / Audit</h2>
+          <p class="muted">Journal des actions Sentinel faites depuis le site ou depuis Discord, avec l’auteur, la cible, la date et le résultat.</p>
         </div>
         <span class="premium-badge">Premium sécurité</span>
       </div>
@@ -837,6 +918,10 @@ function renderAuditPanel(state) {
             <option value="success"${auditFilters.status === 'success' ? ' selected' : ''}>Succès</option>
             <option value="failed"${auditFilters.status === 'failed' ? ' selected' : ''}>Échec</option>
           </select>
+        </div>
+        <div class="audit-field">
+          ${labelHelp('Origine', 'Filtre les actions selon leur provenance : site dashboard ou Discord.')}
+          <select name="source">${auditSourceOptions(auditFilters.source || '')}</select>
         </div>
         <div class="audit-field">
           ${labelHelp('Limite', 'Nombre maximum de lignes affichées. Les serveurs Premium et la créatrice ont une limite plus haute.')}

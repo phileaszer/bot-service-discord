@@ -3010,6 +3010,364 @@ function parseResetGuildConfirmation(customId) {
     };
 }
 
+function truncateAuditValue(value, maxLength = 500) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    return String(value).slice(0, maxLength);
+}
+
+function flattenInteractionOptions(options = []) {
+    const flattened = [];
+
+    for (const option of options) {
+        if (Array.isArray(option.options) && option.options.length > 0) {
+            flattened.push(...flattenInteractionOptions(option.options));
+            continue;
+        }
+
+        flattened.push(option);
+    }
+
+    return flattened;
+}
+
+function getAuditOptionValue(interaction, names) {
+    const options = flattenInteractionOptions(interaction.options?.data || []);
+
+    for (const name of names) {
+        const option = options.find(item => item.name === name);
+
+        if (option?.value !== undefined && option.value !== null && option.value !== '') {
+            return String(option.value);
+        }
+    }
+
+    return null;
+}
+
+function mapDiscordAuditAction(interaction) {
+    if (interaction.isButton()) {
+        if (interaction.customId === 'toggle_service') {
+            return 'toggle-service';
+        }
+
+        if (interaction.customId.startsWith('set_language:')) {
+            return 'set-language';
+        }
+
+        const resetConfirmation = parseResetGuildConfirmation(interaction.customId);
+
+        if (resetConfirmation?.action === 'confirm') {
+            return 'reset-guild';
+        }
+
+        return null;
+    }
+
+    if (!interaction.isChatInputCommand()) {
+        return null;
+    }
+
+    const commandName = resolveCommandName(interaction.commandName);
+
+    if (commandName === 'embed') {
+        const subcommand = interaction.options.getSubcommand(false);
+        const embedActions = {
+            creer: 'custom-embed-create',
+            create: 'custom-embed-create',
+            modifier: 'custom-embed-edit',
+            edit: 'custom-embed-edit',
+            supprimer: 'custom-embed-delete',
+            delete: 'custom-embed-delete'
+        };
+
+        return embedActions[subcommand] || 'custom-embed-create';
+    }
+
+    if (commandName === 'config-langue') {
+        return 'set-language';
+    }
+
+    if (commandName === 'config-role') {
+        return 'set-service-role';
+    }
+
+    if (commandName === 'config-logs') {
+        return 'set-log-channel';
+    }
+
+    if (commandName === 'config-permissions') {
+        const action = interaction.options.getString('action');
+
+        if (action === 'ajouter' || action === 'add') {
+            return 'add-command-role';
+        }
+
+        if (action === 'retirer' || action === 'remove') {
+            return 'remove-command-role';
+        }
+
+        return null;
+    }
+
+    const actionMap = {
+        'sync-service': 'sync-service',
+        'sync-sentinel': 'sync-sentinel',
+        'reset-heures': 'reset-user',
+        'reset-heures-all': 'reset-guild',
+        avertir: 'warn',
+        timeout: 'timeout',
+        'fin-timeout': 'untimeout',
+        expulser: 'kick',
+        bannir: 'ban',
+        purge: 'purge',
+        'modifier-cas': 'edit-case',
+        'supprimer-cas': 'delete-case',
+        unwarn: 'unwarn',
+        tempban: 'tempban',
+        unban: 'unban',
+        lock: 'lock',
+        unlock: 'unlock',
+        slowmode: 'slowmode'
+    };
+
+    return actionMap[commandName] || null;
+}
+
+function getDiscordAuditTarget(interaction, action) {
+    if (interaction.isButton()) {
+        if (action === 'toggle-service') {
+            return { targetType: 'user', targetId: interaction.user.id };
+        }
+
+        if (action === 'set-language' || action === 'reset-guild') {
+            return { targetType: 'guild', targetId: interaction.guild?.id || null };
+        }
+    }
+
+    const roleActions = new Set(['set-service-role', 'add-command-role', 'remove-command-role']);
+    const channelActions = new Set(['set-log-channel', 'publish-service-panel', 'purge', 'lock', 'unlock', 'slowmode']);
+    const messageActions = new Set(['custom-embed-edit', 'custom-embed-delete']);
+    const caseActions = new Set(['edit-case', 'delete-case', 'unwarn']);
+
+    if (caseActions.has(action)) {
+        return { targetType: 'case', targetId: getAuditOptionValue(interaction, ['id', 'case_id']) };
+    }
+
+    if (messageActions.has(action)) {
+        return { targetType: 'message', targetId: getAuditOptionValue(interaction, ['message_id', 'messageId']) };
+    }
+
+    if (roleActions.has(action)) {
+        return { targetType: 'role', targetId: getAuditOptionValue(interaction, ['role', 'role_a_ping']) };
+    }
+
+    if (channelActions.has(action) || action?.startsWith('custom-embed-')) {
+        return { targetType: 'channel', targetId: getAuditOptionValue(interaction, ['salon', 'channel', 'salon_id', 'channel_id']) };
+    }
+
+    const userId = getAuditOptionValue(interaction, ['membre', 'member', 'utilisateur', 'user', 'utilisateur_id', 'user_id']);
+
+    if (userId) {
+        return { targetType: 'user', targetId: userId };
+    }
+
+    return { targetType: null, targetId: null };
+}
+
+function getTextCommandAuditAction(content) {
+    const trimmed = String(content || '').trim();
+
+    if (/^!(fr|en)$/i.test(trimmed) || /^!(langue|language)\b/i.test(trimmed)) {
+        return 'set-language';
+    }
+
+    if (/^!service-panel$/i.test(trimmed)) {
+        return 'publish-service-panel';
+    }
+
+    if (/^!config-permissions\b/i.test(trimmed)) {
+        const action = (trimmed.split(/\s+/)[1] || 'voir').toLowerCase();
+
+        if (['ajouter', 'add'].includes(action)) {
+            return 'add-command-role';
+        }
+
+        if (['retirer', 'remove'].includes(action)) {
+            return 'remove-command-role';
+        }
+
+        return null;
+    }
+
+    if (/^!sync-service$/i.test(trimmed)) {
+        return 'sync-service';
+    }
+
+    if (/^!sync-sentinel$/i.test(trimmed)) {
+        return 'sync-sentinel';
+    }
+
+    if (/^!(reset-heures-all|reset-hours-all)$/i.test(trimmed)) {
+        return 'reset-guild';
+    }
+
+    if (/^!(reset-heures|reset-hours)\b/i.test(trimmed)) {
+        return 'reset-user';
+    }
+
+    const match = /^!(avertir|warn|timeout|fin-timeout|untimeout|expulser|kick|bannir|ban|purge|clear)\b/i.exec(trimmed);
+
+    if (!match) {
+        return null;
+    }
+
+    const actions = {
+        avertir: 'warn',
+        warn: 'warn',
+        timeout: 'timeout',
+        'fin-timeout': 'untimeout',
+        untimeout: 'untimeout',
+        expulser: 'kick',
+        kick: 'kick',
+        bannir: 'ban',
+        ban: 'ban',
+        purge: 'purge',
+        clear: 'purge'
+    };
+
+    return actions[match[1].toLowerCase()] || null;
+}
+
+function getTextCommandAuditTarget(message, action) {
+    if (action === 'publish-service-panel' || action === 'purge') {
+        return { targetType: 'channel', targetId: message.channel?.id || null };
+    }
+
+    if (action === 'add-command-role' || action === 'remove-command-role') {
+        return { targetType: 'role', targetId: message.mentions.roles.first()?.id || null };
+    }
+
+    if (action === 'set-language' || action === 'reset-guild') {
+        return { targetType: 'guild', targetId: message.guild?.id || null };
+    }
+
+    const userId = message.mentions.users.first()?.id || getUserIdFromText(message.content);
+
+    if (userId) {
+        return { targetType: 'user', targetId: userId };
+    }
+
+    return { targetType: null, targetId: null };
+}
+
+function addAuditLogEntry({ guild, actor, action, status, targetType = null, targetId = null, summary, details = {}, source }) {
+    if (!guild?.id || !actor?.id || !action || !source) {
+        return;
+    }
+
+    try {
+        db.prepare(`
+            INSERT INTO dashboard_audit_logs (
+                guild_id,
+                guild_name,
+                actor_user_id,
+                actor_username,
+                action,
+                status,
+                target_type,
+                target_id,
+                summary,
+                details,
+                source,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            guild.id,
+            truncateAuditValue(guild.name, 200),
+            actor.id,
+            truncateAuditValue(actor.tag || actor.user?.tag || actor.username || actor.displayName, 200),
+            truncateAuditValue(action, 100),
+            status === 'failed' ? 'failed' : 'success',
+            truncateAuditValue(targetType, 50),
+            truncateAuditValue(targetId, 100),
+            truncateAuditValue(summary || 'Action Discord Sentinel.', 800),
+            JSON.stringify(details || {}),
+            source,
+            new Date().toISOString()
+        );
+    } catch (error) {
+        console.error('Erreur audit Sentinel :', error);
+    }
+}
+
+function recordDiscordInteractionAudit(interaction, { status = 'success', summary = null } = {}) {
+    if (!interaction?.inCachedGuild?.()) {
+        return;
+    }
+
+    const action = mapDiscordAuditAction(interaction);
+
+    if (!action) {
+        return;
+    }
+
+    const target = getDiscordAuditTarget(interaction, action);
+    const details = interaction.isChatInputCommand()
+        ? {
+            command: `/${interaction.commandName}`,
+            subcommand: interaction.options.getSubcommand(false) || null
+        }
+        : {
+            button: interaction.customId
+        };
+    const sourceLabel = interaction.isButton() ? 'bouton Discord' : 'commande Discord';
+
+    addAuditLogEntry({
+        guild: interaction.guild,
+        actor: interaction.user,
+        action,
+        status,
+        targetType: target.targetType,
+        targetId: target.targetId,
+        summary: summary || `Action Sentinel depuis ${sourceLabel}.`,
+        details,
+        source: 'discord'
+    });
+}
+
+function recordDiscordTextAudit(message, { status = 'success', summary = null } = {}) {
+    if (!message?.guild || message.author?.bot) {
+        return;
+    }
+
+    const action = getTextCommandAuditAction(message.content);
+
+    if (!action) {
+        return;
+    }
+
+    const target = getTextCommandAuditTarget(message, action);
+    const command = String(message.content || '').trim().split(/\s+/)[0] || '!commande';
+
+    addAuditLogEntry({
+        guild: message.guild,
+        actor: message.author,
+        action,
+        status,
+        targetType: target.targetType,
+        targetId: target.targetId,
+        summary: summary || 'Action Sentinel depuis une commande texte Discord.',
+        details: {
+            command
+        },
+        source: 'discord'
+    });
+}
+
 const SENTINEL_SELF_ROLES = {
     announcements: '📡 Sentinel | Annonces',
     maintenance: '🛠 Sentinel | Maintenance',
@@ -4675,6 +5033,10 @@ client.on(Events.InteractionCreate, async interaction => {
         return;
     }
 
+    let auditStatus = 'success';
+    let auditSummary = null;
+
+    try {
     if (interaction.isChatInputCommand()) {
         const guildId = interaction.guild.id;
         const language = getGuildLanguage(guildId);
@@ -5274,6 +5636,8 @@ client.on(Events.InteractionCreate, async interaction => {
             flags: MessageFlags.Ephemeral
         });
     } catch (error) {
+        auditStatus = 'failed';
+        auditSummary = error.message || 'Erreur Discord Sentinel.';
         console.error('Erreur interaction service :', error);
 
         if (!interaction.replied) {
@@ -5282,6 +5646,16 @@ client.on(Events.InteractionCreate, async interaction => {
                 flags: MessageFlags.Ephemeral
             });
         }
+    }
+    } catch (error) {
+        auditStatus = 'failed';
+        auditSummary = error.message || 'Erreur Discord Sentinel.';
+        throw error;
+    } finally {
+        recordDiscordInteractionAudit(interaction, {
+            status: auditStatus,
+            summary: auditSummary
+        });
     }
 });
 
@@ -5312,7 +5686,10 @@ client.on(Events.MessageCreate, async message => {
     const guildId = message.guild.id;
     let language = getGuildLanguage(guildId);
     const content = message.content.trim();
+    let auditStatus = 'success';
+    let auditSummary = null;
 
+    try {
     if (/^!sentinel-build$/i.test(content)) {
         return message.reply(`Build Sentinel actif : \`${SENTINEL_BUILD}\``);
     }
@@ -5608,6 +5985,16 @@ client.on(Events.MessageCreate, async message => {
         return message.reply(t(language, 'resetUser', {
             member: formatResetTarget(resolvedMember, userId, language)
         }));
+    }
+    } catch (error) {
+        auditStatus = 'failed';
+        auditSummary = error.message || 'Erreur commande texte Sentinel.';
+        throw error;
+    } finally {
+        recordDiscordTextAudit(message, {
+            status: auditStatus,
+            summary: auditSummary
+        });
     }
 });
 
