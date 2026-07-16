@@ -1167,7 +1167,7 @@ function renderDashboard() {
       <div class="panel-heading">
         <p class="eyebrow">Modération</p>
         <h2>Commandes de modération</h2>
-        <p class="muted">Les actions Premium restent visibles ici avec un badge dédié, pour comprendre clairement ce qui est inclus dans chaque offre.</p>
+        <p class="muted">Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoute les contrôles avancés pour les gros staffs.</p>
       </div>
       <div class="form-grid">
         <form data-action-form="warn">
@@ -1208,6 +1208,10 @@ function renderDashboard() {
           <input name="count" type="number" min="1" max="100" value="10">
           <button class="button" type="submit">Purger</button>
         </form>
+        <article class="inline-form moderation-note">
+          <h3>Inclus en gratuit</h3>
+          <p>Avertissements, timeout, fin de timeout, expulsion, ban par ID, purge et consultation simple des 10 derniers cas avec `/sanctions`.</p>
+        </article>
       </div>
     </section>
 
@@ -1216,7 +1220,7 @@ function renderDashboard() {
         <div>
           <p class="eyebrow">Options premium</p>
           <h2>Modération avancée</h2>
-          <p class="muted">Ces actions sont pensées pour les staffs qui gèrent beaucoup de salons, de sanctions et de cas de modération.</p>
+          <p class="muted">Ces actions sont pensées pour les staffs qui gèrent beaucoup de salons, de sanctions et de cas de modération. Les sanctions automatiques après X avertissements seront ajoutées plus tard.</p>
         </div>
         ${premiumBadge}
       </div>
@@ -1271,6 +1275,10 @@ function renderDashboard() {
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unwarn</button>
         </form>
+        <article class="inline-form moderation-note premium-roadmap">
+          <h3>Automatisation Premium ${premiumTag}</h3>
+          <p>Prévu plus tard : déclencher automatiquement une sanction après X avertissements, par exemple timeout, kick ou ban selon les règles du serveur.</p>
+        </article>
         <form data-action-form="reset-guild">
           ${labelHelp('Reset global serveur', 'Option Premium : remet à zéro toutes les heures de service du serveur avec une action globale réservée aux grands nettoyages.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Reset global</button>

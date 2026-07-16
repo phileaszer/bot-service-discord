@@ -2724,8 +2724,9 @@ function buildHelpEmbed(guild, requester) {
             {
                 name: 'Moderation',
                 value: [
-                    '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`, `/mod-cases`.',
-                    '`/ban` and `/mod-cases` can use a Discord ID when the user is no longer in the server.',
+                    'Free moderation: `/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
+                    '`/ban` can use a Discord ID when the user is no longer in the server.',
+                    '`/mod-cases` stays available as a limited view of the latest cases.',
                     '`/embed create` sends an announcement as Sentinel. Free servers can keep 2 active embeds; edits are unlimited.',
                     'Text aliases: `!warn`, `!timeout`, `!untimeout`, `!kick`, `!ban`, `!clear`, `!mod-cases`.',
                     'Sentinel checks role hierarchy before applying a sanction.'
@@ -2748,7 +2749,8 @@ function buildHelpEmbed(guild, requester) {
                     '**Premium moderation**',
                     '`/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`',
                     '`/tempban duration user` or `user_id`, `/unban user_id`',
-                    '`/lock`, `/unlock`, `/slowmode`'
+                    '`/lock`, `/unlock`, `/slowmode`',
+                    'Later: automatic sanctions after X warnings, configurable per server.'
                 ].join('\n'),
                 inline: false
             });
@@ -2833,7 +2835,7 @@ function buildHelpEmbed(guild, requester) {
         '`/expulser membre raison` - expulser un membre',
         '`/bannir utilisateur ou utilisateur_id raison` - bannir, meme si la personne n est plus sur le serveur',
         '`/purge nombre` - supprimer jusqu a 100 messages recents',
-        '`/sanctions membre ou utilisateur_id` - voir les 10 dernieres sanctions',
+        '`/sanctions membre ou utilisateur_id` - consultation simple limitee aux 10 derniers cas',
         '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Sentinel',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
@@ -2842,10 +2844,11 @@ function buildHelpEmbed(guild, requester) {
         '`/modifier-cas id raison` - corriger la raison d un cas',
         '`/supprimer-cas id` - supprimer un cas',
         '`/unwarn id` - retirer un avertissement par ID',
-        '`/profil-mod membre ou utilisateur_id` - voir le profil moderation complet',
+        '`/profil-mod membre ou utilisateur_id` - historique avance et profil moderation complet',
         '`/tempban duree utilisateur ou utilisateur_id` - bannir temporairement avec expiration automatique',
         '`/unban utilisateur_id` - debannir par ID et annuler un tempban actif',
-        '`/lock`, `/unlock`, `/slowmode duree` - gerer rapidement un salon'
+        '`/lock`, `/unlock`, `/slowmode duree` - gerer rapidement un salon',
+        'Plus tard : sanctions automatiques apres X avertissements, configurables par serveur.'
     ];
     const freeLimits = isReferenceServer
         ? [
@@ -2861,7 +2864,7 @@ function buildHelpEmbed(guild, requester) {
             'Classement public : top 10 global.',
             `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs gratuits, modifications illimitees.`,
             '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
-            'La moderation gratuite garde les actions essentielles et affiche les 10 derniers cas.',
+            'Moderation gratuite : avertissements, timeout, kick, ban par ID, purge et consultation simple des 10 derniers cas.',
             'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
             'Les options avancees ne sont pas ouvertes publiquement pour le moment.'
         ];
