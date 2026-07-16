@@ -1460,6 +1460,69 @@ code {
   padding: 16px;
 }
 
+.config-hub-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.config-hub-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(234, 242, 255, 0.11);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.06), transparent 46%),
+    rgba(255, 255, 255, 0.04);
+  clip-path: var(--cut);
+}
+
+.config-hub-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.config-hub-card form {
+  display: grid;
+  gap: 12px;
+}
+
+.config-summary-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.config-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(234, 242, 255, 0.08);
+  background: rgba(5, 7, 12, 0.28);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+.config-summary-row dt {
+  color: var(--muted);
+}
+
+.config-summary-row dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-summary-row.is-warning dd {
+  color: var(--pink);
+}
+
 .home-block h3,
 .setup-step h3 {
   margin-bottom: 8px;
@@ -2072,6 +2135,10 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .config-hub-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2223,6 +2290,10 @@ code {
 
   .setup-step-heading strong {
     grid-column: 2;
+  }
+
+  .config-summary-row {
+    grid-template-columns: 1fr;
   }
 
   .command-column li {

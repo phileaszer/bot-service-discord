@@ -681,7 +681,25 @@
     'Aucun rôle staff autorisé': 'No allowed staff role',
     'Configuration complète. Tu peux publier le panneau de service ou gérer le serveur depuis les autres onglets.': 'Configuration complete. You can publish the duty panel or manage the server from the other tabs.',
     'Quand les 4 étapes sont prêtes, Sentinel peut être utilisé proprement par le staff et les membres.': 'When all 4 steps are ready, Sentinel can be used cleanly by staff and members.',
-    'Voir les réglages avancés': 'View advanced settings'
+    'Voir les réglages avancés': 'View advanced settings',
+    'Réglages avancés': 'Advanced settings',
+    'Ici, tu retrouves les actions utiles après la première installation. Les réglages de base restent dans l’assistant pour éviter les doublons.': 'Here you will find useful actions after the first setup. Basic settings stay in the assistant to avoid duplicates.',
+    'Réglages de base': 'Basic settings',
+    'Ces réglages se modifient dans l’assistant, pour garder un parcours simple et éviter les erreurs.': 'These settings are changed in the assistant to keep the flow simple and avoid mistakes.',
+    'Langue': 'Language',
+    'Rôles staff': 'Staff roles',
+    'Ouvrir l’assistant de configuration': 'Open setup assistant',
+    'Panneau de service': 'Duty panel',
+    'Publie ou republie le bouton de service dans le salon de ton choix.': 'Publish or republish the duty button in the channel of your choice.',
+    'Salon de publication': 'Publishing channel',
+    'Salon dans lequel Sentinel enverra le bouton utilisé pour prendre ou finir son service.': 'Channel where Sentinel will send the button used to start or end duty.',
+    'Publier le panneau': 'Publish panel',
+    'Permissions staff': 'Staff permissions',
+    'Liste des rôles qui peuvent gérer Sentinel. Pour ajouter un rôle, utilise l’étape 4 de l’assistant.': 'List of roles that can manage Sentinel. To add a role, use step 4 of the assistant.',
+    'Gérer dans l’assistant': 'Manage in the assistant',
+    'Tu peux publier le panneau ou continuer avec les autres onglets.': 'You can publish the panel or continue with the other tabs.',
+    'Configuration incomplète': 'Incomplete configuration',
+    'Termine l’assistant avant de publier le panneau pour éviter un bouton inutilisable.': 'Finish the assistant before publishing the panel to avoid an unusable button.'
   });
 
   let normalizedTranslations = null;

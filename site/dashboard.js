@@ -563,9 +563,88 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
   `;
 }
 
+function configSummaryList(state) {
+  const status = dashboardConfigStatus(state);
+  const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
+  const rows = [
+    {
+      label: 'Langue',
+      value: languageLabel,
+      ready: Boolean(state.config.language)
+    },
+    {
+      label: 'Rôle de service',
+      value: status.serviceRole ? `@${status.serviceRole.name}` : 'Non configuré',
+      ready: Boolean(status.serviceRole)
+    },
+    {
+      label: 'Salon de logs',
+      value: status.logChannel ? `#${status.logChannel.name}` : 'Non configuré',
+      ready: Boolean(status.logChannel)
+    },
+    {
+      label: 'Rôles staff',
+      value: status.allowedRoles.length > 0
+        ? status.allowedRoles.map((role) => `@${role.name}`).join(', ')
+        : 'Aucun rôle staff autorisé',
+      ready: status.allowedRoles.length > 0
+    }
+  ];
+
+  return `
+    <dl class="config-summary-list">
+      ${rows.map((row) => `
+        <div class="config-summary-row ${row.ready ? 'is-ready' : 'is-warning'}">
+          <dt>${escapeHtml(row.label)}</dt>
+          <dd>${escapeHtml(row.value)}</dd>
+        </div>
+      `).join('')}
+    </dl>
+  `;
+}
+
+function renderConfigurationHub(state, channelOptions) {
+  const status = dashboardConfigStatus(state);
+
+  return `
+    <section class="dashboard-panel config-hub" id="configuration">
+      <div class="panel-heading">
+        <p class="eyebrow">Configuration</p>
+        <h2>Réglages avancés</h2>
+        <p class="muted">Ici, tu retrouves les actions utiles après la première installation. Les réglages de base restent dans l’assistant pour éviter les doublons.</p>
+      </div>
+      <div class="config-hub-grid">
+        <article class="config-hub-card">
+          <h3>Réglages de base</h3>
+          <p>Ces réglages se modifient dans l’assistant, pour garder un parcours simple et éviter les erreurs.</p>
+          ${configSummaryList(state)}
+          <button class="button button-ghost" type="button" data-dashboard-tab="setup">Ouvrir l’assistant de configuration</button>
+        </article>
+        <article class="config-hub-card">
+          <h3>Panneau de service</h3>
+          <p>Publie ou republie le bouton de service dans le salon de ton choix.</p>
+          <form data-action-form="publish-service-panel">
+            ${labelHelp('Salon de publication', 'Salon dans lequel Sentinel enverra le bouton utilisé pour prendre ou finir son service.')}
+            <select name="channelId">${channelOptions}</select>
+            <button class="button" type="submit">Publier le panneau</button>
+          </form>
+        </article>
+      </div>
+      <div class="command-roles">
+        <h3>Permissions staff ${helpTip('Liste des rôles qui peuvent gérer Sentinel. Pour ajouter un rôle, utilise l’étape 4 de l’assistant.')}</h3>
+        <div class="role-chip-row">${commandRoleList(state)}</div>
+        <button class="button button-small" type="button" data-dashboard-tab="setup">Gérer dans l’assistant</button>
+      </div>
+      ${status.ready
+        ? '<div class="dashboard-alert is-ready"><strong>Configuration prête</strong><p>Tu peux publier le panneau ou continuer avec les autres onglets.</p></div>'
+        : '<div class="dashboard-alert is-warning"><strong>Configuration incomplète</strong><p>Termine l’assistant avant de publier le panneau pour éviter un bouton inutilisable.</p><button class="button button-small" type="button" data-dashboard-tab="setup">Ouvrir l’assistant</button></div>'}
+    </section>
+  `;
+}
+
 function commandRoleList(state) {
   const roles = (state.config.commandRoleIds || [])
-    .map((roleId) => state.roles.find((role) => role.id === roleId))
+    .map((roleId) => (state.roles || []).find((role) => role.id === roleId))
     .filter(Boolean);
 
   if (roles.length === 0) {
@@ -905,48 +984,7 @@ function renderDashboard() {
 
       ${tabPanel('setup', renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions))}
 
-      ${tabPanel('configuration', `
-    <section class="dashboard-panel" id="configuration">
-      <div class="panel-heading">
-        <p class="eyebrow">Configuration</p>
-        <h2>Réglages serveur</h2>
-      </div>
-      <div class="form-grid">
-        <form data-action-form="set-language">
-          ${labelHelp('Langue du serveur', 'Choisit la langue utilisée par Sentinel sur ce serveur uniquement. Les réponses Discord et le dashboard suivront ce choix.')}
-          <select name="language">
-            <option value="fr"${state.config.language === 'fr' ? ' selected' : ''}>Français</option>
-            <option value="en"${state.config.language === 'en' ? ' selected' : ''}>English</option>
-          </select>
-          <button class="button" type="submit">Mettre à jour</button>
-        </form>
-        <form data-action-form="set-service-role">
-          ${labelHelp('Rôle de service', 'Rôle ajouté automatiquement quand un membre prend son service, puis retiré quand il termine.')}
-          <select name="roleId">${roleOptions}</select>
-          <button class="button" type="submit">Configurer</button>
-        </form>
-        <form data-action-form="set-log-channel">
-          ${labelHelp('Salon de logs', 'Salon où Sentinel publie les prises de service, fins de service, durées et actions importantes.')}
-          <select name="channelId">${channelOptions}</select>
-          <button class="button" type="submit">Configurer</button>
-        </form>
-        <form data-action-form="publish-service-panel">
-          ${labelHelp('Publier le panneau de service', 'Envoie dans le salon choisi le bouton que les membres utiliseront pour prendre ou finir leur service.')}
-          <select name="channelId">${channelOptions}</select>
-          <button class="button" type="submit">Publier</button>
-        </form>
-      </div>
-      <div class="command-roles">
-        <h3>Rôles autorisés à gérer Sentinel ${helpTip('Ces rôles peuvent utiliser les commandes de gestion et agir depuis le dashboard, selon les permissions Discord du serveur.')}</h3>
-        <div class="role-chip-row">${commandRoleList(state)}</div>
-        <form class="inline-form" data-action-form="add-command-role">
-          ${labelHelp('Ajouter un rôle autorisé', 'Ajoute un rôle staff à la liste des rôles autorisés à configurer et gérer Sentinel.')}
-          <select name="roleId">${commandRoleOptions}</select>
-          <button class="button button-small" type="submit">Ajouter</button>
-        </form>
-      </div>
-    </section>
-      `)}
+      ${tabPanel('configuration', renderConfigurationHub(state, channelOptions))}
 
       ${tabPanel('service', `
     <section class="dashboard-panel" id="service">
