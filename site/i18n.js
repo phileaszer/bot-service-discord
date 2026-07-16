@@ -917,7 +917,32 @@
     'Le dashboard rassemble la configuration, les actions staff, les statistiques et le journal d’audit dans des onglets séparés.': 'The dashboard groups configuration, staff actions, statistics, and the audit log into separate tabs.',
     'Assistant de configuration': 'Setup assistant',
     'Journal d’audit': 'Audit log',
-    'Statut serveur': 'Server status'
+    'Statut serveur': 'Server status',
+    'Pilotage serveur': 'Server control',
+    'Configuration, service, modération, annonces et audit depuis une interface unique.': 'Configuration, duty tracking, moderation, announcements, and audit from one interface.',
+    'Enregistrés': 'Registered',
+    'Actifs maintenant': 'Active now',
+    'Cumul serveur': 'Server total',
+    '7 derniers jours': 'Last 7 days',
+    'Élément': 'Item',
+    'Valeur': 'Value',
+    'État': 'Status',
+    'Opérationnel': 'Operational',
+    'Ouvrir': 'Open',
+    'Actions récentes': 'Recent actions',
+    'Qui a fait quoi, où, quand, et avec quel résultat.': 'Who did what, where, when, and with what result.',
+    'Journal des actions': 'Action log',
+    'Origine': 'Source',
+    'Auteur': 'Actor',
+    'Cible': 'Target',
+    'Serveur': 'Server',
+    'Date': 'Date',
+    'Résultat': 'Result',
+    'Résumé': 'Summary',
+    'Vue': 'View',
+    'Équipe': 'Team',
+    'Embeds': 'Embeds',
+    'Journal': 'Log'
   });
 
   let normalizedTranslations = null;
@@ -977,6 +1002,9 @@
 
     match = /^(\d+)\/4 etapes pretes$/.exec(normalizedValue);
     if (match) return `${match[1]}/4 steps ready`;
+
+    match = /^(\d+)\/4 a finaliser$/.exec(normalizedValue);
+    if (match) return `${match[1]}/4 to finish`;
 
     return value;
   }
