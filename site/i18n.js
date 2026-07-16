@@ -874,6 +874,14 @@
   });
 
   Object.assign(en, {
+    'Sentinel est un bot Discord gratuit pour gérer les prises de service, modérer un serveur et piloter le tout depuis un dashboard web.': 'Sentinel is a free Discord bot for managing duty tracking, moderating a server, and controlling everything from a web dashboard.',
+    'Prises de service, modération, statistiques, logs et dashboard web pour gérer un serveur Discord plus facilement.': 'Duty tracking, moderation, statistics, logs, and a web dashboard to manage a Discord server more easily.',
+    'Services • Modération • Dashboard': 'Duty tracking • Moderation • Dashboard',
+    'Gère les prises de service et la modération de ton Discord avec un bot gratuit, bilingue et pilotable depuis un dashboard web.': 'Manage duty tracking and moderation on your Discord with a free bilingual bot controlled from a web dashboard.',
+    'Inviter Sentinel gratuitement': 'Invite Sentinel for free',
+    'Voir l’installation': 'View setup',
+    'Pointage': 'Clock-in',
+    'Disponible': 'Available',
     'Ce que Sentinel automatise vraiment.': 'What Sentinel truly automates.',
     'Ici, on parle du comportement du bot au quotidien. Les commandes sont listées sur la page Commandes, et le démarrage guidé se trouve sur Installation.': 'Here, this page explains how the bot behaves day to day. Commands are listed on the Commands page, and guided setup is on Setup.',
     'Cycle de service': 'Duty cycle',
