@@ -879,6 +879,8 @@
     'Services • Modération • Dashboard': 'Duty tracking • Moderation • Dashboard',
     'Gère les prises de service et la modération de ton Discord avec un bot gratuit, bilingue et pilotable depuis un dashboard web.': 'Manage duty tracking and moderation on your Discord with a free bilingual bot controlled from a web dashboard.',
     'Inviter Sentinel gratuitement': 'Invite Sentinel for free',
+    'Voir le dashboard': 'View dashboard',
+    'Connexion': 'Sign in',
     'Voir l’installation': 'View setup',
     'Pointage': 'Clock-in',
     'Disponible': 'Available',
