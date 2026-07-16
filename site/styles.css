@@ -1665,6 +1665,19 @@ code {
   clip-path: var(--cut);
 }
 
+.moderation-note p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.premium-roadmap {
+  border-color: rgba(255, 45, 154, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 45, 154, 0.08), transparent 46%),
+    rgba(255, 255, 255, 0.04);
+}
+
 .dashboard-panel label {
   display: inline-flex;
   align-items: center;

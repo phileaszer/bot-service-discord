@@ -12,7 +12,7 @@ Sentinel est un bot Discord multi-serveurs pour suivre les temps de service des 
 - Logs des prises et fins de service
 - Configuration du role de service et du salon de logs
 - Gestion des roles autorises a administrer le bot
-- Moderation simple : avertissements, timeout, expulsion, bannissement, purge et historique des sanctions
+- Moderation gratuite : avertissements, timeout, expulsion, ban par ID, purge et consultation simple des sanctions
 - Embeds d'annonce sous l'identite de Sentinel : 2 embeds actifs gratuits, modifications illimitees
 - Choix de langue par serveur : francais ou anglais
 - Commandes slash localisees avec les localisations natives Discord
@@ -189,7 +189,7 @@ Ces commandes sont preparees pour Sentinel Premium et ne sont pas ouvertes sur l
 - `!summary`
 
 En gratuit, la reinitialisation reste disponible personne par personne avec `/reset-heures membre:@membre`, `/reset-heures utilisateur_id:ID`, `/reset-hours member:@member` ou `/reset-hours user_id:ID`.
-La moderation gratuite garde les actions essentielles et limite la consultation a `/sanctions`, soit les 10 derniers cas visibles.
+La moderation gratuite garde les actions essentielles : avertissements, timeout, expulsion, ban par ID et purge. La consultation des sanctions reste simple avec `/sanctions`, limitee aux 10 derniers cas visibles.
 Les embeds Sentinel sont limites a 2 embeds actifs en gratuit. Ils peuvent etre modifies autant de fois que necessaire. Le Premium prepare la creation illimitee.
 
 ## Moderation / Moderation
@@ -219,6 +219,7 @@ Moderation Premium preparee :
 - `/tempban` bannit temporairement un utilisateur avec expiration automatique, meme avec un ID Discord.
 - `/unban` debannit un utilisateur par ID et annule un tempban actif.
 - `/lock`, `/unlock` et `/slowmode` gerent rapidement un salon.
+- Les sanctions automatiques apres X avertissements sont prevues pour une future version Premium.
 - Creation illimitee d'embeds Sentinel.
 
 English:
@@ -246,6 +247,7 @@ Prepared Premium moderation:
 - `/tempban` temporarily bans a user with automatic expiration, including by Discord ID.
 - `/unban` unbans a user by ID and cancels an active tempban.
 - `/lock`, `/unlock`, and `/slowmode` quickly manage a channel.
+- Automatic sanctions after X warnings are planned for a future Premium version.
 - Unlimited Sentinel embed creation.
 
 ## Permissions
