@@ -277,8 +277,294 @@ function metricCards(state) {
   `;
 }
 
+function resolveRole(state, roleId) {
+  if (!roleId) return null;
+  return (state.roles || []).find((role) => role.id === roleId) || null;
+}
+
+function resolveChannel(state, channelId) {
+  if (!channelId) return null;
+  return (state.channels || []).find((channel) => channel.id === channelId) || null;
+}
+
+function commandRoles(state) {
+  return (state.config.commandRoleIds || [])
+    .map((roleId) => resolveRole(state, roleId))
+    .filter(Boolean);
+}
+
+function dashboardConfigStatus(state) {
+  const serviceRole = resolveRole(state, state.config.serviceRoleId);
+  const logChannel = resolveChannel(state, state.config.logChannelId);
+  const allowedRoles = commandRoles(state);
+  const alerts = [];
+
+  if (!state.config.language) {
+    alerts.push('Choisis la langue du serveur pour que Sentinel réponde correctement.');
+  }
+
+  if (!state.config.serviceRoleId) {
+    alerts.push('Configure le rôle de service avant de publier le panneau.');
+  } else if (!serviceRole) {
+    alerts.push('Le rôle de service configuré n’existe plus sur Discord.');
+  }
+
+  if (!state.config.logChannelId) {
+    alerts.push('Configure un salon de logs pour suivre les prises de service et les actions importantes.');
+  } else if (!logChannel) {
+    alerts.push('Le salon de logs configuré n’existe plus ou n’est plus textuel.');
+  }
+
+  if (allowedRoles.length === 0) {
+    alerts.push('Ajoute au moins un rôle autorisé pour déléguer la gestion de Sentinel au staff.');
+  }
+
+  return {
+    serviceRole,
+    logChannel,
+    allowedRoles,
+    alerts,
+    ready: alerts.length === 0,
+    completedSteps: [
+      Boolean(state.config.language),
+      Boolean(serviceRole),
+      Boolean(logChannel),
+      allowedRoles.length > 0
+    ].filter(Boolean).length
+  };
+}
+
+function statusText(isReady) {
+  return isReady ? 'OK' : 'À faire';
+}
+
+function configStatusCards(state) {
+  const status = dashboardConfigStatus(state);
+  const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
+
+  const cards = [
+    {
+      label: 'Langue du serveur',
+      value: languageLabel,
+      ready: Boolean(state.config.language)
+    },
+    {
+      label: 'Rôle de service',
+      value: status.serviceRole ? `@${status.serviceRole.name}` : 'Non configuré',
+      ready: Boolean(status.serviceRole)
+    },
+    {
+      label: 'Salon de logs',
+      value: status.logChannel ? `#${status.logChannel.name}` : 'Non configuré',
+      ready: Boolean(status.logChannel)
+    },
+    {
+      label: 'Rôles autorisés',
+      value: status.allowedRoles.length > 0
+        ? status.allowedRoles.map((role) => `@${role.name}`).join(', ')
+        : 'Aucun rôle',
+      ready: status.allowedRoles.length > 0
+    },
+    {
+      label: 'Agents enregistrés',
+      value: `${state.summary.registeredUsers}`,
+      ready: true
+    },
+    {
+      label: 'État global',
+      value: status.ready ? 'Configuration prête' : `${status.completedSteps}/4 étapes prêtes`,
+      ready: status.ready
+    }
+  ];
+
+  return `
+    <div class="config-status-grid">
+      ${cards.map((card) => `
+        <article class="config-status-card ${card.ready ? 'is-ready' : 'is-warning'}">
+          <span>${escapeHtml(card.label)}</span>
+          <strong>${escapeHtml(card.value)}</strong>
+          <small>${escapeHtml(statusText(card.ready))}</small>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function configAlerts(state) {
+  const status = dashboardConfigStatus(state);
+
+  if (status.ready) {
+    return `
+      <div class="dashboard-alert is-ready">
+        <strong>Configuration prête</strong>
+        <p>Sentinel peut gérer les services et publier ses logs sur ce serveur.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="dashboard-alert is-warning">
+      <strong>À vérifier avant utilisation</strong>
+      <ul>
+        ${status.alerts.map((alert) => `<li>${escapeHtml(alert)}</li>`).join('')}
+      </ul>
+      <button class="button button-small" type="button" data-dashboard-tab="setup">Ouvrir l’assistant</button>
+    </div>
+  `;
+}
+
+function recentActions(state, limit = 5) {
+  const items = (state.recentActions || state.auditLogs?.items || []).slice(0, limit);
+
+  if (items.length === 0) {
+    return '<p class="muted">Aucune action récente depuis le dashboard.</p>';
+  }
+
+  return `
+    <ul class="recent-action-list">
+      ${items.map((item) => `
+        <li>
+          <span>${escapeHtml(formatAuditDate(item.createdAt))}</span>
+          <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
+          <p>${escapeHtml(item.summary)}</p>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+function renderServerHome(state, premiumBadge) {
+  return `
+    <section class="dashboard-panel server-home">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Accueil serveur</p>
+          <h2>${escapeHtml(state.guild.name)}</h2>
+          <p class="muted">Vue rapide de la configuration, des agents et des dernières actions Sentinel.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      ${metricCards(state)}
+      ${configStatusCards(state)}
+      <div class="server-home-grid">
+        <article class="home-block">
+          <h3>Alertes</h3>
+          ${configAlerts(state)}
+        </article>
+        <article class="home-block">
+          <h3>Actions récentes</h3>
+          ${recentActions(state)}
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function setupStep({ index, title, description, done, current, content }) {
+  return `
+    <article class="setup-step ${done ? 'is-done' : 'is-pending'}">
+      <div class="setup-step-heading">
+        <span class="setup-index">${index}</span>
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+          <p>${escapeHtml(description)}</p>
+          <small>${escapeHtml(current)}</small>
+        </div>
+        <strong>${done ? 'Prêt' : 'À configurer'}</strong>
+      </div>
+      ${content}
+    </article>
+  `;
+}
+
+function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions) {
+  const status = dashboardConfigStatus(state);
+  const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
+  const serviceRoleLabel = status.serviceRole ? `@${status.serviceRole.name}` : 'Aucun rôle choisi';
+  const logChannelLabel = status.logChannel ? `#${status.logChannel.name}` : 'Aucun salon choisi';
+  const commandRolesLabel = status.allowedRoles.length > 0
+    ? status.allowedRoles.map((role) => `@${role.name}`).join(', ')
+    : 'Aucun rôle staff autorisé';
+
+  return `
+    <section class="dashboard-panel setup-assistant">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Assistant</p>
+          <h2>Configurer Sentinel en 4 étapes</h2>
+          <p class="muted">Suis ces étapes dans l’ordre. Chaque validation met directement à jour ce serveur Discord.</p>
+        </div>
+        <span class="setup-progress">${status.completedSteps}/4</span>
+      </div>
+      <div class="setup-steps">
+        ${setupStep({
+          index: '01',
+          title: 'Choisir la langue',
+          description: 'Définit la langue utilisée par Sentinel sur ce serveur.',
+          done: Boolean(state.config.language),
+          current: `Actuel : ${languageLabel}`,
+          content: `
+            <form data-action-form="set-language">
+              <select name="language">
+                <option value="fr"${state.config.language === 'fr' ? ' selected' : ''}>Français</option>
+                <option value="en"${state.config.language === 'en' ? ' selected' : ''}>English</option>
+              </select>
+              <button class="button" type="submit">Valider la langue</button>
+            </form>
+          `
+        })}
+        ${setupStep({
+          index: '02',
+          title: 'Choisir le rôle de service',
+          description: 'Ce rôle sera ajouté quand un membre prend son service, puis retiré à la fin.',
+          done: Boolean(status.serviceRole),
+          current: `Actuel : ${serviceRoleLabel}`,
+          content: `
+            <form data-action-form="set-service-role">
+              <select name="roleId">${roleOptions}</select>
+              <button class="button" type="submit">Configurer le rôle</button>
+            </form>
+          `
+        })}
+        ${setupStep({
+          index: '03',
+          title: 'Choisir le salon de logs',
+          description: 'Sentinel y publiera les prises de service, fins de service et actions importantes.',
+          done: Boolean(status.logChannel),
+          current: `Actuel : ${logChannelLabel}`,
+          content: `
+            <form data-action-form="set-log-channel">
+              <select name="channelId">${channelOptions}</select>
+              <button class="button" type="submit">Configurer les logs</button>
+            </form>
+          `
+        })}
+        ${setupStep({
+          index: '04',
+          title: 'Ajouter les rôles autorisés',
+          description: 'Ces rôles pourront gérer Sentinel depuis Discord et depuis le dashboard.',
+          done: status.allowedRoles.length > 0,
+          current: `Actuel : ${commandRolesLabel}`,
+          content: `
+            <form data-action-form="add-command-role">
+              <select name="roleId">${commandRoleOptions}</select>
+              <button class="button" type="submit">Autoriser ce rôle</button>
+            </form>
+          `
+        })}
+      </div>
+      <div class="setup-footer">
+        ${status.ready
+          ? '<p>Configuration complète. Tu peux publier le panneau de service ou gérer le serveur depuis les autres onglets.</p>'
+          : '<p>Quand les 4 étapes sont prêtes, Sentinel peut être utilisé proprement par le staff et les membres.</p>'}
+        <button class="button button-ghost" type="button" data-dashboard-tab="configuration">Voir les réglages avancés</button>
+      </div>
+    </section>
+  `;
+}
+
 function commandRoleList(state) {
-  const roles = state.config.commandRoleIds
+  const roles = (state.config.commandRoleIds || [])
     .map((roleId) => state.roles.find((role) => role.id === roleId))
     .filter(Boolean);
 
@@ -509,9 +795,15 @@ function labelHelp(label, help, addon = '') {
 const DASHBOARD_TABS = [
   {
     id: 'overview',
-    label: 'Vue d ensemble',
-    eyebrow: 'Etat',
-    title: 'Résumé serveur'
+    label: 'Accueil',
+    eyebrow: 'État',
+    title: 'Accueil serveur'
+  },
+  {
+    id: 'setup',
+    label: 'Assistant',
+    eyebrow: 'Guide',
+    title: 'Configuration guidée'
   },
   {
     id: 'configuration',
@@ -609,18 +901,9 @@ function renderDashboard() {
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
     <div class="dashboard-tab-stage">
-      ${tabPanel('overview', `
-    <section class="dashboard-panel server-overview">
-      <div class="panel-heading row-heading">
-        <div>
-          <p class="eyebrow">Serveur sélectionné</p>
-          <h2>${escapeHtml(state.guild.name)}</h2>
-        </div>
-        ${premiumBadge}
-      </div>
-      ${metricCards(state)}
-    </section>
-      `)}
+      ${tabPanel('overview', renderServerHome(state, premiumBadge))}
+
+      ${tabPanel('setup', renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions))}
 
       ${tabPanel('configuration', `
     <section class="dashboard-panel" id="configuration">
