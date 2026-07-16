@@ -660,26 +660,260 @@ function commandRoleList(state) {
 }
 
 function activeServices(state) {
-  if (state.activeServices.length === 0) {
+  const services = state.activeServices || [];
+
+  if (services.length === 0) {
     return '<p class="muted">Aucun agent en service.</p>';
   }
 
   return `
     <ul class="compact-list">
-      ${state.activeServices.map((service) => `<li><code>${service.userId}</code><span>${service.durationLabel}</span></li>`).join('')}
+      ${services.map((service) => `<li><code>${escapeHtml(service.userId)}</code><span>${escapeHtml(service.durationLabel)}</span></li>`).join('')}
     </ul>
   `;
 }
 
 function topService(state) {
-  if (state.topService.length === 0) {
+  const users = state.topService || [];
+
+  if (users.length === 0) {
     return '<p class="muted">Aucun temps enregistré.</p>';
   }
 
   return `
     <ul class="compact-list">
-      ${state.topService.map((user, index) => `<li><code>#${index + 1} ${user.userId}</code><span>${user.totalTimeLabel}</span></li>`).join('')}
+      ${users.map((user, index) => `<li><code>#${index + 1} ${escapeHtml(user.userId)}</code><span>${escapeHtml(user.totalTimeLabel)}</span></li>`).join('')}
     </ul>
+  `;
+}
+
+function ratioPercent(value, max) {
+  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) {
+    return 0;
+  }
+
+  return Math.max(4, Math.min(100, Math.round((value / max) * 100)));
+}
+
+function leaderboardChart(items = [], emptyText = 'Aucune donnée à afficher.') {
+  const rows = items.slice(0, 6);
+
+  if (rows.length === 0) {
+    return `<p class="muted">${escapeHtml(emptyText)}</p>`;
+  }
+
+  const max = Math.max(...rows.map((item) => Number(item.totalTime) || 0), 1);
+
+  return `
+    <div class="service-chart">
+      ${rows.map((item, index) => `
+        <div class="service-chart-row">
+          <span class="chart-rank">#${index + 1}</span>
+          <span class="chart-user">${escapeHtml(item.userId)}</span>
+          <span class="chart-bar"><i style="width: ${ratioPercent(Number(item.totalTime) || 0, max)}%"></i></span>
+          <strong>${escapeHtml(item.totalTimeLabel || '0h 0min')}</strong>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function activeServicesPanel(state) {
+  const services = (state.activeServices || []).slice(0, 8);
+
+  if (services.length === 0) {
+    return `
+      <div class="service-empty">
+        <strong>Aucun agent en service</strong>
+        <p>Quand un membre prend son service, il apparaît ici avec la durée en cours.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="active-service-grid">
+      ${services.map((service) => `
+        <article>
+          <span>Agent</span>
+          <strong>${escapeHtml(service.userId)}</strong>
+          <small>${escapeHtml(service.durationLabel)}</small>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function formatSessionDate(value) {
+  if (!value) {
+    return 'Date inconnue';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(document.documentElement.lang === 'en' ? 'en-US' : 'fr-FR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(date);
+}
+
+function personalHistory(state) {
+  const personal = state.personalService;
+
+  if (!personal) {
+    return '<p class="muted">Connecte-toi avec Discord pour voir ton historique personnel.</p>';
+  }
+
+  const sessions = personal.sessions || [];
+
+  return `
+    <div class="personal-service">
+      <div class="personal-service-head">
+        <div>
+          <span>Total personnel</span>
+          <strong>${escapeHtml(personal.totalTimeLabel)}</strong>
+        </div>
+        <div>
+          <span>Statut</span>
+          <strong>${personal.active ? 'En service' : 'Hors service'}</strong>
+          ${personal.activeDurationLabel ? `<small>${escapeHtml(personal.activeDurationLabel)}</small>` : ''}
+        </div>
+        <div>
+          <span>Sessions</span>
+          <strong>${escapeHtml(personal.sessionCount)}</strong>
+        </div>
+      </div>
+      ${sessions.length === 0
+        ? '<p class="muted">Aucune session terminée pour ton compte sur ce serveur.</p>'
+        : `<ul class="session-list">
+            ${sessions.map((session) => `
+              <li>
+                <span>${escapeHtml(formatSessionDate(session.date))}</span>
+                <strong>${escapeHtml(session.durationLabel)}</strong>
+              </li>
+            `).join('')}
+          </ul>`}
+    </div>
+  `;
+}
+
+function premiumServiceRoadmap(state, premiumTag) {
+  const disabled = state.advanced ? '' : ' aria-disabled="true"';
+  const items = [
+    ['Top mois', 'Classement mensuel pour suivre les agents les plus actifs sur une période longue.'],
+    ['Top année', 'Vision annuelle utile pour les grandes communautés et les bilans staff.'],
+    ['Exports CSV/PDF', 'Export des heures, sessions et classements pour archivage ou partage externe.'],
+    ['Rapports automatiques', 'Résumés hebdomadaires ou mensuels publiés automatiquement dans un salon choisi.']
+  ];
+
+  return `
+    <div class="service-roadmap">
+      ${items.map(([title, text]) => `
+        <article${disabled}>
+          <span>${premiumTag}</span>
+          <h3>${escapeHtml(title)}</h3>
+          <p>${escapeHtml(text)}</p>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderServicePanel(state, premiumBadge, premiumTag) {
+  return `
+    <section class="dashboard-panel service-overview-panel" id="service">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Service</p>
+          <h2>Statistiques de service</h2>
+          <p class="muted">Vue rapide des agents en service, du top global, des heures de la semaine et de ton historique personnel.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      ${metricCards(state)}
+      <div class="service-insights">
+        <article class="service-insight service-insight-wide">
+          <div class="service-card-heading">
+            <div>
+              <p class="eyebrow">Direct</p>
+              <h3>Agents actuellement en service</h3>
+            </div>
+            <strong>${escapeHtml(state.summary.activeCount)}</strong>
+          </div>
+          ${activeServicesPanel(state)}
+        </article>
+        <article class="service-insight">
+          <div class="service-card-heading">
+            <div>
+              <p class="eyebrow">Classement</p>
+              <h3>Top service</h3>
+            </div>
+          </div>
+          ${leaderboardChart(state.topService || [], 'Aucun temps total enregistré.')}
+        </article>
+        <article class="service-insight">
+          <div class="service-card-heading">
+            <div>
+              <p class="eyebrow">Semaine</p>
+              <h3>Heures des 7 derniers jours</h3>
+            </div>
+          </div>
+          ${leaderboardChart(state.topWeek || [], 'Aucune session cette semaine.')}
+        </article>
+        <article class="service-insight service-insight-wide">
+          <div class="service-card-heading">
+            <div>
+              <p class="eyebrow">Personnel</p>
+              <h3>Ton historique</h3>
+            </div>
+          </div>
+          ${personalHistory(state)}
+        </article>
+      </div>
+    </section>
+
+    <section class="dashboard-panel">
+      <div class="panel-heading">
+        <p class="eyebrow">Actions</p>
+        <h2>Gestion rapide</h2>
+      </div>
+      <div class="form-grid">
+        <form data-action-form="start-service">
+          ${labelHelp('Prendre le service pour un membre', 'Démarre manuellement le service d’un membre avec son ID Discord et applique le rôle de service si possible.')}
+          <input name="userId" placeholder="ID Discord du membre" required>
+          <button class="button" type="submit">Prendre service</button>
+        </form>
+        <form data-action-form="end-service">
+          ${labelHelp('Finir le service pour un membre', 'Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son total.')}
+          <input name="userId" placeholder="ID Discord du membre" required>
+          <button class="button" type="submit">Fin service</button>
+        </form>
+        <form data-action-form="reset-user">
+          ${labelHelp('Réinitialisation individuelle des heures', 'Remet à zéro les heures d’une seule personne avec son ID Discord, même si elle a quitté le serveur.')}
+          <input name="userId" placeholder="ID Discord, même si la personne est partie" required>
+          <button class="button" type="submit">Reset</button>
+        </form>
+        <form data-action-form="sync-service">
+          ${labelHelp('Synchronisation service', 'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et la base de données.', ` ${premiumTag}`)}
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="dashboard-panel inline-premium-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Premium service</p>
+          <h2>Statistiques avancées</h2>
+          <p class="muted">Ces options restent prévues pour les serveurs qui auront besoin de bilans complets et d’exports.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      ${premiumServiceRoadmap(state, premiumTag)}
+    </section>
   `;
 }
 
@@ -1071,45 +1305,7 @@ function renderDashboard() {
 
       ${tabPanel('configuration', renderConfigurationHub(state, channelOptions))}
 
-      ${tabPanel('service', `
-    <section class="dashboard-panel" id="service">
-      <div class="panel-heading">
-        <p class="eyebrow">Service</p>
-        <h2>Actions immédiates</h2>
-      </div>
-      <div class="form-grid">
-        <form data-action-form="start-service">
-          ${labelHelp('Prendre le service pour un membre', 'Démarre manuellement le service d’un membre avec son ID Discord et applique le rôle de service si possible.')}
-          <input name="userId" placeholder="ID Discord du membre" required>
-          <button class="button" type="submit">Prendre service</button>
-        </form>
-        <form data-action-form="end-service">
-          ${labelHelp('Finir le service pour un membre', 'Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son total.')}
-          <input name="userId" placeholder="ID Discord du membre" required>
-          <button class="button" type="submit">Fin service</button>
-        </form>
-        <form data-action-form="reset-user">
-          ${labelHelp('Réinitialisation individuelle des heures', 'Remet à zéro les heures d’une seule personne avec son ID Discord, même si elle a quitté le serveur.')}
-          <input name="userId" placeholder="ID Discord, même si la personne est partie" required>
-          <button class="button" type="submit">Reset</button>
-        </form>
-        <form data-action-form="sync-service">
-          ${labelHelp('Synchronisation service', 'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et la base de données.', ` ${premiumTag}`)}
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
-        </form>
-      </div>
-      <div class="split-mini">
-        <article>
-          <h3>En service</h3>
-          ${activeServices(state)}
-        </article>
-        <article>
-          <h3>Top service</h3>
-          ${topService(state)}
-        </article>
-      </div>
-    </section>
-      `)}
+      ${tabPanel('service', renderServicePanel(state, premiumBadge, premiumTag))}
 
       ${tabPanel('embeds', `
     <section class="dashboard-panel" id="embeds">
