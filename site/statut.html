@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Statut Sentinel | Sentinel</title>
+  <meta name="description" content="État du bot Sentinel, du dashboard, des maintenances et incidents connus.">
+  <meta name="robots" content="index, follow">
+  <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Sentinel"><img src="assets/sentinel-mark.png" alt=""><span>Sentinel</span></a>
+    <nav class="nav-links" aria-label="Navigation principale">
+      <a href="pourquoi.html">Pourquoi ?</a>
+      <a href="fonctionnalites.html">Fonctionnalités</a>
+      <a href="commandes.html">Commandes</a>
+      <a href="premium.html">Premium</a>
+      <a href="securite.html">Sécurité</a>
+      <a href="installation.html">Installation</a>
+      <a href="statut.html" aria-current="page">Statut</a>
+    </nav>
+    <div class="header-actions">
+      <a class="button button-ghost button-small" href="https://bot-service-discord-production.up.railway.app/auth/login" data-discord-login>Connexion Discord</a>
+      <a class="button button-ghost button-small" href="https://bot-service-discord-production.up.railway.app/dashboard">Dashboard</a>
+      <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands">Inviter</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero status-hero">
+      <p class="eyebrow">Statut Sentinel</p>
+      <h1>Surveille l’état du bot et du dashboard.</h1>
+      <p>Cette page affiche l’état actuel de Sentinel, la dernière vérification connue, les maintenances et les incidents ouverts.</p>
+    </section>
+
+    <section class="section section-dark">
+      <div class="section-inner">
+        <div class="status-grid">
+          <article class="status-panel" data-status-card="bot">
+            <span class="status-dot" data-status-dot="bot"></span>
+            <p class="eyebrow">Bot Discord</p>
+            <h2 data-status-bot>Vérification...</h2>
+            <p data-status-bot-detail>Connexion au statut en cours.</p>
+          </article>
+          <article class="status-panel" data-status-card="dashboard">
+            <span class="status-dot" data-status-dot="dashboard"></span>
+            <p class="eyebrow">Dashboard web</p>
+            <h2 data-status-dashboard>Vérification...</h2>
+            <p data-status-dashboard-detail>Connexion au statut en cours.</p>
+          </article>
+          <article class="status-panel">
+            <p class="eyebrow">Dernière mise à jour</p>
+            <h2 data-status-updated>En attente</h2>
+            <p>Le statut se rafraichit automatiquement quand la page est ouverte.</p>
+          </article>
+          <article class="status-panel">
+            <p class="eyebrow">Version</p>
+            <h2 data-status-build>Sentinel</h2>
+            <p>Version active du déploiement actuellement servi par le dashboard.</p>
+          </article>
+        </div>
+
+        <div class="status-detail-grid">
+          <article class="dashboard-panel">
+            <p class="eyebrow">Incidents connus</p>
+            <h2>Suivi public</h2>
+            <div data-status-incidents>
+              <p class="muted">Aucun incident connu pour le moment.</p>
+            </div>
+          </article>
+          <article class="dashboard-panel">
+            <p class="eyebrow">Maintenance</p>
+            <h2>Planning</h2>
+            <div data-status-maintenance>
+              <p class="muted">Aucune maintenance annoncée actuellement.</p>
+            </div>
+          </article>
+        </div>
+
+        <div class="support-banner">
+          <div>
+            <p class="eyebrow">Besoin d'aide ?</p>
+            <h2>Le serveur support reste le point de contact.</h2>
+            <p>Si le statut semble normal mais que ton serveur rencontre un souci, rejoins le support avec l’ID de ton serveur et une capture du problème.</p>
+          </div>
+          <a class="button" href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Sentinel</span>
+    <div><a href="pourquoi.html">Pourquoi Sentinel ?</a><a href="installation.html">Installation</a><a href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a></div>
+  </footer>
+  <script src="i18n.js"></script>
+  <script src="auth.js"></script>
+  <script src="status.js"></script>
+</body>
+</html>

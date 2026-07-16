@@ -8,6 +8,7 @@ const db = require('./database/database');
 const sessions = new Map();
 const oauthStates = new Map();
 let dashboardServer = null;
+const dashboardStartedAt = new Date().toISOString();
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const SESSION_COOKIE = 'sentinel_session';
@@ -35,7 +36,11 @@ const ALLOWED_RETURN_PATHS = new Set([
     '/securite',
     '/securite.html',
     '/installation',
-    '/installation.html'
+    '/installation.html',
+    '/pourquoi',
+    '/pourquoi.html',
+    '/statut',
+    '/statut.html'
 ]);
 
 const MIME_TYPES = {
@@ -631,7 +636,8 @@ function createSession(payload, req = null) {
 function json(res, status, payload) {
     res.writeHead(status, {
         'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*'
     });
     res.end(JSON.stringify(payload));
 }
@@ -853,6 +859,14 @@ async function buildGuildState(ctx, guild, session = null) {
 
     const config = ctx.helpers.getGuildConfig(guild.id);
     const summary = ctx.helpers.getServiceSummary(guild.id);
+    const viewerUserId = session?.user?.id || null;
+    const viewerData = viewerUserId ? ctx.helpers.getUserData(guild.id, viewerUserId) : null;
+    const viewerSessions = viewerUserId && ctx.helpers.getUserSessions
+        ? ctx.helpers.getUserSessions(guild.id, viewerUserId, 8)
+        : [];
+    const viewerSessionCount = viewerUserId && ctx.helpers.getUserSessionCount
+        ? ctx.helpers.getUserSessionCount(guild.id, viewerUserId)
+        : viewerSessions.length;
     const commandRoleIds = ctx.helpers.getCommandRoleIds(guild.id);
     const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id);
     const canViewGlobalAudit = isCreatorUser(session?.user?.id);
@@ -904,6 +918,26 @@ async function buildGuildState(ctx, guild, session = null) {
             ...user,
             totalTimeLabel: ctx.helpers.formatDuration(user.totalTime)
         })),
+        topWeek: ctx.helpers.getTopWeek(guild.id).slice(0, 10).map(user => ({
+            ...user,
+            totalTimeLabel: ctx.helpers.formatDuration(user.totalTime)
+        })),
+        personalService: viewerUserId
+            ? {
+                userId: viewerUserId,
+                totalTime: viewerData?.totalTime || 0,
+                totalTimeLabel: ctx.helpers.formatDuration(viewerData?.totalTime || 0),
+                active: Boolean(viewerData?.startTime),
+                activeDuration: viewerData?.startTime ? Date.now() - viewerData.startTime : 0,
+                activeDurationLabel: viewerData?.startTime ? ctx.helpers.formatDuration(Date.now() - viewerData.startTime) : null,
+                sessionCount: viewerSessionCount,
+                sessions: viewerSessions.map(item => ({
+                    date: item.date,
+                    duration: item.duration || 0,
+                    durationLabel: ctx.helpers.formatDuration(item.duration || 0)
+                }))
+            }
+            : null,
         customEmbeds: {
             quota: customEmbedQuota,
             items: ctx.helpers.getCustomEmbeds(guild.id).map(item => ({
@@ -1416,6 +1450,23 @@ async function runDashboardAction(ctx, guild, member, body) {
 }
 
 async function handleApi(req, res, ctx, url) {
+    if (req.method === 'GET' && url.pathname === '/api/status') {
+        json(res, 200, {
+            ok: true,
+            status: {
+                botOnline: Boolean(ctx.client?.isReady?.()),
+                dashboardOnline: true,
+                botPing: Number.isFinite(ctx.client?.ws?.ping) ? Math.round(ctx.client.ws.ping) : null,
+                startedAt: dashboardStartedAt,
+                lastUpdate: new Date().toISOString(),
+                build: ctx.build || null,
+                incidents: [],
+                maintenance: null
+            }
+        });
+        return;
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/logout') {
         const sessionId = parseCookies(req)[SESSION_COOKIE];
 
@@ -1610,7 +1661,9 @@ function serveStatic(req, res, url) {
         commandes: 'commandes.html',
         premium: 'premium.html',
         securite: 'securite.html',
-        installation: 'installation.html'
+        installation: 'installation.html',
+        pourquoi: 'pourquoi.html',
+        statut: 'statut.html'
     };
     const relativePath = routeMap[cleanPath] || cleanPath;
     const filePath = path.normalize(path.join(siteDir, relativePath));

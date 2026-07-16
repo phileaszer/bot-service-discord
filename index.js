@@ -4898,6 +4898,7 @@ client.once(Events.ClientReady, async () => {
 
     startDashboardServer({
         client,
+        build: SENTINEL_BUILD,
         invitePermissions: BOT_INVITE_PERMISSIONS,
         maxTimeoutDuration: MAX_TIMEOUT_DURATION,
         maxTempbanDuration: MAX_TEMPBAN_DURATION,
@@ -4932,7 +4933,10 @@ client.once(Events.ClientReady, async () => {
             getServiceSummary,
             getTemporaryBan,
             getTopService,
+            getTopWeek,
             getUserData,
+            getUserSessions,
+            getUserSessionCount,
             getUserTargetErrorById,
             hasCommandRoleAccess,
             hasModerationAccess,
