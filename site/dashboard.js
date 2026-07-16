@@ -611,7 +611,7 @@ function renderConfigurationHub(state, channelOptions) {
       <div class="panel-heading">
         <p class="eyebrow">Configuration</p>
         <h2>Réglages avancés</h2>
-        <p class="muted">Ici, tu retrouves les actions utiles après la première installation. Les réglages de base restent dans l’assistant pour éviter les doublons.</p>
+        <p class="muted">Ici, tu retrouves les actions utiles après la première installation. Les réglages de base restent dans l’assistant pour garder un parcours simple.</p>
       </div>
       <div class="config-hub-grid">
         <article class="config-hub-card">
@@ -897,7 +897,7 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
           <button class="button" type="submit">Reset</button>
         </form>
         <form data-action-form="sync-service">
-          ${labelHelp('Synchronisation service', 'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et la base de données.', ` ${premiumTag}`)}
+          ${labelHelp('Synchronisation service', 'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et les données de service.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
         </form>
       </div>

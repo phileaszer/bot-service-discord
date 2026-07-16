@@ -79,7 +79,7 @@
       setText('[data-status-bot-detail]', status.botPing === null || status.botPing === undefined
         ? 'Connexion Discord active.'
         : `Connexion Discord active. Ping : ${status.botPing} ms.`);
-      setText('[data-status-dashboard-detail]', 'Dashboard accessible depuis Railway.');
+      setText('[data-status-dashboard-detail]', 'Dashboard accessible.');
       setText('[data-status-updated]', formatDate(status.lastUpdate));
       setText('[data-status-build]', status.build || 'Sentinel');
       renderList('[data-status-incidents]', status.incidents, 'Aucun incident connu pour le moment.');
@@ -90,7 +90,7 @@
       setText('[data-status-bot]', 'Indisponible');
       setText('[data-status-dashboard]', 'Indisponible');
       setText('[data-status-bot-detail]', 'Impossible de lire le statut en direct.');
-      setText('[data-status-dashboard-detail]', 'La page est chargée, mais l’API de statut ne répond pas.');
+      setText('[data-status-dashboard-detail]', 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.');
       setText('[data-status-updated]', formatDate(new Date().toISOString()));
     }
   }
