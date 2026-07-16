@@ -316,6 +316,7 @@
     'Connecte-toi pour afficher tes serveurs.': 'Log in to show your servers.',
     'Selectionne un serveur': 'Select a server',
     'Ouvre le volet des serveurs pour choisir le Discord a piloter.': 'Open the server drawer to choose the Discord server to control.',
+    'Utilise le bouton « Choisir un serveur » en haut de la page pour afficher tes Discords et sélectionner celui à piloter.': 'Use the “Choose a server” button at the top of the page to show your Discord servers and select the one to control.',
     'Ouvrir le volet': 'Open drawer',
     'Deconnexion': 'Log out',
     'Connexion Discord': 'Discord login',
