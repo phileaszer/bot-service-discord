@@ -245,6 +245,31 @@ img {
   opacity: 0.45;
 }
 
+.action-link,
+.header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--muted);
+  font-weight: 900;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.action-link {
+  padding: 0 4px;
+}
+
+.header-link {
+  padding: 0 2px;
+  font-size: 0.84rem;
+}
+
+.action-link:hover,
+.header-link:hover {
+  color: var(--cyan);
+}
+
 .discord-profile-button {
   gap: 8px;
   min-width: 0;
