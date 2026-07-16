@@ -1210,7 +1210,7 @@ function renderDashboard() {
         </form>
         <article class="inline-form moderation-note">
           <h3>Inclus en gratuit</h3>
-          <p>Avertissements, timeout, fin de timeout, expulsion, ban par ID, purge et consultation simple des 10 derniers cas avec `/sanctions`.</p>
+          <p>Avertissements, timeout, fin de timeout, expulsion, ban par ID, purge et consultation simple des 10 derniers cas avec <code>/sanctions</code>.</p>
         </article>
       </div>
     </section>
