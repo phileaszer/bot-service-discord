@@ -699,7 +699,25 @@
     'Gérer dans l’assistant': 'Manage in the assistant',
     'Tu peux publier le panneau ou continuer avec les autres onglets.': 'You can publish the panel or continue with the other tabs.',
     'Configuration incomplète': 'Incomplete configuration',
-    'Termine l’assistant avant de publier le panneau pour éviter un bouton inutilisable.': 'Finish the assistant before publishing the panel to avoid an unusable button.'
+    'Termine l’assistant avant de publier le panneau pour éviter un bouton inutilisable.': 'Finish the assistant before publishing the panel to avoid an unusable button.',
+    'Bouton service': 'Duty button',
+    'Toutes les origines': 'All sources',
+    'Site': 'Website',
+    'Discord': 'Discord',
+    'Membre': 'Member',
+    'Rôle': 'Role',
+    'Message': 'Message',
+    'Cas': 'Case',
+    'Serveur': 'Server',
+    'Aucune cible': 'No target',
+    'Inconnu': 'Unknown',
+    'Aucune action trouvée avec ces filtres.': 'No action found with these filters.',
+    'Acteur': 'Actor',
+    'Résultat': 'Result',
+    'Logs / Audit': 'Logs / Audit',
+    'Journal des actions Sentinel faites depuis le site ou depuis Discord, avec l’auteur, la cible, la date et le résultat.': 'Log of Sentinel actions made from the website or Discord, with the author, target, date, and result.',
+    'Origine': 'Source',
+    'Filtre les actions selon leur provenance : site dashboard ou Discord.': 'Filters actions by source: dashboard website or Discord.'
   });
 
   let normalizedTranslations = null;

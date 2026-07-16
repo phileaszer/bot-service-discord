@@ -236,7 +236,7 @@ function addDashboardAuditLog({ guild, actor, body, status, summary }) {
     );
 }
 
-function buildAuditQuery({ guildId = null, actorUserId = null, targetId = null, action = null, status = null, limit = 25 } = {}) {
+function buildAuditQuery({ guildId = null, actorUserId = null, targetId = null, action = null, status = null, source = null, limit = 25 } = {}) {
     const where = [];
     const params = [];
 
@@ -263,6 +263,11 @@ function buildAuditQuery({ guildId = null, actorUserId = null, targetId = null, 
     if (status) {
         where.push('status = ?');
         params.push(status);
+    }
+
+    if (source) {
+        where.push('source = ?');
+        params.push(source);
     }
 
     const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
@@ -1518,6 +1523,7 @@ async function handleApi(req, res, ctx, url) {
                     targetId: normalizeAuditValue(url.searchParams.get('targetId')),
                     action: normalizeAuditValue(url.searchParams.get('action')),
                     status: normalizeAuditValue(url.searchParams.get('status')),
+                    source: normalizeAuditValue(url.searchParams.get('source')),
                     limit
                 })
             }
@@ -1540,6 +1546,7 @@ async function handleApi(req, res, ctx, url) {
                     targetId: normalizeAuditValue(url.searchParams.get('targetId')),
                     action: normalizeAuditValue(url.searchParams.get('action')),
                     status: normalizeAuditValue(url.searchParams.get('status')),
+                    source: normalizeAuditValue(url.searchParams.get('source')),
                     limit: Math.min(Number(url.searchParams.get('limit')) || 100, 100)
                 })
             }
