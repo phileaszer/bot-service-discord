@@ -607,6 +607,7 @@ h3 {
 .wide-card,
 .plan-card,
 .link-board a,
+.start-board article,
 .trust-card,
 .scenario-card {
   border: 1px solid rgba(234, 242, 255, 0.12);
@@ -632,6 +633,7 @@ h3 {
 .troubleshoot-card,
 .support-banner,
 .status-card,
+.start-board article,
 .trust-card,
 .scenario-card {
   position: relative;
@@ -645,6 +647,7 @@ h3 {
 .troubleshoot-card::before,
 .support-banner::before,
 .status-card::before,
+.start-board article::before,
 .trust-card::before,
 .scenario-card::before {
   position: absolute;
@@ -660,6 +663,7 @@ h3 {
 .feature-card,
 .command-column,
 .plan-card,
+.start-board article,
 .trust-card,
 .scenario-card {
   padding: 24px;
@@ -675,6 +679,7 @@ h3 {
 }
 
 .feature-card p,
+.start-board p,
 .trust-card p,
 .scenario-card p,
 .command-column span,
@@ -761,6 +766,38 @@ h3 {
   gap: 12px;
 }
 
+.start-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.start-board article {
+  display: grid;
+  gap: 8px;
+  min-height: 132px;
+}
+
+.start-board article span {
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.start-board article strong {
+  font-size: 1.04rem;
+}
+
+.start-board p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.start-board .action-link {
+  grid-column: 1 / -1;
+  width: max-content;
+}
+
 .link-board a {
   display: grid;
   gap: 6px;
@@ -770,6 +807,7 @@ h3 {
 
 .link-board a:hover,
 .feature-card:hover,
+.start-board article:hover,
 .trust-card:hover,
 .scenario-card:hover,
 .wide-card:hover,
@@ -781,6 +819,43 @@ h3 {
 
 .link-board span {
   color: var(--muted);
+}
+
+.faq-layout {
+  align-items: start;
+}
+
+.faq-list {
+  display: grid;
+  gap: 10px;
+}
+
+.faq-list details {
+  border: 1px solid rgba(234, 242, 255, 0.12);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.032), transparent 44%, rgba(255, 45, 154, 0.026)),
+    rgba(255, 255, 255, 0.035);
+  clip-path: var(--cut);
+}
+
+.faq-list summary {
+  min-height: 58px;
+  padding: 18px 20px;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 900;
+}
+
+.faq-list summary::marker {
+  color: var(--cyan);
+}
+
+.faq-list p {
+  margin: 0;
+  padding: 0 20px 20px;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .comparison-board {
@@ -2689,6 +2764,7 @@ code {
 
   .feature-grid,
   .why-grid,
+  .start-board,
   .trust-grid,
   .scenario-grid,
   .command-page-grid,
@@ -2873,6 +2949,7 @@ code {
   }
 
   .hero-metrics,
+  .start-board,
   .trust-grid,
   .scenario-grid,
   .dashboard-metrics,
@@ -2988,6 +3065,10 @@ code {
 
   .audit-actions .button {
     width: 100%;
+  }
+
+  .start-board .action-link {
+    width: auto;
   }
 
   .audit-side {

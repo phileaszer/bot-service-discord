@@ -499,8 +499,8 @@ function renderServerHome(state, premiumBadge) {
         </article>
         <article class="home-block">
           <div class="home-block-heading">
-            <h3>Actions récentes</h3>
-            <button class="button button-small button-ghost" type="button" data-dashboard-tab="audit">Audit</button>
+            <h3>Dernières actions</h3>
+            <button class="button button-small button-ghost" type="button" data-dashboard-tab="audit">Historique</button>
           </div>
           ${recentActions(state)}
         </article>
@@ -1176,9 +1176,9 @@ function renderAuditPanel(state) {
     <section class="dashboard-panel" id="audit">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Audit</p>
-          <h2>Journal des actions</h2>
-          <p class="muted">Qui a fait quoi, où, quand, et avec quel résultat.</p>
+          <p class="eyebrow">Historique</p>
+          <h2>Ce qui a été fait</h2>
+          <p class="muted">Retrouve l’auteur, la cible, la date et le résultat d’une action.</p>
         </div>
         <span class="premium-badge">Premium sécurité</span>
       </div>
@@ -1192,7 +1192,7 @@ function renderAuditPanel(state) {
           <input name="targetId" placeholder="ID cible" value="${escapeHtml(auditFilters.targetId || '')}">
         </div>
         <div class="audit-field">
-          ${labelHelp('Action', 'Filtre par type d’action dashboard : reset, ban, embed, configuration, etc.')}
+          ${labelHelp('Action', 'Filtre par type d’action : reset, ban, embed, configuration, etc.')}
           <select name="action">${auditActionOptions(auditFilters.action || '')}</select>
         </div>
         <div class="audit-field">
@@ -1204,7 +1204,7 @@ function renderAuditPanel(state) {
           </select>
         </div>
         <div class="audit-field">
-          ${labelHelp('Origine', 'Filtre les actions selon leur provenance : site dashboard ou Discord.')}
+          ${labelHelp('Origine', 'Filtre les actions selon leur provenance : site ou Discord.')}
           <select name="source">${auditSourceOptions(auditFilters.source || '')}</select>
         </div>
         <div class="audit-field">
@@ -1212,7 +1212,7 @@ function renderAuditPanel(state) {
           <input name="limit" type="number" min="1" max="100" value="${escapeHtml(auditFilters.limit || auditLogs.limit || 25)}">
         </div>
         <div class="audit-actions">
-          <button class="button" type="submit">Filtrer le journal</button>
+          <button class="button" type="submit">Filtrer l’historique</button>
           <button class="button button-ghost" type="button" data-audit-reset>Réinitialiser</button>
           ${canViewGlobal ? `
             <button class="button button-ghost" type="button" data-audit-scope="${currentScope === 'global' ? 'server' : 'global'}">
@@ -1222,7 +1222,7 @@ function renderAuditPanel(state) {
         </div>
       </form>
       <div class="audit-scope-note">
-        <span>${currentScope === 'global' ? 'Vue globale privée créatrice' : 'Vue serveur uniquement'}</span>
+        <span>${currentScope === 'global' ? 'Vue privée créatrice' : 'Ce serveur uniquement'}</span>
         <small>${escapeHtml((state.auditLogs?.items || []).length)} entrée(s) affichée(s)</small>
       </div>
       ${auditLogList(state)}
@@ -1273,9 +1273,9 @@ const DASHBOARD_TABS = [
   },
   {
     id: 'audit',
-    label: 'Audit',
-    eyebrow: 'Journal',
-    title: 'Journal des actions'
+    label: 'Historique',
+    eyebrow: 'Suivi',
+    title: 'Ce qui a été fait'
   },
   {
     id: 'setup',
@@ -1291,7 +1291,7 @@ function renderDashboardTabs(state, premiumBadge) {
   return `
     <section class="dashboard-control-panel">
       <div class="control-summary">
-        <p class="eyebrow">Centre de contrôle</p>
+        <p class="eyebrow">Serveur sélectionné</p>
         <h2>${escapeHtml(activeTab.title)}</h2>
         <p>${escapeHtml(state.guild.name)}</p>
       </div>
@@ -1332,7 +1332,7 @@ function renderDashboard() {
       <div class="empty-state">
         <img src="assets/sentinel-mark.png" alt="">
         <h2>Sélectionne un serveur</h2>
-        <p>Le dashboard affichera les commandes disponibles selon les permissions et le statut Premium du serveur.</p>
+        <p>Choisis un serveur pour voir les réglages et les actions disponibles.</p>
       </div>
     `;
     return;
@@ -1413,7 +1413,7 @@ function renderDashboard() {
       <div class="panel-heading">
         <p class="eyebrow">Modération</p>
         <h2>Commandes de modération</h2>
-        <p class="muted">Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoute les contrôles avancés pour les gros staffs.</p>
+        <p class="muted">Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoutera des outils plus poussés pour les gros staffs.</p>
       </div>
       <div class="form-grid module-form-grid">
         <form data-action-form="warn">
@@ -1557,7 +1557,7 @@ async function runAction(action, data, button = null) {
     currentState = payload.state;
     renderDashboard();
     renderGuilds();
-    toast(payload.message || 'Action exécutée.');
+    toast(payload.message || 'Action terminée.');
   } catch (error) {
     toast(error.message, 'error');
   } finally {

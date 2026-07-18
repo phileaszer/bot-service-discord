@@ -31,8 +31,8 @@
   <main>
     <section class="page-hero">
       <p class="eyebrow">Sécurité</p>
-      <h1>Des garde-fous clairs avant chaque action sensible.</h1>
-      <p>Sentinel respecte les permissions Discord, les rôles autorisés, la hiérarchie du serveur et garde ses données limitées à son fonctionnement.</p>
+      <h1>Des limites claires avant chaque action importante.</h1>
+      <p>Sentinel respecte Discord, les rôles de ton serveur et ne garde que les données dont il a besoin pour fonctionner.</p>
     </section>
 
     <section class="section section-dark">
@@ -40,8 +40,8 @@
         <article class="wide-card">
           <div>
             <p class="eyebrow">Accès</p>
-            <h2>Gestion par rôles autorisés.</h2>
-            <p>Les commandes de gestion passent par les rôles définis dans Sentinel. Le propriétaire du serveur garde un accès de secours pour éviter de bloquer toute la configuration.</p>
+            <h2>Le staff autorisé garde la main.</h2>
+            <p>Les commandes de gestion passent par les rôles choisis dans Sentinel. Le propriétaire du serveur garde un accès de secours en cas d’erreur de configuration.</p>
           </div>
           <ul class="check-list">
             <li>/config-permissions</li>
@@ -53,8 +53,8 @@
         <article class="wide-card">
           <div>
             <p class="eyebrow">Modération</p>
-            <h2>Discord garde le dernier mot.</h2>
-            <p>Sentinel ne contourne pas Discord. Si le bot n’a pas la permission nécessaire ou si son rôle est trop bas, l’action est refusée proprement.</p>
+            <h2>Discord garde toujours le dernier mot.</h2>
+            <p>Si Sentinel n’a pas la permission nécessaire ou si son rôle est trop bas, l’action est refusée.</p>
           </div>
           <ul class="check-list">
             <li>Permission Discord vérifiée</li>
@@ -66,8 +66,8 @@
         <article class="wide-card">
           <div>
             <p class="eyebrow">Données</p>
-            <h2>Stockage limité au fonctionnement du bot.</h2>
-            <p>Sentinel stocke uniquement les informations nécessaires aux services, aux logs, aux réglages serveur et aux actions de modération.</p>
+            <h2>Le stockage reste limité.</h2>
+            <p>Sentinel garde seulement ce qui sert aux services, aux logs, aux réglages serveur et aux sanctions.</p>
           </div>
           <ul class="check-list">
             <li>Données séparées par serveur</li>
@@ -83,29 +83,61 @@
         <div class="section-heading">
           <p class="eyebrow">Transparence</p>
           <h2>Ce qu’un admin doit savoir avant d’inviter Sentinel.</h2>
-          <p>Les permissions servent à exécuter les actions demandées par le serveur. Elles ne donnent pas à Sentinel le droit de dépasser les règles Discord.</p>
+          <p>Les permissions servent à faire les actions demandées par ton serveur. Elles ne permettent pas à Sentinel de dépasser les règles Discord.</p>
         </div>
         <div class="trust-grid security-trust-grid">
           <article class="trust-card">
             <span class="feature-icon">01</span>
             <h3>Ce qui est stocké</h3>
-            <p>IDs du serveur, des utilisateurs, des rôles et des salons configurés, temps de service, sessions, logs utiles et dossiers de modération.</p>
+            <p>Identifiants du serveur, des utilisateurs, des rôles et des salons configurés, temps de service, sessions, logs utiles et dossiers de modération.</p>
           </article>
           <article class="trust-card">
             <span class="feature-icon">02</span>
             <h3>Ce qui n’est pas stocké</h3>
-            <p>Pas de mot de passe, pas de token utilisateur, pas de paiement, pas de vente de données et pas d’enregistrement de conversations privées.</p>
+            <p>Pas de mot de passe, pas de token utilisateur, pas de paiement, pas de vente de données et pas d’enregistrement de messages privés.</p>
           </article>
           <article class="trust-card">
             <span class="feature-icon">03</span>
             <h3>Pourquoi ces permissions</h3>
-            <p>Le bot doit pouvoir envoyer des messages, gérer le rôle de service, modérer si le staff le demande et écrire dans les salons de logs configurés.</p>
+            <p>Le bot doit pouvoir envoyer des messages, gérer le rôle de service, appliquer une sanction demandée et écrire dans les salons de logs.</p>
           </article>
           <article class="trust-card">
             <span class="feature-icon">04</span>
             <h3>Comment garder la main</h3>
-            <p>Place le rôle Sentinel correctement, limite les rôles autorisés, vérifie /diagnostic et garde les salons de logs accessibles au staff.</p>
+            <p>Place le rôle Sentinel assez haut, limite les rôles autorisés, utilise <code>/diagnostic</code> et garde les logs visibles par le staff.</p>
           </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="faq">
+      <div class="section-inner split-layout faq-layout">
+        <div class="section-heading">
+          <p class="eyebrow">FAQ</p>
+          <h2>Les questions que les admins posent le plus.</h2>
+          <p>Des réponses courtes pour comprendre Sentinel avant de l’ajouter à un serveur.</p>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>Pourquoi Sentinel demande ces permissions ?</summary>
+            <p>Pour envoyer ses messages, gérer le rôle de service, écrire dans le salon de logs et appliquer les sanctions demandées par le staff.</p>
+          </details>
+          <details>
+            <summary>Que faire si le bot n’apparaît pas ?</summary>
+            <p>Retire l’intégration, puis réinvite Sentinel avec le bouton officiel. Dans Discord, il doit apparaître comme bot, pas seulement comme commandes.</p>
+          </details>
+          <details>
+            <summary>Comment configurer le rôle de service ?</summary>
+            <p>Utilise <code>/config-role</code>, choisis le rôle donné aux membres en service, puis place le rôle Sentinel au-dessus de ce rôle.</p>
+          </details>
+          <details>
+            <summary>Comment remettre les heures d’une personne à zéro ?</summary>
+            <p>Utilise <code>/reset-heures</code> avec le membre ou son ID Discord. Le reset de tout le serveur est prévu pour le Premium.</p>
+          </details>
+          <details>
+            <summary>Est-ce que Sentinel lit les messages privés ?</summary>
+            <p>Non. Sentinel ne lit pas les messages privés et ne stocke pas les conversations privées des utilisateurs.</p>
+          </details>
         </div>
       </div>
     </section>
