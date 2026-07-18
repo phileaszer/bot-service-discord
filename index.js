@@ -84,6 +84,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff
 };
 const SENTINEL_BUILD = 'community-suite-2026-06-23-v1';
+const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 let lastSentinelServerSync = null;
 let lastSentinelServerSyncResult = null;
 
@@ -387,6 +388,7 @@ function resolveCommandName(commandName) {
     const aliases = {
         aide: 'aide',
         help: 'aide',
+        dashboard: 'dashboard',
         'config-langue': 'config-langue',
         language: 'config-langue',
         'config-role': 'config-role',
@@ -465,6 +467,13 @@ function getBotInviteUrl() {
     return `https://discord.com/oauth2/authorize?${params.toString()}`;
 }
 
+function getDashboardUrl(pathname = '/dashboard') {
+    const baseUrl = String(process.env.DASHBOARD_URL || DEFAULT_DASHBOARD_URL).replace(/\/$/, '');
+    const cleanPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+
+    return `${baseUrl}${cleanPath}`;
+}
+
 function getGuildInstallRequiredMessage() {
     const language = 'fr';
     const inviteUrl = getBotInviteUrl();
@@ -524,6 +533,50 @@ function createSentinelEmbed({
     }
 
     return embed;
+}
+
+function buildDashboardEmbed(guild, requester) {
+    const language = getGuildLanguage(guild.id);
+    const dashboardUrl = getDashboardUrl('/dashboard');
+    const isEnglish = language === 'en';
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.accent,
+        title: isEnglish ? 'Sentinel | Dashboard' : 'Sentinel | Dashboard',
+        description: isEnglish
+            ? [
+                'Open the web dashboard to manage Sentinel from your browser.',
+                '',
+                '`1.` Log in with Discord.',
+                '`2.` Choose the server.',
+                '`3.` Configure service, logs, embeds, moderation, and audit from one place.',
+                '',
+                dashboardUrl
+            ].join('\n')
+            : [
+                'Ouvre le dashboard web pour gérer Sentinel depuis ton navigateur.',
+                '',
+                '`1.` Connecte-toi avec Discord.',
+                '`2.` Choisis le serveur.',
+                '`3.` Configure le service, les logs, les embeds, la modération et l’historique au même endroit.',
+                '',
+                dashboardUrl
+            ].join('\n'),
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    });
+}
+
+function buildDashboardComponents(language = 'fr') {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Open dashboard' : 'Ouvrir le dashboard')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getDashboardUrl('/dashboard'))
+        )
+    ];
 }
 
 function getRankLabel(index) {
@@ -2999,6 +3052,7 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                         name: 'Useful checks',
                         value: [
                             '`/config-view` shows the current setup.',
+                            '`/dashboard` opens the web dashboard.',
                             '`/diagnostic` checks permissions and role order.',
                             '`/ping` checks whether Sentinel and SQLite respond.'
                         ].join('\n')
@@ -3082,6 +3136,31 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                 ]
             },
             {
+                id: 'dashboard',
+                label: 'Dashboard',
+                menuDescription: 'Open the web dashboard and manage a server.',
+                emoji: '🖥️',
+                title: 'Sentinel | Dashboard',
+                description: 'The dashboard lets authorized staff manage Sentinel from a browser.',
+                fields: [
+                    {
+                        name: 'Open it',
+                        value: [
+                            'Use `/dashboard` in Discord, then click the button.',
+                            'You can also open the public website and choose `Dashboard`.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'What you can do there',
+                        value: [
+                            'Choose a server connected to your Discord account.',
+                            'Configure language, duty role, log channel, service panel, embeds, moderation actions, and audit history.',
+                            'If a server asks for authorization, invite Sentinel as a real bot first.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
                 id: 'commands',
                 label: 'Free commands',
                 menuDescription: 'The main free service commands.',
@@ -3101,6 +3180,7 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                     {
                         name: 'Staff',
                         value: [
+                            '`/dashboard` gives the web dashboard link.',
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/embed create` sends an announcement as Sentinel.',
                             'Free servers can keep 2 active Sentinel embeds. Edits are unlimited.'
@@ -3237,6 +3317,7 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                     name: 'Vérifications utiles',
                     value: [
                         '`/config-voir` affiche les réglages actuels.',
+                        '`/dashboard` ouvre le dashboard web.',
                         '`/diagnostic` vérifie les permissions et l’ordre des rôles.',
                         '`/ping` vérifie que Sentinel et SQLite répondent.'
                     ].join('\n')
@@ -3320,6 +3401,31 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
             ]
         },
         {
+            id: 'dashboard',
+            label: 'Dashboard',
+            menuDescription: 'Ouvrir le site et gérer un serveur.',
+            emoji: '🖥️',
+            title: 'Sentinel | Dashboard',
+            description: 'Le dashboard permet aux staffs autorisés de gérer Sentinel depuis un navigateur.',
+            fields: [
+                {
+                    name: 'L’ouvrir',
+                    value: [
+                        'Utilise `/dashboard` dans Discord, puis clique sur le bouton.',
+                        'Tu peux aussi ouvrir le site public et choisir `Dashboard`.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Ce que tu peux faire dessus',
+                    value: [
+                        'Choisir un serveur lié à ton compte Discord.',
+                        'Configurer la langue, le rôle de service, le salon de logs, le panneau de service, les embeds, les sanctions et l’historique.',
+                        'Si un serveur demande une autorisation, invite d’abord Sentinel comme vrai bot.'
+                    ].join('\n')
+                }
+            ]
+        },
+        {
             id: 'commands',
             label: 'Commandes gratuites',
             menuDescription: 'Les commandes service principales.',
@@ -3339,6 +3445,7 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                 {
                     name: 'Staff',
                     value: [
+                        '`/dashboard` donne le lien du dashboard web.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
                         `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
@@ -5636,6 +5743,14 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
+        if (commandName === 'dashboard') {
+            return interaction.reply({
+                embeds: [buildDashboardEmbed(interaction.guild, interaction.user)],
+                components: buildDashboardComponents(language),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
         if (isAdvancedCommand(commandName) && !isAdvancedGuild(guildId)) {
             return interaction.reply({
                 content: getAdvancedUnavailableMessage(language, commandName),
@@ -6303,6 +6418,13 @@ client.on(Events.MessageCreate, async message => {
         return message.reply({
             embeds: [buildHelpEmbed(message.guild, message.author)],
             components: buildHelpMenuComponents(message.guild, message.author)
+        });
+    }
+
+    if (/^!dashboard$/i.test(content)) {
+        return message.reply({
+            embeds: [buildDashboardEmbed(message.guild, message.author)],
+            components: buildDashboardComponents(language)
         });
     }
 

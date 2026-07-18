@@ -32,6 +32,8 @@ function getAdvancedGuildId() {
 const publicCommands = [
     command('aide', 'help', 'Affiche le guide de demarrage de Sentinel.', 'Shows the Sentinel getting started guide.'),
 
+    command('dashboard', 'dashboard', 'Donne le lien du dashboard web Sentinel.', 'Shows the Sentinel web dashboard link.'),
+
     command('config-langue', 'language', 'Configure la langue de ce serveur.', 'Sets this server language.')
         .addStringOption(option =>
             option
