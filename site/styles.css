@@ -886,7 +886,7 @@ h3 {
 }
 
 .status-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .status-detail-grid {
@@ -2067,6 +2067,141 @@ code {
   line-height: 1.5;
 }
 
+.diagnostics-panel,
+.user-lookup-note {
+  grid-column: 1 / -1;
+}
+
+.panel-mini-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.panel-mini-heading h3 {
+  margin: 4px 0 0;
+}
+
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.diagnostic-check {
+  display: grid;
+  gap: 6px;
+  min-height: 104px;
+  padding: 12px;
+  border: 1px solid rgba(234, 242, 255, 0.1);
+  background: rgba(7, 10, 16, 0.44);
+  clip-path: var(--cut);
+}
+
+.diagnostic-check span,
+.diagnostic-check small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.diagnostic-check strong {
+  color: var(--mint);
+  font-size: 1.08rem;
+}
+
+.diagnostic-check.is-warning strong {
+  color: var(--pink);
+}
+
+.moderation-filters,
+.inline-lookup-form {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  clip-path: none;
+}
+
+.case-detail-row td {
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.055), transparent 52%, rgba(255, 45, 154, 0.04)),
+    rgba(255, 255, 255, 0.025);
+}
+
+.case-detail-card {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.case-detail-card div {
+  display: grid;
+  gap: 4px;
+}
+
+.case-detail-card span,
+.case-detail-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.case-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.user-profile-card {
+  display: grid;
+  gap: 14px;
+}
+
+.user-profile-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.user-profile-head img,
+.user-avatar-placeholder {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(23, 231, 255, 0.28);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 45, 154, 0.4), transparent 45%),
+    rgba(255, 255, 255, 0.06);
+}
+
+.user-profile-head h3,
+.user-profile-head small {
+  margin: 0;
+}
+
+.user-profile-stats,
+.user-profile-columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.user-profile-stats article,
+.user-profile-columns > div {
+  padding: 12px;
+  border: 1px solid rgba(234, 242, 255, 0.09);
+  background: rgba(7, 10, 16, 0.42);
+  clip-path: var(--cut);
+}
+
+.user-profile-stats span,
+.user-profile-stats small,
+.user-profile-columns h4 {
+  color: var(--muted);
+}
+
+.user-profile-wide {
+  grid-column: span 2;
+}
+
 .premium-roadmap {
   border-color: rgba(255, 45, 154, 0.22);
   background:
@@ -2685,6 +2820,8 @@ code {
   border-radius: var(--radius);
   background: rgba(10, 15, 25, 0.95);
   box-shadow: var(--shadow);
+  line-height: 1.45;
+  white-space: pre-line;
 }
 
 .toast-success {
@@ -2832,6 +2969,16 @@ code {
   .audit-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .diagnostic-grid,
+  .user-profile-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-detail-card,
+  .user-profile-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 700px) {
@@ -2971,11 +3118,19 @@ code {
   .personal-service-head,
   .audit-filters,
   .audit-detail-grid,
+  .diagnostic-grid,
+  .case-detail-card,
+  .user-profile-stats,
+  .user-profile-columns,
   .form-grid,
   .help-panel-grid,
   .split-mini,
   .setup-step form {
     grid-template-columns: 1fr;
+  }
+
+  .user-profile-wide {
+    grid-column: auto;
   }
 
   .setup-step-heading {

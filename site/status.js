@@ -27,6 +27,28 @@
     }).format(date);
   }
 
+  function formatUptime(seconds) {
+    const value = Number(seconds);
+
+    if (!Number.isFinite(value) || value < 0) {
+      return 'Indisponible';
+    }
+
+    const days = Math.floor(value / 86400);
+    const hours = Math.floor((value % 86400) / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+
+    if (days > 0) {
+      return `${days}j ${hours}h`;
+    }
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}min`;
+    }
+
+    return `${minutes}min`;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -81,6 +103,9 @@
         : `Connexion Discord active. Ping : ${status.botPing} ms.`);
       setText('[data-status-dashboard-detail]', 'Dashboard accessible.');
       setText('[data-status-updated]', formatDate(status.lastUpdate));
+      setText('[data-status-ping]', status.botPing === null || status.botPing === undefined ? 'Indisponible' : `${status.botPing} ms`);
+      setText('[data-status-guilds]', status.guildCount === null || status.guildCount === undefined ? 'Indisponible' : String(status.guildCount));
+      setText('[data-status-uptime]', formatUptime(status.uptimeSeconds));
       setText('[data-status-build]', status.build || 'Sentinel');
       renderList('[data-status-incidents]', status.incidents, 'Aucun incident connu pour le moment.');
       renderList('[data-status-maintenance]', status.maintenance ? [status.maintenance] : [], 'Aucune maintenance annoncée actuellement.');
@@ -92,6 +117,9 @@
       setText('[data-status-bot-detail]', 'Impossible de lire le statut en direct.');
       setText('[data-status-dashboard-detail]', 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.');
       setText('[data-status-updated]', formatDate(new Date().toISOString()));
+      setText('[data-status-ping]', 'Indisponible');
+      setText('[data-status-guilds]', 'Indisponible');
+      setText('[data-status-uptime]', 'Indisponible');
     }
   }
 
