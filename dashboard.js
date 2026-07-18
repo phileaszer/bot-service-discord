@@ -1637,7 +1637,8 @@ async function handleApi(req, res, ctx, url) {
                 startedAt: dashboardStartedAt,
                 uptimeSeconds: Math.floor(process.uptime()),
                 guildCount: ctx.client?.guilds?.cache?.size || 0,
-                lastUpdate: new Date().toISOString(),
+                lastUpdate: dashboardStartedAt,
+                lastCheck: new Date().toISOString(),
                 build: ctx.build || null,
                 incidents,
                 maintenance
