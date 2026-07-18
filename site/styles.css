@@ -2439,6 +2439,18 @@ code {
   background: rgba(255, 45, 154, 0.035);
 }
 
+.moderation-cases-note {
+  grid-column: 1 / -1;
+}
+
+.moderation-case-table {
+  min-width: 760px;
+}
+
+.case-limit-note {
+  margin-top: 10px;
+}
+
 .module-panel .panel-heading {
   padding-bottom: 14px;
   border-bottom: 1px solid rgba(234, 242, 255, 0.08);

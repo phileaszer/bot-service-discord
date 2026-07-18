@@ -38,6 +38,33 @@ async function api(path, options = {}) {
   return payload;
 }
 
+function dashboardErrorMessage(message) {
+  const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
+
+  if (language === 'en') {
+    return message || 'Action failed.';
+  }
+
+  const translated = {
+    'Login required.': 'Connecte-toi avec Discord pour utiliser le dashboard.',
+    'Sentinel is not installed on this server.': 'Sentinel doit être invité comme bot sur ce serveur avant d’utiliser le dashboard.',
+    'You do not have access to this server dashboard.': 'Tu n’as pas accès au dashboard de ce serveur.',
+    'You do not have permission to manage Sentinel on this server.': 'Tu n’as pas de rôle autorisé pour gérer Sentinel sur ce serveur.',
+    'You do not have permission for this moderation action.': 'Tu n’as pas la permission Discord nécessaire pour cette sanction.',
+    'Sentinel does not have the required Discord permission.': 'Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
+    'This action is reserved for Sentinel Premium.': 'Cette action est réservée à Sentinel Premium.',
+    'Invalid Discord user ID.': 'L’ID Discord indiqué n’est pas valide.',
+    'Text channel not found.': 'Salon textuel introuvable.',
+    'Invalid timeout duration.': 'Durée de timeout invalide. Exemple : 10m, 2h, 7d.',
+    'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
+    'Invalid slowmode duration.': 'Durée de mode lent invalide.',
+    'Case not found.': 'Aucun cas trouvé avec cet ID.',
+    'Unknown moderation action.': 'Action de modération inconnue.'
+  };
+
+  return translated[message] || message || 'Action impossible pour le moment.';
+}
+
 function toast(message, type = 'success') {
   const stack = $('[data-toasts]');
   const item = document.createElement('div');
@@ -1025,6 +1052,7 @@ const AUDIT_ACTION_LABELS = {
   ban: 'Ban',
   tempban: 'Ban temporaire',
   unban: 'Déban',
+  clear: 'Purge',
   purge: 'Purge',
   lock: 'Lock',
   unlock: 'Unlock',
@@ -1120,6 +1148,64 @@ function auditActorLabel(item) {
   }
 
   return item.actorUsername || item.actorUserId || 'Inconnu';
+}
+
+function moderationCaseTargetLabel(item) {
+  if (item.targetUserId) {
+    return item.targetUserId;
+  }
+
+  if (item.action === 'clear' || item.action === 'purge') {
+    return 'Salon';
+  }
+
+  if (['lock', 'unlock', 'slowmode'].includes(item.action)) {
+    return 'Salon';
+  }
+
+  return 'Aucune cible';
+}
+
+function moderationCaseList(state) {
+  const cases = state.moderationCases?.items || [];
+  const limit = state.moderationCases?.limit || 10;
+
+  if (cases.length === 0) {
+    return '<p class="muted">Aucun dossier de modération enregistré pour le moment.</p>';
+  }
+
+  return `
+    <div class="table-shell moderation-case-shell">
+      <table class="dashboard-table moderation-case-table">
+        <thead>
+          <tr>
+            <th>Cas</th>
+            <th>Action</th>
+            <th>Cible</th>
+            <th>Staff</th>
+            <th>Raison</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cases.map((item) => `
+            <tr>
+              <td><strong>#${escapeHtml(item.id)}</strong></td>
+              <td>
+                <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
+                ${item.durationLabel ? `<small>${escapeHtml(item.durationLabel)}</small>` : ''}
+              </td>
+              <td><code>${escapeHtml(moderationCaseTargetLabel(item))}</code></td>
+              <td><code>${escapeHtml(item.moderatorUserId || 'Inconnu')}</code></td>
+              <td>${escapeHtml(item.reason || 'Aucune raison indiquée')}</td>
+              <td>${escapeHtml(formatAuditDate(item.createdAt))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted case-limit-note">Affichage limité aux ${escapeHtml(limit)} derniers dossiers sur ce serveur.</p>
+  `;
 }
 
 function auditLogList(state) {
@@ -1454,6 +1540,10 @@ function renderDashboard() {
           <input name="count" type="number" min="1" max="100" value="10">
           <button class="button" type="submit">Purger</button>
         </form>
+        <article class="inline-form moderation-cases-note">
+          ${labelHelp('Derniers dossiers', 'Affiche les dernières sanctions enregistrées sur ce serveur. Les ID restent visibles même si la personne a quitté le Discord.')}
+          ${moderationCaseList(state)}
+        </article>
         <article class="inline-form moderation-note">
           <h3>Inclus en gratuit</h3>
           <p>Avertissements, timeout, fin de timeout, expulsion, ban par ID, purge et consultation simple des 10 derniers cas avec <code>/sanctions</code>.</p>
@@ -1559,7 +1649,7 @@ async function runAction(action, data, button = null) {
     renderGuilds();
     toast(payload.message || 'Action terminée.');
   } catch (error) {
-    toast(error.message, 'error');
+    toast(dashboardErrorMessage(error.message), 'error');
   } finally {
     setLoading(button, false);
   }
@@ -1588,7 +1678,7 @@ async function loadAuditLogs(filters = auditFilters, scope = auditScope, button 
     currentState.auditLogs = payload.auditLogs;
     renderDashboard();
   } catch (error) {
-    toast(error.message, 'error');
+    toast(dashboardErrorMessage(error.message), 'error');
   } finally {
     setLoading(button, false);
   }
@@ -1663,7 +1753,7 @@ async function selectGuild(guildId) {
   if (guild && !guild.installed) {
     currentState = null;
     renderDashboard();
-    toast('Autorise Sentinel sur ce serveur avant d’ouvrir le dashboard.', 'error');
+    toast(dashboardErrorMessage('Sentinel is not installed on this server.'), 'error');
     return;
   }
 

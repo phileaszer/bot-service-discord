@@ -1272,6 +1272,16 @@ function getModerationCases(guildId, userId, limit = 10) {
     `).all(guildId, userId, limit);
 }
 
+function getRecentModerationCases(guildId, limit = 10) {
+    return db.prepare(`
+        SELECT id, target_user_id, moderator_user_id, action, reason, duration, created_at
+        FROM moderation_cases
+        WHERE guild_id = ?
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT ?
+    `).all(guildId, limit);
+}
+
 function getModerationCase(guildId, caseId) {
     return db.prepare(`
         SELECT id, target_user_id, moderator_user_id, action, reason, duration, created_at
@@ -5494,6 +5504,7 @@ client.once(Events.ClientReady, async () => {
             getGuildLanguage,
             getLogChannel,
             getModerationCase,
+            getRecentModerationCases,
             getModerationTargetError,
             getCustomEmbedChannelError,
             getReason,
