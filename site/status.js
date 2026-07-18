@@ -102,7 +102,8 @@
         ? 'Connexion Discord active.'
         : `Connexion Discord active. Ping : ${status.botPing} ms.`);
       setText('[data-status-dashboard-detail]', 'Dashboard accessible.');
-      setText('[data-status-updated]', formatDate(status.lastUpdate));
+      setText('[data-status-updated]', formatDate(status.lastUpdate || status.startedAt));
+      setText('[data-status-checked]', formatDate(status.lastCheck));
       setText('[data-status-ping]', status.botPing === null || status.botPing === undefined ? 'Indisponible' : `${status.botPing} ms`);
       setText('[data-status-guilds]', status.guildCount === null || status.guildCount === undefined ? 'Indisponible' : String(status.guildCount));
       setText('[data-status-uptime]', formatUptime(status.uptimeSeconds));
@@ -116,7 +117,8 @@
       setText('[data-status-dashboard]', 'Indisponible');
       setText('[data-status-bot-detail]', 'Impossible de lire le statut en direct.');
       setText('[data-status-dashboard-detail]', 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.');
-      setText('[data-status-updated]', formatDate(new Date().toISOString()));
+      setText('[data-status-updated]', 'Indisponible');
+      setText('[data-status-checked]', 'Indisponible');
       setText('[data-status-ping]', 'Indisponible');
       setText('[data-status-guilds]', 'Indisponible');
       setText('[data-status-uptime]', 'Indisponible');
