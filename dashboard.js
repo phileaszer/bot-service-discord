@@ -853,6 +853,171 @@ function getTextChannel(guild, channelId) {
     return channel;
 }
 
+function mapModerationCase(ctx, item) {
+    return {
+        id: item.id,
+        targetUserId: item.target_user_id,
+        moderatorUserId: item.moderator_user_id,
+        action: item.action,
+        reason: item.reason,
+        duration: item.duration,
+        durationLabel: item.duration ? ctx.helpers.formatDuration(item.duration) : null,
+        createdAt: item.created_at
+    };
+}
+
+function permissionCheck(id, label, ok, fix, detail = null) {
+    return {
+        id,
+        label,
+        ok: Boolean(ok),
+        value: ok ? 'Oui' : 'Non',
+        fix: ok ? null : fix,
+        detail
+    };
+}
+
+function buildPermissionDiagnostics(ctx, guild, config) {
+    const botMember = guild.members.me;
+    const serviceRole = config.serviceRoleId ? guild.roles.cache.get(config.serviceRoleId) : null;
+    const logChannel = config.logChannelId ? guild.channels.cache.get(config.logChannelId) : null;
+    const botPermissions = botMember?.permissions;
+    const logPermissions = logChannel && botMember ? logChannel.permissionsFor(botMember) : null;
+    const has = permission => Boolean(botPermissions?.has(permission));
+    const canManageRoles = has(PermissionsBitField.Flags.ManageRoles);
+    const serviceRoleTooHigh = Boolean(
+        serviceRole
+        && botMember
+        && botMember.roles.highest.comparePositionTo(serviceRole) <= 0
+    );
+    const logChannelWritable = !logChannel || Boolean(
+        logPermissions?.has(PermissionsBitField.Flags.ViewChannel)
+        && logPermissions?.has(PermissionsBitField.Flags.SendMessages)
+    );
+    const checks = [
+        permissionCheck(
+            'ban',
+            'Sentinel peut bannir',
+            has(PermissionsBitField.Flags.BanMembers),
+            'Ajoute la permission “Bannir des membres” au rôle Sentinel.'
+        ),
+        permissionCheck(
+            'timeout',
+            'Sentinel peut timeout',
+            has(PermissionsBitField.Flags.ModerateMembers),
+            'Ajoute la permission “Exclure temporairement des membres” au rôle Sentinel.'
+        ),
+        permissionCheck(
+            'kick',
+            'Sentinel peut expulser',
+            has(PermissionsBitField.Flags.KickMembers),
+            'Ajoute la permission “Expulser des membres” au rôle Sentinel.'
+        ),
+        permissionCheck(
+            'purge',
+            'Sentinel peut purger',
+            has(PermissionsBitField.Flags.ManageMessages),
+            'Ajoute la permission “Gérer les messages” au rôle Sentinel.'
+        ),
+        permissionCheck(
+            'manageRoles',
+            'Sentinel peut gérer les rôles',
+            canManageRoles,
+            'Ajoute la permission “Gérer les rôles” au rôle Sentinel.'
+        ),
+        permissionCheck(
+            'serviceRole',
+            'Rôle de service configuré',
+            Boolean(serviceRole),
+            'Choisis le rôle de service dans l’assistant de configuration.'
+        ),
+        {
+            id: 'roleOrder',
+            label: 'Rôle Sentinel trop bas',
+            ok: !serviceRoleTooHigh,
+            value: serviceRoleTooHigh ? 'Oui' : 'Non',
+            fix: serviceRoleTooHigh
+                ? `Monte le rôle Sentinel au-dessus du rôle “${serviceRole.name}”.`
+                : null,
+            detail: serviceRole ? `Rôle de service : ${serviceRole.name}` : null
+        },
+        permissionCheck(
+            'logs',
+            'Salon de logs accessible',
+            logChannelWritable,
+            logChannel
+                ? `Autorise Sentinel à voir et écrire dans #${logChannel.name}.`
+                : 'Le salon de logs est optionnel, mais recommandé.'
+        )
+    ];
+
+    return {
+        canBan: has(PermissionsBitField.Flags.BanMembers),
+        canTimeout: has(PermissionsBitField.Flags.ModerateMembers),
+        canKick: has(PermissionsBitField.Flags.KickMembers),
+        canPurge: has(PermissionsBitField.Flags.ManageMessages),
+        canManageRoles,
+        serviceRoleTooHigh,
+        canManageServiceRole: Boolean(serviceRole && canManageRoles && !serviceRoleTooHigh),
+        logChannelWritable,
+        checks,
+        fixes: checks.filter(item => !item.ok).map(item => item.fix)
+    };
+}
+
+function getStatusListFromEnv(name) {
+    return String(process.env[name] || '')
+        .split(/\r?\n|;;/)
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    const user = member?.user || await ctx.client.users.fetch(userId).catch(() => null);
+    const advanced = ctx.helpers.isAdvancedGuild(guild.id) || isCreatorUser(session?.user?.id);
+    const sessionLimit = advanced ? 25 : 5;
+    const caseLimit = advanced ? 25 : 10;
+    const userData = ctx.helpers.getUserData(guild.id, userId);
+    const sessions = ctx.helpers.getUserSessions(guild.id, userId, sessionLimit);
+    const cases = ctx.helpers.getModerationCases(guild.id, userId, caseLimit);
+    const actionsByTarget = getDashboardAuditLogs({ guildId: guild.id, targetId: userId, limit: 10 });
+    const actionsByActor = getDashboardAuditLogs({ guildId: guild.id, actorUserId: userId, limit: 10 });
+    const actions = Array.from(
+        new Map([...actionsByTarget, ...actionsByActor].map(item => [item.id, item])).values()
+    )
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 10);
+
+    return {
+        user: {
+            id: userId,
+            tag: user?.tag || user?.username || null,
+            username: user?.username || null,
+            avatar: user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null,
+            inGuild: Boolean(member)
+        },
+        service: {
+            totalTime: userData?.totalTime || 0,
+            totalTimeLabel: ctx.helpers.formatDuration(userData?.totalTime || 0),
+            active: Boolean(userData?.startTime),
+            activeDuration: userData?.startTime ? Date.now() - userData.startTime : 0,
+            activeDurationLabel: userData?.startTime ? ctx.helpers.formatDuration(Date.now() - userData.startTime) : null,
+            sessionCount: ctx.helpers.getUserSessionCount(guild.id, userId),
+            sessions: sessions.map(item => ({
+                date: item.date,
+                duration: item.duration || 0,
+                durationLabel: ctx.helpers.formatDuration(item.duration || 0)
+            }))
+        },
+        moderationCases: {
+            limit: caseLimit,
+            items: cases.map(item => mapModerationCase(ctx, item))
+        },
+        actions
+    };
+}
+
 async function buildGuildState(ctx, guild, session = null) {
     await guild.roles.fetch().catch(() => null);
     await guild.channels.fetch().catch(() => null);
@@ -956,18 +1121,10 @@ async function buildGuildState(ctx, guild, session = null) {
                 updatedAt: item.updated_at
             }))
         },
+        diagnostics: buildPermissionDiagnostics(ctx, guild, config),
         moderationCases: {
             limit: moderationCaseLimit,
-            items: moderationCases.map(item => ({
-                id: item.id,
-                targetUserId: item.target_user_id,
-                moderatorUserId: item.moderator_user_id,
-                action: item.action,
-                reason: item.reason,
-                duration: item.duration,
-                durationLabel: item.duration ? ctx.helpers.formatDuration(item.duration) : null,
-                createdAt: item.created_at
-            }))
+            items: moderationCases.map(item => mapModerationCase(ctx, item))
         },
         recentActions: getDashboardAuditLogs({
             guildId: guild.id,
@@ -1468,6 +1625,9 @@ async function runDashboardAction(ctx, guild, member, body) {
 
 async function handleApi(req, res, ctx, url) {
     if (req.method === 'GET' && url.pathname === '/api/status') {
+        const incidents = getStatusListFromEnv('SENTINEL_STATUS_INCIDENTS');
+        const maintenance = String(process.env.SENTINEL_STATUS_MAINTENANCE || '').trim() || null;
+
         json(res, 200, {
             ok: true,
             status: {
@@ -1475,10 +1635,12 @@ async function handleApi(req, res, ctx, url) {
                 dashboardOnline: true,
                 botPing: Number.isFinite(ctx.client?.ws?.ping) ? Math.round(ctx.client.ws.ping) : null,
                 startedAt: dashboardStartedAt,
+                uptimeSeconds: Math.floor(process.uptime()),
+                guildCount: ctx.client?.guilds?.cache?.size || 0,
                 lastUpdate: new Date().toISOString(),
                 build: ctx.build || null,
-                incidents: [],
-                maintenance: null
+                incidents,
+                maintenance
             }
         });
         return;
@@ -1570,6 +1732,44 @@ async function handleApi(req, res, ctx, url) {
         const { guild } = await getDashboardAccess(ctx, session, stateMatch[1]);
         updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
         json(res, 200, { ok: true, state: await buildGuildState(ctx, guild, session) });
+        return;
+    }
+
+    const casesMatch = /^\/api\/guilds\/(\d{17,20})\/moderation-cases$/.exec(url.pathname);
+    if (req.method === 'GET' && casesMatch) {
+        const { guild } = await getDashboardAccess(ctx, session, casesMatch[1]);
+        const canViewGlobalAudit = isCreatorUser(session.user.id);
+        const maxLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 100 : 10;
+        const limit = Math.min(Number(url.searchParams.get('limit')) || maxLimit, maxLimit);
+        const targetUserId = normalizeAuditValue(url.searchParams.get('userId'));
+        const action = normalizeAuditValue(url.searchParams.get('action'));
+        const caseId = normalizeAuditValue(url.searchParams.get('caseId'));
+        const items = ctx.helpers.getFilteredModerationCases(guild.id, {
+            targetUserId,
+            action,
+            caseId,
+            limit
+        }).map(item => mapModerationCase(ctx, item));
+
+        json(res, 200, {
+            ok: true,
+            moderationCases: {
+                limit: maxLimit,
+                items
+            }
+        });
+        return;
+    }
+
+    const userMatch = /^\/api\/guilds\/(\d{17,20})\/users\/([^/]+)$/.exec(url.pathname);
+    if (req.method === 'GET' && userMatch) {
+        const { guild } = await getDashboardAccess(ctx, session, userMatch[1]);
+        const userId = normalizeUserId(ctx, decodeURIComponent(userMatch[2]));
+
+        json(res, 200, {
+            ok: true,
+            profile: await buildUserDashboardProfile(ctx, guild, userId, session)
+        });
         return;
     }
 

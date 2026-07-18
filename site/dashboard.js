@@ -12,6 +12,9 @@ let tooltipPinned = false;
 let tooltipElement = null;
 let auditScope = 'server';
 let auditFilters = {};
+let moderationFilters = {};
+let expandedModerationCaseId = null;
+let selectedUserProfile = null;
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -62,7 +65,20 @@ function dashboardErrorMessage(message) {
     'Unknown moderation action.': 'Action de modération inconnue.'
   };
 
-  return translated[message] || message || 'Action impossible pour le moment.';
+  const base = translated[message] || message || 'Action impossible pour le moment.';
+  const diagnostics = currentState?.diagnostics;
+  const firstFix = diagnostics?.fixes?.[0] || null;
+  const resolutionByMessage = {
+    'You do not have permission for this moderation action.': 'Vérifie que ton rôle Discord a la permission nécessaire, ou ajoute ton rôle dans les rôles autorisés Sentinel.',
+    'Sentinel does not have the required Discord permission.': firstFix || 'Ouvre le diagnostic permissions du dashboard et corrige la permission indiquée.',
+    'Invalid Discord user ID.': 'Copie l’ID Discord numérique complet de la personne, pas son pseudo.',
+    'Text channel not found.': 'Choisis un salon textuel accessible par Sentinel.',
+    'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
+    'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
+  };
+  const resolution = resolutionByMessage[message];
+
+  return resolution ? `${base}\nÀ faire : ${resolution}` : base;
 }
 
 function toast(message, type = 'success') {
@@ -1057,6 +1073,8 @@ const AUDIT_ACTION_LABELS = {
   lock: 'Lock',
   unlock: 'Unlock',
   slowmode: 'Mode lent',
+  case_edit: 'Cas modifié',
+  case_delete: 'Cas supprimé',
   'edit-case': 'Cas modifié',
   'delete-case': 'Cas supprimé',
   unwarn: 'Avertissement retiré'
@@ -1150,6 +1168,63 @@ function auditActorLabel(item) {
   return item.actorUsername || item.actorUserId || 'Inconnu';
 }
 
+function moderationFilterActionOptions(selectedAction = '') {
+  const actions = [
+    '',
+    'warn',
+    'timeout',
+    'untimeout',
+    'kick',
+    'ban',
+    'clear',
+    'tempban',
+    'unban',
+    'lock',
+    'unlock',
+    'slowmode',
+    'case_delete',
+    'unwarn'
+  ];
+
+  return actions.map((action) => {
+    const label = action ? (AUDIT_ACTION_LABELS[action] || action) : 'Toutes les sanctions';
+    return `<option value="${escapeHtml(action)}"${action === selectedAction ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+}
+
+function permissionDiagnosticsPanel(state) {
+  const diagnostics = state.diagnostics;
+
+  if (!diagnostics?.checks?.length) {
+    return '';
+  }
+
+  const headline = diagnostics.fixes?.length
+    ? `${diagnostics.fixes.length} point(s) à corriger`
+    : 'Tout est prêt';
+
+  return `
+    <article class="inline-form diagnostics-panel">
+      <div class="panel-mini-heading">
+        <div>
+          <p class="eyebrow">Diagnostic permissions</p>
+          <h3>Ce que Sentinel peut faire</h3>
+        </div>
+        ${statusBadge(headline, diagnostics.fixes.length === 0)}
+      </div>
+      <div class="diagnostic-grid">
+        ${diagnostics.checks.map((check) => `
+          <div class="diagnostic-check ${check.ok ? 'is-ready' : 'is-warning'}">
+            <span>${escapeHtml(check.label)}</span>
+            <strong>${escapeHtml(check.value)}</strong>
+            ${check.ok ? '' : `<small>${escapeHtml(check.fix)}</small>`}
+          </div>
+        `).join('')}
+      </div>
+    </article>
+  `;
+}
+
 function moderationCaseTargetLabel(item) {
   if (item.targetUserId) {
     return item.targetUserId;
@@ -1164,6 +1239,74 @@ function moderationCaseTargetLabel(item) {
   }
 
   return 'Aucune cible';
+}
+
+function moderationCaseDetails(item) {
+  if (String(expandedModerationCaseId) !== String(item.id)) {
+    return '';
+  }
+
+  return `
+    <tr class="case-detail-row">
+      <td colspan="7">
+        <div class="case-detail-card">
+          <div>
+            <span>Cas</span>
+            <strong>#${escapeHtml(item.id)}</strong>
+          </div>
+          <div>
+            <span>Action</span>
+            <strong>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</strong>
+          </div>
+          <div>
+            <span>Cible</span>
+            <code>${escapeHtml(moderationCaseTargetLabel(item))}</code>
+          </div>
+          <div>
+            <span>Staff</span>
+            <code>${escapeHtml(item.moderatorUserId || 'Inconnu')}</code>
+          </div>
+          <div>
+            <span>Durée</span>
+            <strong>${escapeHtml(item.durationLabel || 'Sans durée')}</strong>
+          </div>
+          <div class="case-detail-wide">
+            <span>Raison</span>
+            <p>${escapeHtml(item.reason || 'Aucune raison indiquée')}</p>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function moderationCaseFilters(state) {
+  const limit = state.advanced ? 25 : 10;
+
+  return `
+    <form class="audit-filters moderation-filters" data-moderation-filter>
+      <div class="audit-field">
+        ${labelHelp('Utilisateur', 'Filtre les sanctions liées à un ID Discord précis.')}
+        <input name="userId" placeholder="ID Discord" value="${escapeHtml(moderationFilters.userId || '')}">
+      </div>
+      <div class="audit-field">
+        ${labelHelp('Type', 'Affiche seulement un type de sanction : avertissement, timeout, ban, purge, etc.')}
+        <select name="action">${moderationFilterActionOptions(moderationFilters.action || '')}</select>
+      </div>
+      <div class="audit-field">
+        ${labelHelp('Cas', 'Ouvre rapidement un dossier précis avec son numéro.')}
+        <input name="caseId" placeholder="Exemple : 12" value="${escapeHtml(moderationFilters.caseId || '')}">
+      </div>
+      <div class="audit-field">
+        ${labelHelp('Limite', 'Nombre maximum de dossiers affichés. Le gratuit reste limité aux derniers cas.')}
+        <input name="limit" type="number" min="1" max="${state.advanced ? 100 : 10}" value="${escapeHtml(moderationFilters.limit || limit)}">
+      </div>
+      <div class="audit-actions">
+        <button class="button" type="submit">Filtrer les sanctions</button>
+        <button class="button button-ghost" type="button" data-moderation-reset>Réinitialiser</button>
+      </div>
+    </form>
+  `;
 }
 
 function moderationCaseList(state) {
@@ -1185,6 +1328,7 @@ function moderationCaseList(state) {
             <th>Staff</th>
             <th>Raison</th>
             <th>Date</th>
+            <th>Détails</th>
           </tr>
         </thead>
         <tbody>
@@ -1199,12 +1343,77 @@ function moderationCaseList(state) {
               <td><code>${escapeHtml(item.moderatorUserId || 'Inconnu')}</code></td>
               <td>${escapeHtml(item.reason || 'Aucune raison indiquée')}</td>
               <td>${escapeHtml(formatAuditDate(item.createdAt))}</td>
+              <td><button class="button button-small button-ghost" type="button" data-case-detail="${escapeHtml(item.id)}">Voir</button></td>
             </tr>
+            ${moderationCaseDetails(item)}
           `).join('')}
         </tbody>
       </table>
     </div>
     <p class="muted case-limit-note">Affichage limité aux ${escapeHtml(limit)} derniers dossiers sur ce serveur.</p>
+  `;
+}
+
+function userProfilePanel(profile) {
+  if (!profile) {
+    return '<p class="muted">Entre un ID Discord pour voir les heures, sanctions et actions liées à cette personne.</p>';
+  }
+
+  const sessions = profile.service?.sessions || [];
+  const cases = profile.moderationCases?.items || [];
+  const actions = profile.actions || [];
+  const tag = profile.user.tag || profile.user.username || profile.user.id;
+
+  return `
+    <div class="user-profile-card">
+      <div class="user-profile-head">
+        ${profile.user.avatar ? `<img src="${escapeHtml(profile.user.avatar)}" alt="">` : '<span class="user-avatar-placeholder"></span>'}
+        <div>
+          <h3>${escapeHtml(tag)}</h3>
+          <code>${escapeHtml(profile.user.id)}</code>
+          <small>${profile.user.inGuild ? 'Présent sur le serveur' : 'Hors du serveur ou introuvable'}</small>
+        </div>
+      </div>
+      <div class="user-profile-stats">
+        <article>
+          <span>Heures totales</span>
+          <strong>${escapeHtml(profile.service.totalTimeLabel)}</strong>
+        </article>
+        <article>
+          <span>Statut service</span>
+          <strong>${profile.service.active ? 'En service' : 'Hors service'}</strong>
+          ${profile.service.activeDurationLabel ? `<small>${escapeHtml(profile.service.activeDurationLabel)}</small>` : ''}
+        </article>
+        <article>
+          <span>Sessions</span>
+          <strong>${escapeHtml(profile.service.sessionCount)}</strong>
+        </article>
+        <article>
+          <span>Sanctions</span>
+          <strong>${escapeHtml(cases.length)}</strong>
+        </article>
+      </div>
+      <div class="user-profile-columns">
+        <div>
+          <h4>Dernières sessions</h4>
+          ${sessions.length
+            ? `<ul class="compact-list">${sessions.map((session) => `<li><span>${escapeHtml(formatSessionDate(session.date))}</span><strong>${escapeHtml(session.durationLabel)}</strong></li>`).join('')}</ul>`
+            : '<p class="muted">Aucune session terminée.</p>'}
+        </div>
+        <div>
+          <h4>Sanctions</h4>
+          ${cases.length
+            ? `<ul class="compact-list">${cases.map((item) => `<li><span>#${escapeHtml(item.id)} ${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</span><small>${escapeHtml(item.reason || 'Aucune raison')}</small></li>`).join('')}</ul>`
+            : '<p class="muted">Aucune sanction enregistrée.</p>'}
+        </div>
+        <div class="user-profile-wide">
+          <h4>Dernières actions liées</h4>
+          ${actions.length
+            ? `<ul class="compact-list">${actions.map((item) => `<li><span>${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</span><small>${escapeHtml(formatAuditDate(item.createdAt))} - ${escapeHtml(item.summary)}</small></li>`).join('')}</ul>`
+            : '<p class="muted">Aucune action récente liée à cet ID.</p>'}
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -1501,6 +1710,7 @@ function renderDashboard() {
         <h2>Commandes de modération</h2>
         <p class="muted">Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoutera des outils plus poussés pour les gros staffs.</p>
       </div>
+      ${permissionDiagnosticsPanel(state)}
       <div class="form-grid module-form-grid">
         <form data-action-form="warn">
           ${labelHelp('Avertir par ID', 'Ajoute un avertissement au dossier de modération d’un utilisateur et l’enregistre dans les logs.')}
@@ -1542,7 +1752,16 @@ function renderDashboard() {
         </form>
         <article class="inline-form moderation-cases-note">
           ${labelHelp('Derniers dossiers', 'Affiche les dernières sanctions enregistrées sur ce serveur. Les ID restent visibles même si la personne a quitté le Discord.')}
+          ${moderationCaseFilters(state)}
           ${moderationCaseList(state)}
+        </article>
+        <article class="inline-form user-lookup-note">
+          ${labelHelp('Historique utilisateur', 'Entre un ID Discord pour consulter les heures, les sanctions et les actions liées à une personne.')}
+          <form class="inline-lookup-form" data-user-lookup>
+            <input name="userId" placeholder="ID Discord" required>
+            <button class="button" type="submit">Chercher</button>
+          </form>
+          ${userProfilePanel(selectedUserProfile)}
         </article>
         <article class="inline-form moderation-note">
           <h3>Inclus en gratuit</h3>
@@ -1684,6 +1903,48 @@ async function loadAuditLogs(filters = auditFilters, scope = auditScope, button 
   }
 }
 
+async function loadModerationCases(filters = moderationFilters, button = null) {
+  if (!selectedGuildId || !currentState) return;
+
+  setLoading(button, true);
+
+  try {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(filters || {})) {
+      if (value !== undefined && value !== null && String(value).trim()) {
+        params.set(key, String(value).trim());
+      }
+    }
+
+    const payload = await api(`/api/guilds/${selectedGuildId}/moderation-cases?${params}`);
+    moderationFilters = { ...filters };
+    expandedModerationCaseId = null;
+    currentState.moderationCases = payload.moderationCases;
+    renderDashboard();
+  } catch (error) {
+    toast(dashboardErrorMessage(error.message), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function loadUserProfile(userId, button = null) {
+  if (!selectedGuildId || !currentState) return;
+
+  setLoading(button, true);
+
+  try {
+    const payload = await api(`/api/guilds/${selectedGuildId}/users/${encodeURIComponent(userId)}`);
+    selectedUserProfile = payload.profile;
+    renderDashboard();
+  } catch (error) {
+    toast(dashboardErrorMessage(error.message), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 function attachDashboardHandlers() {
   $$('[data-dashboard-tab]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -1735,6 +1996,39 @@ function attachDashboardHandlers() {
       loadAuditLogs(auditFilters, nextScope, button);
     });
   });
+
+  $$('[data-moderation-filter]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = $('button[type="submit"]', form);
+      loadModerationCases(formData(form), button);
+    });
+  });
+
+  $$('[data-moderation-reset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      moderationFilters = {};
+      loadModerationCases({}, button);
+    });
+  });
+
+  $$('[data-case-detail]').forEach((button) => {
+    button.addEventListener('click', () => {
+      expandedModerationCaseId = String(expandedModerationCaseId) === String(button.dataset.caseDetail)
+        ? null
+        : button.dataset.caseDetail;
+      renderDashboard();
+    });
+  });
+
+  $$('[data-user-lookup]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = $('button[type="submit"]', form);
+      const data = formData(form);
+      loadUserProfile(data.userId, button);
+    });
+  });
 }
 
 async function loadGuilds() {
@@ -1747,6 +2041,9 @@ async function selectGuild(guildId) {
   selectedGuildId = guildId;
   auditScope = 'server';
   auditFilters = {};
+  moderationFilters = {};
+  expandedModerationCaseId = null;
+  selectedUserProfile = null;
   renderGuilds();
 
   const guild = guilds.find((item) => item.id === guildId);

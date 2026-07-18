@@ -1335,6 +1335,40 @@ function getRecentModerationCases(guildId, limit = 10) {
     `).all(guildId, limit);
 }
 
+function getFilteredModerationCases(guildId, filters = {}) {
+    const where = ['guild_id = ?'];
+    const params = [guildId];
+    const targetUserId = normalizeUserId(filters.targetUserId);
+    const caseId = Number(filters.caseId);
+    const action = String(filters.action || '').trim();
+
+    if (targetUserId) {
+        where.push('target_user_id = ?');
+        params.push(targetUserId);
+    }
+
+    if (Number.isInteger(caseId) && caseId > 0) {
+        where.push('id = ?');
+        params.push(caseId);
+    }
+
+    if (/^[a-z_-]+$/i.test(action)) {
+        where.push('action = ?');
+        params.push(action);
+    }
+
+    const safeLimit = Math.min(Math.max(Number(filters.limit) || 10, 1), 100);
+    params.push(safeLimit);
+
+    return db.prepare(`
+        SELECT id, target_user_id, moderator_user_id, action, reason, duration, created_at
+        FROM moderation_cases
+        WHERE ${where.join(' AND ')}
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT ?
+    `).all(...params);
+}
+
 function getModerationCase(guildId, caseId) {
     return db.prepare(`
         SELECT id, target_user_id, moderator_user_id, action, reason, duration, created_at
@@ -2738,6 +2772,36 @@ function buildLanguageChoiceEmbed(requester, language = 'fr') {
         requester,
         language
     });
+}
+
+function buildServerOnboardingEmbed(guild, requester) {
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.accent,
+        title: 'Sentinel | Premiers pas',
+        description: [
+            'Merci d’avoir invité Sentinel. Pour que le bot fonctionne correctement, suis ces étapes dans l’ordre.',
+            '',
+            '`1.` Choisis la langue du serveur avec les boutons ci-dessous.',
+            '`2.` Configure le rôle de service avec `/config-role role:@role`.',
+            '`3.` Configure le salon de logs avec `/config-logs salon_id:ID`.',
+            '`4.` Publie le panneau dans le bon salon avec `!service-panel`.',
+            '',
+            'Besoin d’un guide complet ? Utilise `/aide` ou `/dashboard`.'
+        ].join('\n'),
+        requester,
+        thumbnail: guild.iconURL(),
+        language: 'fr'
+    }).addFields(
+        {
+            name: 'À vérifier',
+            value: [
+                'Le rôle Sentinel doit être au-dessus du rôle de service.',
+                'Sentinel doit pouvoir voir et écrire dans le salon de logs.',
+                'Le dashboard peut aussi guider toute la configuration.'
+            ].join('\n'),
+            inline: false
+        }
+    );
 }
 
 function buildLegacyHelpEmbed(guild, requester) {
@@ -5610,6 +5674,8 @@ client.once(Events.ClientReady, async () => {
             getGuildConfig,
             getGuildLanguage,
             getLogChannel,
+            getFilteredModerationCases,
+            getModerationCases,
             getModerationCase,
             getRecentModerationCases,
             getModerationTargetError,
@@ -5695,7 +5761,7 @@ client.on(Events.GuildCreate, async guild => {
     }
 
     await channel.send({
-        embeds: [buildLanguageChoiceEmbed(client.user, 'fr')],
+        embeds: [buildServerOnboardingEmbed(guild, client.user)],
         components: buildLanguageButtons('fr')
     }).catch(() => {});
 });
