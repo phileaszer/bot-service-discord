@@ -31,8 +31,8 @@
   <main>
     <section class="page-hero">
       <p class="eyebrow">Sécurité</p>
-      <h1>Des garde-fous avant chaque action sensible.</h1>
-      <p>Sentinel respecte les permissions Discord, les rôles autorisés et la hiérarchie du serveur.</p>
+      <h1>Des garde-fous clairs avant chaque action sensible.</h1>
+      <p>Sentinel respecte les permissions Discord, les rôles autorisés, la hiérarchie du serveur et garde ses données limitées à son fonctionnement.</p>
     </section>
 
     <section class="section section-dark">
@@ -41,7 +41,7 @@
           <div>
             <p class="eyebrow">Accès</p>
             <h2>Gestion par rôles autorisés.</h2>
-            <p>Les commandes de gestion passent par les rôles définis dans Sentinel. Le propriétaire garde un accès de secours pour éviter tout blocage.</p>
+            <p>Les commandes de gestion passent par les rôles définis dans Sentinel. Le propriétaire du serveur garde un accès de secours pour éviter de bloquer toute la configuration.</p>
           </div>
           <ul class="check-list">
             <li>/config-permissions</li>
@@ -54,7 +54,7 @@
           <div>
             <p class="eyebrow">Modération</p>
             <h2>Discord garde le dernier mot.</h2>
-            <p>Sentinel ne contourne pas Discord : si une permission ou la hiérarchie manque, l’action est refusée.</p>
+            <p>Sentinel ne contourne pas Discord. Si le bot n’a pas la permission nécessaire ou si son rôle est trop bas, l’action est refusée proprement.</p>
           </div>
           <ul class="check-list">
             <li>Permission Discord vérifiée</li>
@@ -67,7 +67,7 @@
           <div>
             <p class="eyebrow">Données</p>
             <h2>Stockage limité au fonctionnement du bot.</h2>
-            <p>Sentinel stocke uniquement les IDs Discord, les temps de service, les sessions et la configuration serveur nécessaires à son fonctionnement.</p>
+            <p>Sentinel stocke uniquement les informations nécessaires aux services, aux logs, aux réglages serveur et aux actions de modération.</p>
           </div>
           <ul class="check-list">
             <li>Données séparées par serveur</li>
@@ -75,6 +75,38 @@
             <li>Politique de confidentialité disponible</li>
           </ul>
         </article>
+      </div>
+    </section>
+
+    <section class="section section-flow">
+      <div class="section-inner">
+        <div class="section-heading">
+          <p class="eyebrow">Transparence</p>
+          <h2>Ce qu’un admin doit savoir avant d’inviter Sentinel.</h2>
+          <p>Les permissions servent à exécuter les actions demandées par le serveur. Elles ne donnent pas à Sentinel le droit de dépasser les règles Discord.</p>
+        </div>
+        <div class="trust-grid security-trust-grid">
+          <article class="trust-card">
+            <span class="feature-icon">01</span>
+            <h3>Ce qui est stocké</h3>
+            <p>IDs du serveur, des utilisateurs, des rôles et des salons configurés, temps de service, sessions, logs utiles et dossiers de modération.</p>
+          </article>
+          <article class="trust-card">
+            <span class="feature-icon">02</span>
+            <h3>Ce qui n’est pas stocké</h3>
+            <p>Pas de mot de passe, pas de token utilisateur, pas de paiement, pas de vente de données et pas d’enregistrement de conversations privées.</p>
+          </article>
+          <article class="trust-card">
+            <span class="feature-icon">03</span>
+            <h3>Pourquoi ces permissions</h3>
+            <p>Le bot doit pouvoir envoyer des messages, gérer le rôle de service, modérer si le staff le demande et écrire dans les salons de logs configurés.</p>
+          </article>
+          <article class="trust-card">
+            <span class="feature-icon">04</span>
+            <h3>Comment garder la main</h3>
+            <p>Place le rôle Sentinel correctement, limite les rôles autorisés, vérifie /diagnostic et garde les salons de logs accessibles au staff.</p>
+          </article>
+        </div>
       </div>
     </section>
   </main>
