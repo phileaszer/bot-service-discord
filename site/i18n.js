@@ -945,6 +945,57 @@
     'Journal': 'Log'
   });
 
+  Object.assign(en, {
+    'Sentinel est un bot Discord gratuit pour gérer les prises de service, modérer un serveur et piloter le tout depuis un dashboard web fiable.': 'Sentinel is a free Discord bot for managing duty tracking, moderating a server, and controlling everything from a reliable web dashboard.',
+    'Service réaliste • Modération • Dashboard': 'Realistic duty • Moderation • Dashboard',
+    'Organise les prises de service, garde une modération lisible et pilote ton serveur Discord depuis une interface claire, sans perdre le contrôle des permissions.': 'Organize duty tracking, keep moderation readable, and control your Discord server from a clear interface without losing control over permissions.',
+    'RP / staff': 'RP / staff',
+    'Rôles': 'Roles',
+    'Deux besoins, un seul bot.': 'Two needs, one bot.',
+    'Sentinel réunit le suivi des heures de service et les actions de modération essentielles dans un outil sobre, lisible et adapté aux serveurs actifs.': 'Sentinel brings duty-hour tracking and essential moderation actions together in a clean, readable tool for active servers.',
+    'Confiance': 'Trust',
+    'Ce que Sentinel fait, et ce qu’il ne fait pas.': 'What Sentinel does, and what it does not do.',
+    'Un admin doit pouvoir comprendre pourquoi Sentinel demande des permissions, quelles données sont utiles au bot, et où restent les limites.': 'An admin should understand why Sentinel requests permissions, which data the bot needs, and where the limits stay.',
+    'Données nécessaires': 'Required data',
+    'Sentinel garde les identifiants Discord nécessaires, la configuration du serveur, les temps de service, les sessions et les actions de modération.': 'Sentinel stores the required Discord identifiers, server configuration, duty time, sessions, and moderation actions.',
+    'Pas de collecte inutile': 'No unnecessary collection',
+    'Sentinel ne stocke pas les mots de passe, les e-mails privés, les paiements, les tokens Discord ou les messages privés des utilisateurs.': 'Sentinel does not store passwords, private emails, payments, Discord tokens, or private messages from users.',
+    'Permissions contrôlées': 'Controlled permissions',
+    'Les actions sensibles passent par les rôles autorisés, les permissions Discord et la hiérarchie des rôles du serveur.': 'Sensitive actions go through allowed roles, Discord permissions, and the server role hierarchy.',
+    'Actions traçables': 'Traceable actions',
+    'Les logs et le journal du dashboard aident le staff à comprendre ce qui a été fait, par qui, et sur quel serveur.': 'Logs and the dashboard audit trail help staff understand what was done, by whom, and on which server.',
+    'La règle est simple :': 'The rule is simple:',
+    'Sentinel automatise ce que ton staff pourrait déjà faire avec ses permissions Discord, puis le rend plus propre à suivre.': 'Sentinel automates what your staff could already do with their Discord permissions, then makes it cleaner to track.',
+    'L’accueil reste volontairement court. Les autres pages détaillent les cas d’usage, les commandes, l’installation, la sécurité et l’état du service.': 'The home page stays intentionally short. The other pages cover use cases, commands, setup, security, and service status.',
+    'Exemples concrets': 'Concrete examples',
+    'Des usages faciles à imaginer sur un vrai serveur.': 'Use cases that are easy to picture on a real server.',
+    'Sentinel n’est pas limité à un seul type de communauté. Il sert dès qu’un serveur doit savoir qui est actif, qui intervient et ce qui a été fait.': 'Sentinel is not limited to one type of community. It helps whenever a server needs to know who is active, who intervened, and what was done.',
+    'RP police / EMS': 'Police / EMS RP',
+    'Les agents prennent leur service, le rôle s’applique automatiquement, les heures restent propres et le staff peut consulter les présences.': 'Agents clock in, the role is applied automatically, hours stay clean, and staff can review attendance.',
+    'Équipe staff': 'Staff team',
+    'Les responsables suivent les modérateurs actifs, vérifient les actions récentes et gardent une trace des sanctions importantes.': 'Managers track active moderators, review recent actions, and keep a record of important sanctions.',
+    'Communauté Discord': 'Discord community',
+    'Le serveur garde des outils simples pour avertir, sanctionner, publier des annonces propres et retrouver les décisions du staff.': 'The server keeps simple tools to warn, sanction, publish clean announcements, and review staff decisions.',
+    'Permanences et équipes': 'Shifts and teams',
+    'Un projet, une association ou une équipe peut suivre les créneaux de présence sans tableau manuel ni messages dispersés.': 'A project, association, or team can track presence slots without a manual spreadsheet or scattered messages.',
+    'Des garde-fous clairs avant chaque action sensible.': 'Clear guardrails before every sensitive action.',
+    'Sentinel respecte les permissions Discord, les rôles autorisés, la hiérarchie du serveur et garde ses données limitées à son fonctionnement.': 'Sentinel respects Discord permissions, allowed roles, server hierarchy, and keeps its data limited to what it needs to operate.',
+    'Les commandes de gestion passent par les rôles définis dans Sentinel. Le propriétaire du serveur garde un accès de secours pour éviter de bloquer toute la configuration.': 'Management commands go through roles configured in Sentinel. The server owner keeps fallback access to avoid locking the entire setup.',
+    'Sentinel ne contourne pas Discord. Si le bot n’a pas la permission nécessaire ou si son rôle est trop bas, l’action est refusée proprement.': 'Sentinel does not bypass Discord. If the bot lacks the required permission or its role is too low, the action is cleanly refused.',
+    'Sentinel stocke uniquement les informations nécessaires aux services, aux logs, aux réglages serveur et aux actions de modération.': 'Sentinel only stores the information needed for duty tracking, logs, server settings, and moderation actions.',
+    'Transparence': 'Transparency',
+    'Ce qu’un admin doit savoir avant d’inviter Sentinel.': 'What an admin should know before inviting Sentinel.',
+    'Les permissions servent à exécuter les actions demandées par le serveur. Elles ne donnent pas à Sentinel le droit de dépasser les règles Discord.': 'Permissions are used to execute actions requested by the server. They do not let Sentinel go beyond Discord rules.',
+    'Ce qui est stocké': 'What is stored',
+    'IDs du serveur, des utilisateurs, des rôles et des salons configurés, temps de service, sessions, logs utiles et dossiers de modération.': 'Server, user, role, and configured channel IDs, duty time, sessions, useful logs, and moderation records.',
+    'Ce qui n’est pas stocké': 'What is not stored',
+    'Pas de mot de passe, pas de token utilisateur, pas de paiement, pas de vente de données et pas d’enregistrement de conversations privées.': 'No password, no user token, no payment data, no data selling, and no private conversation recording.',
+    'Pourquoi ces permissions': 'Why these permissions',
+    'Le bot doit pouvoir envoyer des messages, gérer le rôle de service, modérer si le staff le demande et écrire dans les salons de logs configurés.': 'The bot must be able to send messages, manage the duty role, moderate when staff requests it, and write in configured log channels.',
+    'Comment garder la main': 'How to stay in control',
+    'Place le rôle Sentinel correctement, limite les rôles autorisés, vérifie /diagnostic et garde les salons de logs accessibles au staff.': 'Place the Sentinel role correctly, limit allowed roles, check /diagnostic, and keep log channels accessible to staff.'
+  });
+
   let normalizedTranslations = null;
 
   function normalizeTranslationKey(value) {
