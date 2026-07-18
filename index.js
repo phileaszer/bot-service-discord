@@ -6,6 +6,7 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    StringSelectMenuBuilder,
     ChannelType,
     PermissionsBitField,
     EmbedBuilder,
@@ -2676,7 +2677,7 @@ function buildLanguageChoiceEmbed(requester, language = 'fr') {
     });
 }
 
-function buildHelpEmbed(guild, requester) {
+function buildLegacyHelpEmbed(guild, requester) {
     const language = getGuildLanguage(guild.id);
     if (language === 'en') {
         const fields = [
@@ -2958,6 +2959,573 @@ function buildHelpEmbed(guild, requester) {
         language
     })
         .addFields(fields);
+}
+
+const HELP_PAGE_DEFAULT = 'start';
+
+function buildHelpPageDefinitions(guild, language = 'fr') {
+    const isReferenceServer = isAdvancedGuild(guild.id);
+
+    if (language === 'en') {
+        const pages = [
+            {
+                id: 'start',
+                label: 'Start here',
+                menuDescription: 'The shortest path to start using Sentinel.',
+                emoji: '👋',
+                title: 'Sentinel | Help',
+                description: 'Choose a section in the menu below. Each page is short so the guide stays readable on mobile.',
+                fields: [
+                    {
+                        name: 'Recommended order',
+                        value: [
+                            '`1.` Invite Sentinel as a real Discord bot.',
+                            '`2.` Choose the server language with `/language`.',
+                            '`3.` Set the duty role and log channel.',
+                            '`4.` Publish the duty panel with `!service-panel`.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Useful checks',
+                        value: [
+                            '`/config-view` shows the current setup.',
+                            '`/diagnostic` checks permissions and role order.',
+                            '`/ping` checks whether Sentinel and SQLite respond.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
+                id: 'install',
+                label: 'Install',
+                menuDescription: 'Invite Sentinel and check Discord role order.',
+                emoji: '🧩',
+                title: 'Sentinel | Install',
+                description: 'Before configuring anything, make sure Discord sees Sentinel as a bot.',
+                fields: [
+                    {
+                        name: 'Discord integration',
+                        value: [
+                            'In `Server Settings > Integrations`, Sentinel must show the `Bot` badge.',
+                            'If you only see `Commands`, remove the integration and invite Sentinel again with the official link.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Role order',
+                        value: [
+                            'Create a duty role, for example `On duty`, `Patrol`, or `Active agent`.',
+                            'Move the Sentinel role above that duty role, otherwise Discord will refuse role changes.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
+                id: 'config',
+                label: 'Setup',
+                menuDescription: 'Language, duty role, logs, and staff roles.',
+                emoji: '⚙️',
+                title: 'Sentinel | Server setup',
+                description: 'These commands prepare Sentinel for this server only.',
+                fields: [
+                    {
+                        name: 'Basic setup',
+                        value: [
+                            '`/language language:English` chooses English for this server.',
+                            '`/config-role role:@role` sets the duty role.',
+                            '`/config-channel channel_id:ID` sets the log channel by ID.',
+                            '`/config-view` shows what is configured.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Who can manage Sentinel?',
+                        value: [
+                            'At the start, owner/admin/manage-server/manage-roles can configure Sentinel.',
+                            'Then use `/config-permissions action:add role:@role` to choose the staff roles allowed to manage it.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
+                id: 'service',
+                label: 'Duty panel',
+                menuDescription: 'Publish and use the duty buttons.',
+                emoji: '🟢',
+                title: 'Sentinel | Duty panel',
+                description: 'The panel is a normal text command, not a slash command.',
+                fields: [
+                    {
+                        name: 'Publish the panel',
+                        value: [
+                            'Go to the channel where members should clock in.',
+                            'Send `!service-panel`.',
+                            'Sentinel will post the buttons in that channel.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Use the buttons',
+                        value: [
+                            '`Start / End` starts or ends duty.',
+                            '`My hours` shows personal hours.',
+                            '`On duty` shows currently active agents.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
+                id: 'commands',
+                label: 'Free commands',
+                menuDescription: 'The main free service commands.',
+                emoji: '📋',
+                title: 'Sentinel | Free commands',
+                description: 'The free version keeps the essentials visible and simple.',
+                fields: [
+                    {
+                        name: 'Members',
+                        value: [
+                            '`/my-hours` shows your hours.',
+                            '`/history` shows your latest personal sessions.',
+                            '`/on-duty` shows active agents.',
+                            '`/top-service` shows the server top 10.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Staff',
+                        value: [
+                            '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
+                            '`/embed create` sends an announcement as Sentinel.',
+                            'Free servers can keep 2 active Sentinel embeds. Edits are unlimited.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
+                id: 'moderation',
+                label: 'Moderation',
+                menuDescription: 'Warn, timeout, kick, ban by ID, and purge.',
+                emoji: '🛡️',
+                title: 'Sentinel | Moderation',
+                description: 'Sentinel checks Discord permissions and role hierarchy before every sanction.',
+                fields: [
+                    {
+                        name: 'Free moderation',
+                        value: [
+                            '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
+                            '`/ban` can use a Discord ID when the user is no longer in the server.',
+                            '`/mod-cases` shows a limited view of the latest cases.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Important',
+                        value: 'If an action is refused, check Sentinel role position and Discord permissions.'
+                    }
+                ]
+            },
+            {
+                id: 'limits',
+                label: isReferenceServer ? 'Reference server' : 'Free limits',
+                menuDescription: isReferenceServer ? 'What is open on the reference server.' : 'What free servers can use today.',
+                emoji: '⭐',
+                title: isReferenceServer ? 'Sentinel | Reference server' : 'Sentinel | Free limits',
+                description: isReferenceServer
+                    ? 'This server has access to the complete Sentinel command set.'
+                    : 'The free version stays useful, while larger tools are planned for Premium.',
+                fields: isReferenceServer
+                    ? [
+                        {
+                            name: 'Reference access',
+                            value: [
+                                `History up to ${REFERENCE_HISTORY_LIMIT} sessions per request.`,
+                                `Leaderboards up to ${REFERENCE_TOP_LIMIT} agents.`,
+                                '`/reset-hours-all`, `/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-sentinel` are available.',
+                                'Sentinel embeds: unlimited creation and unlimited edits.'
+                            ].join('\n')
+                        }
+                    ]
+                    : [
+                        {
+                            name: 'Free access',
+                            value: [
+                                `Personal history: last ${FREE_HISTORY_LIMIT} sessions.`,
+                                `Public ranking: top ${FREE_TOP_LIMIT}.`,
+                                `Sentinel embeds: ${FREE_CUSTOM_EMBED_LIMIT} active embeds, unlimited edits.`,
+                                '`/reset-hours-all` will be reserved for Sentinel Premium.'
+                            ].join('\n')
+                        }
+                    ]
+            },
+            {
+                id: 'troubleshooting',
+                label: 'Troubleshooting',
+                menuDescription: 'Quick fixes when something does not work.',
+                emoji: '🛠️',
+                title: 'Sentinel | Troubleshooting',
+                description: 'Most issues come from invite scopes, role order, or channel permissions.',
+                fields: [
+                    {
+                        name: 'Quick fixes',
+                        value: [
+                            'Sentinel does not give the role? Move Sentinel above the duty role.',
+                            'Logs are not sent? Check that Sentinel can view and write in the log channel.',
+                            'Command refused? Check `/config-permissions action:list`.',
+                            'Sentinel is not in member list? Reinvite it as a bot, not commands only.'
+                        ].join('\n')
+                    }
+                ]
+            }
+        ];
+
+        if (isReferenceServer) {
+            pages.push({
+                id: 'advanced',
+                label: 'Advanced',
+                menuDescription: 'Reference/Premium commands.',
+                emoji: '💎',
+                title: 'Sentinel | Advanced commands',
+                description: 'These tools are reserved for the reference server and future Premium servers.',
+                fields: [
+                    {
+                        name: 'Service',
+                        value: [
+                            '`/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-hours-all`.',
+                            '`/embed create` is unlimited here. `/embed edit` is unlimited everywhere.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Premium moderation',
+                        value: [
+                            '`/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`.',
+                            '`/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
+                            'Later: automatic sanctions after X warnings.'
+                        ].join('\n')
+                    }
+                ]
+            });
+        }
+
+        return pages;
+    }
+
+    const pages = [
+        {
+            id: 'start',
+            label: 'Commencer',
+            menuDescription: 'Le chemin le plus simple pour démarrer.',
+            emoji: '👋',
+            title: 'Sentinel | Aide',
+            description: 'Choisis une rubrique dans le menu ci-dessous. Chaque page est courte pour rester lisible sur mobile.',
+            fields: [
+                {
+                    name: 'Ordre conseillé',
+                    value: [
+                        '`1.` Invite Sentinel comme vrai bot Discord.',
+                        '`2.` Choisis la langue du serveur avec `/config-langue`.',
+                        '`3.` Configure le rôle de service et le salon de logs.',
+                        '`4.` Publie le panneau avec `!service-panel`.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Vérifications utiles',
+                    value: [
+                        '`/config-voir` affiche les réglages actuels.',
+                        '`/diagnostic` vérifie les permissions et l’ordre des rôles.',
+                        '`/ping` vérifie que Sentinel et SQLite répondent.'
+                    ].join('\n')
+                }
+            ]
+        },
+        {
+            id: 'install',
+            label: 'Installation',
+            menuDescription: 'Inviter Sentinel et vérifier les rôles.',
+            emoji: '🧩',
+            title: 'Sentinel | Installation',
+            description: 'Avant de configurer le bot, vérifie que Discord voit bien Sentinel comme un bot.',
+            fields: [
+                {
+                    name: 'Intégration Discord',
+                    value: [
+                        'Dans `Paramètres du serveur > Intégrations`, Sentinel doit avoir le badge `Bot`.',
+                        'Si tu vois seulement `Commandes`, retire l’intégration et réinvite Sentinel avec le lien officiel.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Ordre des rôles',
+                    value: [
+                        'Crée un rôle de service, par exemple `En service`, `Patrouille` ou `Agent actif`.',
+                        'Place le rôle Sentinel au-dessus de ce rôle, sinon Discord refusera de l’ajouter ou de le retirer.'
+                    ].join('\n')
+                }
+            ]
+        },
+        {
+            id: 'config',
+            label: 'Configuration',
+            menuDescription: 'Langue, rôle, logs et rôles staff.',
+            emoji: '⚙️',
+            title: 'Sentinel | Configuration serveur',
+            description: 'Ces commandes préparent Sentinel pour ce serveur uniquement.',
+            fields: [
+                {
+                    name: 'Réglages de base',
+                    value: [
+                        '`/config-langue langue:Français` choisit la langue du serveur.',
+                        '`/config-role role:@role` choisit le rôle donné en service.',
+                        '`/config-logs salon_id:ID` choisit le salon de logs par ID.',
+                        '`/config-voir` affiche ce qui est configuré.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Qui peut gérer Sentinel ?',
+                    value: [
+                        'Au départ, propriétaire/admin/Gérer le serveur/Gérer les rôles peuvent configurer.',
+                        'Ensuite, utilise `/config-permissions action:ajouter role:@role` pour choisir les rôles staff autorisés.'
+                    ].join('\n')
+                }
+            ]
+        },
+        {
+            id: 'service',
+            label: 'Panneau service',
+            menuDescription: 'Publier et utiliser les boutons de service.',
+            emoji: '🟢',
+            title: 'Sentinel | Panneau de service',
+            description: 'Le panneau est une commande texte normale, pas une commande slash.',
+            fields: [
+                {
+                    name: 'Publier le panneau',
+                    value: [
+                        'Va dans le salon où les membres doivent pointer.',
+                        'Envoie `!service-panel`.',
+                        'Sentinel publiera les boutons dans ce salon.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Utiliser les boutons',
+                    value: [
+                        '`Prendre / Quitter` commence ou termine le service.',
+                        '`Mes heures` affiche les heures personnelles.',
+                        '`En service` affiche les agents actuellement actifs.'
+                    ].join('\n')
+                }
+            ]
+        },
+        {
+            id: 'commands',
+            label: 'Commandes gratuites',
+            menuDescription: 'Les commandes service principales.',
+            emoji: '📋',
+            title: 'Sentinel | Commandes gratuites',
+            description: 'Le gratuit garde les commandes essentielles, sans noyer les utilisateurs.',
+            fields: [
+                {
+                    name: 'Membres',
+                    value: [
+                        '`/mes-heures` affiche tes heures.',
+                        '`/historique-service` affiche tes dernières sessions.',
+                        '`/en-service` affiche les agents actifs.',
+                        '`/top-service` affiche le top 10 du serveur.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Staff',
+                    value: [
+                        '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
+                        '`/embed creer` publie une annonce sous l’identité de Sentinel.',
+                        `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
+                    ].join('\n')
+                }
+            ]
+        },
+        {
+            id: 'moderation',
+            label: 'Modération',
+            menuDescription: 'Warn, timeout, expulsion, ban par ID et purge.',
+            emoji: '🛡️',
+            title: 'Sentinel | Modération',
+            description: 'Sentinel vérifie les permissions Discord et la hiérarchie des rôles avant chaque sanction.',
+            fields: [
+                {
+                    name: 'Modération gratuite',
+                    value: [
+                        '`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`.',
+                        '`/bannir` peut utiliser un ID Discord si la personne n’est plus sur le serveur.',
+                        '`/sanctions` affiche une vue simple des derniers cas.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Important',
+                    value: 'Si une action est refusée, vérifie la position du rôle Sentinel et les permissions Discord.'
+                }
+            ]
+        },
+        {
+            id: 'limits',
+            label: isReferenceServer ? 'Serveur référence' : 'Limites gratuites',
+            menuDescription: isReferenceServer ? 'Ce qui est ouvert sur le serveur référence.' : 'Ce que les serveurs gratuits peuvent utiliser.',
+            emoji: '⭐',
+            title: isReferenceServer ? 'Sentinel | Serveur de référence' : 'Sentinel | Limites gratuites',
+            description: isReferenceServer
+                ? 'Ce serveur a accès à l’ensemble des commandes Sentinel.'
+                : 'Le gratuit reste utile, les outils plus lourds sont prévus pour le Premium.',
+            fields: isReferenceServer
+                ? [
+                    {
+                        name: 'Accès référence',
+                        value: [
+                            `Historique jusqu’à ${REFERENCE_HISTORY_LIMIT} sessions par demande.`,
+                            `Classements jusqu’à ${REFERENCE_TOP_LIMIT} agents.`,
+                            '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel` sont disponibles.',
+                            'Embeds Sentinel : création illimitée et modifications illimitées.'
+                        ].join('\n')
+                    }
+                ]
+                : [
+                    {
+                        name: 'Accès gratuit',
+                        value: [
+                            `Historique personnel : ${FREE_HISTORY_LIMIT} dernières sessions.`,
+                            `Classement public : top ${FREE_TOP_LIMIT}.`,
+                            `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs, modifications illimitées.`,
+                            '`/reset-heures-all` sera réservé à Sentinel Premium.'
+                        ].join('\n')
+                    }
+                ]
+        },
+        {
+            id: 'troubleshooting',
+            label: 'Dépannage',
+            menuDescription: 'Les corrections rapides quand ça bloque.',
+            emoji: '🛠️',
+            title: 'Sentinel | Dépannage rapide',
+            description: 'La plupart des soucis viennent du lien d’invitation, de l’ordre des rôles ou des permissions salon.',
+            fields: [
+                {
+                    name: 'Corrections rapides',
+                    value: [
+                        'Sentinel ne donne pas le rôle ? Remonte son rôle au-dessus du rôle de service.',
+                        'Les logs ne partent pas ? Vérifie que Sentinel peut voir et écrire dans le salon.',
+                        'Commande refusée ? Vérifie `/config-permissions action:voir`.',
+                        'Sentinel n’apparaît pas dans les membres ? Réinvite-le comme bot, pas seulement comme commandes.'
+                    ].join('\n')
+                }
+            ]
+        }
+    ];
+
+    if (isReferenceServer) {
+        pages.push({
+            id: 'advanced',
+            label: 'Avancé',
+            menuDescription: 'Commandes référence/Premium.',
+            emoji: '💎',
+            title: 'Sentinel | Commandes avancées',
+            description: 'Ces outils sont réservés au serveur de référence et aux futurs serveurs Premium.',
+            fields: [
+                {
+                    name: 'Service',
+                    value: [
+                        '`/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-heures-all`.',
+                        '`/embed creer` est illimité ici. `/embed modifier` reste illimité partout.'
+                    ].join('\n')
+                },
+                {
+                    name: 'Modération Premium',
+                    value: [
+                        '`/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`.',
+                        '`/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
+                        'Plus tard : sanctions automatiques après X avertissements.'
+                    ].join('\n')
+                }
+            ]
+        });
+    }
+
+    return pages;
+}
+
+function getHelpPage(guild, language, pageId = HELP_PAGE_DEFAULT) {
+    const pages = buildHelpPageDefinitions(guild, language);
+    const page = pages.find(item => item.id === pageId) || pages[0];
+
+    return {
+        pages,
+        page,
+        index: pages.findIndex(item => item.id === page.id)
+    };
+}
+
+function buildHelpEmbed(guild, requester, pageId = HELP_PAGE_DEFAULT) {
+    const language = getGuildLanguage(guild.id);
+    const { pages, page, index } = getHelpPage(guild, language, pageId);
+    const pageLabel = language === 'en'
+        ? `Page ${index + 1}/${pages.length}`
+        : `Page ${index + 1}/${pages.length}`;
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.primary,
+        title: page.title,
+        description: `${page.description}\n\n${pageLabel}`,
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    }).addFields(page.fields.map(field => ({
+        ...field,
+        inline: false
+    })));
+}
+
+function buildHelpMenuComponents(guild, requester, pageId = HELP_PAGE_DEFAULT) {
+    const language = getGuildLanguage(guild.id);
+    const { pages, page } = getHelpPage(guild, language, pageId);
+    const placeholder = language === 'en'
+        ? 'Choose a help section'
+        : 'Choisis une rubrique d’aide';
+
+    return [
+        new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`sentinel_help:${requester.id}`)
+                .setPlaceholder(placeholder)
+                .addOptions(pages.map(item => ({
+                    label: item.label,
+                    value: item.id,
+                    description: item.menuDescription,
+                    emoji: item.emoji,
+                    default: item.id === page.id
+                })))
+        )
+    ];
+}
+
+function parseHelpMenuRequesterId(customId) {
+    const match = /^sentinel_help:(\d{17,20})$/.exec(customId);
+
+    return match ? match[1] : null;
+}
+
+async function handleHelpMenuInteraction(interaction) {
+    if (!interaction.isStringSelectMenu() || !interaction.customId.startsWith('sentinel_help:')) {
+        return false;
+    }
+
+    const requesterId = parseHelpMenuRequesterId(interaction.customId);
+    const language = getGuildLanguage(interaction.guild.id);
+
+    if (requesterId && interaction.user.id !== requesterId) {
+        return interaction.reply({
+            content: language === 'en'
+                ? 'This help menu belongs to the person who opened it. Use `/help` to open yours.'
+                : 'Ce menu d’aide appartient à la personne qui l’a ouvert. Utilise `/aide` pour ouvrir le tien.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const pageId = interaction.values[0] || HELP_PAGE_DEFAULT;
+
+    return interaction.update({
+        embeds: [buildHelpEmbed(interaction.guild, interaction.user, pageId)],
+        components: buildHelpMenuComponents(interaction.guild, interaction.user, pageId)
+    });
 }
 
 function buildServicePanelComponents(language = 'fr') {
@@ -5050,10 +5618,9 @@ client.on(Events.InteractionCreate, async interaction => {
         const commandName = resolveCommandName(interaction.commandName);
 
         if (commandName === 'aide') {
-            const embed = buildHelpEmbed(interaction.guild, interaction.user);
-
             return interaction.reply({
-                embeds: [embed],
+                embeds: [buildHelpEmbed(interaction.guild, interaction.user)],
+                components: buildHelpMenuComponents(interaction.guild, interaction.user),
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -5469,6 +6036,14 @@ client.on(Events.InteractionCreate, async interaction => {
         return;
     }
 
+    if (interaction.isStringSelectMenu()) {
+        const handled = await handleHelpMenuInteraction(interaction);
+
+        if (handled) {
+            return;
+        }
+    }
+
     if (!interaction.isButton()) return;
 
     const buttonLanguage = getGuildLanguage(interaction.guild.id);
@@ -5714,9 +6289,10 @@ client.on(Events.MessageCreate, async message => {
     }
 
     if (/^!(aide|help)$/i.test(content)) {
-        const embed = buildHelpEmbed(message.guild, message.author);
-
-        return message.reply({ embeds: [embed] });
+        return message.reply({
+            embeds: [buildHelpEmbed(message.guild, message.author)],
+            components: buildHelpMenuComponents(message.guild, message.author)
+        });
     }
 
     if (/^!(langue|language)\b/i.test(content)) {
