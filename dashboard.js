@@ -871,6 +871,10 @@ async function buildGuildState(ctx, guild, session = null) {
     const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id);
     const canViewGlobalAudit = isCreatorUser(session?.user?.id);
     const auditLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 50 : 10;
+    const moderationCaseLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 25 : 10;
+    const moderationCases = ctx.helpers.getRecentModerationCases
+        ? ctx.helpers.getRecentModerationCases(guild.id, moderationCaseLimit)
+        : [];
     const roles = guild.roles.cache
         .filter(role => !role.managed && role.id !== guild.id)
         .sort((a, b) => b.position - a.position)
@@ -950,6 +954,19 @@ async function buildGuildState(ctx, guild, session = null) {
                 thumbnailUrl: item.thumbnail_url,
                 footer: item.footer,
                 updatedAt: item.updated_at
+            }))
+        },
+        moderationCases: {
+            limit: moderationCaseLimit,
+            items: moderationCases.map(item => ({
+                id: item.id,
+                targetUserId: item.target_user_id,
+                moderatorUserId: item.moderator_user_id,
+                action: item.action,
+                reason: item.reason,
+                duration: item.duration,
+                durationLabel: item.duration ? ctx.helpers.formatDuration(item.duration) : null,
+                createdAt: item.created_at
             }))
         },
         recentActions: getDashboardAuditLogs({
