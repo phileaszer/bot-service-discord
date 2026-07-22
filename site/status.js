@@ -1,8 +1,11 @@
 (() => {
   const RAILWAY_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
+  const STATUS_REFRESH_INTERVAL = 90 * 1000;
   const endpoint = window.location.hostname.endsWith('railway.app')
     ? '/api/status'
     : `${RAILWAY_ORIGIN}/api/status`;
+  let refreshTimer = null;
+  let statusRequestInFlight = false;
 
   function setText(selector, value) {
     const element = document.querySelector(selector);
@@ -89,6 +92,12 @@
   }
 
   async function loadStatus() {
+    if (statusRequestInFlight) {
+      return;
+    }
+
+    statusRequestInFlight = true;
+
     try {
       const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
       const payload = await response.json();
@@ -122,9 +131,38 @@
       setText('[data-status-ping]', 'Indisponible');
       setText('[data-status-guilds]', 'Indisponible');
       setText('[data-status-uptime]', 'Indisponible');
+    } finally {
+      statusRequestInFlight = false;
     }
   }
 
+  function startStatusPolling() {
+    if (refreshTimer || document.hidden) {
+      return;
+    }
+
+    refreshTimer = setInterval(loadStatus, STATUS_REFRESH_INTERVAL);
+  }
+
+  function stopStatusPolling() {
+    if (!refreshTimer) {
+      return;
+    }
+
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopStatusPolling();
+      return;
+    }
+
+    loadStatus();
+    startStatusPolling();
+  });
+
   loadStatus();
-  setInterval(loadStatus, 60 * 1000);
+  startStatusPolling();
 })();

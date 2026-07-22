@@ -2,11 +2,13 @@ const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const zlib = require('zlib');
 const { PermissionsBitField } = require('discord.js');
 const db = require('./database/database');
 
 const sessions = new Map();
 const oauthStates = new Map();
+const staticFileCache = new Map();
 let dashboardServer = null;
 const dashboardStartedAt = new Date().toISOString();
 
@@ -55,6 +57,10 @@ const MIME_TYPES = {
     '.xml': 'application/xml; charset=utf-8',
     '.txt': 'text/plain; charset=utf-8'
 };
+const COMPRESSIBLE_EXTENSIONS = new Set(['.html', '.css', '.js', '.json', '.svg', '.xml', '.txt']);
+const STATIC_CACHE_MAX_ENTRY_BYTES = 8 * 1024 * 1024;
+const STATIC_ASSET_CACHE_CONTROL = 'public, max-age=3600, stale-while-revalidate=86400';
+const STATIC_HTML_CACHE_CONTROL = 'no-cache';
 
 function createHttpError(status, message, details = {}) {
     const error = new Error(message);
@@ -1869,8 +1875,72 @@ async function handleApi(req, res, ctx, url) {
     throw createHttpError(404, 'API route not found.');
 }
 
+function acceptsEncoding(req, encoding) {
+    return String(req.headers['accept-encoding'] || '')
+        .split(',')
+        .map(value => value.trim().toLowerCase())
+        .some(value => value === encoding || value.startsWith(`${encoding};`));
+}
+
+function createStaticEtag(stats) {
+    return `W/"${stats.size.toString(16)}-${Math.floor(stats.mtimeMs).toString(16)}"`;
+}
+
+function getCachedStaticFile(filePath, ext, stats) {
+    const cached = staticFileCache.get(filePath);
+
+    if (
+        cached
+        && cached.size === stats.size
+        && cached.mtimeMs === stats.mtimeMs
+    ) {
+        return cached;
+    }
+
+    const content = fs.readFileSync(filePath);
+    const cacheable = content.length <= STATIC_CACHE_MAX_ENTRY_BYTES;
+    const compressible = COMPRESSIBLE_EXTENSIONS.has(ext) && content.length >= 1024;
+    const entry = {
+        content,
+        etag: createStaticEtag(stats),
+        lastModified: stats.mtime.toUTCString(),
+        mtimeMs: stats.mtimeMs,
+        size: stats.size,
+        br: compressible ? zlib.brotliCompressSync(content, {
+            params: {
+                [zlib.constants.BROTLI_PARAM_QUALITY]: 4
+            }
+        }) : null,
+        gzip: compressible ? zlib.gzipSync(content, { level: 6 }) : null
+    };
+
+    if (cacheable) {
+        staticFileCache.set(filePath, entry);
+    }
+
+    return entry;
+}
+
+function isFreshStaticRequest(req, entry) {
+    const ifNoneMatch = req.headers['if-none-match'];
+
+    if (ifNoneMatch && ifNoneMatch.split(',').map(value => value.trim()).includes(entry.etag)) {
+        return true;
+    }
+
+    const ifModifiedSince = req.headers['if-modified-since'];
+
+    if (!ifModifiedSince) {
+        return false;
+    }
+
+    const modifiedSince = new Date(ifModifiedSince).getTime();
+
+    return Number.isFinite(modifiedSince) && modifiedSince >= Math.floor(entry.mtimeMs / 1000) * 1000;
+}
+
 function serveStatic(req, res, url) {
-    const siteDir = path.join(__dirname, 'site');
+    const siteDir = path.resolve(__dirname, 'site');
     const cleanPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const routeMap = {
         '': 'index.html',
@@ -1884,22 +1954,49 @@ function serveStatic(req, res, url) {
         statut: 'statut.html'
     };
     const relativePath = routeMap[cleanPath] || cleanPath;
-    const filePath = path.normalize(path.join(siteDir, relativePath));
+    const filePath = path.resolve(siteDir, relativePath);
 
-    if (!filePath.startsWith(siteDir)) {
+    if (filePath !== siteDir && !filePath.startsWith(`${siteDir}${path.sep}`)) {
         throw createHttpError(403, 'Forbidden.');
     }
 
     const finalPath = fs.existsSync(filePath) && fs.statSync(filePath).isFile()
         ? filePath
         : path.join(siteDir, '404.html');
-    const ext = path.extname(finalPath);
-    const content = fs.readFileSync(finalPath);
+    const statusCode = finalPath.endsWith('404.html') ? 404 : 200;
+    const ext = path.extname(finalPath).toLowerCase();
+    const stats = fs.statSync(finalPath);
+    const entry = getCachedStaticFile(finalPath, ext, stats);
+    const cacheControl = statusCode === 404
+        ? 'no-store'
+        : (ext === '.html' ? STATIC_HTML_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL);
+    const headers = {
+        'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+        'Cache-Control': cacheControl,
+        ETag: entry.etag,
+        'Last-Modified': entry.lastModified,
+        Vary: 'Accept-Encoding'
+    };
 
-    res.writeHead(finalPath.endsWith('404.html') ? 404 : 200, {
-        'Content-Type': MIME_TYPES[ext] || 'application/octet-stream'
-    });
-    res.end(content);
+    if (statusCode === 200 && isFreshStaticRequest(req, entry)) {
+        res.writeHead(304, headers);
+        res.end();
+        return;
+    }
+
+    let content = entry.content;
+
+    if (entry.br && acceptsEncoding(req, 'br')) {
+        content = entry.br;
+        headers['Content-Encoding'] = 'br';
+    } else if (entry.gzip && acceptsEncoding(req, 'gzip')) {
+        content = entry.gzip;
+        headers['Content-Encoding'] = 'gzip';
+    }
+
+    headers['Content-Length'] = content.length;
+    res.writeHead(statusCode, headers);
+    res.end(req.method === 'HEAD' ? undefined : content);
 }
 
 async function handleRequest(req, res, ctx) {

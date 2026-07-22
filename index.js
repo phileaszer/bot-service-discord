@@ -28,6 +28,7 @@ const client = new Client({
 });
 
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
+const DEBUG_INTERACTIONS = String(process.env.DEBUG_INTERACTIONS || '').toLowerCase() === 'true';
 const FREE_HISTORY_LIMIT = 5;
 const FREE_TOP_LIMIT = 10;
 const FREE_CUSTOM_EMBED_LIMIT = 2;
@@ -5769,7 +5770,7 @@ client.on(Events.GuildCreate, async guild => {
 client.on(Events.InteractionCreate, async interaction => {
     saveDiscordUserProfile(interaction.user);
 
-    if (interaction.isButton()) {
+    if (DEBUG_INTERACTIONS && interaction.isButton()) {
         console.log(`Bouton Discord recu : ${interaction.customId} par ${interaction.user.tag} (${interaction.user.id})`);
     }
 
