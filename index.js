@@ -239,7 +239,7 @@ const I18N = {
         customEmbedQuotaFree: 'Quota gratuit : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
         customEmbedQuotaUnlimited: 'Quota Premium : embeds illimités.',
         dossierPanelTitle: 'Sentinel | Bureau d’accueil',
-        dossierPanelDescription: 'Les dossiers sont le système de tickets de Sentinel : chaque demande ouvre un salon privé entre le membre et l’équipe autorisée.\n\nChoisis le type de dossier à ouvrir. Un référent pourra le prendre en charge et garder un compte rendu propre.',
+        dossierPanelDescription: 'Les dossiers sont les espaces privés de suivi de Sentinel : chaque demande ouvre un salon dédié entre le membre et l’équipe autorisée.\n\nChoisis le type de dossier à ouvrir. Un référent pourra le prendre en charge et garder un compte rendu propre.',
         dossierSupportLabel: 'Ouvrir un dossier',
         dossierReportLabel: 'Signalement',
         dossierComplaintLabel: 'Plainte',
@@ -249,7 +249,7 @@ const I18N = {
         dossierCreated: 'Dossier créé : {channel}',
         dossierNotInDossier: 'Ce bouton doit être utilisé dans un dossier Sentinel.',
         dossierCloseDenied: 'Seul le demandeur ou un membre autorisé peut clôturer ce dossier.',
-        dossierClosed: 'Dossier clôturé. Le salon sera archivé dans quelques secondes.',
+        dossierClosed: 'Dossier clôturé. Le compte rendu a été envoyé, puis le salon va être fermé.',
         dossierClaimed: 'Dossier pris en charge par {member}.',
         dossierClaimDenied: 'Tu dois avoir un rôle autorisé pour prendre en charge ce dossier.',
         dossierAddDone: '✅ {member} a été ajouté comme intervenant du dossier.',
@@ -368,7 +368,7 @@ const I18N = {
         customEmbedQuotaFree: 'Free quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
         customEmbedQuotaUnlimited: 'Premium quota: unlimited embeds.',
         dossierPanelTitle: 'Sentinel | Reception desk',
-        dossierPanelDescription: 'Dossiers are Sentinel tickets: each request opens a private channel between the member and the authorized team.\n\nChoose the dossier type to open. A referent can take it over and keep a clean transcript.',
+        dossierPanelDescription: 'Dossiers are Sentinel private follow-up spaces: each request opens a dedicated channel between the member and the authorized team.\n\nChoose the dossier type to open. A referent can take it over and keep a clean transcript.',
         dossierSupportLabel: 'Open a dossier',
         dossierReportLabel: 'Report',
         dossierComplaintLabel: 'Complaint',
@@ -378,7 +378,7 @@ const I18N = {
         dossierCreated: 'Dossier created: {channel}',
         dossierNotInDossier: 'This button must be used inside a Sentinel dossier.',
         dossierCloseDenied: 'Only the requester or an authorized member can close this dossier.',
-        dossierClosed: 'Dossier closed. The channel will be archived in a few seconds.',
+        dossierClosed: 'Dossier closed. The transcript has been sent, then the channel will be closed.',
         dossierClaimed: 'Dossier taken over by {member}.',
         dossierClaimDenied: 'You need an authorized role to take over this dossier.',
         dossierAddDone: '✅ {member} has been added as a dossier participant.',
@@ -3561,10 +3561,10 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
             {
                 id: 'dossiers',
                 label: 'Dossiers',
-                menuDescription: 'Sentinel ticket system with a RP vocabulary.',
+                menuDescription: 'Sentinel dossier system with a RP vocabulary.',
                 emoji: '📁',
                 title: 'Sentinel | Dossiers',
-                description: 'Dossiers are Sentinel tickets: every request opens a private channel with the authorized team.',
+                description: 'Dossiers are Sentinel private case channels: every request opens a dedicated space with the authorized team.',
                 fields: [
                     {
                         name: 'How it works',
@@ -3853,10 +3853,10 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
             {
                 id: 'dossiers',
                 label: 'Dossiers',
-                menuDescription: 'Le système de tickets Sentinel avec un vocabulaire RP.',
+                menuDescription: 'Le système de dossiers Sentinel avec un vocabulaire RP.',
                 emoji: '📁',
                 title: 'Sentinel | Dossiers',
-                description: 'Les dossiers sont le système de tickets de Sentinel : chaque demande ouvre un salon privé avec l’équipe autorisée.',
+                description: 'Les dossiers sont les salons privés de suivi de Sentinel : chaque demande ouvre un espace dédié avec l’équipe autorisée.',
                 fields: [
                     {
                         name: 'Fonctionnement',

@@ -482,6 +482,34 @@ function configAlerts(state) {
   `;
 }
 
+function getPublicInviteUrl() {
+  return $('[data-public-invite]')?.href || 'https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands';
+}
+
+function dossierPermissionAlert(state) {
+  const checks = state.diagnostics?.checks || [];
+  const missingDossierChecks = checks.filter((check) => (
+    ['manageChannels', 'attachFiles'].includes(check.id)
+    && !check.ok
+  ));
+
+  if (missingDossierChecks.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="dashboard-alert is-warning dossier-permission-alert">
+      <strong>Dossiers Sentinel à vérifier</strong>
+      <p>Sentinel n’a pas encore tous les droits nécessaires pour ouvrir les salons privés ou envoyer les comptes rendus.</p>
+      <ul>
+        ${missingDossierChecks.map((check) => `<li>${escapeHtml(check.fix || check.label)}</li>`).join('')}
+      </ul>
+      <p>Si Sentinel a été invité avant l’ajout des dossiers, réinvite-le avec le lien officiel ou ajoute ces permissions au rôle Sentinel.</p>
+      <a class="button button-small" href="${escapeHtml(getPublicInviteUrl())}" target="_blank" rel="noopener">Réinviter Sentinel</a>
+    </div>
+  `;
+}
+
 function recentActions(state, limit = 5) {
   const items = (state.recentActions || state.auditLogs?.items || []).slice(0, limit);
 
@@ -540,6 +568,7 @@ function renderServerHome(state, premiumBadge) {
         <article class="home-block">
           <h3>Alertes</h3>
           ${configAlerts(state)}
+          ${dossierPermissionAlert(state)}
         </article>
         <article class="home-block">
           <div class="home-block-heading">
@@ -1643,7 +1672,7 @@ const DASHBOARD_TABS = [
   {
     id: 'dossiers',
     label: 'Dossiers',
-    eyebrow: 'Tickets',
+    eyebrow: 'Support',
     title: 'Dossiers Sentinel'
   },
   {
@@ -1787,13 +1816,14 @@ function renderDashboard() {
         <div>
           <p class="eyebrow">Dossiers Sentinel</p>
           <h2>Bureau d’accueil et suivi</h2>
-          <p class="muted">Les dossiers sont le système de tickets de Sentinel : chaque demande ouvre un salon privé entre le membre et l’équipe autorisée.</p>
+          <p class="muted">Les dossiers sont les espaces privés de suivi de Sentinel : chaque demande ouvre un salon dédié entre le membre et l’équipe autorisée.</p>
         </div>
         <span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>
       </div>
+      ${dossierPermissionAlert(state)}
       <div class="form-grid module-form-grid">
         <form data-action-form="publish-dossier-panel">
-          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau qui permet aux membres d’ouvrir un dossier Sentinel, c’est-à-dire un ticket privé avec le staff.')}
+          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau qui permet aux membres d’ouvrir un dossier Sentinel, puis d’échanger en privé avec le staff.')}
           <select name="channelId">${channelOptions}</select>
           <button class="button" type="submit">Publier le bureau</button>
         </form>

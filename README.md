@@ -14,7 +14,7 @@ Sentinel est un bot Discord multi-serveurs pour suivre les temps de service des 
 - Gestion des roles autorises a administrer le bot
 - Moderation gratuite : avertissements, timeout, expulsion, ban par ID, purge et consultation simple des sanctions
 - Embeds d'annonce sous l'identite de Sentinel : 2 embeds actifs gratuits, modifications illimitees
-- Dossiers Sentinel : systeme de tickets avec bureau d'accueil, salons prives, intervenants et compte rendu
+- Dossiers Sentinel : bureau d'accueil, salons prives, intervenants et compte rendu
 - Choix de langue par serveur : francais ou anglais
 - Commandes slash localisees avec les localisations natives Discord
 - Stockage SQLite avec `better-sqlite3`
@@ -202,11 +202,11 @@ En gratuit, la reinitialisation reste disponible personne par personne avec `/re
 La moderation gratuite garde les actions essentielles : avertissements, timeout, expulsion, ban par ID et purge. La consultation des sanctions reste simple avec `/sanctions`, limitee aux 10 derniers cas visibles.
 Les embeds Sentinel sont limites a 2 embeds actifs en gratuit. Ils peuvent etre modifies autant de fois que necessaire. Le Premium prepare la creation illimitee.
 
-## Dossiers Sentinel / Tickets
+## Dossiers Sentinel
 
 Francais :
 
-Les dossiers sont le systeme de tickets de Sentinel. Un membre ouvre un dossier depuis le bureau d'accueil, puis Sentinel cree un salon prive avec le demandeur et les roles autorises.
+Les dossiers sont les espaces prives de suivi de Sentinel. Un membre ouvre un dossier depuis le bureau d'accueil, puis Sentinel cree un salon prive avec le demandeur et les roles autorises.
 
 - `/dossier-panel` publie le bureau d'accueil Sentinel.
 - `/dossier-fermer` cloture le dossier du salon actuel.
@@ -216,12 +216,12 @@ Les dossiers sont le systeme de tickets de Sentinel. Un membre ouvre un dossier 
 
 English:
 
-Dossiers are Sentinel tickets. A member opens a dossier from the reception desk, then Sentinel creates a private channel with the requester and authorized roles.
+Dossiers are Sentinel private follow-up spaces. A member opens a dossier from the reception desk, then Sentinel creates a private channel with the requester and authorized roles.
 
 - `/ticket-panel` publishes the Sentinel reception desk.
-- `/close-ticket` closes the current channel ticket.
-- `/ticket-add` adds a participant to the ticket.
-- `/ticket-remove` removes a participant from the ticket.
+- `/close-ticket` closes the current dossier channel.
+- `/ticket-add` adds a participant to the dossier.
+- `/ticket-remove` removes a participant from the dossier.
 - `/ticket-transcript` generates a text transcript and sends it to the log channel when configured.
 
 ## Moderation / Moderation
