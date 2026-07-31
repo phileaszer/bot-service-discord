@@ -60,6 +60,7 @@ const MIME_TYPES = {
 const COMPRESSIBLE_EXTENSIONS = new Set(['.html', '.css', '.js', '.json', '.svg', '.xml', '.txt']);
 const STATIC_CACHE_MAX_ENTRY_BYTES = 8 * 1024 * 1024;
 const STATIC_ASSET_CACHE_CONTROL = 'public, max-age=3600, stale-while-revalidate=86400';
+const STATIC_SCRIPT_CACHE_CONTROL = 'no-cache';
 const STATIC_HTML_CACHE_CONTROL = 'no-cache';
 
 function createHttpError(status, message, details = {}) {
@@ -2045,7 +2046,9 @@ function serveStatic(req, res, url) {
     const entry = getCachedStaticFile(finalPath, ext, stats);
     const cacheControl = statusCode === 404
         ? 'no-store'
-        : (ext === '.html' ? STATIC_HTML_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL);
+        : (ext === '.html'
+            ? STATIC_HTML_CACHE_CONTROL
+            : (ext === '.js' ? STATIC_SCRIPT_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL));
     const headers = {
         'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
         'Cache-Control': cacheControl,
