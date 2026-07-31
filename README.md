@@ -14,6 +14,7 @@ Sentinel est un bot Discord multi-serveurs pour suivre les temps de service des 
 - Gestion des roles autorises a administrer le bot
 - Moderation gratuite : avertissements, timeout, expulsion, ban par ID, purge et consultation simple des sanctions
 - Embeds d'annonce sous l'identite de Sentinel : 2 embeds actifs gratuits, modifications illimitees
+- Dossiers Sentinel : systeme de tickets avec bureau d'accueil, salons prives, intervenants et compte rendu
 - Choix de langue par serveur : francais ou anglais
 - Commandes slash localisees avec les localisations natives Discord
 - Stockage SQLite avec `better-sqlite3`
@@ -64,7 +65,7 @@ Discord does not allow slash command names to change based on the language selec
 
 Lien d'invitation officiel :
 
-[Inviter Sentinel](https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands)
+[Inviter Sentinel](https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands)
 
 Le lien doit contenir les deux scopes Discord :
 
@@ -80,9 +81,11 @@ Permissions demandees :
 - Bannir des membres
 - Moderer les membres
 - Gerer les messages
+- Gerer les salons
 - Voir les salons
 - Envoyer des messages
 - Integrer des liens
+- Joindre des fichiers
 - Lire l'historique des messages
 
 Important : le role Sentinel doit etre place au-dessus du role de service dans la hierarchie des roles Discord.
@@ -113,6 +116,11 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 | `/embed creer` | `/embed create` |
 | `/embed modifier` | `/embed edit` |
 | `/embed supprimer` | `/embed delete` |
+| `/dossier-panel` | `/ticket-panel` |
+| `/dossier-fermer` | `/close-ticket` |
+| `/dossier-ajouter` | `/ticket-add` |
+| `/dossier-retirer` | `/ticket-remove` |
+| `/dossier-compte-rendu` | `/ticket-transcript` |
 
 ## Commandes texte gratuites
 
@@ -121,6 +129,8 @@ Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des mem
 - `!langue fr`
 - `!language en`
 - `!service-panel`
+- `!dossier-panel`
+- `!ticket-panel`
 - `!config-voir`
 - `!config-permissions ajouter|retirer|voir [@role]`
 - `!historique-service [limite]`
@@ -191,6 +201,28 @@ Ces commandes sont preparees pour Sentinel Premium et ne sont pas ouvertes sur l
 En gratuit, la reinitialisation reste disponible personne par personne avec `/reset-heures membre:@membre`, `/reset-heures utilisateur_id:ID`, `/reset-hours member:@member` ou `/reset-hours user_id:ID`.
 La moderation gratuite garde les actions essentielles : avertissements, timeout, expulsion, ban par ID et purge. La consultation des sanctions reste simple avec `/sanctions`, limitee aux 10 derniers cas visibles.
 Les embeds Sentinel sont limites a 2 embeds actifs en gratuit. Ils peuvent etre modifies autant de fois que necessaire. Le Premium prepare la creation illimitee.
+
+## Dossiers Sentinel / Tickets
+
+Francais :
+
+Les dossiers sont le systeme de tickets de Sentinel. Un membre ouvre un dossier depuis le bureau d'accueil, puis Sentinel cree un salon prive avec le demandeur et les roles autorises.
+
+- `/dossier-panel` publie le bureau d'accueil Sentinel.
+- `/dossier-fermer` cloture le dossier du salon actuel.
+- `/dossier-ajouter` ajoute un intervenant au dossier.
+- `/dossier-retirer` retire un intervenant du dossier.
+- `/dossier-compte-rendu` genere un compte rendu texte et l'envoie dans le salon de logs quand il est configure.
+
+English:
+
+Dossiers are Sentinel tickets. A member opens a dossier from the reception desk, then Sentinel creates a private channel with the requester and authorized roles.
+
+- `/ticket-panel` publishes the Sentinel reception desk.
+- `/close-ticket` closes the current channel ticket.
+- `/ticket-add` adds a participant to the ticket.
+- `/ticket-remove` removes a participant from the ticket.
+- `/ticket-transcript` generates a text transcript and sends it to the log channel when configured.
 
 ## Moderation / Moderation
 

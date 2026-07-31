@@ -427,6 +427,41 @@ const publicCommands = [
                 )
         ),
 
+    command('dossier-panel', 'ticket-panel', 'Publie le bureau d accueil des dossiers Sentinel.', 'Publishes the Sentinel ticket reception panel.')
+        .addChannelOption(option =>
+            option
+                .setName('salon')
+                .setNameLocalizations(en('channel'))
+                .setDescription('Salon ou publier le bureau d accueil')
+                .setDescriptionLocalizations(en('Channel where the reception panel will be published'))
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(false)
+        ),
+
+    command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the Sentinel ticket in the current channel.'),
+
+    command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel ticket.')
+        .addUserOption(option =>
+            option
+                .setName('membre')
+                .setNameLocalizations(en('member'))
+                .setDescription('Membre a ajouter au dossier')
+                .setDescriptionLocalizations(en('Member to add to the ticket'))
+                .setRequired(true)
+        ),
+
+    command('dossier-retirer', 'ticket-remove', 'Retire un intervenant du dossier Sentinel actuel.', 'Removes a participant from the current Sentinel ticket.')
+        .addUserOption(option =>
+            option
+                .setName('membre')
+                .setNameLocalizations(en('member'))
+                .setDescription('Membre a retirer du dossier')
+                .setDescriptionLocalizations(en('Member to remove from the ticket'))
+                .setRequired(true)
+        ),
+
+    command('dossier-compte-rendu', 'ticket-transcript', 'Genere le compte rendu du dossier Sentinel actuel.', 'Generates the current Sentinel ticket transcript.'),
+
     command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d un membre.', 'Resets a member service hours.')
         .addUserOption(option =>
             option

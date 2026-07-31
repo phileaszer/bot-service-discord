@@ -17,7 +17,7 @@ const COLORS = {
 const LINKS = {
     website: 'https://phileaszer.github.io/bot-service-discord/',
     topgg: 'https://top.gg/bot/1511426423376842922',
-    invite: 'https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780156422&integration_type=0&scope=bot+applications.commands',
+    invite: 'https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands',
     github: 'https://github.com/phileaszer/bot-service-discord',
     terms: 'https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md',
     privacy: 'https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md'
@@ -75,7 +75,7 @@ const CHANNELS = [
     { name: '🚨｜bugs', category: 'support', kind: 'frCommunity', topic: 'Signalement de bugs Sentinel', panel: 'bugs' },
     { name: '🤖｜commandes', category: 'support', kind: 'frCommunity', topic: 'Commandes Sentinel', panel: 'commands' },
     { name: '🛰｜demandes-support', category: 'support', kind: 'frCommunity', topic: 'Demandes support Sentinel', panel: 'supportRequests' },
-    { name: '🎫｜ouvrir-un-ticket', category: 'support', kind: 'frReadOnly', topic: 'Ouvrir un ticket prive Sentinel', panel: 'tickets' },
+    { name: '📁｜ouvrir-un-dossier', aliases: ['🎫｜ouvrir-un-ticket'], category: 'support', kind: 'frReadOnly', topic: 'Ouvrir un dossier prive Sentinel', panel: 'tickets' },
     { name: '🧭｜roadmap', category: 'dev', kind: 'frCommunity', topic: 'Direction et priorites Sentinel', panel: 'roadmap' },
     { name: '⚡｜beta-tests', category: 'dev', kind: 'frCommunity', topic: 'Tests des prochaines fonctionnalites Sentinel', panel: 'beta' },
     { name: '🔮｜idees-futures', category: 'dev', kind: 'frCommunity', topic: 'Idees long terme pour Sentinel', panel: 'futureIdeas' },
@@ -98,7 +98,7 @@ const CHANNELS = [
     { name: '🚨｜bug-reports', category: 'supportEn', kind: 'enCommunity', topic: 'Sentinel bug reports', panel: 'bugsEn' },
     { name: '🤖｜commands', category: 'supportEn', kind: 'enCommunity', topic: 'Sentinel commands', panel: 'commandsEn' },
     { name: '🛰｜support-requests', category: 'supportEn', kind: 'enCommunity', topic: 'Sentinel support requests', panel: 'supportRequestsEn' },
-    { name: '🎫｜open-a-ticket', category: 'supportEn', kind: 'enReadOnly', topic: 'Open a private Sentinel ticket', panel: 'ticketsEn' },
+    { name: '📁｜open-a-dossier', aliases: ['🎫｜open-a-ticket'], category: 'supportEn', kind: 'enReadOnly', topic: 'Open a private Sentinel dossier', panel: 'ticketsEn' },
     { name: '🧭｜roadmap-en', category: 'devEn', kind: 'enCommunity', topic: 'Sentinel direction and priorities', panel: 'roadmapEn' },
     { name: '⚡｜beta-tests-en', category: 'devEn', kind: 'enCommunity', topic: 'Testing upcoming Sentinel features', panel: 'betaEn' },
     { name: '🔮｜future-ideas', category: 'devEn', kind: 'enCommunity', topic: 'Long-term Sentinel ideas', panel: 'futureIdeasEn' },
@@ -674,21 +674,23 @@ function panelPayload(panel) {
             ]
         },
         tickets: {
-            embeds: [embed('Support prive', 'Pour une demande personnelle, sensible ou qui demande un vrai suivi, ouvre un ticket prive avec le support Sentinel.\n\nUn espace dedie sera cree pour toi et l equipe pourra te repondre proprement.', COLORS.pink)],
+            embeds: [embed('Bureau d accueil Sentinel', 'Les dossiers sont le systeme de tickets de Sentinel : chaque demande ouvre un salon prive avec l equipe autorisee.\n\nChoisis le type de dossier a ouvrir. Un espace dedie sera cree pour toi et le support pourra te repondre proprement.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('sentinel_ticket:create').setLabel('Ouvrir un ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫'),
-                    new ButtonBuilder().setCustomId('sentinel_ticket:bug').setLabel('Signaler un bug').setStyle(ButtonStyle.Danger).setEmoji('🚨')
+                    new ButtonBuilder().setCustomId('sentinel_dossier:support').setLabel('Ouvrir un dossier').setStyle(ButtonStyle.Primary).setEmoji('📁'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:report').setLabel('Signalement').setStyle(ButtonStyle.Danger).setEmoji('🚨'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:bug').setLabel('Bug Sentinel').setStyle(ButtonStyle.Danger).setEmoji('🧪')
                 )
             ]
         }
         ,
         ticketsEn: {
-            embeds: [embed('Private Support', 'For a personal, sensitive or follow-up request, open a private ticket with Sentinel support.\n\nA dedicated space will be created for you and the team will answer properly.', COLORS.pink)],
+            embeds: [embed('Sentinel Reception Desk', 'Dossiers are Sentinel tickets: each request opens a private channel with the authorized team.\n\nChoose the dossier type to open. A dedicated space will be created and support can answer properly.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('sentinel_ticket:create').setLabel('Open a ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫'),
-                    new ButtonBuilder().setCustomId('sentinel_ticket:bug').setLabel('Report a bug').setStyle(ButtonStyle.Danger).setEmoji('🚨')
+                    new ButtonBuilder().setCustomId('sentinel_dossier:support').setLabel('Open a dossier').setStyle(ButtonStyle.Primary).setEmoji('📁'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:report').setLabel('Report').setStyle(ButtonStyle.Danger).setEmoji('🚨'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:bug').setLabel('Sentinel bug').setStyle(ButtonStyle.Danger).setEmoji('🧪')
                 )
             ]
         }

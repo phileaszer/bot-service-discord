@@ -79,6 +79,20 @@ CREATE TABLE IF NOT EXISTS custom_embeds (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sentinel_dossiers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL UNIQUE,
+    owner_user_id TEXT NOT NULL,
+    opener_user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    referent_user_id TEXT,
+    created_at TEXT NOT NULL,
+    closed_at TEXT,
+    closed_by_user_id TEXT
+);
+
 CREATE TABLE IF NOT EXISTS user_profiles (
     user_id TEXT PRIMARY KEY,
     username TEXT,
@@ -148,6 +162,12 @@ ON moderation_tempbans (expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_custom_embeds_guild
 ON custom_embeds (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_sentinel_dossiers_guild_status
+ON sentinel_dossiers (guild_id, status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_sentinel_dossiers_owner
+ON sentinel_dossiers (guild_id, owner_user_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_user
 ON dashboard_sessions (user_id);

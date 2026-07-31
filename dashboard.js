@@ -872,6 +872,22 @@ function mapModerationCase(ctx, item) {
     };
 }
 
+function mapDossier(item) {
+    return {
+        id: item.id,
+        guildId: item.guildId,
+        channelId: item.channelId,
+        ownerUserId: item.ownerUserId,
+        openerUserId: item.openerUserId,
+        type: item.type,
+        status: item.status,
+        referentUserId: item.referentUserId,
+        createdAt: item.createdAt,
+        closedAt: item.closedAt,
+        closedByUserId: item.closedByUserId
+    };
+}
+
 function permissionCheck(id, label, ok, fix, detail = null) {
     return {
         id,
@@ -926,6 +942,18 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             'Ajoute la permission “Gérer les messages” au rôle Sentinel.'
         ),
         permissionCheck(
+            'manageChannels',
+            'Sentinel peut créer des salons',
+            has(PermissionsBitField.Flags.ManageChannels),
+            'Ajoute la permission “Gérer les salons” au rôle Sentinel.'
+        ),
+        permissionCheck(
+            'attachFiles',
+            'Sentinel peut joindre des fichiers',
+            has(PermissionsBitField.Flags.AttachFiles),
+            'Ajoute la permission “Joindre des fichiers” au rôle Sentinel pour les comptes rendus.'
+        ),
+        permissionCheck(
             'manageRoles',
             'Sentinel peut gérer les rôles',
             canManageRoles,
@@ -962,6 +990,8 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         canTimeout: has(PermissionsBitField.Flags.ModerateMembers),
         canKick: has(PermissionsBitField.Flags.KickMembers),
         canPurge: has(PermissionsBitField.Flags.ManageMessages),
+        canManageChannels: has(PermissionsBitField.Flags.ManageChannels),
+        canAttachFiles: has(PermissionsBitField.Flags.AttachFiles),
         canManageRoles,
         serviceRoleTooHigh,
         canManageServiceRole: Boolean(serviceRole && canManageRoles && !serviceRoleTooHigh),
@@ -1126,6 +1156,10 @@ async function buildGuildState(ctx, guild, session = null) {
                 footer: item.footer,
                 updatedAt: item.updated_at
             }))
+        },
+        dossiers: {
+            openCount: ctx.helpers.getOpenDossierCount(guild.id),
+            items: ctx.helpers.getRecentDossiers(guild.id, 25).map(mapDossier)
         },
         diagnostics: buildPermissionDiagnostics(ctx, guild, config),
         moderationCases: {
@@ -1539,6 +1573,44 @@ async function customEmbedAction(ctx, guild, actor, body) {
     throw createHttpError(400, 'Unknown custom embed action.');
 }
 
+async function dossierAction(ctx, guild, actor, body) {
+    requireCommandAccess(ctx, actor);
+
+    const language = ctx.helpers.getGuildLanguage(guild.id);
+    const action = body.action;
+    const channel = getTextChannel(guild, body.channelId);
+
+    if (action === 'publish-dossier-panel') {
+        await channel.send({
+            embeds: [ctx.helpers.buildDossierPanelEmbed(guild, actor.user, language)],
+            components: ctx.helpers.buildDossierPanelComponents(language)
+        });
+
+        return `Bureau d'accueil Sentinel publie dans #${channel.name}.`;
+    }
+
+    if (action === 'dossier-close') {
+        if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
+            throw createHttpError(400, 'This channel is not a Sentinel dossier.');
+        }
+
+        const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id) || {
+            id: channel.id,
+            channelId: channel.id,
+            ownerUserId: null,
+            type: 'support'
+        };
+
+        await ctx.helpers.sendDossierTranscript(channel, dossier, actor.user, language);
+        ctx.helpers.closeDossierRecord(guild.id, channel.id, actor.id);
+        await channel.delete('Cloture dossier Sentinel depuis le dashboard').catch(() => {});
+
+        return `Dossier Sentinel cloture : #${channel.name}.`;
+    }
+
+    throw createHttpError(400, 'Unknown dossier action.');
+}
+
 async function runDashboardAction(ctx, guild, member, body) {
     const action = body.action;
     const language = ctx.helpers.getGuildLanguage(guild.id);
@@ -1624,6 +1696,10 @@ async function runDashboardAction(ctx, guild, member, body) {
 
     if (['custom-embed-create', 'custom-embed-edit', 'custom-embed-delete'].includes(action)) {
         return customEmbedAction(ctx, guild, member, body);
+    }
+
+    if (['publish-dossier-panel', 'dossier-close'].includes(action)) {
+        return dossierAction(ctx, guild, member, body);
     }
 
     return moderationAction(ctx, guild, member, body);

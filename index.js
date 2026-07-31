@@ -10,6 +10,7 @@ const {
     ChannelType,
     PermissionsBitField,
     EmbedBuilder,
+    AttachmentBuilder,
     MessageFlags,
     Events
 } = require('discord.js');
@@ -236,7 +237,26 @@ const I18N = {
         customEmbedNotFound: '❌ Aucun embed Sentinel géré ne correspond à ce message dans ce salon.',
         customEmbedNoEditFields: '❌ Indique au moins un champ à modifier : titre, message, couleur, image, miniature ou footer.',
         customEmbedQuotaFree: 'Quota gratuit : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
-        customEmbedQuotaUnlimited: 'Quota Premium : embeds illimités.'
+        customEmbedQuotaUnlimited: 'Quota Premium : embeds illimités.',
+        dossierPanelTitle: 'Sentinel | Bureau d’accueil',
+        dossierPanelDescription: 'Les dossiers sont le système de tickets de Sentinel : chaque demande ouvre un salon privé entre le membre et l’équipe autorisée.\n\nChoisis le type de dossier à ouvrir. Un référent pourra le prendre en charge et garder un compte rendu propre.',
+        dossierSupportLabel: 'Ouvrir un dossier',
+        dossierReportLabel: 'Signalement',
+        dossierComplaintLabel: 'Plainte',
+        dossierAdminLabel: 'Demande administrative',
+        dossierOpenedTitle: 'Sentinel | Dossier ouvert',
+        dossierAlreadyOpen: 'Tu as déjà un dossier ouvert : {channel}',
+        dossierCreated: 'Dossier créé : {channel}',
+        dossierNotInDossier: 'Ce bouton doit être utilisé dans un dossier Sentinel.',
+        dossierCloseDenied: 'Seul le demandeur ou un membre autorisé peut clôturer ce dossier.',
+        dossierClosed: 'Dossier clôturé. Le salon sera archivé dans quelques secondes.',
+        dossierClaimed: 'Dossier pris en charge par {member}.',
+        dossierClaimDenied: 'Tu dois avoir un rôle autorisé pour prendre en charge ce dossier.',
+        dossierAddDone: '✅ {member} a été ajouté comme intervenant du dossier.',
+        dossierRemoveDone: '✅ {member} a été retiré du dossier.',
+        dossierCommandOutside: '❌ Cette commande doit être utilisée dans un salon de dossier Sentinel.',
+        dossierTranscriptDone: '✅ Compte rendu généré.',
+        dossierPanelPublished: '✅ Bureau d’accueil Sentinel publié dans {channel}.'
     },
     en: {
         requestedBy: 'Requested by',
@@ -346,11 +366,30 @@ const I18N = {
         customEmbedNotFound: '❌ No managed Sentinel embed matches this message in this channel.',
         customEmbedNoEditFields: '❌ Provide at least one field to edit: title, message, color, image, thumbnail, or footer.',
         customEmbedQuotaFree: 'Free quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
-        customEmbedQuotaUnlimited: 'Premium quota: unlimited embeds.'
+        customEmbedQuotaUnlimited: 'Premium quota: unlimited embeds.',
+        dossierPanelTitle: 'Sentinel | Reception desk',
+        dossierPanelDescription: 'Dossiers are Sentinel tickets: each request opens a private channel between the member and the authorized team.\n\nChoose the dossier type to open. A referent can take it over and keep a clean transcript.',
+        dossierSupportLabel: 'Open a dossier',
+        dossierReportLabel: 'Report',
+        dossierComplaintLabel: 'Complaint',
+        dossierAdminLabel: 'Administrative request',
+        dossierOpenedTitle: 'Sentinel | Dossier opened',
+        dossierAlreadyOpen: 'You already have an open dossier: {channel}',
+        dossierCreated: 'Dossier created: {channel}',
+        dossierNotInDossier: 'This button must be used inside a Sentinel dossier.',
+        dossierCloseDenied: 'Only the requester or an authorized member can close this dossier.',
+        dossierClosed: 'Dossier closed. The channel will be archived in a few seconds.',
+        dossierClaimed: 'Dossier taken over by {member}.',
+        dossierClaimDenied: 'You need an authorized role to take over this dossier.',
+        dossierAddDone: '✅ {member} has been added as a dossier participant.',
+        dossierRemoveDone: '✅ {member} has been removed from this dossier.',
+        dossierCommandOutside: '❌ This command must be used inside a Sentinel dossier channel.',
+        dossierTranscriptDone: '✅ Transcript generated.',
+        dossierPanelPublished: '✅ Sentinel reception desk published in {channel}.'
     }
 };
 
-const BOT_INVITE_PERMISSIONS = '1099780156422';
+const BOT_INVITE_PERMISSIONS = '1099780189206';
 
 function normalizeLanguage(value) {
     const normalized = String(value || '').trim().toLowerCase();
@@ -445,7 +484,17 @@ function resolveCommandName(commandName) {
         lock: 'lock',
         unlock: 'unlock',
         slowmode: 'slowmode',
-        embed: 'embed'
+        embed: 'embed',
+        'dossier-panel': 'dossier-panel',
+        'ticket-panel': 'dossier-panel',
+        'dossier-fermer': 'dossier-fermer',
+        'close-ticket': 'dossier-fermer',
+        'dossier-ajouter': 'dossier-ajouter',
+        'ticket-add': 'dossier-ajouter',
+        'dossier-retirer': 'dossier-retirer',
+        'ticket-remove': 'dossier-retirer',
+        'dossier-compte-rendu': 'dossier-compte-rendu',
+        'ticket-transcript': 'dossier-compte-rendu'
     };
 
     return aliases[commandName] || commandName;
@@ -804,6 +853,290 @@ function hasCommandRoleAccess(member) {
 
 function getCommandRoleAccessDeniedMessage(language = 'fr') {
     return t(language, 'accessDenied');
+}
+
+const DOSSIER_TYPES = {
+    support: {
+        emoji: '📁',
+        color: SENTINEL_COLORS.primary,
+        fr: {
+            label: 'Support',
+            channelPrefix: 'dossier-support',
+            intro: [
+                'Explique ta demande clairement.',
+                '',
+                '- problème ou question',
+                '- commande/fonction concernée',
+                '- capture ou message d’erreur si disponible',
+                '',
+                'Un référent prendra le dossier dès que possible.'
+            ]
+        },
+        en: {
+            label: 'Support',
+            channelPrefix: 'support-dossier',
+            intro: [
+                'Explain your request clearly.',
+                '',
+                '- issue or question',
+                '- related command or feature',
+                '- screenshot or error message if available',
+                '',
+                'A referent will take over the dossier as soon as possible.'
+            ]
+        }
+    },
+    report: {
+        emoji: '🚨',
+        color: SENTINEL_COLORS.danger,
+        fr: {
+            label: 'Signalement',
+            channelPrefix: 'dossier-signalement',
+            intro: [
+                'Décris le signalement avec les éléments utiles.',
+                '',
+                '**Personne concernée :**',
+                '**Ce qui s’est passé :**',
+                '**Salon / moment :**',
+                '**Preuve ou capture :**',
+                '',
+                'L’équipe autorisée traitera le dossier.'
+            ]
+        },
+        en: {
+            label: 'Report',
+            channelPrefix: 'report-dossier',
+            intro: [
+                'Describe the report with useful details.',
+                '',
+                '**Concerned person:**',
+                '**What happened:**',
+                '**Channel / moment:**',
+                '**Proof or screenshot:**',
+                '',
+                'The authorized team will handle the dossier.'
+            ]
+        }
+    },
+    complaint: {
+        emoji: '⚖️',
+        color: SENTINEL_COLORS.warning,
+        fr: {
+            label: 'Plainte',
+            channelPrefix: 'dossier-plainte',
+            intro: [
+                'Expose ta plainte calmement et ajoute le contexte nécessaire.',
+                '',
+                '**Sujet de la plainte :**',
+                '**Personnes concernées :**',
+                '**Résumé :**',
+                '**Éléments à joindre :**'
+            ]
+        },
+        en: {
+            label: 'Complaint',
+            channelPrefix: 'complaint-dossier',
+            intro: [
+                'Explain your complaint calmly and add the needed context.',
+                '',
+                '**Complaint subject:**',
+                '**People involved:**',
+                '**Summary:**',
+                '**Evidence to attach:**'
+            ]
+        }
+    },
+    admin: {
+        emoji: '🧾',
+        color: SENTINEL_COLORS.accent,
+        fr: {
+            label: 'Demande administrative',
+            channelPrefix: 'dossier-admin',
+            intro: [
+                'Présente ta demande administrative.',
+                '',
+                '**Demande :**',
+                '**Serveur / équipe concernée :**',
+                '**Détails :**',
+                '**Pièces utiles :**'
+            ]
+        },
+        en: {
+            label: 'Administrative request',
+            channelPrefix: 'admin-dossier',
+            intro: [
+                'Describe your administrative request.',
+                '',
+                '**Request:**',
+                '**Concerned server / team:**',
+                '**Details:**',
+                '**Useful attachments:**'
+            ]
+        }
+    },
+    bug: {
+        emoji: '🧪',
+        color: SENTINEL_COLORS.danger,
+        fr: {
+            label: 'Bug Sentinel',
+            channelPrefix: 'dossier-bug',
+            intro: [
+                'Merci de compléter le signalement avec le plus de précision possible.',
+                '',
+                '**Commande ou fonction concernée :**',
+                '**Ce que tu as fait :**',
+                '**Résultat obtenu :**',
+                '**Résultat attendu :**',
+                '**Capture, message d’erreur ou contexte :**'
+            ]
+        },
+        en: {
+            label: 'Sentinel bug',
+            channelPrefix: 'bug-dossier',
+            intro: [
+                'Please complete the report as precisely as possible.',
+                '',
+                '**Command or feature:**',
+                '**What you did:**',
+                '**Actual result:**',
+                '**Expected result:**',
+                '**Screenshot, error message, or context:**'
+            ]
+        }
+    }
+};
+
+function normalizeDossierType(value) {
+    const raw = String(value || '').trim().toLowerCase();
+
+    if (raw === 'signalement') return 'report';
+    if (raw === 'plainte') return 'complaint';
+    if (raw === 'administratif' || raw === 'administrative') return 'admin';
+    if (raw === 'bug') return 'bug';
+
+    return DOSSIER_TYPES[raw] ? raw : 'support';
+}
+
+function getDossierTypeMeta(type, language = 'fr') {
+    const key = normalizeDossierType(type);
+    const base = DOSSIER_TYPES[key] || DOSSIER_TYPES.support;
+    const copy = base[language === 'en' ? 'en' : 'fr'];
+
+    return {
+        key,
+        emoji: base.emoji,
+        color: base.color,
+        ...copy
+    };
+}
+
+function mapDossier(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        id: row.id,
+        guildId: row.guild_id,
+        channelId: row.channel_id,
+        ownerUserId: row.owner_user_id,
+        openerUserId: row.opener_user_id,
+        type: row.type,
+        status: row.status,
+        referentUserId: row.referent_user_id,
+        createdAt: row.created_at,
+        closedAt: row.closed_at,
+        closedByUserId: row.closed_by_user_id
+    };
+}
+
+function getDossierByChannel(guildId, channelId) {
+    return mapDossier(db.prepare(`
+        SELECT *
+        FROM sentinel_dossiers
+        WHERE guild_id = ? AND channel_id = ?
+    `).get(guildId, channelId));
+}
+
+function getOpenDossierForUser(guildId, userId) {
+    return mapDossier(db.prepare(`
+        SELECT *
+        FROM sentinel_dossiers
+        WHERE guild_id = ? AND owner_user_id = ? AND status = 'open'
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT 1
+    `).get(guildId, userId));
+}
+
+function createDossierRecord(guildId, channelId, ownerUserId, openerUserId, type) {
+    const createdAt = new Date().toISOString();
+    const info = db.prepare(`
+        INSERT INTO sentinel_dossiers (
+            guild_id,
+            channel_id,
+            owner_user_id,
+            opener_user_id,
+            type,
+            status,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, 'open', ?)
+    `).run(guildId, channelId, ownerUserId, openerUserId, normalizeDossierType(type), createdAt);
+
+    return getDossierByChannel(guildId, channelId) || {
+        id: info.lastInsertRowid,
+        guildId,
+        channelId,
+        ownerUserId,
+        openerUserId,
+        type: normalizeDossierType(type),
+        status: 'open',
+        createdAt
+    };
+}
+
+function setDossierReferent(guildId, channelId, referentUserId) {
+    db.prepare(`
+        UPDATE sentinel_dossiers
+        SET referent_user_id = ?
+        WHERE guild_id = ? AND channel_id = ? AND status = 'open'
+    `).run(referentUserId, guildId, channelId);
+
+    return getDossierByChannel(guildId, channelId);
+}
+
+function closeDossierRecord(guildId, channelId, closedByUserId) {
+    db.prepare(`
+        UPDATE sentinel_dossiers
+        SET status = 'closed',
+            closed_at = ?,
+            closed_by_user_id = ?
+        WHERE guild_id = ? AND channel_id = ?
+    `).run(new Date().toISOString(), closedByUserId, guildId, channelId);
+
+    return getDossierByChannel(guildId, channelId);
+}
+
+function getRecentDossiers(guildId, limit = 25) {
+    const safeLimit = clampNumber(limit, 1, 100);
+
+    return db.prepare(`
+        SELECT *
+        FROM sentinel_dossiers
+        WHERE guild_id = ?
+        ORDER BY status = 'open' DESC, datetime(created_at) DESC, id DESC
+        LIMIT ?
+    `).all(guildId, safeLimit).map(mapDossier);
+}
+
+function getOpenDossierCount(guildId) {
+    const row = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM sentinel_dossiers
+        WHERE guild_id = ? AND status = 'open'
+    `).get(guildId);
+
+    return row?.count || 0;
 }
 
 function getUserData(guildId, userId) {
@@ -3226,6 +3559,33 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                 ]
             },
             {
+                id: 'dossiers',
+                label: 'Dossiers',
+                menuDescription: 'Sentinel ticket system with a RP vocabulary.',
+                emoji: '📁',
+                title: 'Sentinel | Dossiers',
+                description: 'Dossiers are Sentinel tickets: every request opens a private channel with the authorized team.',
+                fields: [
+                    {
+                        name: 'How it works',
+                        value: [
+                            '`/ticket-panel` publishes the Sentinel reception desk.',
+                            'Members choose a type: support, report, complaint, administrative request, or bug.',
+                            'Sentinel creates a private dossier channel and keeps a simple transcript.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Inside a dossier',
+                        value: [
+                            '`/close-ticket` closes the current dossier.',
+                            '`/ticket-add member:@member` adds a participant.',
+                            '`/ticket-remove member:@member` removes a participant.',
+                            '`/ticket-transcript` sends the transcript to the log channel when possible.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
                 id: 'commands',
                 label: 'Free commands',
                 menuDescription: 'The main free service commands.',
@@ -3465,10 +3825,10 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                 }
             ]
         },
-        {
-            id: 'dashboard',
-            label: 'Dashboard',
-            menuDescription: 'Ouvrir le site et gérer un serveur.',
+            {
+                id: 'dashboard',
+                label: 'Dashboard',
+                menuDescription: 'Ouvrir le site et gérer un serveur.',
             emoji: '🖥️',
             title: 'Sentinel | Dashboard',
             description: 'Le dashboard permet aux staffs autorisés de gérer Sentinel depuis un navigateur.',
@@ -3487,12 +3847,39 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
                         'Configurer la langue, le rôle de service, le salon de logs, le panneau de service, les embeds, les sanctions et l’historique.',
                         'Si un serveur demande une autorisation, invite d’abord Sentinel comme vrai bot.'
                     ].join('\n')
-                }
-            ]
-        },
-        {
-            id: 'commands',
-            label: 'Commandes gratuites',
+                    }
+                ]
+            },
+            {
+                id: 'dossiers',
+                label: 'Dossiers',
+                menuDescription: 'Le système de tickets Sentinel avec un vocabulaire RP.',
+                emoji: '📁',
+                title: 'Sentinel | Dossiers',
+                description: 'Les dossiers sont le système de tickets de Sentinel : chaque demande ouvre un salon privé avec l’équipe autorisée.',
+                fields: [
+                    {
+                        name: 'Fonctionnement',
+                        value: [
+                            '`/dossier-panel` publie le bureau d’accueil Sentinel.',
+                            'Les membres choisissent un type : support, signalement, plainte, administratif ou bug.',
+                            'Sentinel crée un salon privé de dossier et garde un compte rendu simple.'
+                        ].join('\n')
+                    },
+                    {
+                        name: 'Dans un dossier',
+                        value: [
+                            '`/dossier-fermer` clôture le dossier actuel.',
+                            '`/dossier-ajouter membre:@membre` ajoute un intervenant.',
+                            '`/dossier-retirer membre:@membre` retire un intervenant.',
+                            '`/dossier-compte-rendu` envoie le compte rendu dans le salon de logs quand c’est possible.'
+                        ].join('\n')
+                    }
+                ]
+            },
+            {
+                id: 'commands',
+                label: 'Commandes gratuites',
             menuDescription: 'Les commandes service principales.',
             emoji: '📋',
             title: 'Sentinel | Commandes gratuites',
@@ -3883,7 +4270,12 @@ function mapDiscordAuditAction(interaction) {
         unban: 'unban',
         lock: 'lock',
         unlock: 'unlock',
-        slowmode: 'slowmode'
+        slowmode: 'slowmode',
+        'dossier-panel': 'publish-dossier-panel',
+        'dossier-fermer': 'dossier-close',
+        'dossier-ajouter': 'dossier-add',
+        'dossier-retirer': 'dossier-remove',
+        'dossier-compte-rendu': 'dossier-transcript'
     };
 
     return actionMap[commandName] || null;
@@ -3901,7 +4293,7 @@ function getDiscordAuditTarget(interaction, action) {
     }
 
     const roleActions = new Set(['set-service-role', 'add-command-role', 'remove-command-role']);
-    const channelActions = new Set(['set-log-channel', 'publish-service-panel', 'purge', 'lock', 'unlock', 'slowmode']);
+    const channelActions = new Set(['set-log-channel', 'publish-service-panel', 'publish-dossier-panel', 'dossier-close', 'dossier-transcript', 'purge', 'lock', 'unlock', 'slowmode']);
     const messageActions = new Set(['custom-embed-edit', 'custom-embed-delete']);
     const caseActions = new Set(['edit-case', 'delete-case', 'unwarn']);
 
@@ -3939,6 +4331,10 @@ function getTextCommandAuditAction(content) {
 
     if (/^!service-panel$/i.test(trimmed)) {
         return 'publish-service-panel';
+    }
+
+    if (/^!(dossier-panel|ticket-panel)$/i.test(trimmed)) {
+        return 'publish-dossier-panel';
     }
 
     if (/^!config-permissions\b/i.test(trimmed)) {
@@ -3995,7 +4391,7 @@ function getTextCommandAuditAction(content) {
 }
 
 function getTextCommandAuditTarget(message, action) {
-    if (action === 'publish-service-panel' || action === 'purge') {
+    if (action === 'publish-service-panel' || action === 'publish-dossier-panel' || action === 'purge') {
         return { targetType: 'channel', targetId: message.channel?.id || null };
     }
 
@@ -4195,6 +4591,26 @@ function buildTicketOverwrites(guild, member) {
         }
     ];
 
+    for (const roleId of getCommandRoleIds(guild.id)) {
+        const role = guild.roles.cache.get(roleId);
+
+        if (!role) {
+            continue;
+        }
+
+        overwrites.push({
+            id: role.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.AttachFiles,
+                PermissionsBitField.Flags.EmbedLinks
+            ]
+        });
+    }
+
     for (const roleName of SENTINEL_STAFF_ROLES) {
         const role = findRoleByName(guild, roleName);
 
@@ -4214,6 +4630,137 @@ function buildTicketOverwrites(guild, member) {
     }
 
     return overwrites;
+}
+
+function buildDossierPanelEmbed(guild, requester, language = 'fr') {
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.primary,
+        title: t(language, 'dossierPanelTitle'),
+        description: t(language, 'dossierPanelDescription'),
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    });
+}
+
+function buildDossierPanelComponents(language = 'fr') {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('sentinel_dossier:support')
+                .setLabel(t(language, 'dossierSupportLabel'))
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('📁'),
+            new ButtonBuilder()
+                .setCustomId('sentinel_dossier:report')
+                .setLabel(t(language, 'dossierReportLabel'))
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('🚨'),
+            new ButtonBuilder()
+                .setCustomId('sentinel_dossier:complaint')
+                .setLabel(t(language, 'dossierComplaintLabel'))
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('⚖️')
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('sentinel_dossier:admin')
+                .setLabel(t(language, 'dossierAdminLabel'))
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('🧾'),
+            new ButtonBuilder()
+                .setCustomId('sentinel_dossier:bug')
+                .setLabel(language === 'en' ? 'Sentinel bug' : 'Bug Sentinel')
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('🧪')
+        )
+    ];
+}
+
+async function publishDossierPanel(channel, requester, language = 'fr') {
+    await channel.send({
+        embeds: [buildDossierPanelEmbed(channel.guild, requester, language)],
+        components: buildDossierPanelComponents(language)
+    });
+}
+
+function parseDossierChannelTopic(topic) {
+    const match = /^sentinel-(?:dossier|ticket):(\d{17,20}):([a-z-]+)(?::(\d+))?/.exec(String(topic || ''));
+
+    if (!match) {
+        return null;
+    }
+
+    return {
+        ownerUserId: match[1],
+        type: normalizeDossierType(match[2]),
+        dossierId: match[3] ? Number(match[3]) : null
+    };
+}
+
+function isDossierChannel(channel) {
+    return Boolean(parseDossierChannelTopic(channel?.topic));
+}
+
+function memberCanManageDossier(member) {
+    return Boolean(member && (
+        hasCommandRoleAccess(member)
+        || member.permissions.has(PermissionsBitField.Flags.ManageChannels)
+        || member.permissions.has(PermissionsBitField.Flags.Administrator)
+    ));
+}
+
+function getDossierChannelFromInteraction(interaction) {
+    if (!interaction.channel || !isDossierChannel(interaction.channel)) {
+        return null;
+    }
+
+    return interaction.channel;
+}
+
+async function buildDossierTranscript(channel, dossier, language = 'fr') {
+    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    const sortedMessages = messages
+        ? Array.from(messages.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp)
+        : [];
+    const header = language === 'en'
+        ? [
+            `Sentinel dossier #${dossier?.id || 'unknown'}`,
+            `Channel: #${channel.name}`,
+            `Requester: ${dossier?.ownerUserId || 'unknown'}`,
+            `Type: ${dossier?.type || 'support'}`,
+            `Generated: ${new Date().toISOString()}`
+        ]
+        : [
+            `Dossier Sentinel #${dossier?.id || 'inconnu'}`,
+            `Salon : #${channel.name}`,
+            `Demandeur : ${dossier?.ownerUserId || 'inconnu'}`,
+            `Type : ${dossier?.type || 'support'}`,
+            `Généré : ${new Date().toISOString()}`
+        ];
+    const lines = sortedMessages.map(message => {
+        const content = message.content || '[embed/fichier/bouton]';
+        return `[${new Date(message.createdTimestamp).toISOString()}] ${message.author?.tag || message.author?.id || 'inconnu'}: ${content.replace(/\s+/g, ' ').slice(0, 1800)}`;
+    });
+
+    return [...header, '', ...lines].join('\n');
+}
+
+async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
+    const transcript = await buildDossierTranscript(channel, dossier, language);
+    const fileName = `dossier-sentinel-${dossier?.id || channel.id}.txt`;
+    const attachment = new AttachmentBuilder(Buffer.from(transcript, 'utf8'), { name: fileName });
+    const logChannel = getLogChannel(channel.guild);
+    const logMessage = language === 'en'
+        ? `🧾 Transcript for ${channel.name}, generated by ${actor}.`
+        : `🧾 Compte rendu de ${channel.name}, généré par ${actor}.`;
+
+    if (logChannel) {
+        await logChannel.send({ content: logMessage, files: [attachment] }).catch(() => {});
+        return;
+    }
+
+    await channel.send({ content: logMessage, files: [attachment] }).catch(() => {});
 }
 
 async function handleSentinelSelfRoleButton(interaction) {
@@ -4387,65 +4934,82 @@ async function applySentinelLanguageToMember(guild, userId, language) {
 
 async function handleSentinelTicketButton(interaction) {
     await interaction.guild.channels.fetch();
-    const ticketType = interaction.customId === 'sentinel_ticket:bug' ? 'bug' : 'support';
-    const ticketLabel = ticketType === 'bug' ? 'bug' : 'support';
+    const language = getGuildLanguage(interaction.guild.id);
+    const rawType = interaction.customId.startsWith('sentinel_dossier:')
+        ? interaction.customId.split(':')[1]
+        : (interaction.customId === 'sentinel_ticket:bug' ? 'bug' : 'support');
+    const dossierType = normalizeDossierType(rawType);
+    const meta = getDossierTypeMeta(dossierType, language);
 
-    const existingTicket = interaction.guild.channels.cache.find(channel =>
-        channel.type === ChannelType.GuildText
-        && channel.topic?.startsWith(`sentinel-ticket:${interaction.user.id}`)
-    );
+    const existingRecord = getOpenDossierForUser(interaction.guild.id, interaction.user.id);
+    const existingTicket = existingRecord
+        ? interaction.guild.channels.cache.get(existingRecord.channelId)
+        : interaction.guild.channels.cache.find(channel =>
+            channel.type === ChannelType.GuildText
+            && parseDossierChannelTopic(channel.topic)?.ownerUserId === interaction.user.id
+        );
 
     if (existingTicket) {
         return interaction.reply({
-            content: `Tu as deja un ticket ouvert : ${existingTicket}`,
+            content: t(language, 'dossierAlreadyOpen', { channel: existingTicket }),
             flags: MessageFlags.Ephemeral
         });
     }
 
     const supportCategory = findCategoryByName(interaction.guild, [
         '✦ SENTINEL // SUPPORT',
-        'SENTINEL // SUPPORT'
+        'SENTINEL // SUPPORT',
+        interaction.channel?.parent?.name
     ]);
     const ticketChannel = await interaction.guild.channels.create({
-        name: `${ticketLabel}-${sanitizeTicketName(interaction.user.username)}`,
+        name: `${meta.channelPrefix}-${sanitizeTicketName(interaction.user.username)}`,
         type: ChannelType.GuildText,
-        parent: supportCategory?.id || null,
-        topic: `sentinel-ticket:${interaction.user.id}:${ticketType}`,
+        parent: supportCategory?.id || interaction.channel?.parentId || null,
+        topic: `sentinel-dossier:${interaction.user.id}:${dossierType}`,
         permissionOverwrites: buildTicketOverwrites(interaction.guild, interaction.member),
-        reason: `Creation ticket Sentinel ${ticketType}`
+        reason: `Creation dossier Sentinel ${dossierType}`
     });
+    const dossier = createDossierRecord(
+        interaction.guild.id,
+        ticketChannel.id,
+        interaction.user.id,
+        interaction.user.id,
+        dossierType
+    );
+    await ticketChannel.setTopic(`sentinel-dossier:${interaction.user.id}:${dossierType}:${dossier.id}`).catch(() => {});
 
-    const description = ticketType === 'bug'
-        ? [
-            `${interaction.user}, merci de completer le signalement avec le plus de precision possible.`,
-            '',
-            '**Commande ou fonction concernee :**',
-            '**Ce que tu as fait :**',
-            '**Resultat obtenu :**',
-            '**Resultat attendu :**',
-            '**Capture, message d erreur ou contexte :**',
-            '',
-            'Le support analysera le bug des que possible.'
-        ]
-        : [
-            `${interaction.user}, explique ta demande clairement.`,
-            '',
-            '- probleme ou question',
-            '- commande/fonction concernee',
-            '- capture ou message d erreur si disponible',
-            '',
-            'Le support te repondra des que possible.'
-        ];
+    const description = [
+        language === 'en'
+            ? `${interaction.user}, this private channel is your Sentinel dossier.`
+            : `${interaction.user}, ce salon privé est ton dossier Sentinel.`,
+        '',
+        ...meta.intro
+    ];
     const embed = new EmbedBuilder()
-        .setColor(ticketType === 'bug' ? SENTINEL_COLORS.danger : SENTINEL_COLORS.primary)
-        .setTitle(ticketType === 'bug' ? 'Ticket Sentinel | Bug' : 'Ticket Sentinel | Support')
+        .setColor(meta.color)
+        .setTitle(`${t(language, 'dossierOpenedTitle')} #${dossier.id}`)
         .setDescription(description.join('\n'))
+        .addFields(
+            { name: language === 'en' ? 'Type' : 'Type', value: `${meta.emoji} ${meta.label}`, inline: true },
+            { name: language === 'en' ? 'Status' : 'Statut', value: language === 'en' ? 'Waiting' : 'En attente', inline: true },
+            { name: language === 'en' ? 'Referent' : 'Référent', value: language === 'en' ? 'None yet' : 'Aucun pour le moment', inline: true }
+        )
         .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId('sentinel_ticket:close')
-            .setLabel('Fermer le ticket')
+            .setCustomId('sentinel_dossier:claim')
+            .setLabel(language === 'en' ? 'Take over' : 'Prendre en charge')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('✅'),
+        new ButtonBuilder()
+            .setCustomId('sentinel_dossier:transcript')
+            .setLabel(language === 'en' ? 'Transcript' : 'Compte rendu')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('🧾'),
+        new ButtonBuilder()
+            .setCustomId('sentinel_dossier:close')
+            .setLabel(language === 'en' ? 'Close dossier' : 'Clôturer le dossier')
             .setStyle(ButtonStyle.Danger)
             .setEmoji('🔒')
     );
@@ -4455,41 +5019,245 @@ async function handleSentinelTicketButton(interaction) {
         embeds: [embed],
         components: [row]
     });
-    await sendSentinelStaffLog(interaction.guild, `🎫 Ticket Sentinel ouvert : ${ticketChannel} par ${interaction.user} (${ticketType}).`);
+    await sendSentinelStaffLog(interaction.guild, `📁 Dossier Sentinel #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`);
 
     return interaction.reply({
-        content: `Ticket cree : ${ticketChannel}`,
+        content: t(language, 'dossierCreated', { channel: ticketChannel }),
         flags: MessageFlags.Ephemeral
     });
 }
 
-async function handleSentinelTicketCloseButton(interaction) {
-    if (!interaction.channel?.topic?.startsWith('sentinel-ticket:')) {
+async function handleSentinelDossierClaimButton(interaction) {
+    const language = getGuildLanguage(interaction.guild.id);
+    const channel = getDossierChannelFromInteraction(interaction);
+
+    if (!channel) {
         return interaction.reply({
-            content: 'Ce bouton ne peut etre utilise que dans un ticket Sentinel.',
+            content: t(language, 'dossierNotInDossier'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (!memberCanManageDossier(interaction.member)) {
+        return interaction.reply({
+            content: t(language, 'dossierClaimDenied'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const dossier = setDossierReferent(interaction.guild.id, channel.id, interaction.user.id);
+    await channel.send(language === 'en'
+        ? `✅ ${interaction.user} is now the dossier referent.`
+        : `✅ ${interaction.user} prend ce dossier en charge.`
+    ).catch(() => {});
+    await sendSentinelStaffLog(interaction.guild, `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`);
+
+    return interaction.reply({
+        content: t(language, 'dossierClaimed', { member: interaction.user }),
+        flags: MessageFlags.Ephemeral
+    });
+}
+
+async function handleSentinelDossierTranscriptButton(interaction) {
+    const language = getGuildLanguage(interaction.guild.id);
+    const channel = getDossierChannelFromInteraction(interaction);
+
+    if (!channel) {
+        return interaction.reply({
+            content: t(language, 'dossierNotInDossier'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (!memberCanManageDossier(interaction.member)) {
+        return interaction.reply({
+            content: t(language, 'dossierClaimDenied'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const dossier = getDossierByChannel(interaction.guild.id, channel.id) || parseDossierChannelTopic(channel.topic);
+    await sendDossierTranscript(channel, dossier, interaction.user, language);
+
+    return interaction.editReply(t(language, 'dossierTranscriptDone'));
+}
+
+async function handleDossierInteraction(interaction, commandName, language) {
+    const dossierCommands = new Set([
+        'dossier-panel',
+        'dossier-fermer',
+        'dossier-ajouter',
+        'dossier-retirer',
+        'dossier-compte-rendu'
+    ]);
+
+    if (!dossierCommands.has(commandName)) {
+        return false;
+    }
+
+    if (commandName === 'dossier-panel') {
+        if (!hasCommandRoleAccess(interaction.member)) {
+            await interaction.reply({
+                content: getCommandRoleAccessDeniedMessage(language),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const channel = interaction.options.getChannel('salon') || interaction.channel;
+
+        if (!channel?.isTextBased?.()) {
+            await interaction.reply({
+                content: t(language, 'channelNotText'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        await publishDossierPanel(channel, interaction.user, language);
+        await interaction.reply({
+            content: t(language, 'dossierPanelPublished', { channel }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    const channel = getDossierChannelFromInteraction(interaction);
+
+    if (!channel) {
+        await interaction.reply({
+            content: t(language, 'dossierCommandOutside'),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (!memberCanManageDossier(interaction.member)) {
+        await interaction.reply({
+            content: getCommandRoleAccessDeniedMessage(language),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'dossier-compte-rendu') {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const dossier = getDossierByChannel(interaction.guild.id, channel.id) || parseDossierChannelTopic(channel.topic);
+        await sendDossierTranscript(channel, dossier, interaction.user, language);
+        await interaction.editReply(t(language, 'dossierTranscriptDone'));
+        return true;
+    }
+
+    if (commandName === 'dossier-fermer') {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const topic = parseDossierChannelTopic(channel.topic);
+        const dossier = getDossierByChannel(interaction.guild.id, channel.id) || topic;
+        await sendDossierTranscript(channel, dossier, interaction.user, language);
+        const closedDossier = closeDossierRecord(interaction.guild.id, channel.id, interaction.user.id) || dossier;
+        await sendSentinelStaffLog(interaction.guild, `🔒 Dossier Sentinel #${closedDossier?.id || channel.id} clôturé : **${channel.name}** par ${interaction.user}.`);
+        await interaction.editReply(t(language, 'dossierClosed'));
+
+        setTimeout(() => {
+            channel?.delete('Cloture dossier Sentinel').catch(() => {});
+        }, 5000);
+        return true;
+    }
+
+    const user = interaction.options.getUser('membre') || interaction.options.getUser('member');
+
+    if (!user) {
+        await interaction.reply({
+            content: t(language, 'moderationUserRequired'),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'dossier-ajouter') {
+        await channel.permissionOverwrites.edit(user.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true,
+            AttachFiles: true,
+            EmbedLinks: true
+        }, { reason: `Ajout intervenant dossier Sentinel par ${interaction.user.tag}` });
+
+        await interaction.reply({
+            content: t(language, 'dossierAddDone', { member: user }),
+            flags: MessageFlags.Ephemeral
+        });
+        await channel.send(language === 'en'
+            ? `${user} has been added as a dossier participant.`
+            : `${user} a été ajouté comme intervenant du dossier.`
+        ).catch(() => {});
+        return true;
+    }
+
+    const topic = parseDossierChannelTopic(channel.topic);
+
+    if (topic?.ownerUserId === user.id) {
+        await interaction.reply({
+            content: language === 'en'
+                ? 'The requester cannot be removed from their own dossier.'
+                : 'Le demandeur ne peut pas être retiré de son propre dossier.',
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    await channel.permissionOverwrites.delete(user.id, `Retrait intervenant dossier Sentinel par ${interaction.user.tag}`).catch(async () => {
+        await channel.permissionOverwrites.edit(user.id, { ViewChannel: false }, { reason: `Retrait intervenant dossier Sentinel par ${interaction.user.tag}` });
+    });
+
+    await interaction.reply({
+        content: t(language, 'dossierRemoveDone', { member: user }),
+        flags: MessageFlags.Ephemeral
+    });
+    await channel.send(language === 'en'
+        ? `${user} has been removed from this dossier.`
+        : `${user} a été retiré du dossier.`
+    ).catch(() => {});
+    return true;
+}
+
+async function handleSentinelTicketCloseButton(interaction) {
+    const language = getGuildLanguage(interaction.guild.id);
+    const channel = getDossierChannelFromInteraction(interaction);
+    const topic = parseDossierChannelTopic(interaction.channel?.topic);
+
+    if (!channel || !topic) {
+        return interaction.reply({
+            content: t(language, 'dossierNotInDossier'),
             flags: MessageFlags.Ephemeral
         });
     }
 
     if (
-        !interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels)
-        && interaction.channel.topic !== `sentinel-ticket:${interaction.user.id}`
+        !memberCanManageDossier(interaction.member)
+        && topic.ownerUserId !== interaction.user.id
     ) {
         return interaction.reply({
-            content: 'Tu ne peux fermer que ton ticket, sauf si tu as la permission Gerer les salons.',
+            content: t(language, 'dossierCloseDenied'),
             flags: MessageFlags.Ephemeral
         });
     }
 
-    await interaction.reply({
-        content: 'Ticket ferme. Suppression dans quelques secondes...',
-        flags: MessageFlags.Ephemeral
-    });
-    await sendSentinelStaffLog(interaction.guild, `🔒 Ticket Sentinel ferme : **${interaction.channel.name}** par ${interaction.user}.`);
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const dossier = getDossierByChannel(interaction.guild.id, channel.id) || {
+        id: topic.dossierId,
+        ownerUserId: topic.ownerUserId,
+        type: topic.type
+    };
+    await sendDossierTranscript(channel, dossier, interaction.user, language);
+    const closedDossier = closeDossierRecord(interaction.guild.id, channel.id, interaction.user.id) || dossier;
+    await sendSentinelStaffLog(interaction.guild, `🔒 Dossier Sentinel #${closedDossier?.id || channel.id} clôturé : **${channel.name}** par ${interaction.user}.`);
+    await interaction.editReply(t(language, 'dossierClosed'));
 
     setTimeout(() => {
-        interaction.channel?.delete('Fermeture ticket Sentinel').catch(() => {});
-    }, 3000);
+        channel?.delete('Cloture dossier Sentinel').catch(() => {});
+    }, 5000);
 }
 
 async function handleSentinelVoteButton(interaction) {
@@ -5660,7 +6428,10 @@ client.once(Events.ClientReady, async () => {
             buildCustomAnnouncementEmbed,
             buildCustomEmbedData,
             buildCustomEmbedPayload,
+            buildDossierPanelComponents,
+            buildDossierPanelEmbed,
             buildServicePanelComponents,
+            closeDossierRecord,
             createUserIfMissing,
             deleteCustomEmbedRecord,
             deleteModerationCase,
@@ -5674,10 +6445,13 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbedRecord,
             getGuildConfig,
             getGuildLanguage,
+            getDossierByChannel,
             getLogChannel,
+            getOpenDossierCount,
             getFilteredModerationCases,
             getModerationCases,
             getModerationCase,
+            getRecentDossiers,
             getRecentModerationCases,
             getModerationTargetError,
             getCustomEmbedChannelError,
@@ -5701,6 +6475,7 @@ client.once(Events.ClientReady, async () => {
             resetGuild,
             resetUser,
             sendModerationLog,
+            sendDossierTranscript,
             setGuildLanguage,
             syncServiceState,
             updateGuildConfig,
@@ -5830,6 +6605,10 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         if (await handleModerationInteraction(interaction, commandName, language)) {
+            return;
+        }
+
+        if (await handleDossierInteraction(interaction, commandName, language)) {
             return;
         }
 
@@ -6330,15 +7109,26 @@ client.on(Events.InteractionCreate, async interaction => {
         return handleSentinelButton(interaction, handleSentinelSelfRoleButton);
     }
 
-    if (interaction.customId === 'sentinel_ticket:create') {
+    if (
+        interaction.customId.startsWith('sentinel_dossier:')
+        && ['support', 'report', 'complaint', 'admin'].includes(interaction.customId.split(':')[1])
+    ) {
         return handleSentinelButton(interaction, handleSentinelTicketButton);
     }
 
-    if (interaction.customId === 'sentinel_ticket:bug') {
+    if (interaction.customId === 'sentinel_dossier:bug' || interaction.customId === 'sentinel_ticket:create' || interaction.customId === 'sentinel_ticket:bug') {
         return handleSentinelButton(interaction, handleSentinelTicketButton);
     }
 
-    if (interaction.customId === 'sentinel_ticket:close') {
+    if (interaction.customId === 'sentinel_dossier:claim') {
+        return handleSentinelButton(interaction, handleSentinelDossierClaimButton);
+    }
+
+    if (interaction.customId === 'sentinel_dossier:transcript') {
+        return handleSentinelButton(interaction, handleSentinelDossierTranscriptButton);
+    }
+
+    if (interaction.customId === 'sentinel_dossier:close' || interaction.customId === 'sentinel_ticket:close') {
         return handleSentinelButton(interaction, handleSentinelTicketCloseButton);
     }
 
@@ -6531,6 +7321,15 @@ client.on(Events.MessageCreate, async message => {
             content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
             components: buildServicePanelComponents(language)
         });
+    }
+
+    if (/^!(dossier-panel|ticket-panel)$/i.test(content)) {
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        await publishDossierPanel(message.channel, message.author, language);
+        return message.reply(t(language, 'dossierPanelPublished', { channel: message.channel }));
     }
 
     if (/^!(config-voir|config-view)$/i.test(content)) {

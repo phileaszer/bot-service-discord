@@ -2068,8 +2068,22 @@ code {
 }
 
 .diagnostics-panel,
-.user-lookup-note {
+.user-lookup-note,
+.dossier-list-card {
   grid-column: 1 / -1;
+}
+
+.form-grid .table-action-form,
+.table-action-form {
+  display: inline-grid;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  clip-path: none;
+}
+
+.dossier-table td:last-child {
+  width: 150px;
 }
 
 .panel-mini-heading {

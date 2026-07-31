@@ -62,7 +62,8 @@ function dashboardErrorMessage(message) {
     'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
-    'Unknown moderation action.': 'Action de modération inconnue.'
+    'Unknown moderation action.': 'Action de modération inconnue.',
+    'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
   };
 
   const base = translated[message] || message || 'Action impossible pour le moment.';
@@ -1045,11 +1046,84 @@ function customEmbedList(state) {
   `;
 }
 
+function dossierTypeLabel(type) {
+  const labels = {
+    support: 'Support',
+    report: 'Signalement',
+    complaint: 'Plainte',
+    admin: 'Administratif',
+    bug: 'Bug Sentinel'
+  };
+
+  return labels[type] || 'Support';
+}
+
+function dossierStatusLabel(status) {
+  return status === 'closed' ? 'Clôturé' : 'Ouvert';
+}
+
+function dossierList(state) {
+  const items = state.dossiers?.items || [];
+
+  if (items.length === 0) {
+    return '<p class="muted">Aucun dossier Sentinel enregistré pour le moment.</p>';
+  }
+
+  return `
+    <div class="table-shell dossier-table-shell">
+      <table class="dashboard-table dossier-table">
+        <thead>
+          <tr>
+            <th>Dossier</th>
+            <th>Type</th>
+            <th>Demandeur</th>
+            <th>Référent</th>
+            <th>Statut</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => {
+            const channel = resolveChannel(state, item.channelId);
+            const isOpen = item.status !== 'closed';
+
+            return `
+              <tr>
+                <td>
+                  <strong>#${escapeHtml(item.id)}</strong>
+                  <small>${channel ? `#${escapeHtml(channel.name)}` : escapeHtml(item.channelId)}</small>
+                </td>
+                <td>${escapeHtml(dossierTypeLabel(item.type))}</td>
+                <td><code>${escapeHtml(item.ownerUserId)}</code></td>
+                <td>${item.referentUserId ? `<code>${escapeHtml(item.referentUserId)}</code>` : '<span class="muted">Aucun</span>'}</td>
+                <td>${statusBadge(dossierStatusLabel(item.status), isOpen)}</td>
+                <td>
+                  ${isOpen ? `
+                    <form class="table-action-form" data-action-form="dossier-close">
+                      <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                      <button class="button button-small button-ghost" type="submit">Clôturer</button>
+                    </form>
+                  ` : '<span class="muted">Archivé</span>'}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 const AUDIT_ACTION_LABELS = {
   'set-language': 'Langue',
   'set-service-role': 'Rôle de service',
   'set-log-channel': 'Salon de logs',
   'publish-service-panel': 'Panneau de service',
+  'publish-dossier-panel': 'Bureau d’accueil',
+  'dossier-close': 'Dossier clôturé',
+  'dossier-add': 'Intervenant ajouté',
+  'dossier-remove': 'Intervenant retiré',
+  'dossier-transcript': 'Compte rendu dossier',
   'add-command-role': 'Rôle autorisé ajouté',
   'remove-command-role': 'Rôle autorisé retiré',
   'toggle-service': 'Bouton service',
@@ -1567,6 +1641,12 @@ const DASHBOARD_TABS = [
     title: 'Messages Sentinel'
   },
   {
+    id: 'dossiers',
+    label: 'Dossiers',
+    eyebrow: 'Tickets',
+    title: 'Dossiers Sentinel'
+  },
+  {
     id: 'audit',
     label: 'Historique',
     eyebrow: 'Suivi',
@@ -1696,6 +1776,34 @@ function renderDashboard() {
         <article class="inline-form">
           ${labelHelp('Embeds gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard. Copie leur ID pour les gérer.')}
           ${customEmbedList(state)}
+        </article>
+      </div>
+    </section>
+      `)}
+
+      ${tabPanel('dossiers', `
+    <section class="dashboard-panel module-panel dossiers-panel" id="dossiers">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Dossiers Sentinel</p>
+          <h2>Bureau d’accueil et suivi</h2>
+          <p class="muted">Les dossiers sont le système de tickets de Sentinel : chaque demande ouvre un salon privé entre le membre et l’équipe autorisée.</p>
+        </div>
+        <span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>
+      </div>
+      <div class="form-grid module-form-grid">
+        <form data-action-form="publish-dossier-panel">
+          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau qui permet aux membres d’ouvrir un dossier Sentinel, c’est-à-dire un ticket privé avec le staff.')}
+          <select name="channelId">${channelOptions}</select>
+          <button class="button" type="submit">Publier le bureau</button>
+        </form>
+        <article class="inline-form dossier-explain-card">
+          ${labelHelp('À quoi ça sert ?', 'Un dossier sert pour une demande support, un signalement, une plainte, une demande administrative ou un bug Sentinel.')}
+          <p>Quand un membre ouvre un dossier, Sentinel crée un salon privé, garde le demandeur, les rôles autorisés et les intervenants dans le même espace, puis peut générer un compte rendu.</p>
+        </article>
+        <article class="inline-form dossier-list-card">
+          ${labelHelp('Dossiers récents', 'Retrouve les dossiers ouverts ou clôturés sur ce serveur. Un dossier ouvert peut être clôturé depuis le dashboard.')}
+          ${dossierList(state)}
         </article>
       </div>
     </section>
