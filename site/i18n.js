@@ -356,7 +356,7 @@
     'Dossiers Sentinel': 'Sentinel dossiers',
     'Les demandes deviennent des dossiers Sentinel.': 'Requests become Sentinel dossiers.',
     'Un membre ouvre une demande depuis le bureau d’accueil. Sentinel crée un salon privé, garde les intervenants au même endroit et peut générer un compte rendu.': 'A member opens a request from the reception desk. Sentinel creates a private channel, keeps participants in the same place, and can generate a transcript.',
-    'Les dossiers sont les espaces privés de suivi de Sentinel : chaque demande ouvre un salon dédié avec l’équipe autorisée.': 'Dossiers are Sentinel private follow-up spaces: each request opens a dedicated channel with the authorized team.',
+    'Dans Sentinel, un dossier correspond à un ticket privé : chaque demande ouvre un salon dédié avec l’équipe autorisée.': 'In Sentinel, a dossier is a private ticket: each request opens a dedicated channel with the authorized team.',
     'Bureau d’accueil et suivi': 'Reception desk and tracking',
     'Les dossiers sont les espaces privés de suivi de Sentinel : chaque demande ouvre un salon dédié entre le membre et l’équipe autorisée.': 'Dossiers are Sentinel private follow-up spaces: each request opens a dedicated channel between the member and the authorized team.',
     'Publier le bureau d’accueil': 'Publish the reception desk',
