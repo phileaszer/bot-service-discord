@@ -1816,20 +1816,20 @@ function renderDashboard() {
         <div>
           <p class="eyebrow">Dossiers Sentinel</p>
           <h2>Bureau d’accueil et suivi</h2>
-          <p class="muted">Les dossiers sont les espaces privés de suivi de Sentinel : chaque demande ouvre un salon dédié entre le membre et l’équipe autorisée.</p>
+          <p class="muted">Dans Sentinel, un dossier est simplement un ticket privé : un membre ouvre une demande, puis Sentinel crée un salon privé avec lui et l’équipe autorisée.</p>
         </div>
         <span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>
       </div>
       ${dossierPermissionAlert(state)}
       <div class="form-grid module-form-grid">
         <form data-action-form="publish-dossier-panel">
-          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau qui permet aux membres d’ouvrir un dossier Sentinel, puis d’échanger en privé avec le staff.')}
+          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau de tickets. Les membres pourront ouvrir un dossier Sentinel depuis Discord.')}
           <select name="channelId">${channelOptions}</select>
           <button class="button" type="submit">Publier le bureau</button>
         </form>
         <article class="inline-form dossier-explain-card">
-          ${labelHelp('À quoi ça sert ?', 'Un dossier sert pour une demande support, un signalement, une plainte, une demande administrative ou un bug Sentinel.')}
-          <p>Quand un membre ouvre un dossier, Sentinel crée un salon privé, garde le demandeur, les rôles autorisés et les intervenants dans le même espace, puis peut générer un compte rendu.</p>
+          ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est un ticket privé pour le support, un signalement, une plainte, une demande administrative ou un bug.')}
+          <p>Quand un membre ouvre un dossier, Sentinel crée le salon du ticket, garde le demandeur, les rôles autorisés et les intervenants au même endroit, puis peut générer un compte rendu.</p>
         </article>
         <article class="inline-form dossier-list-card">
           ${labelHelp('Dossiers récents', 'Retrouve les dossiers ouverts ou clôturés sur ce serveur. Un dossier ouvert peut être clôturé depuis le dashboard.')}
