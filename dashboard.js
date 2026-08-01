@@ -3,7 +3,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const zlib = require('zlib');
-const { PermissionsBitField } = require('discord.js');
+const { ChannelType, PermissionsBitField } = require('discord.js');
 const db = require('./database/database');
 
 const sessions = new Map();
@@ -130,6 +130,7 @@ function getAuditTarget(body = {}) {
     const targetChecks = [
         ['user', body.userId],
         ['role', body.roleId],
+        ['category', body.categoryId],
         ['channel', body.channelId],
         ['message', body.messageId],
         ['case', body.caseId]
@@ -151,9 +152,13 @@ function sanitizeAuditDetails(body = {}) {
         'language',
         'roleId',
         'channelId',
+        'categoryId',
         'userId',
         'messageId',
         'caseId',
+        'dossierId',
+        'dossierStatus',
+        'dossierType',
         'duration',
         'count',
         'deleteDays',
@@ -820,6 +825,20 @@ function requireAdvanced(ctx, guildId) {
     }
 }
 
+function getDossierStatusLabel(status, language = 'fr') {
+    const labels = {
+        open: { fr: 'Ouvert', en: 'Open' },
+        in_progress: { fr: 'En cours', en: 'In progress' },
+        waiting: { fr: 'En attente', en: 'Waiting' },
+        resolved: { fr: 'Résolu', en: 'Resolved' },
+        closed: { fr: 'Fermé', en: 'Closed' }
+    };
+    const key = String(status || 'open').trim().toLowerCase().replace(/-/g, '_');
+    const copy = labels[key] || labels.open;
+
+    return copy[language === 'en' ? 'en' : 'fr'];
+}
+
 function normalizeUserId(ctx, value) {
     const userId = ctx.helpers.normalizeUserId(value);
 
@@ -882,6 +901,9 @@ function mapDossier(item) {
         openerUserId: item.openerUserId,
         type: item.type,
         status: item.status,
+        priority: item.priority || 'normal',
+        subject: item.subject || null,
+        description: item.description || null,
         referentUserId: item.referentUserId,
         createdAt: item.createdAt,
         closedAt: item.closedAt,
@@ -1074,6 +1096,7 @@ async function buildGuildState(ctx, guild, session = null) {
     const canViewGlobalAudit = isCreatorUser(session?.user?.id);
     const auditLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 50 : 10;
     const moderationCaseLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 25 : 10;
+    const dossierHistoryLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 100 : 10;
     const moderationCases = ctx.helpers.getRecentModerationCases
         ? ctx.helpers.getRecentModerationCases(guild.id, moderationCaseLimit)
         : [];
@@ -1087,6 +1110,14 @@ async function buildGuildState(ctx, guild, session = null) {
         }));
     const channels = guild.channels.cache
         .filter(channel => channel.isTextBased?.())
+        .sort((a, b) => a.rawPosition - b.rawPosition)
+        .map(channel => ({
+            id: channel.id,
+            name: channel.name,
+            type: channel.type
+        }));
+    const categories = guild.channels.cache
+        .filter(channel => channel.type === ChannelType.GuildCategory)
         .sort((a, b) => a.rawPosition - b.rawPosition)
         .map(channel => ({
             id: channel.id,
@@ -1108,6 +1139,7 @@ async function buildGuildState(ctx, guild, session = null) {
         },
         roles,
         channels,
+        categories,
         summary: {
             registeredUsers: summary.registeredUsers,
             activeCount: summary.activeServices.length,
@@ -1160,7 +1192,14 @@ async function buildGuildState(ctx, guild, session = null) {
         },
         dossiers: {
             openCount: ctx.helpers.getOpenDossierCount(guild.id),
-            items: ctx.helpers.getRecentDossiers(guild.id, 25).map(mapDossier)
+            historyLimit: dossierHistoryLimit,
+            panelQuota: ctx.helpers.getDossierPanelQuota
+                ? ctx.helpers.getDossierPanelQuota(guild.id)
+                : { used: 0, limit: 1, unlimited: false, remaining: 1 },
+            settings: ctx.helpers.getDossierTypeSettings
+                ? ctx.helpers.getDossierTypeSettings(guild.id)
+                : [],
+            items: ctx.helpers.getRecentDossiers(guild.id, dossierHistoryLimit).map(mapDossier)
         },
         diagnostics: buildPermissionDiagnostics(ctx, guild, config),
         moderationCases: {
@@ -1579,18 +1618,28 @@ async function dossierAction(ctx, guild, actor, body) {
 
     const language = ctx.helpers.getGuildLanguage(guild.id);
     const action = body.action;
-    const channel = getTextChannel(guild, body.channelId);
 
     if (action === 'publish-dossier-panel') {
-        await channel.send({
+        const channel = getTextChannel(guild, body.channelId);
+        const quota = ctx.helpers.getDossierPanelQuota
+            ? ctx.helpers.getDossierPanelQuota(guild.id)
+            : { unlimited: false, used: 0, limit: 1 };
+
+        if (!quota.unlimited && quota.used >= quota.limit) {
+            throw createHttpError(402, `Le gratuit permet ${quota.limit} panneau de dossiers par serveur.`);
+        }
+
+        const message = await channel.send({
             embeds: [ctx.helpers.buildDossierPanelEmbed(guild, actor.user, language)],
             components: ctx.helpers.buildDossierPanelComponents(language)
         });
+        ctx.helpers.recordDossierPanel?.(guild.id, channel.id, message.id, actor.id);
 
         return `Bureau d'accueil Sentinel publie dans #${channel.name}.`;
     }
 
     if (action === 'dossier-close') {
+        const channel = getTextChannel(guild, body.channelId);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
@@ -1602,11 +1651,71 @@ async function dossierAction(ctx, guild, actor, body) {
             type: 'support'
         };
 
-        await ctx.helpers.sendDossierTranscript(channel, dossier, actor.user, language);
-        ctx.helpers.closeDossierRecord(guild.id, channel.id, actor.id);
+        const closedDossier = ctx.helpers.closeDossierRecord(guild.id, channel.id, actor.id) || {
+            ...dossier,
+            status: 'closed',
+            closedAt: new Date().toISOString(),
+            closedByUserId: actor.id
+        };
+
+        await ctx.helpers.sendDossierTranscript(channel, closedDossier, actor.user, language);
         await channel.delete('Cloture dossier Sentinel depuis le dashboard').catch(() => {});
 
         return `Dossier Sentinel cloture : #${channel.name}.`;
+    }
+
+    if (action === 'dossier-status') {
+        requireAdvanced(ctx, guild.id);
+
+        const channel = getTextChannel(guild, body.channelId);
+        if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
+            throw createHttpError(400, 'This channel is not a Sentinel dossier.');
+        }
+
+        const dossier = ctx.helpers.updateDossierStatus(guild.id, channel.id, body.dossierStatus || body.status);
+        const nextStatus = dossier?.status || body.dossierStatus || body.status || 'open';
+        const nextStatusLabel = getDossierStatusLabel(nextStatus, language);
+
+        await channel.send(`📌 ${actor.user} a mis à jour le statut du dossier : **${nextStatusLabel}**.`).catch(() => {});
+        return `Statut du dossier mis a jour : ${nextStatusLabel}.`;
+    }
+
+    if (action === 'dossier-claim') {
+        requireAdvanced(ctx, guild.id);
+
+        const channel = getTextChannel(guild, body.channelId);
+        if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
+            throw createHttpError(400, 'This channel is not a Sentinel dossier.');
+        }
+
+        const dossier = ctx.helpers.setDossierReferent
+            ? ctx.helpers.setDossierReferent(guild.id, channel.id, actor.id)
+            : null;
+
+        await channel.send(`✅ ${actor.user} prend ce dossier en charge.`).catch(() => {});
+        return `Dossier Sentinel pris en charge${dossier?.id ? ` : #${dossier.id}` : ''}.`;
+    }
+
+    if (action === 'set-dossier-category') {
+        requireAdvanced(ctx, guild.id);
+
+        const dossierType = String(body.dossierType || '').trim();
+        const categoryId = String(body.categoryId || '').trim() || null;
+
+        if (!dossierType) {
+            throw createHttpError(400, 'Missing dossier type.');
+        }
+
+        if (categoryId) {
+            const category = guild.channels.cache.get(categoryId);
+
+            if (!category || category.type !== ChannelType.GuildCategory) {
+                throw createHttpError(400, 'Category not found.');
+            }
+        }
+
+        const setting = ctx.helpers.updateDossierTypeCategory(guild.id, dossierType, categoryId);
+        return `Categorie dossier mise a jour pour ${setting.type}.`;
     }
 
     throw createHttpError(400, 'Unknown dossier action.');
@@ -1699,7 +1808,7 @@ async function runDashboardAction(ctx, guild, member, body) {
         return customEmbedAction(ctx, guild, member, body);
     }
 
-    if (['publish-dossier-panel', 'dossier-close'].includes(action)) {
+    if (['publish-dossier-panel', 'dossier-close', 'dossier-status', 'dossier-claim', 'set-dossier-category'].includes(action)) {
         return dossierAction(ctx, guild, member, body);
     }
 

@@ -15,6 +15,8 @@ let auditFilters = {};
 let moderationFilters = {};
 let expandedModerationCaseId = null;
 let selectedUserProfile = null;
+let dossierFilters = {};
+let expandedDossierId = null;
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -62,6 +64,8 @@ function dashboardErrorMessage(message) {
     'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
+    'Missing dossier type.': 'Type de dossier manquant.',
+    'Category not found.': 'Catégorie Discord introuvable.',
     'Unknown moderation action.': 'Action de modération inconnue.',
     'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
   };
@@ -1079,23 +1083,221 @@ function dossierTypeLabel(type) {
   const labels = {
     support: 'Support',
     report: 'Signalement',
-    complaint: 'Plainte',
-    admin: 'Administratif',
-    bug: 'Bug Sentinel'
+    recruitment: 'Recrutement',
+    partnership: 'Partenariat',
+    other: 'Autre',
+    complaint: 'Signalement',
+    admin: 'Autre',
+    bug: 'Autre'
   };
 
   return labels[type] || 'Support';
 }
 
 function dossierStatusLabel(status) {
-  return status === 'closed' ? 'Clôturé' : 'Ouvert';
+  const labels = {
+    open: 'Ouvert',
+    in_progress: 'En cours',
+    waiting: 'En attente',
+    resolved: 'Résolu',
+    closed: 'Fermé'
+  };
+
+  return labels[status] || 'Ouvert';
+}
+
+function dossierPriorityLabel(priority) {
+  const labels = {
+    normal: 'Normal',
+    important: 'Important',
+    urgent: 'Urgent'
+  };
+
+  return labels[priority] || 'Normal';
+}
+
+function dossierQuotaText(state) {
+  const quota = state.dossiers?.panelQuota;
+
+  if (!quota) {
+    return 'Quota indisponible';
+  }
+
+  if (quota.unlimited) {
+    return 'Premium : panneaux illimités, historique long et réglages avancés.';
+  }
+
+  return `Gratuit : ${quota.used}/${quota.limit} panneau publié. ${quota.remaining} restant. Historique visible : ${state.dossiers?.historyLimit || 10} dossiers.`;
+}
+
+function categoryOptionList(categories = [], selectedId = null) {
+  const options = [`<option value="">Même catégorie que le panneau</option>`];
+
+  for (const category of categories) {
+    const selected = category.id === selectedId ? ' selected' : '';
+    options.push(`<option value="${escapeHtml(category.id)}"${selected}>${escapeHtml(category.name)}</option>`);
+  }
+
+  return options.join('');
+}
+
+function dossierSettingForType(state, type) {
+  return (state.dossiers?.settings || []).find((setting) => setting.type === type) || null;
+}
+
+function dossierPremiumSettings(state, premiumTag) {
+  const types = [
+    ['support', 'Support'],
+    ['report', 'Signalement'],
+    ['recruitment', 'Recrutement'],
+    ['partnership', 'Partenariat'],
+    ['other', 'Autre']
+  ];
+  const disabled = state.advanced ? '' : ' disabled';
+
+  return `
+    <article class="inline-form dossier-premium-settings">
+      ${labelHelp('Catégories par type', 'Option Premium : envoie chaque type de dossier dans une catégorie Discord différente, par exemple recrutement dans une catégorie staff dédiée.', ` ${premiumTag}`)}
+      <div class="dossier-category-grid">
+        ${types.map(([type, label]) => {
+          const setting = dossierSettingForType(state, type);
+
+          return `
+            <form data-action-form="set-dossier-category">
+              <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+              <strong>${escapeHtml(label)}</strong>
+              <select name="categoryId"${disabled}>${categoryOptionList(state.categories || [], setting?.categoryId || '')}</select>
+              <button class="button button-small" type="submit"${disabled}>Enregistrer</button>
+            </form>
+          `;
+        }).join('')}
+      </div>
+      <p class="muted">Plus tard, ce même espace accueillera les formulaires personnalisés, les priorités, les templates, le branding et les automatisations.</p>
+    </article>
+  `;
+}
+
+function dossierStatusOptions(selectedStatus = '') {
+  const options = [
+    ['', 'Tous les statuts'],
+    ['open', 'Ouvert'],
+    ['in_progress', 'En cours'],
+    ['waiting', 'En attente'],
+    ['resolved', 'Résolu'],
+    ['closed', 'Fermé']
+  ];
+
+  return options
+    .map(([value, label]) => `<option value="${escapeHtml(value)}"${value === selectedStatus ? ' selected' : ''}>${escapeHtml(label)}</option>`)
+    .join('');
+}
+
+function dossierStatusActionOptions(selectedStatus = 'in_progress') {
+  const options = [
+    ['open', 'Ouvert'],
+    ['in_progress', 'En cours'],
+    ['waiting', 'En attente'],
+    ['resolved', 'Résolu']
+  ];
+
+  return options
+    .map(([value, label]) => `<option value="${escapeHtml(value)}"${value === selectedStatus ? ' selected' : ''}>${escapeHtml(label)}</option>`)
+    .join('');
+}
+
+function dossierMatchesFilters(item) {
+  const userId = String(dossierFilters.userId || '').trim();
+  const referentId = String(dossierFilters.referentId || '').trim();
+  const status = String(dossierFilters.status || '').trim();
+
+  if (userId && ![item.ownerUserId, item.openerUserId].includes(userId)) {
+    return false;
+  }
+
+  if (referentId && item.referentUserId !== referentId) {
+    return false;
+  }
+
+  if (status && item.status !== status) {
+    return false;
+  }
+
+  return true;
+}
+
+function dossierFiltersPanel() {
+  return `
+    <form class="audit-filters dossier-filters" data-dossier-filter>
+      <div class="audit-field">
+        ${labelHelp('Demandeur', 'Filtre les dossiers ouverts par un ID Discord précis.')}
+        <input name="userId" placeholder="ID Discord" value="${escapeHtml(dossierFilters.userId || '')}">
+      </div>
+      <div class="audit-field">
+        ${labelHelp('Référent', 'Filtre les dossiers pris en charge par un membre du staff.')}
+        <input name="referentId" placeholder="ID Discord référent" value="${escapeHtml(dossierFilters.referentId || '')}">
+      </div>
+      <div class="audit-field">
+        ${labelHelp('Statut', 'Affiche seulement les dossiers ouverts, en cours, en attente, résolus ou fermés.')}
+        <select name="status">${dossierStatusOptions(dossierFilters.status || '')}</select>
+      </div>
+      <div class="audit-actions">
+        <button class="button" type="submit">Filtrer les dossiers</button>
+        <button class="button button-ghost" type="button" data-dossier-reset>Réinitialiser</button>
+      </div>
+    </form>
+  `;
+}
+
+function dossierDetailRow(item) {
+  if (String(expandedDossierId) !== String(item.id)) {
+    return '';
+  }
+
+  return `
+    <tr class="case-detail-row dossier-detail-row">
+      <td colspan="7">
+        <div class="case-detail-card">
+          <div>
+            <span>Dossier</span>
+            <strong>#${escapeHtml(item.id)}</strong>
+          </div>
+          <div>
+            <span>Type</span>
+            <strong>${escapeHtml(dossierTypeLabel(item.type))}</strong>
+          </div>
+          <div>
+            <span>Priorité</span>
+            <strong>${escapeHtml(dossierPriorityLabel(item.priority))}</strong>
+          </div>
+          <div>
+            <span>Ouvert le</span>
+            <strong>${escapeHtml(formatAuditDate(item.createdAt))}</strong>
+          </div>
+          <div>
+            <span>Fermé le</span>
+            <strong>${escapeHtml(item.closedAt ? formatAuditDate(item.closedAt) : 'Encore ouvert')}</strong>
+          </div>
+          <div class="case-detail-wide">
+            <span>Sujet</span>
+            <p>${escapeHtml(item.subject || 'Aucun sujet enregistré.')}</p>
+          </div>
+          <div class="case-detail-wide">
+            <span>Description</span>
+            <p>${escapeHtml(item.description || 'Aucune description enregistrée.')}</p>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
 }
 
 function dossierList(state) {
-  const items = state.dossiers?.items || [];
+  const items = (state.dossiers?.items || []).filter(dossierMatchesFilters);
+  const advancedDisabled = state.advanced ? '' : ' disabled';
+  const advancedHint = state.advanced ? '' : '<small class="premium-inline-note">Premium</small>';
 
   if (items.length === 0) {
-    return '<p class="muted">Aucun dossier Sentinel enregistré pour le moment.</p>';
+    return '<p class="muted">Aucun dossier Sentinel trouvé avec ces filtres.</p>';
   }
 
   return `
@@ -1108,6 +1310,7 @@ function dossierList(state) {
             <th>Demandeur</th>
             <th>Référent</th>
             <th>Statut</th>
+            <th>Détail</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -1120,26 +1323,40 @@ function dossierList(state) {
               <tr>
                 <td>
                   <strong>#${escapeHtml(item.id)}</strong>
+                  ${item.subject ? `<small>${escapeHtml(item.subject)}</small>` : ''}
                   <small>${channel ? `#${escapeHtml(channel.name)}` : escapeHtml(item.channelId)}</small>
                 </td>
                 <td>${escapeHtml(dossierTypeLabel(item.type))}</td>
                 <td><code>${escapeHtml(item.ownerUserId)}</code></td>
                 <td>${item.referentUserId ? `<code>${escapeHtml(item.referentUserId)}</code>` : '<span class="muted">Aucun</span>'}</td>
                 <td>${statusBadge(dossierStatusLabel(item.status), isOpen)}</td>
+                <td><button class="button button-small button-ghost" type="button" data-dossier-detail="${escapeHtml(item.id)}">Voir</button></td>
                 <td>
                   ${isOpen ? `
-                    <form class="table-action-form" data-action-form="dossier-close">
+                    <form class="table-action-form dossier-table-actions" data-action-form="dossier-status">
+                      <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                      <select name="dossierStatus"${advancedDisabled}>${dossierStatusActionOptions(item.status)}</select>
+                      <button class="button button-small button-ghost" type="submit"${advancedDisabled}>Statut</button>
+                    </form>
+                    <form class="table-action-form dossier-table-actions" data-action-form="dossier-claim">
+                      <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                      <button class="button button-small button-ghost" type="submit"${advancedDisabled}>Prendre</button>
+                    </form>
+                    ${advancedHint}
+                    <form class="table-action-form dossier-table-actions" data-action-form="dossier-close">
                       <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
                       <button class="button button-small button-ghost" type="submit">Clôturer</button>
                     </form>
                   ` : '<span class="muted">Archivé</span>'}
                 </td>
               </tr>
+              ${dossierDetailRow(item)}
             `;
           }).join('')}
         </tbody>
       </table>
     </div>
+    <p class="muted case-limit-note">Affichage limité aux ${escapeHtml(state.dossiers?.historyLimit || 10)} derniers dossiers visibles pour ce serveur.</p>
   `;
 }
 
@@ -1150,6 +1367,9 @@ const AUDIT_ACTION_LABELS = {
   'publish-service-panel': 'Panneau de service',
   'publish-dossier-panel': 'Bureau d’accueil',
   'dossier-close': 'Dossier clôturé',
+  'dossier-status': 'Statut dossier',
+  'dossier-claim': 'Dossier pris en charge',
+  'set-dossier-category': 'Catégorie dossier',
   'dossier-add': 'Intervenant ajouté',
   'dossier-remove': 'Intervenant retiré',
   'dossier-transcript': 'Compte rendu dossier',
@@ -1232,6 +1452,7 @@ function auditTargetTypeLabel(type) {
   const labels = {
     user: 'Membre',
     channel: 'Salon',
+    category: 'Catégorie',
     role: 'Rôle',
     message: 'Message',
     case: 'Cas',
@@ -1254,6 +1475,11 @@ function auditTargetLabel(item, state) {
   if (item.targetType === 'channel') {
     const channel = resolveChannel(state, item.targetId);
     return channel ? `#${channel.name}` : `Salon ${item.targetId}`;
+  }
+
+  if (item.targetType === 'category') {
+    const category = (state.categories || []).find((candidate) => candidate.id === item.targetId);
+    return category ? `Catégorie ${category.name}` : `Catégorie ${item.targetId}`;
   }
 
   if (item.targetType === 'guild') {
@@ -1816,23 +2042,33 @@ function renderDashboard() {
         <div>
           <p class="eyebrow">Dossiers Sentinel</p>
           <h2>Bureau d’accueil et suivi</h2>
-          <p class="muted">Dans Sentinel, un dossier est simplement un ticket privé : un membre ouvre une demande, puis Sentinel crée un salon privé avec lui et l’équipe autorisée.</p>
+          <p class="muted">Dans Sentinel, un dossier est un ticket privé : un membre choisit un type de demande, explique le sujet, puis Sentinel crée un salon réservé avec l’équipe autorisée.</p>
         </div>
         <span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>
       </div>
       ${dossierPermissionAlert(state)}
+      <div class="dashboard-alert is-ready dossier-quota-alert">
+        <strong>Limites dossiers</strong>
+        <p>${escapeHtml(dossierQuotaText(state))}</p>
+      </div>
       <div class="form-grid module-form-grid">
         <form data-action-form="publish-dossier-panel">
-          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau de tickets. Les membres pourront ouvrir un dossier Sentinel depuis Discord.')}
+          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau de tickets. En gratuit, un serveur garde un seul panneau actif ; en Premium, les panneaux seront illimités.')}
           <select name="channelId">${channelOptions}</select>
           <button class="button" type="submit">Publier le bureau</button>
         </form>
         <article class="inline-form dossier-explain-card">
-          ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est un ticket privé pour le support, un signalement, une plainte, une demande administrative ou un bug.')}
-          <p>Quand un membre ouvre un dossier, Sentinel crée le salon du ticket, garde le demandeur, les rôles autorisés et les intervenants au même endroit, puis peut générer un compte rendu.</p>
+          ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est un ticket privé pour le support, un signalement, un recrutement, un partenariat ou une autre demande.')}
+          <p>En gratuit, le staff peut répondre, ajouter des intervenants, générer un compte rendu et clôturer le dossier. En Premium, il pourra aussi prendre officiellement un dossier en charge et suivre des statuts avancés.</p>
         </article>
+        <article class="inline-form dossier-explain-card premium-roadmap">
+          ${labelHelp('Premium dossiers', 'Le Premium ajoutera les panneaux illimités, catégories personnalisées, formulaires avancés, prise en charge, statuts avancés, priorités, templates, historique complet, statistiques et automatisations.')}
+          <p>Le gratuit reste simple : ouvrir, suivre, clôturer et retrouver les 10 derniers dossiers. Le Premium servira aux gros staffs qui ont besoin de trier et automatiser beaucoup de demandes.</p>
+        </article>
+        ${dossierPremiumSettings(state, premiumTag)}
         <article class="inline-form dossier-list-card">
           ${labelHelp('Dossiers récents', 'Retrouve les dossiers ouverts ou clôturés sur ce serveur. Un dossier ouvert peut être clôturé depuis le dashboard.')}
+          ${dossierFiltersPanel(state)}
           ${dossierList(state)}
         </article>
       </div>
@@ -2150,6 +2386,32 @@ function attachDashboardHandlers() {
     });
   });
 
+  $$('[data-dossier-filter]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      dossierFilters = formData(form);
+      expandedDossierId = null;
+      renderDashboard();
+    });
+  });
+
+  $$('[data-dossier-reset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      dossierFilters = {};
+      expandedDossierId = null;
+      renderDashboard();
+    });
+  });
+
+  $$('[data-dossier-detail]').forEach((button) => {
+    button.addEventListener('click', () => {
+      expandedDossierId = String(expandedDossierId) === String(button.dataset.dossierDetail)
+        ? null
+        : button.dataset.dossierDetail;
+      renderDashboard();
+    });
+  });
+
   $$('[data-case-detail]').forEach((button) => {
     button.addEventListener('click', () => {
       expandedModerationCaseId = String(expandedModerationCaseId) === String(button.dataset.caseDetail)
@@ -2182,6 +2444,8 @@ async function selectGuild(guildId) {
   moderationFilters = {};
   expandedModerationCaseId = null;
   selectedUserProfile = null;
+  dossierFilters = {};
+  expandedDossierId = null;
   renderGuilds();
 
   const guild = guilds.find((item) => item.id === guildId);
@@ -2331,6 +2595,8 @@ $('[data-logout]')?.addEventListener('click', async () => {
   selectedGuildId = null;
   currentState = null;
   currentSettings = null;
+  dossierFilters = {};
+  expandedDossierId = null;
   localStorage.removeItem('sentinel-discord-profile');
   renderUser();
   renderGuilds();

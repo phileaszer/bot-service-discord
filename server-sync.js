@@ -555,7 +555,7 @@ function panelPayload(panel) {
             embeds: [embed('Aide installation', `Besoin d aide pour inviter Sentinel, regler les permissions, configurer un salon ou comprendre une commande ?\n\n**Avant de demander**\n1. Verifie que Sentinel est installe comme bot, pas seulement comme integration de commandes.\n2. Place le role Sentinel au-dessus des roles qu il doit gerer.\n3. Verifie que les scopes \`bot\` et \`applications.commands\` sont presents.\n4. Utilise le lien officiel : ${LINKS.invite}\n\n**Pour recevoir de l aide rapidement**\nIndique ce que tu voulais faire, la commande ou le bouton concerne, ce qui bloque, et le message d erreur si tu en as un.`, COLORS.dark)]
         },
         bugs: {
-            embeds: [embed('Signalement de bugs', 'Si Sentinel ne reagit pas comme prevu, signale-le ici ou ouvre un dossier bug.\n\n**Format conseille**\nCommande ou fonction :\nCe que tu as fait :\nResultat obtenu :\nResultat attendu :\nCapture ou message d erreur :\n\nLes bugs de boutons, permissions, dossiers, langues, logs et commandes sont prioritaires sur le serveur de reference.', COLORS.dark)]
+            embeds: [embed('Signalement de bugs', 'Si Sentinel ne reagit pas comme prevu, signale-le ici ou ouvre un dossier de signalement.\n\n**Format conseille**\nCommande ou fonction :\nCe que tu as fait :\nResultat obtenu :\nResultat attendu :\nCapture ou message d erreur :\n\nLes bugs de boutons, permissions, dossiers, langues, logs et commandes sont prioritaires sur le serveur de reference.', COLORS.dark)]
         },
         commands: {
             embeds: [embed('Commandes Sentinel', 'Les commandes principales de Sentinel sont disponibles avec `/` et plusieurs alias texte.\n\n**Membres**\n`/aide`, `/mes-heures`, `/historique-service`, `/en-service`, `/top-service`\n\n**Serveur de reference**\n`/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-heures`, `/reset-heures-all`\n\n**Moderation**\n`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`, `/sanctions`\n\n**Configuration**\n`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir`, `/config-langue`', COLORS.cyan)]
@@ -567,13 +567,13 @@ function panelPayload(panel) {
             embeds: [embed('Roadmap Sentinel', 'Priorites actuelles :\n\n**Court terme**\n- stabiliser les boutons et dossiers\n- enrichir les panneaux de ressources et statut\n- publier les annonces depuis les outils staff\n- ameliorer la documentation publique\n\n**Moyen terme**\n- statistiques de service plus detaillees\n- meilleurs rapports de moderation\n- workflow de release notes plus propre\n- verification continue des permissions\n\n**Long terme**\n- integrations externes utiles\n- tableau de bord web\n- automatisations de communaute plus fines', COLORS.violet)]
         },
         beta: {
-            embeds: [embed('Beta tests', 'Les tests avances de Sentinel passent ici.\n\nA tester en priorite :\n- boutons de langue et roles\n- ouverture/fermeture de dossiers support et bug\n- votes priorites\n- commandes avancees du serveur de reference\n- publication annonce/changelog/release depuis les outils staff\n- panneaux statut et ressources\n\nLes retours precis sont les plus utiles : action faite, resultat obtenu, resultat attendu, capture si possible.', COLORS.cyan)]
+            embeds: [embed('Beta tests', 'Les tests avances de Sentinel passent ici.\n\nA tester en priorite :\n- boutons de langue et roles\n- ouverture/fermeture de dossiers support, signalement, recrutement, partenariat et autre\n- votes priorites\n- commandes avancees du serveur de reference\n- publication annonce/changelog/release depuis les outils staff\n- panneaux statut et ressources\n\nLes retours precis sont les plus utiles : action faite, resultat obtenu, resultat attendu, capture si possible.', COLORS.cyan)]
         },
         futureIdeas: {
             embeds: [embed('Idees futures', 'Cet espace sert a imaginer la suite de Sentinel.\n\nPistes ouvertes : tableau de bord web, meilleure page top.gg, systeme de templates serveur, analytics de service, assistants de configuration, notifications de maintenance, workflows de publication et outils staff plus pousses.\n\nUne bonne idee explique le probleme, l utilisateur concerne, et ce que Sentinel devrait simplifier.', COLORS.violet)]
         },
         patchNotes: {
-            embeds: [embed('Notes de version', 'Version serveur de reference actuelle :\n\n- site officiel publie\n- page top.gg publiee\n- serveur communautaire bilingue FR/EN\n- boutons de langue fonctionnels\n- dossiers support et bug\n- votes priorites\n- salon staff de tests bot\n- toutes les commandes actives sur le serveur de reference\n- outil staff de publication Discord\n\nLes prochaines notes reprendront uniquement les changements finalises.', COLORS.pink)]
+            embeds: [embed('Notes de version', 'Version serveur de reference actuelle :\n\n- site officiel publie\n- page top.gg publiee\n- serveur communautaire bilingue FR/EN\n- boutons de langue fonctionnels\n- dossiers support, signalement, recrutement, partenariat et autre\n- votes priorites\n- salon staff de tests bot\n- toutes les commandes actives sur le serveur de reference\n- outil staff de publication Discord\n\nLes prochaines notes reprendront uniquement les changements finalises.', COLORS.pink)]
         },
         rulesEn: {
             embeds: [embed('Sentinel Rules', '**Respect**\nEvery member should be able to talk without pressure, provocation or personal attacks.\n\n**Clarity**\nKeep channels readable: no spam, flood, abusive mentions or intentionally confusing messages.\n\n**Security**\nReport suspicious behavior, abuse or Sentinel security issues privately to the staff.\n\n**Support**\nClear requests are handled faster: context, command involved, screenshot or error when possible.\n\n**Server spirit**\nPerformance, security, reliability. Keep the community useful, calm and clean.', COLORS.cyan)]
@@ -614,7 +614,7 @@ function panelPayload(panel) {
             embeds: [embed('Setup Help', `Need help inviting Sentinel, setting permissions, configuring a channel or understanding a command?\n\n**Before asking**\n1. Make sure Sentinel is installed as a bot, not only as a command integration.\n2. Place the Sentinel role above the roles it has to manage.\n3. Make sure the \`bot\` and \`applications.commands\` scopes are present.\n4. Use the official invite link: ${LINKS.invite}\n\n**For faster help**\nExplain what you wanted to do, the command or button involved, what is blocking you and the error message if you have one.`, COLORS.dark)]
         },
         bugsEn: {
-            embeds: [embed('Bug Reports', 'If Sentinel does not behave as expected, report it here or open a bug dossier.\n\n**Suggested format**\nCommand or feature:\nWhat you did:\nActual result:\nExpected result:\nScreenshot or error message:\n\nButton, permission, dossier, language, log and command bugs are prioritized on the reference server.', COLORS.dark)]
+            embeds: [embed('Bug Reports', 'If Sentinel does not behave as expected, report it here or open a report dossier.\n\n**Suggested format**\nCommand or feature:\nWhat you did:\nActual result:\nExpected result:\nScreenshot or error message:\n\nButton, permission, dossier, language, log and command bugs are prioritized on the reference server.', COLORS.dark)]
         },
         commandsEn: {
             embeds: [embed('Sentinel Commands', 'Sentinel main commands are available with `/` and several text aliases.\n\n**Members**\n`/help`, `/my-hours`, `/history`, `/on-duty`, `/top-service`\n\n**Reference server**\n`/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-hours`, `/reset-hours-all`\n\n**Moderation**\n`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`, `/mod-cases`\n\n**Configuration**\n`/config-role`, `/config-channel`, `/config-permissions`, `/config-view`, `/language`', COLORS.cyan)]
@@ -626,13 +626,13 @@ function panelPayload(panel) {
             embeds: [embed('Sentinel Roadmap', 'Current priorities:\n\n**Short term**\n- stabilize buttons and dossiers\n- enrich resources and status panels\n- publish announcements from the reference chat\n- improve public documentation\n\n**Mid term**\n- deeper duty statistics\n- better moderation reports\n- cleaner release note workflow\n- continuous permission checks\n\n**Long term**\n- useful external integrations\n- web dashboard\n- server template automation\n- sharper staff tools', COLORS.violet)]
         },
         betaEn: {
-            embeds: [embed('Beta Tests', 'Advanced Sentinel tests happen here.\n\nPriority checks:\n- language buttons and roles\n- support and bug dossier open/close flow\n- priority votes\n- reference server advanced commands\n- announcement/changelog/release publishing from the reference chat\n- status and resources panels\n\nPrecise feedback is best: action, actual result, expected result, screenshot if possible.', COLORS.cyan)]
+            embeds: [embed('Beta Tests', 'Advanced Sentinel tests happen here.\n\nPriority checks:\n- language buttons and roles\n- support, report, recruitment, partnership and other dossier open/close flow\n- priority votes\n- reference server advanced commands\n- announcement/changelog/release publishing from the reference chat\n- status and resources panels\n\nPrecise feedback is best: action, actual result, expected result, screenshot if possible.', COLORS.cyan)]
         },
         futureIdeasEn: {
             embeds: [embed('Future Ideas', 'This space is for imagining Sentinel future.\n\nOpen directions: web dashboard, stronger top.gg page, server template system, duty analytics, setup assistants, maintenance notifications, publishing workflows and deeper staff tools.\n\nA strong idea explains the problem, the affected user and what Sentinel should simplify.', COLORS.violet)]
         },
         patchNotesEn: {
-            embeds: [embed('Release Notes', 'Current reference server version:\n\n- official website published\n- top.gg page published\n- bilingual FR/EN community server\n- working language buttons\n- support and bug dossiers\n- priority votes\n- staff bot test channel\n- all commands active on the reference server\n- Discord publishing tool from the reference chat\n\nFuture release notes will only list finalized changes.', COLORS.pink)]
+            embeds: [embed('Release Notes', 'Current reference server version:\n\n- official website published\n- top.gg page published\n- bilingual FR/EN community server\n- working language buttons\n- support, report, recruitment, partnership and other dossiers\n- priority votes\n- staff bot test channel\n- all commands active on the reference server\n- Discord publishing tool from the reference chat\n\nFuture release notes will only list finalized changes.', COLORS.pink)]
         },
         staff: {
             embeds: [embed('Staff Sentinel', 'Coordination interne du staff Sentinel : moderation, support, annonces, priorites et suivi communautaire.', COLORS.dark)]
@@ -674,23 +674,27 @@ function panelPayload(panel) {
             ]
         },
         tickets: {
-            embeds: [embed('Bureau d accueil Sentinel', 'Les dossiers sont les espaces prives de suivi de Sentinel : chaque demande ouvre un salon dedie avec l equipe autorisee.\n\nChoisis le type de dossier a ouvrir. Un espace dedie sera cree pour toi et le support pourra te repondre proprement.', COLORS.pink)],
+            embeds: [embed('Bureau d accueil Sentinel', 'Dans Sentinel, un dossier est un ticket prive : chaque demande ouvre un salon dedie avec le membre et l equipe autorisee.\n\nChoisis le type de dossier a ouvrir. Sentinel te demandera ensuite le sujet et la description avant de creer le salon.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('sentinel_dossier:support').setLabel('Ouvrir un dossier').setStyle(ButtonStyle.Primary).setEmoji('📁'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:support').setLabel('Support').setStyle(ButtonStyle.Primary).setEmoji('📁'),
                     new ButtonBuilder().setCustomId('sentinel_dossier:report').setLabel('Signalement').setStyle(ButtonStyle.Danger).setEmoji('🚨'),
-                    new ButtonBuilder().setCustomId('sentinel_dossier:bug').setLabel('Bug Sentinel').setStyle(ButtonStyle.Danger).setEmoji('🧪')
+                    new ButtonBuilder().setCustomId('sentinel_dossier:recruitment').setLabel('Recrutement').setStyle(ButtonStyle.Secondary).setEmoji('🛡️'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:partnership').setLabel('Partenariat').setStyle(ButtonStyle.Secondary).setEmoji('🤝'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:other').setLabel('Autre').setStyle(ButtonStyle.Secondary).setEmoji('💬')
                 )
             ]
         }
         ,
         ticketsEn: {
-            embeds: [embed('Sentinel Reception Desk', 'Dossiers are Sentinel private follow-up spaces: each request opens a dedicated channel with the authorized team.\n\nChoose the dossier type to open. A dedicated space will be created and support can answer properly.', COLORS.pink)],
+            embeds: [embed('Sentinel Reception Desk', 'In Sentinel, a dossier is a private ticket: each request opens a dedicated channel with the member and the authorized team.\n\nChoose the dossier type to open. Sentinel will then ask for the subject and description before creating the channel.', COLORS.pink)],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('sentinel_dossier:support').setLabel('Open a dossier').setStyle(ButtonStyle.Primary).setEmoji('📁'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:support').setLabel('Support').setStyle(ButtonStyle.Primary).setEmoji('📁'),
                     new ButtonBuilder().setCustomId('sentinel_dossier:report').setLabel('Report').setStyle(ButtonStyle.Danger).setEmoji('🚨'),
-                    new ButtonBuilder().setCustomId('sentinel_dossier:bug').setLabel('Sentinel bug').setStyle(ButtonStyle.Danger).setEmoji('🧪')
+                    new ButtonBuilder().setCustomId('sentinel_dossier:recruitment').setLabel('Recruitment').setStyle(ButtonStyle.Secondary).setEmoji('🛡️'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:partnership').setLabel('Partnership').setStyle(ButtonStyle.Secondary).setEmoji('🤝'),
+                    new ButtonBuilder().setCustomId('sentinel_dossier:other').setLabel('Other').setStyle(ButtonStyle.Secondary).setEmoji('💬')
                 )
             ]
         }

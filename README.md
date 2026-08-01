@@ -206,23 +206,31 @@ Les embeds Sentinel sont limites a 2 embeds actifs en gratuit. Ils peuvent etre 
 
 Francais :
 
-Les dossiers sont les espaces prives de suivi de Sentinel. Un membre ouvre un dossier depuis le bureau d'accueil, puis Sentinel cree un salon prive avec le demandeur et les roles autorises.
+Les dossiers Sentinel sont des tickets prives. Un membre choisit un type de demande depuis le bureau d'accueil, complete un sujet et une description, puis Sentinel cree un salon prive avec le demandeur et les roles autorises.
 
 - `/dossier-panel` publie le bureau d'accueil Sentinel.
 - `/dossier-fermer` cloture le dossier du salon actuel.
 - `/dossier-ajouter` ajoute un intervenant au dossier.
 - `/dossier-retirer` retire un intervenant du dossier.
 - `/dossier-compte-rendu` genere un compte rendu texte et l'envoie dans le salon de logs quand il est configure.
+- Types disponibles : support, signalement, recrutement, partenariat et autre.
+- En gratuit, un dossier passe de ouvert a ferme. Les statuts avances et la prise en charge officielle sont prepares pour Premium.
+- Gratuit : 1 panneau de dossiers, 5 dossiers ouverts en meme temps, 10 derniers dossiers visibles.
+- Premium prepare : panneaux illimites, categories personnalisees, formulaires avances, priorites, templates, historique complet, statistiques et automatisations.
 
 English:
 
-Dossiers are Sentinel private follow-up spaces. A member opens a dossier from the reception desk, then Sentinel creates a private channel with the requester and authorized roles.
+Dossiers are private tickets. A member chooses a request type from the reception desk, fills in a subject and description, then Sentinel creates a private channel with the requester and authorized roles.
 
 - `/ticket-panel` publishes the Sentinel reception desk.
 - `/close-ticket` closes the current dossier channel.
 - `/ticket-add` adds a participant to the dossier.
 - `/ticket-remove` removes a participant from the dossier.
 - `/ticket-transcript` generates a text transcript and sends it to the log channel when configured.
+- Available types: support, report, recruitment, partnership, and other.
+- On free servers, a dossier moves from open to closed. Advanced statuses and official assignment are prepared for Premium.
+- Free: 1 dossier panel, 5 open dossiers at the same time, 10 recent dossiers visible.
+- Prepared Premium: unlimited panels, custom categories, advanced forms, priorities, templates, full history, statistics, and automations.
 
 ## Moderation / Moderation
 
