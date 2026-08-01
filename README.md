@@ -101,7 +101,7 @@ Les informations d'exploitation du bot restent privées. Les fichiers `.env`, ba
 
 ## Licence
 
-Ce dépôt est public pour présenter Sentinel et faciliter le suivi du projet. Le code n'est pas publié sous licence open source : toute copie, redistribution ou réutilisation du bot nécessite une autorisation préalable.
+Sentinel est un projet propriétaire. Le dépôt est consultable publiquement pour présenter le bot et suivre son évolution, mais le code ne peut pas être copié, redistribué ou réutilisé sans autorisation préalable.
 
 ## English
 
