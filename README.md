@@ -91,36 +91,13 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 
 La liste complète et les explications détaillées sont disponibles sur le site.
 
-## Configuration locale
-
-Copie `.env.example` vers `.env` en local, ou configure les variables dans ton hébergeur :
-
-```env
-TOKEN=
-CLIENT_ID=
-CLIENT_SECRET=
-DASHBOARD_URL=
-DATABASE_PATH=./database/service.db
-```
-
-Ne publie jamais `.env`.
-
-## Développement
-
-```bash
-npm install
-npm run check
-npm run deploy:commands
-npm start
-```
-
-Les fichiers de base de données, les logs et les sauvegardes locales sont ignorés par Git.
-
 ## Sécurité et données
 
 Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe, ne collecte pas les informations de paiement et ne vend aucune donnée.
 
 Les données nécessaires au fonctionnement sont décrites dans la Politique de confidentialité : identifiants Discord, configuration serveur, temps de service, sanctions, dossiers, annonces, sessions dashboard et journal d'audit.
+
+Les informations d'exploitation du bot restent privées. Les fichiers `.env`, bases de données, logs et sauvegardes locales ne doivent jamais être publiés.
 
 ## Licence
 
