@@ -1,49 +1,117 @@
-# Conditions d'Utilisation
+# Conditions d'utilisation
 
-Derniere mise a jour : 5 juin 2026
+Dernière mise à jour : 1 août 2026
 
-En utilisant Sentinel, vous acceptez les presentes Conditions d'Utilisation.
+En utilisant Sentinel, vous acceptez les présentes conditions.
 
-## Objet du bot
+## Objet
 
-Sentinel est un bot Discord permettant aux serveurs de suivre les temps de service de leurs membres, de consulter des classements, de configurer un role de service, de gerer des options liees au suivi d'activite et d'utiliser des commandes de moderation.
+Sentinel est un bot Discord qui aide les serveurs à gérer les prises de service, la modération, les dossiers privés de support, les annonces et certaines actions depuis un dashboard web.
 
-## Utilisation
+## Utilisation du service
 
-Le bot est fourni tel quel, sans garantie de disponibilite permanente, d'absence d'erreur ou de conservation indefinie des donnees.
+Sentinel est fourni tel quel. Le service peut être modifié, interrompu, limité ou indisponible à tout moment pour des raisons techniques, de maintenance, de sécurité ou d'abus.
 
-Les proprietaires et equipes de gestion des serveurs Discord sont responsables de l'utilisation du bot sur leurs serveurs, de la configuration des permissions et de l'information de leurs membres.
+Les propriétaires et équipes de gestion des serveurs Discord restent responsables :
 
-L'utilisation du bot doit respecter les Conditions d'Utilisation de Discord, les regles des serveurs concernes et les lois applicables.
+- de l'ajout du bot sur leur serveur ;
+- de la configuration des rôles et permissions ;
+- de l'utilisation des commandes ;
+- de l'information de leurs membres ;
+- du respect des règles Discord et des lois applicables.
 
-## Donnees
+Sentinel ne doit pas être utilisé pour harceler, contourner les règles de Discord, collecter des informations sensibles ou automatiser des actions abusives.
 
-Le bot peut enregistrer certaines donnees necessaires a son fonctionnement, notamment :
+## Données
 
-- identifiants Discord des utilisateurs ;
-- identifiants des serveurs Discord ;
-- temps de service enregistres ;
-- sessions de service ;
-- sanctions de moderation enregistrees par le bot ;
-- parametres de configuration du serveur ;
-- roles autorises a gerer le bot.
+Sentinel peut enregistrer des données nécessaires à son fonctionnement, notamment des identifiants Discord, des paramètres de serveur, des temps de service, des sanctions, des dossiers/tickets, des annonces, des sessions dashboard et des journaux d'audit.
 
-Ces donnees sont utilisees uniquement pour fournir les fonctionnalites du bot.
+Le détail des données collectées, de leur utilisation et de leur conservation est décrit dans la Politique de confidentialité.
 
-## Responsabilite
+## Permissions Discord
 
-L'editeur du bot ne pourra etre tenu responsable des pertes de donnees, interruptions de service, erreurs de configuration, conflits de permissions, indisponibilites ou dommages indirects lies a l'utilisation du bot.
+Certaines fonctionnalités nécessitent des permissions Discord, comme gérer les rôles, envoyer des messages, modérer les membres, bannir, expulser ou gérer des salons.
 
-Il est recommande aux serveurs qui utilisent le bot de verifier regulierement leur configuration et leurs donnees importantes.
+Si les permissions ou la hiérarchie des rôles sont mal configurées, certaines actions peuvent échouer. Sentinel ne peut pas agir au-dessus des limites imposées par Discord.
 
-## Suspension ou limitation
+## Premium
 
-L'acces au bot peut etre suspendu, limite ou interrompu en cas d'abus, de comportement malveillant, de non-respect des presentes conditions ou de contrainte technique.
+Certaines options avancées peuvent être réservées à une offre Premium. Les limites et fonctionnalités disponibles peuvent évoluer avec le temps.
+
+## Responsabilité
+
+L'éditeur de Sentinel ne pourra pas être tenu responsable des pertes de données, erreurs de configuration, interruptions de service, sanctions mal utilisées, conflits de permissions ou dommages indirects liés à l'utilisation du bot.
+
+Il est recommandé de vérifier régulièrement la configuration du serveur et de ne pas utiliser Sentinel pour stocker des informations sensibles.
+
+## Suspension
+
+L'accès à Sentinel peut être suspendu ou limité en cas d'abus, de comportement malveillant, de risque de sécurité, de non-respect des présentes conditions ou de contrainte technique.
 
 ## Modifications
 
-Ces conditions peuvent etre modifiees a tout moment. La version publiee sur ce depot fait foi.
+Ces conditions peuvent être modifiées à tout moment. La version publiée sur ce dépôt fait foi.
 
 ## Contact
 
-Pour toute question concernant ces conditions, contactez le proprietaire du projet via le depot GitHub du bot.
+Pour toute question, utilisez le serveur support ou les moyens de contact indiqués sur le site de Sentinel.
+
+---
+
+# Terms of Service
+
+Last updated: August 1, 2026
+
+By using Sentinel, you agree to these terms.
+
+## Purpose
+
+Sentinel is a Discord bot that helps servers manage duty tracking, moderation, private support tickets, announcements and selected actions from a web dashboard.
+
+## Use of the service
+
+Sentinel is provided as is. The service may be changed, interrupted, limited or unavailable at any time for technical, maintenance, security or abuse-related reasons.
+
+Server owners and management teams remain responsible for:
+
+- inviting the bot to their server;
+- configuring roles and permissions;
+- using commands properly;
+- informing their members;
+- following Discord rules and applicable laws.
+
+Sentinel must not be used to harass others, bypass Discord rules, collect sensitive information or automate abusive actions.
+
+## Data
+
+Sentinel may store data required for its features, including Discord IDs, server settings, duty times, moderation cases, tickets, announcements, dashboard sessions and audit logs.
+
+The collected data, its use and retention are described in the Privacy Policy.
+
+## Discord permissions
+
+Some features require Discord permissions, such as managing roles, sending messages, moderating members, banning, kicking or managing channels.
+
+If permissions or role hierarchy are incorrectly configured, some actions may fail. Sentinel cannot bypass limits enforced by Discord.
+
+## Premium
+
+Some advanced options may be reserved for a Premium offer. Available limits and features may change over time.
+
+## Liability
+
+The publisher of Sentinel cannot be held responsible for data loss, configuration mistakes, service interruptions, misuse of moderation actions, permission conflicts or indirect damages related to the bot.
+
+Servers should regularly verify their configuration and should not use Sentinel to store sensitive information.
+
+## Suspension
+
+Access to Sentinel may be suspended or limited in case of abuse, malicious behavior, security risk, violation of these terms or technical constraints.
+
+## Changes
+
+These terms may be updated at any time. The version published in this repository is the reference version.
+
+## Contact
+
+For questions, use the support server or the contact methods listed on the Sentinel website.

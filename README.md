@@ -1,299 +1,150 @@
-﻿# Sentinel
+# Sentinel
 
-Sentinel est un bot Discord multi-serveurs pour suivre les temps de service des membres.
+Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs RP et les équipes staff qui veulent gérer leurs prises de service, leur modération et leurs demandes depuis un même endroit.
 
-## Fonctionnalites
+## Liens utiles
 
-- Prise et fin de service avec bouton Discord
-- Temps de service total par membre
-- Historique personnel limite aux 5 dernieres sessions
-- Classement global limite au top 10
-- Liste des agents actuellement en service
-- Logs des prises et fins de service
-- Configuration du role de service et du salon de logs
-- Gestion des roles autorises a administrer le bot
-- Moderation gratuite : avertissements, timeout, expulsion, ban par ID, purge et consultation simple des sanctions
-- Embeds d'annonce sous l'identite de Sentinel : 2 embeds actifs gratuits, modifications illimitees
-- Dossiers Sentinel : bureau d'accueil, salons prives, intervenants et compte rendu
-- Choix de langue par serveur : francais ou anglais
-- Commandes slash localisees avec les localisations natives Discord
-- Stockage SQLite avec `better-sqlite3`
+- Site public : https://phileaszer.github.io/bot-service-discord/
+- Dashboard : https://bot-service-discord-production.up.railway.app/dashboard
+- Inviter Sentinel : https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands
+- Serveur support : https://discord.gg/jzPqcUdVns
+- Conditions d'utilisation : https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md
+- Politique de confidentialité : https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md
 
-## Langues / Languages
+## Ce que fait Sentinel
 
-Sentinel supporte le francais et l'anglais.
+- Suivi des services : prise et fin de service, temps total, historique personnel, agents en service et classements.
+- Modération : avertissements, timeout, expulsion, ban par ID, purge et consultation des sanctions.
+- Dossiers Sentinel : système de tickets privés pour le support, les signalements, les recrutements, les partenariats et les autres demandes.
+- Annonces : création et modification d'embeds publiés sous l'identité de Sentinel.
+- Dashboard : configuration du serveur, actions rapides, audit, suivi des services, sanctions, dossiers et annonces.
+- Langues : français et anglais, avec un choix propre à chaque serveur.
+- Stockage : base SQLite locale avec `better-sqlite3`.
 
-La langue est stockee individuellement pour chaque serveur dans SQLite. Changer la langue d'un serveur ne change pas les autres serveurs.
+## Version gratuite
 
-Commandes :
+Sentinel Gratuit reste utilisable sans abonnement :
 
-- `/config-langue langue:Francais`
-- `/language language:English`
-- `!langue fr`
-- `!language en`
+- panneau de service ;
+- heures personnelles ;
+- historique personnel limité ;
+- classement global limité au top 10 ;
+- modération essentielle ;
+- consultation simple des sanctions ;
+- 2 embeds actifs, modifiables sans limite ;
+- 1 panneau de dossiers ;
+- 5 dossiers ouverts en même temps ;
+- 10 derniers dossiers visibles.
 
-Quand Sentinel rejoint un serveur, il essaie d'envoyer un message avec deux boutons : `Francais` et `English`.
+## Premium prévu
 
-Discord ne permet pas de changer les noms des commandes slash selon la langue choisie par le serveur. La solution propre utilisee par Sentinel est :
+Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion plus avancée :
 
-- les reponses, embeds, boutons et logs suivent la langue du serveur
-- les commandes slash utilisent les localisations natives Discord
-- un utilisateur avec Discord en francais voit les noms francais
-- un utilisateur avec Discord en anglais voit les noms anglais
+- statistiques mensuelles et annuelles ;
+- exports CSV, Excel ou PDF ;
+- rapports automatiques ;
+- embeds illimités ;
+- panneaux de dossiers illimités ;
+- catégories et formulaires personnalisés ;
+- statuts avancés, priorités et prise en charge staff ;
+- transcriptions complètes ;
+- historique complet et recherche avancée ;
+- automatisations de modération et de dossiers.
 
-Sentinel supports French and English.
+Le gratuit reste volontairement simple. Le Premium apportera surtout du confort, du volume et des outils de gestion pour les grosses communautés.
 
-The language is stored individually for each server in SQLite. Changing one server language does not change any other server.
+## Installation rapide
 
-Commands:
+1. Invite Sentinel avec le lien officiel.
+2. Vérifie que le badge `Bot` apparaît bien dans les intégrations Discord.
+3. Choisis la langue du serveur avec `/config-langue` ou `/language`.
+4. Configure le rôle de service avec `/config-role`.
+5. Configure le salon de logs avec `/config-logs`.
+6. Ajoute les rôles autorisés avec `/config-permissions`.
+7. Publie le panneau de service avec `/service-panel`.
+8. Publie le panneau de dossiers avec `/dossier-panel` si tu veux utiliser les tickets.
 
-- `/config-langue langue:Francais`
-- `/language language:English`
-- `!langue fr`
-- `!language en`
+Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit gérer ou modérer.
 
-When Sentinel joins a server, it tries to send a message with two buttons: `Francais` and `English`.
+## Commandes principales
 
-Discord does not allow slash command names to change based on the language selected by a server. Sentinel uses the cleanest available solution:
+| Français | English | Utilité |
+| --- | --- | --- |
+| `/aide` | `/help` | Guide intégré du bot |
+| `/config-langue` | `/language` | Choisir la langue du serveur |
+| `/config-role` | `/config-role` | Définir le rôle de service |
+| `/config-logs` | `/config-channel` | Définir le salon de logs |
+| `/config-voir` | `/config-view` | Voir la configuration actuelle |
+| `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
+| `/mes-heures` | `/my-hours` | Voir ses heures |
+| `/en-service` | `/on-duty` | Voir les agents en service |
+| `/top-service` | `/top-service` | Voir le classement global |
+| `/reset-heures` | `/reset-hours` | Remettre les heures d'une personne à zéro |
+| `/avertir` | `/warn` | Ajouter un avertissement |
+| `/timeout` | `/timeout` | Mettre un membre en timeout |
+| `/expulser` | `/kick` | Expulser un membre |
+| `/bannir` | `/ban` | Bannir un membre ou un ID Discord |
+| `/purge` | `/clear` | Supprimer des messages récents |
+| `/sanctions` | `/mod-cases` | Voir les sanctions récentes |
+| `/embed` | `/embed` | Gérer les annonces Sentinel |
+| `/dossier-panel` | `/ticket-panel` | Publier le panneau de tickets |
 
-- replies, embeds, buttons, and logs follow the server language
-- slash commands use Discord native localizations
-- a user using Discord in French sees French command names
-- a user using Discord in English sees English command names
+La liste complète et les explications détaillées sont disponibles sur le site.
 
-## Ajouter Sentinel a un serveur
+## Configuration locale
 
-Lien d'invitation officiel :
+Copie `.env.example` vers `.env` en local, ou configure les variables dans ton hébergeur :
 
-[Inviter Sentinel](https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands)
+```env
+TOKEN=
+CLIENT_ID=
+CLIENT_SECRET=
+DASHBOARD_URL=
+DATABASE_PATH=./database/service.db
+```
 
-Le lien doit contenir les deux scopes Discord :
+Ne publie jamais `.env`.
 
-- `bot`
-- `applications.commands`
+## Développement
 
-Si Sentinel apparait dans les integrations avec seulement `Commandes` et sans badge `Bot`, retire l'integration puis utilise le lien ci-dessus.
+```bash
+npm install
+npm run check
+npm run deploy:commands
+npm start
+```
 
-Permissions demandees :
+Les fichiers de base de données, les logs et les sauvegardes locales sont ignorés par Git.
 
-- Gerer les roles
-- Exclure des membres
-- Bannir des membres
-- Moderer les membres
-- Gerer les messages
-- Gerer les salons
-- Voir les salons
-- Envoyer des messages
-- Integrer des liens
-- Joindre des fichiers
-- Lire l'historique des messages
+## Sécurité et données
 
-Important : le role Sentinel doit etre place au-dessus du role de service dans la hierarchie des roles Discord.
-Pour la moderation, le role Sentinel doit aussi etre au-dessus des roles des membres qu'il doit moderer.
+Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe, ne collecte pas les informations de paiement et ne vend aucune donnée.
 
-## Commandes slash gratuites
+Les données nécessaires au fonctionnement sont décrites dans la Politique de confidentialité : identifiants Discord, configuration serveur, temps de service, sanctions, dossiers, annonces, sessions dashboard et journal d'audit.
 
-| Francais | English |
-| --- | --- |
-| `/aide` | `/help` |
-| `/config-langue` | `/language` |
-| `/config-role` | `/config-role` |
-| `/config-logs` | `/config-channel` |
-| `/config-voir` | `/config-view` |
-| `/config-permissions` | `/config-permissions` |
-| `/historique-service` | `/history` |
-| `/mes-heures` | `/my-hours` |
-| `/en-service` | `/on-duty` |
-| `/top-service` | `/top-service` |
-| `/reset-heures` | `/reset-hours` |
-| `/avertir` | `/warn` |
-| `/timeout` | `/timeout` |
-| `/fin-timeout` | `/untimeout` |
-| `/expulser` | `/kick` |
-| `/bannir` | `/ban` |
-| `/purge` | `/clear` |
-| `/sanctions` | `/mod-cases` |
-| `/embed creer` | `/embed create` |
-| `/embed modifier` | `/embed edit` |
-| `/embed supprimer` | `/embed delete` |
-| `/dossier-panel` | `/ticket-panel` |
-| `/dossier-fermer` | `/close-ticket` |
-| `/dossier-ajouter` | `/ticket-add` |
-| `/dossier-retirer` | `/ticket-remove` |
-| `/dossier-compte-rendu` | `/ticket-transcript` |
+## English
 
-## Commandes texte gratuites
+Sentinel is a bilingual Discord bot for duty tracking, moderation, private tickets and web dashboard management.
 
-- `!aide`
-- `!help`
-- `!langue fr`
-- `!language en`
-- `!service-panel`
-- `!dossier-panel`
-- `!ticket-panel`
-- `!config-voir`
-- `!config-permissions ajouter|retirer|voir [@role]`
-- `!historique-service [limite]`
-- `!history [limit]`
-- `!mes-heures`
-- `!my-hours`
-- `!en-service`
-- `!on-duty`
-- `!top-service`
-- `!reset-heures @membre` ou `!reset-heures ID`
-- `!reset-hours @member` or `!reset-hours ID`
-- `!avertir @membre raison`
-- `!warn @member reason`
-- `!timeout @membre 10m raison`
-- `!timeout @member 10m reason`
-- `!fin-timeout @membre raison`
-- `!untimeout @member reason`
-- `!expulser @membre raison`
-- `!kick @member reason`
-- `!bannir @membre raison`
-- `!ban @member reason`
-- `!purge 10`
-- `!clear 10`
-- `!sanctions @membre`
-- `!mod-cases @member`
+Useful links:
 
-## Premium prepare
+- Website: https://phileaszer.github.io/bot-service-discord/
+- Dashboard: https://bot-service-discord-production.up.railway.app/dashboard
+- Invite Sentinel: https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands
+- Support server: https://discord.gg/jzPqcUdVns
+- Terms of Service: https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md
+- Privacy Policy: https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md
 
-Ces commandes sont preparees pour Sentinel Premium et ne sont pas ouvertes sur les serveurs gratuits.
+Main features:
 
-- `/reset-heures-all`
-- `/reset-hours-all`
-- `/heures`
-- `/hours`
-- `/top-semaine`
-- `/top-week`
-- `/resume-service`
-- `/summary`
-- `/historique-service membre limite`
-- `/history member limit`
-- `/diagnostic`
-- `/sync-service`
-- `/sync-sentinel`
-- `/ping`
-- `/cas`
-- `/case`
-- `/modifier-cas`
-- `/edit-case`
-- `/supprimer-cas`
-- `/delete-case`
-- `/unwarn`
-- `/profil-mod`
-- `/mod-profile`
-- `/tempban`
-- `/unban`
-- `/lock`
-- `/unlock`
-- `/slowmode`
-- `!reset-heures-all`
-- `!reset-hours-all`
-- `!heures @membre`
-- `!hours @member`
-- `!top-semaine`
-- `!top-week`
-- `!resume-service`
-- `!summary`
+- duty panel, personal hours, active staff and leaderboards;
+- moderation commands: warn, timeout, kick, ban by ID, clear and cases;
+- private tickets, called Sentinel dossiers in the French interface;
+- announcement embeds;
+- web dashboard;
+- per-server language selection;
+- SQLite storage with `better-sqlite3`.
 
-En gratuit, la reinitialisation reste disponible personne par personne avec `/reset-heures membre:@membre`, `/reset-heures utilisateur_id:ID`, `/reset-hours member:@member` ou `/reset-hours user_id:ID`.
-La moderation gratuite garde les actions essentielles : avertissements, timeout, expulsion, ban par ID et purge. La consultation des sanctions reste simple avec `/sanctions`, limitee aux 10 derniers cas visibles.
-Les embeds Sentinel sont limites a 2 embeds actifs en gratuit. Ils peuvent etre modifies autant de fois que necessaire. Le Premium prepare la creation illimitee.
+For setup, invite Sentinel, choose the server language, configure the duty role, configure the log channel, add authorized roles, then publish the duty panel or the ticket panel.
 
-## Dossiers Sentinel
-
-Francais :
-
-Les dossiers Sentinel sont des tickets prives. Un membre choisit un type de demande depuis le bureau d'accueil, complete un sujet et une description, puis Sentinel cree un salon prive avec le demandeur et les roles autorises.
-
-- `/dossier-panel` publie le bureau d'accueil Sentinel.
-- `/dossier-fermer` cloture le dossier du salon actuel.
-- `/dossier-ajouter` ajoute un intervenant au dossier.
-- `/dossier-retirer` retire un intervenant du dossier.
-- `/dossier-compte-rendu` genere un compte rendu texte et l'envoie dans le salon de logs quand il est configure.
-- Types disponibles : support, signalement, recrutement, partenariat et autre.
-- En gratuit, un dossier passe de ouvert a ferme. Les statuts avances et la prise en charge officielle sont prepares pour Premium.
-- Gratuit : 1 panneau de dossiers, 5 dossiers ouverts en meme temps, 10 derniers dossiers visibles.
-- Premium prepare : panneaux illimites, categories personnalisees, formulaires avances, priorites, templates, historique complet, statistiques et automatisations.
-
-English:
-
-Dossiers are private tickets. A member chooses a request type from the reception desk, fills in a subject and description, then Sentinel creates a private channel with the requester and authorized roles.
-
-- `/ticket-panel` publishes the Sentinel reception desk.
-- `/close-ticket` closes the current dossier channel.
-- `/ticket-add` adds a participant to the dossier.
-- `/ticket-remove` removes a participant from the dossier.
-- `/ticket-transcript` generates a text transcript and sends it to the log channel when configured.
-- Available types: support, report, recruitment, partnership, and other.
-- On free servers, a dossier moves from open to closed. Advanced statuses and official assignment are prepared for Premium.
-- Free: 1 dossier panel, 5 open dossiers at the same time, 10 recent dossiers visible.
-- Prepared Premium: unlimited panels, custom categories, advanced forms, priorities, templates, full history, statistics, and automations.
-
-## Moderation / Moderation
-
-Francais :
-
-- `/avertir` enregistre une sanction sans appliquer de punition Discord.
-- `/timeout` rend un membre muet temporairement. Durées valides : `10m`, `2h`, `7d`.
-- `/fin-timeout` retire un timeout actif.
-- `/expulser` retire un membre du serveur.
-- `/bannir` bannit un utilisateur du serveur. Si la personne n'est plus sur le serveur, utilise `utilisateur_id`.
-- `/purge` supprime jusqu'a 100 messages recents dans le salon.
-- `/sanctions` affiche les 10 dernieres sanctions d'un membre ou d'un ID Discord.
-- `/embed creer` publie une annonce sous l'identite de Sentinel.
-- `/embed modifier` modifie un embed Sentinel existant sans consommer de quota.
-- `/embed supprimer` supprime un embed Sentinel et libere un emplacement gratuit.
-
-Sentinel verifie les roles autorises, les permissions Discord et la hierarchie des roles avant d'appliquer une sanction.
-
-Moderation Premium preparee :
-
-- `/cas` affiche le detail d'un cas.
-- `/modifier-cas` corrige la raison d'un cas.
-- `/supprimer-cas` supprime un cas.
-- `/unwarn` retire un avertissement par ID.
-- `/profil-mod` affiche un profil moderation complet, meme avec un ID Discord.
-- `/tempban` bannit temporairement un utilisateur avec expiration automatique, meme avec un ID Discord.
-- `/unban` debannit un utilisateur par ID et annule un tempban actif.
-- `/lock`, `/unlock` et `/slowmode` gerent rapidement un salon.
-- Les sanctions automatiques apres X avertissements sont prevues pour une future version Premium.
-- Creation illimitee d'embeds Sentinel.
-
-English:
-
-- `/warn` records a moderation case without applying a Discord punishment.
-- `/timeout` temporarily times out a member. Valid durations: `10m`, `2h`, `7d`.
-- `/untimeout` removes an active timeout.
-- `/kick` removes a member from the server.
-- `/ban` bans a user from the server. If the user is no longer in the server, use `user_id`.
-- `/clear` deletes up to 100 recent messages in the channel.
-- `/mod-cases` shows the last 10 moderation cases for a member or Discord ID.
-- `/embed create` publishes an announcement under Sentinel identity.
-- `/embed edit` edits an existing Sentinel embed without using quota.
-- `/embed delete` deletes a Sentinel embed and frees a free slot.
-
-Sentinel checks configured roles, Discord permissions, and role hierarchy before applying a moderation action.
-
-Prepared Premium moderation:
-
-- `/case` shows one case details.
-- `/edit-case` edits a case reason.
-- `/delete-case` deletes a case.
-- `/unwarn` removes a warning by ID.
-- `/mod-profile` shows a full moderation profile, including by Discord ID.
-- `/tempban` temporarily bans a user with automatic expiration, including by Discord ID.
-- `/unban` unbans a user by ID and cancels an active tempban.
-- `/lock`, `/unlock`, and `/slowmode` quickly manage a channel.
-- Automatic sanctions after X warnings are planned for a future Premium version.
-- Unlimited Sentinel embed creation.
-
-## Permissions
-
-Les commandes de gestion du bot sont accessibles uniquement aux roles configures avec `/config-permissions`.
-Si aucun role de gestion n'est encore configure, les membres avec `Administrateur`, `Gerer le serveur` ou `Gerer les roles` peuvent demarrer la configuration.
-Une fois un role ajoute, ce role devient l'acces normal aux commandes de gestion.
-Le proprietaire du serveur garde un acces de secours pour eviter un blocage complet.
-
+Never publish `.env` or any Discord token.
