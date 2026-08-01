@@ -122,6 +122,10 @@ Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe, ne 
 
 Les données nécessaires au fonctionnement sont décrites dans la Politique de confidentialité : identifiants Discord, configuration serveur, temps de service, sanctions, dossiers, annonces, sessions dashboard et journal d'audit.
 
+## Licence
+
+Ce dépôt est public pour présenter Sentinel et faciliter le suivi du projet. Le code n'est pas publié sous licence open source : toute copie, redistribution ou réutilisation du bot nécessite une autorisation préalable.
+
 ## English
 
 Sentinel is a bilingual Discord bot for duty tracking, moderation, private tickets and web dashboard management.
@@ -146,5 +150,7 @@ Main features:
 - SQLite storage with `better-sqlite3`.
 
 For setup, invite Sentinel, choose the server language, configure the duty role, configure the log channel, add authorized roles, then publish the duty panel or the ticket panel.
+
+This repository is public for presentation and project tracking. The code is not released under an open-source license: copying, redistributing or reusing the bot requires prior permission.
 
 Never publish `.env` or any Discord token.
