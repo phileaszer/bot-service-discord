@@ -807,6 +807,16 @@ function requireCommandAccess(ctx, member) {
     }
 }
 
+function requireDossierAccess(ctx, member) {
+    const canManageDossier = ctx.helpers.memberCanManageDossier
+        ? ctx.helpers.memberCanManageDossier(member)
+        : ctx.helpers.hasCommandRoleAccess(member);
+
+    if (!member || !canManageDossier) {
+        throw createHttpError(403, 'You do not have permission to manage Sentinel dossiers on this server.');
+    }
+}
+
 function requireModerationAccess(ctx, member, permissionFlag) {
     if (!member || !ctx.helpers.hasModerationAccess(member, permissionFlag)) {
         throw createHttpError(403, 'You do not have permission for this moderation action.');
@@ -1092,6 +1102,9 @@ async function buildGuildState(ctx, guild, session = null) {
         ? ctx.helpers.getUserSessionCount(guild.id, viewerUserId)
         : viewerSessions.length;
     const commandRoleIds = ctx.helpers.getCommandRoleIds(guild.id);
+    const dossierRoleIds = ctx.helpers.getDossierRoleIds
+        ? ctx.helpers.getDossierRoleIds(guild.id)
+        : [];
     const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id);
     const canViewGlobalAudit = isCreatorUser(session?.user?.id);
     const auditLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 50 : 10;
@@ -1193,6 +1206,7 @@ async function buildGuildState(ctx, guild, session = null) {
         dossiers: {
             openCount: ctx.helpers.getOpenDossierCount(guild.id),
             historyLimit: dossierHistoryLimit,
+            roleIds: dossierRoleIds,
             panelQuota: ctx.helpers.getDossierPanelQuota
                 ? ctx.helpers.getDossierPanelQuota(guild.id)
                 : { used: 0, limit: 1, unlimited: false, remaining: 1 },
@@ -1500,20 +1514,20 @@ async function customEmbedAction(ctx, guild, actor, body) {
 
     const language = ctx.helpers.getGuildLanguage(guild.id);
     const action = body.action;
-    const channel = getTextChannel(guild, body.channelId);
     const roleToPing = body.roleId ? guild.roles.cache.get(body.roleId) : null;
 
     if (body.roleId && !roleToPing) {
         throw createHttpError(400, 'Role not found.');
     }
 
-    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language);
-
-    if (channelError) {
-        throw createHttpError(403, channelError);
-    }
-
     if (action === 'custom-embed-create') {
+        const channel = getTextChannel(guild, body.channelId);
+        const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language);
+
+        if (channelError) {
+            throw createHttpError(403, channelError);
+        }
+
         const quota = ctx.helpers.getCustomEmbedQuota(guild.id);
 
         if (!quota.unlimited && quota.used >= quota.limit) {
@@ -1556,8 +1570,16 @@ async function customEmbedAction(ctx, guild, actor, body) {
 
     const record = ctx.helpers.getCustomEmbedRecord(guild.id, messageId);
 
-    if (!record || record.channel_id !== channel.id) {
+    if (!record) {
         throw createHttpError(404, 'Sentinel embed not found.');
+    }
+
+    const channel = guild.channels.cache.get(record.channel_id)
+        || await guild.channels.fetch(record.channel_id).catch(() => null);
+    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, null, language);
+
+    if (channelError) {
+        throw createHttpError(403, channelError);
     }
 
     const message = await channel.messages.fetch(messageId).catch(() => null);
@@ -1614,12 +1636,12 @@ async function customEmbedAction(ctx, guild, actor, body) {
 }
 
 async function dossierAction(ctx, guild, actor, body) {
-    requireCommandAccess(ctx, actor);
-
     const language = ctx.helpers.getGuildLanguage(guild.id);
     const action = body.action;
 
     if (action === 'publish-dossier-panel') {
+        requireCommandAccess(ctx, actor);
+
         const channel = getTextChannel(guild, body.channelId);
         const quota = ctx.helpers.getDossierPanelQuota
             ? ctx.helpers.getDossierPanelQuota(guild.id)
@@ -1638,7 +1660,27 @@ async function dossierAction(ctx, guild, actor, body) {
         return `Bureau d'accueil Sentinel publie dans #${channel.name}.`;
     }
 
+    if (action === 'add-dossier-role' || action === 'remove-dossier-role') {
+        requireCommandAccess(ctx, actor);
+
+        const role = guild.roles.cache.get(body.roleId);
+
+        if (!role || role.id === guild.id) {
+            throw createHttpError(400, 'Role not found.');
+        }
+
+        if (action === 'add-dossier-role') {
+            ctx.helpers.addDossierRole(guild.id, role.id);
+            return `Rôle responsable de ticket ajouté : ${role.name}.`;
+        }
+
+        ctx.helpers.removeDossierRole(guild.id, role.id);
+        return `Rôle responsable de ticket retiré : ${role.name}.`;
+    }
+
     if (action === 'dossier-close') {
+        requireDossierAccess(ctx, actor);
+
         const channel = getTextChannel(guild, body.channelId);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
@@ -1665,7 +1707,7 @@ async function dossierAction(ctx, guild, actor, body) {
     }
 
     if (action === 'dossier-status') {
-        requireAdvanced(ctx, guild.id);
+        requireDossierAccess(ctx, actor);
 
         const channel = getTextChannel(guild, body.channelId);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
@@ -1681,7 +1723,7 @@ async function dossierAction(ctx, guild, actor, body) {
     }
 
     if (action === 'dossier-claim') {
-        requireAdvanced(ctx, guild.id);
+        requireDossierAccess(ctx, actor);
 
         const channel = getTextChannel(guild, body.channelId);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
@@ -1697,6 +1739,7 @@ async function dossierAction(ctx, guild, actor, body) {
     }
 
     if (action === 'set-dossier-category') {
+        requireCommandAccess(ctx, actor);
         requireAdvanced(ctx, guild.id);
 
         const dossierType = String(body.dossierType || '').trim();
@@ -1808,7 +1851,7 @@ async function runDashboardAction(ctx, guild, member, body) {
         return customEmbedAction(ctx, guild, member, body);
     }
 
-    if (['publish-dossier-panel', 'dossier-close', 'dossier-status', 'dossier-claim', 'set-dossier-category'].includes(action)) {
+    if (['publish-dossier-panel', 'add-dossier-role', 'remove-dossier-role', 'dossier-close', 'dossier-status', 'dossier-claim', 'set-dossier-category'].includes(action)) {
         return dossierAction(ctx, guild, member, body);
     }
 

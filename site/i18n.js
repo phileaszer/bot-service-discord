@@ -1249,6 +1249,29 @@
     'Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoutera des outils plus poussés pour les gros staffs.': 'Free keeps the essential actions: warnings, timeout, kick, ID ban, and purge. Premium will add deeper tools for larger staff teams.'
   });
 
+  Object.assign(en, {
+    'Premium : accès illimité aux embeds Sentinel, créations et modifications illimitées.': 'Premium: unlimited access to Sentinel embeds, with unlimited creation and edits.',
+    'Modifie un embed Sentinel déjà envoyé avec son ID de message. Les modifications ne consomment pas de quota et Sentinel retrouve le salon automatiquement.': 'Edits an already sent Sentinel embed with its message ID. Edits do not consume quota and Sentinel finds the channel automatically.',
+    'Supprime un embed géré par Sentinel avec son ID de message et libère son emplacement gratuit si le serveur n’est pas Premium.': 'Deletes a Sentinel-managed embed with its message ID and frees its free slot if the server is not Premium.',
+    'En gratuit, les responsables peuvent répondre, ajouter des intervenants, prendre le ticket en charge, corriger son statut, générer un compte rendu et le clôturer.': 'On free servers, responsible roles can reply, add participants, take over the ticket, correct its status, generate a transcript, and close it.',
+    'Rôles responsables': 'Responsible roles',
+    'Ces rôles peuvent voir les tickets, les prendre en charge, changer leur statut, générer l’archive et clôturer le salon.': 'These roles can see tickets, take them over, update their status, generate the archive, and close the channel.',
+    'Choisir un rôle responsable': 'Choose a responsible role',
+    'Ajouter le rôle': 'Add role',
+    'Aucun rôle responsable n’est configuré. Les rôles autorisés, le propriétaire et les membres avec les permissions Discord nécessaires peuvent encore gérer les tickets.': 'No responsible role is configured. Allowed roles, the owner, and members with the required Discord permissions can still manage tickets.',
+    'Rôle ticket ajouté': 'Ticket role added',
+    'Rôle ticket retiré': 'Ticket role removed',
+    'Le Premium ajoutera les panneaux illimités, catégories personnalisées, formulaires avancés, priorités, templates, historique complet, statistiques et automatisations.': 'Premium will add unlimited panels, custom categories, advanced forms, priorities, templates, full history, statistics, and automations.',
+    'Accès illimité aux embeds d’annonce Sentinel': 'Unlimited access to Sentinel announcement embeds',
+    'Catégories, formulaires, priorités, templates et branding des dossiers': 'Dossier categories, forms, priorities, templates, and branding',
+    'Préparer plusieurs bureaux de tickets, personnaliser les formulaires, organiser les priorités et garder un historique exploitable.': 'Prepare several ticket desks, customize forms, organize priorities, and keep usable history.',
+    'Statuts': 'Statuses',
+    'Rôles capables de prendre en charge, corriger le statut et clôturer un ticket': 'Roles able to take over, correct status, and close a ticket',
+    'Responsables': 'Responsible roles',
+    'Accès illimité aux annonces Sentinel': 'Unlimited access to Sentinel announcements',
+    'Panneaux illimités, catégories, formulaires, priorités, templates, historique complet, statistiques et automatisations': 'Unlimited panels, categories, forms, priorities, templates, full history, statistics, and automations'
+  });
+
   let normalizedTranslations = null;
 
   function normalizeTranslationKey(value) {

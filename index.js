@@ -241,10 +241,10 @@ const I18N = {
         customEmbedCreated: '✅ Embed Sentinel envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
         customEmbedEdited: '✅ Embed Sentinel `{messageId}` modifié. Les modifications ne consomment pas de quota.',
         customEmbedDeleted: '✅ Embed Sentinel `{messageId}` supprimé. Son emplacement gratuit est libéré.',
-        customEmbedNotFound: '❌ Aucun embed Sentinel géré ne correspond à ce message dans ce salon.',
+        customEmbedNotFound: '❌ Aucun embed Sentinel géré ne correspond à cet ID.',
         customEmbedNoEditFields: '❌ Indique au moins un champ à modifier : titre, message, couleur, image, miniature ou footer.',
         customEmbedQuotaFree: 'Quota gratuit : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
-        customEmbedQuotaUnlimited: 'Quota Premium : embeds illimités.',
+        customEmbedQuotaUnlimited: 'Quota Premium : accès illimité aux embeds.',
         dossierPanelTitle: 'Sentinel | Bureau d’accueil',
         dossierPanelDescription: 'Dans Sentinel, un dossier est un ticket privé : chaque demande ouvre un salon dédié avec le membre et l’équipe autorisée.\n\nChoisis le type de dossier à ouvrir. Sentinel demandera le sujet avant de créer le salon.',
         dossierSupportLabel: 'Support',
@@ -267,9 +267,9 @@ const I18N = {
         dossierClosed: 'Dossier clôturé. Le compte rendu a été envoyé, puis le salon va être fermé.',
         dossierClaimed: 'Dossier pris en charge par {member}.',
         dossierClaimDenied: 'Tu dois avoir un rôle autorisé pour prendre en charge ce dossier.',
-        dossierClaimPremiumOnly: '⭐ La prise en charge officielle des dossiers est une option Premium. En gratuit, le staff peut quand même répondre, ajouter un intervenant, faire un compte rendu et clôturer le dossier.',
+        dossierClaimPremiumOnly: '⭐ Les options Premium des dossiers concernent surtout les volumes, les formulaires, les priorités et les automatisations.',
         dossierStatusDenied: 'Tu dois avoir un rôle autorisé pour modifier le statut du dossier.',
-        dossierStatusPremiumOnly: '⭐ Les statuts avancés des dossiers sont une option Premium. En gratuit, le dossier passe simplement de ouvert à fermé.',
+        dossierStatusPremiumOnly: '⭐ Les options Premium des dossiers concernent surtout les volumes, les formulaires, les priorités et les automatisations.',
         dossierStatusUpdated: 'Statut du dossier mis à jour : **{status}**.',
         dossierAddDone: '✅ {member} a été ajouté comme intervenant du dossier.',
         dossierRemoveDone: '✅ {member} a été retiré du dossier.',
@@ -382,10 +382,10 @@ const I18N = {
         customEmbedCreated: '✅ Sentinel embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
         customEmbedEdited: '✅ Sentinel embed `{messageId}` edited. Edits do not use quota.',
         customEmbedDeleted: '✅ Sentinel embed `{messageId}` deleted. Its free slot is now available.',
-        customEmbedNotFound: '❌ No managed Sentinel embed matches this message in this channel.',
+        customEmbedNotFound: '❌ No managed Sentinel embed matches this ID.',
         customEmbedNoEditFields: '❌ Provide at least one field to edit: title, message, color, image, thumbnail, or footer.',
         customEmbedQuotaFree: 'Free quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
-        customEmbedQuotaUnlimited: 'Premium quota: unlimited embeds.',
+        customEmbedQuotaUnlimited: 'Premium quota: unlimited embed access.',
         dossierPanelTitle: 'Sentinel | Reception desk',
         dossierPanelDescription: 'In Sentinel, a dossier is a private ticket: each request opens a dedicated channel with the member and the authorized team.\n\nChoose the dossier type to open. Sentinel will ask for the subject before creating the channel.',
         dossierSupportLabel: 'Support',
@@ -408,9 +408,9 @@ const I18N = {
         dossierClosed: 'Dossier closed. The transcript has been sent, then the channel will be closed.',
         dossierClaimed: 'Dossier taken over by {member}.',
         dossierClaimDenied: 'You need an authorized role to take over this dossier.',
-        dossierClaimPremiumOnly: '⭐ Official dossier assignment is a Premium option. Free servers can still reply, add participants, generate a transcript, and close the dossier.',
+        dossierClaimPremiumOnly: '⭐ Premium dossier options mainly cover volume, forms, priorities, and automations.',
         dossierStatusDenied: 'You need an authorized role to update this dossier status.',
-        dossierStatusPremiumOnly: '⭐ Advanced dossier statuses are a Premium option. On free servers, dossiers simply move from open to closed.',
+        dossierStatusPremiumOnly: '⭐ Premium dossier options mainly cover volume, forms, priorities, and automations.',
         dossierStatusUpdated: 'Dossier status updated: **{status}**.',
         dossierAddDone: '✅ {member} has been added as a dossier participant.',
         dossierRemoveDone: '✅ {member} has been removed from this dossier.',
@@ -848,6 +848,47 @@ function removeCommandRole(guildId, roleId) {
     `).run(guildId, roleId);
 }
 
+function getDossierRoleIds(guildId) {
+    return db.prepare(`
+        SELECT role_id
+        FROM sentinel_dossier_roles
+        WHERE guild_id = ?
+        ORDER BY role_id ASC
+    `).all(guildId).map(row => row.role_id);
+}
+
+function addDossierRole(guildId, roleId) {
+    db.prepare(`
+        INSERT OR IGNORE INTO sentinel_dossier_roles (guild_id, role_id)
+        VALUES (?, ?)
+    `).run(guildId, roleId);
+}
+
+function removeDossierRole(guildId, roleId) {
+    db.prepare(`
+        DELETE FROM sentinel_dossier_roles
+        WHERE guild_id = ? AND role_id = ?
+    `).run(guildId, roleId);
+}
+
+function hasDossierRoleAccess(member) {
+    if (!member) {
+        return false;
+    }
+
+    return getDossierRoleIds(member.guild.id).some(roleId => member.roles.cache.has(roleId));
+}
+
+function hasSentinelStaffRole(member) {
+    if (!member || !isAdvancedGuild(member.guild.id)) {
+        return false;
+    }
+
+    return SENTINEL_STAFF_ROLES.some(staffRoleName =>
+        member.roles.cache.some(role => role.name === staffRoleName)
+    );
+}
+
 function formatCommandRoleList(guildId, language = 'fr') {
     const roleIds = getCommandRoleIds(guildId);
 
@@ -870,6 +911,10 @@ function hasCommandRoleAccess(member) {
     }
 
     if (member.id === member.guild.ownerId) {
+        return true;
+    }
+
+    if (hasSentinelStaffRole(member)) {
         return true;
     }
 
@@ -4817,6 +4862,7 @@ function sanitizeTicketName(value) {
 }
 
 function buildTicketOverwrites(guild, member) {
+    const allowedRoleIds = new Set();
     const overwrites = [
         {
             id: guild.roles.everyone.id,
@@ -4834,13 +4880,12 @@ function buildTicketOverwrites(guild, member) {
         }
     ];
 
-    for (const roleId of getCommandRoleIds(guild.id)) {
-        const role = guild.roles.cache.get(roleId);
-
-        if (!role) {
-            continue;
+    const pushAllowedRole = role => {
+        if (!role || allowedRoleIds.has(role.id)) {
+            return;
         }
 
+        allowedRoleIds.add(role.id);
         overwrites.push({
             id: role.id,
             allow: [
@@ -4852,24 +4897,18 @@ function buildTicketOverwrites(guild, member) {
                 PermissionsBitField.Flags.EmbedLinks
             ]
         });
+    };
+
+    for (const roleId of getCommandRoleIds(guild.id)) {
+        pushAllowedRole(guild.roles.cache.get(roleId));
+    }
+
+    for (const roleId of getDossierRoleIds(guild.id)) {
+        pushAllowedRole(guild.roles.cache.get(roleId));
     }
 
     for (const roleName of SENTINEL_STAFF_ROLES) {
-        const role = findRoleByName(guild, roleName);
-
-        if (role) {
-            overwrites.push({
-                id: role.id,
-                allow: [
-                    PermissionsBitField.Flags.ViewChannel,
-                    PermissionsBitField.Flags.SendMessages,
-                    PermissionsBitField.Flags.ReadMessageHistory,
-                    PermissionsBitField.Flags.ManageMessages,
-                    PermissionsBitField.Flags.AttachFiles,
-                    PermissionsBitField.Flags.EmbedLinks
-                ]
-            });
-        }
+        pushAllowedRole(findRoleByName(guild, roleName));
     }
 
     return overwrites;
@@ -4961,7 +5000,6 @@ function buildDossierOpenModal(dossierType, language = 'fr') {
 }
 
 function buildDossierControlComponents(language = 'fr', options = {}) {
-    const advanced = Boolean(options.advanced);
     const statusOptions = Object.entries(DOSSIER_STATUSES)
         .filter(([key]) => key !== 'closed')
         .map(([key, value]) => ({
@@ -4975,8 +5013,7 @@ function buildDossierControlComponents(language = 'fr', options = {}) {
                 .setCustomId('sentinel_dossier:claim')
                 .setLabel(language === 'en' ? 'Take over' : 'Prendre en charge')
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji('✅')
-                .setDisabled(!advanced),
+                .setEmoji('✅'),
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:transcript')
                 .setLabel(language === 'en' ? 'Transcript' : 'Compte rendu')
@@ -4992,7 +5029,6 @@ function buildDossierControlComponents(language = 'fr', options = {}) {
             new StringSelectMenuBuilder()
                 .setCustomId('sentinel_dossier_status')
                 .setPlaceholder(language === 'en' ? 'Update dossier status' : 'Modifier le statut du dossier')
-                .setDisabled(!advanced)
                 .addOptions(statusOptions)
         )
     ];
@@ -5018,7 +5054,8 @@ function isDossierChannel(channel) {
 
 function memberCanManageDossier(member) {
     return Boolean(member && (
-        hasCommandRoleAccess(member)
+        hasDossierRoleAccess(member)
+        || hasCommandRoleAccess(member)
         || member.permissions.has(PermissionsBitField.Flags.ManageChannels)
         || member.permissions.has(PermissionsBitField.Flags.Administrator)
     ));
@@ -5085,32 +5122,81 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     const duration = createdAt
         ? formatDuration(new Date(closedAt).getTime() - new Date(createdAt).getTime())
         : null;
-    const logMessage = language === 'en'
-        ? [
-            `🧾 Transcript for ${channel.name}, generated by ${actor}.`,
-            `Dossier: #${dossier?.id || channel.id}`,
-            `Type: ${getDossierTypeMeta(dossier?.type || 'support', language).label}`,
-            `Status: ${getDossierStatusLabel(dossier?.status || 'open', language)}`,
-            `Referent: ${dossier?.referentUserId ? `<@${dossier.referentUserId}>` : 'none'}`,
-            `Duration: ${duration || 'unknown'}`,
-            dossier?.subject ? `Subject: ${dossier.subject}` : null
-        ].filter(Boolean).join('\n')
-        : [
-            `🧾 Compte rendu de ${channel.name}, généré par ${actor}.`,
-            `Dossier : #${dossier?.id || channel.id}`,
-            `Type : ${getDossierTypeMeta(dossier?.type || 'support', language).label}`,
-            `Statut : ${getDossierStatusLabel(dossier?.status || 'open', language)}`,
-            `Référent : ${dossier?.referentUserId ? `<@${dossier.referentUserId}>` : 'aucun'}`,
-            `Durée : ${duration || 'inconnue'}`,
-            dossier?.subject ? `Sujet : ${dossier.subject}` : null
-        ].filter(Boolean).join('\n');
+    const dossierType = getDossierTypeMeta(dossier?.type || 'support', language).label;
+    const status = getDossierStatusLabel(dossier?.status || 'open', language);
+    const archiveEmbed = new EmbedBuilder()
+        .setColor(SENTINEL_COLORS.neutral)
+        .setTitle(language === 'en' ? 'Sentinel | Ticket archive' : 'Sentinel | Archive de dossier')
+        .setDescription(language === 'en'
+            ? `Transcript generated for ${channel}.`
+            : `Compte rendu généré pour ${channel}.`
+        )
+        .addFields(
+            {
+                name: language === 'en' ? 'Dossier' : 'Dossier',
+                value: `#${dossier?.id || channel.id}`,
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Type' : 'Type',
+                value: dossierType,
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Status' : 'Statut',
+                value: status,
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Requester' : 'Demandeur',
+                value: dossier?.ownerUserId ? `<@${dossier.ownerUserId}>` : (language === 'en' ? 'unknown' : 'inconnu'),
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Referent' : 'Référent',
+                value: dossier?.referentUserId ? `<@${dossier.referentUserId}>` : (language === 'en' ? 'none' : 'aucun'),
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Closed by' : 'Clôturé par',
+                value: `${actor}`,
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Duration' : 'Durée',
+                value: duration || (language === 'en' ? 'unknown' : 'inconnue'),
+                inline: true
+            },
+            {
+                name: language === 'en' ? 'Subject' : 'Sujet',
+                value: truncateAuditValue(dossier?.subject || (language === 'en' ? 'none' : 'aucun'), 1000),
+                inline: false
+            }
+        )
+        .setTimestamp();
 
     if (logChannel) {
-        await logChannel.send({ content: logMessage, files: [attachment] }).catch(() => {});
-        return;
+        const sent = await logChannel.send({
+            embeds: [archiveEmbed],
+            files: [attachment]
+        }).catch(() => null);
+
+        return {
+            sentToLogChannel: Boolean(sent),
+            logChannelId: logChannel.id
+        };
     }
 
-    await channel.send({ content: logMessage, files: [attachment] }).catch(() => {});
+    const sent = await channel.send({
+        embeds: [archiveEmbed],
+        files: [attachment]
+    }).catch(() => null);
+
+    return {
+        sentToLogChannel: false,
+        logChannelId: null,
+        sentInDossier: Boolean(sent)
+    };
 }
 
 async function handleSentinelSelfRoleButton(interaction) {
@@ -5433,13 +5519,6 @@ async function handleSentinelDossierClaimButton(interaction) {
         });
     }
 
-    if (!isAdvancedGuild(interaction.guild.id)) {
-        return interaction.reply({
-            content: t(language, 'dossierClaimPremiumOnly'),
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
     if (!memberCanManageDossier(interaction.member)) {
         return interaction.reply({
             content: t(language, 'dossierClaimDenied'),
@@ -5467,14 +5546,6 @@ async function handleDossierStatusSelect(interaction) {
     if (!channel) {
         await interaction.reply({
             content: t(language, 'dossierNotInDossier'),
-            flags: MessageFlags.Ephemeral
-        });
-        return true;
-    }
-
-    if (!isAdvancedGuild(interaction.guild.id)) {
-        await interaction.reply({
-            content: t(language, 'dossierStatusPremiumOnly'),
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -6484,21 +6555,29 @@ function getCustomEmbedInteractionInput(interaction) {
     };
 }
 
-async function fetchManagedCustomEmbedMessage(guildId, channel, messageId) {
+async function fetchManagedCustomEmbedMessage(guildId, fallbackChannel, messageId) {
     const record = getCustomEmbedRecord(guildId, messageId);
 
-    if (!record || record.channel_id !== channel.id) {
-        return { record: null, message: null };
+    if (!record) {
+        return { record: null, message: null, channel: null };
+    }
+
+    const guild = fallbackChannel?.guild || client.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(record.channel_id)
+        || await guild?.channels.fetch(record.channel_id).catch(() => null);
+
+    if (!channel || !channel.isTextBased()) {
+        return { record: null, message: null, channel: null };
     }
 
     const message = await channel.messages.fetch(messageId).catch(() => null);
 
     if (!message || message.author.id !== client.user.id) {
         deleteCustomEmbedRecord(guildId, messageId);
-        return { record: null, message: null };
+        return { record: null, message: null, channel: null };
     }
 
-    return { record, message };
+    return { record, message, channel };
 }
 
 async function handleCustomEmbedInteraction(interaction, commandName, language) {
@@ -6517,17 +6596,18 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
     const guildId = interaction.guild.id;
     const subcommand = interaction.options.getSubcommand();
     const channel = interaction.options.getChannel('salon') || interaction.options.getChannel('channel');
-    const channelError = getCustomEmbedChannelError(interaction.guild, channel, null, language);
-
-    if (channelError) {
-        await interaction.reply({
-            content: channelError,
-            flags: MessageFlags.Ephemeral
-        });
-        return true;
-    }
 
     if (subcommand === 'creer') {
+        const channelError = getCustomEmbedChannelError(interaction.guild, channel, null, language);
+
+        if (channelError) {
+            await interaction.reply({
+                content: channelError,
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
         const quota = getCustomEmbedQuota(guildId);
 
         if (!quota.unlimited && quota.used >= quota.limit) {
@@ -6594,11 +6674,21 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
         return true;
     }
 
-    const { record, message } = await fetchManagedCustomEmbedMessage(guildId, channel, messageId);
+    const { record, message, channel: embedChannel } = await fetchManagedCustomEmbedMessage(guildId, channel, messageId);
 
     if (!record || !message) {
         await interaction.reply({
             content: t(language, 'customEmbedNotFound'),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    const channelError = getCustomEmbedChannelError(interaction.guild, embedChannel, null, language);
+
+    if (channelError) {
+        await interaction.reply({
+            content: channelError,
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -6895,6 +6985,7 @@ client.once(Events.ClientReady, async () => {
         helpers: {
             addCommandRole,
             addCustomEmbedRecord,
+            addDossierRole,
             addModerationCase,
             addSession,
             buildCustomAnnouncementEmbed,
@@ -6915,6 +7006,7 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbeds,
             getCustomEmbedQuota,
             getCustomEmbedRecord,
+            getDossierRoleIds,
             getGuildConfig,
             getGuildLanguage,
             getDossierByChannel,
@@ -6940,11 +7032,13 @@ client.once(Events.ClientReady, async () => {
             getUserSessionCount,
             getUserTargetErrorById,
             hasCommandRoleAccess,
+            memberCanManageDossier,
             hasModerationAccess,
             isAdvancedGuild,
             normalizeUserId,
             parseDurationToMs,
             parseSlowmodeToSeconds,
+            removeDossierRole,
             removeCommandRole,
             recordDossierPanel,
             resetGuild,

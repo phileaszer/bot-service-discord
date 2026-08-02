@@ -55,17 +55,20 @@ function dashboardErrorMessage(message) {
     'Sentinel is not installed on this server.': 'Sentinel doit être invité comme bot sur ce serveur avant d’utiliser le dashboard.',
     'You do not have access to this server dashboard.': 'Tu n’as pas accès au dashboard de ce serveur.',
     'You do not have permission to manage Sentinel on this server.': 'Tu n’as pas de rôle autorisé pour gérer Sentinel sur ce serveur.',
+    'You do not have permission to manage Sentinel dossiers on this server.': 'Tu n’as pas de rôle responsable pour gérer les tickets Sentinel sur ce serveur.',
     'You do not have permission for this moderation action.': 'Tu n’as pas la permission Discord nécessaire pour cette sanction.',
     'Sentinel does not have the required Discord permission.': 'Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
     'This action is reserved for Sentinel Premium.': 'Cette action est réservée à Sentinel Premium.',
     'Invalid Discord user ID.': 'L’ID Discord indiqué n’est pas valide.',
     'Text channel not found.': 'Salon textuel introuvable.',
+    'Role not found.': 'Rôle Discord introuvable.',
     'Invalid timeout duration.': 'Durée de timeout invalide. Exemple : 10m, 2h, 7d.',
     'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
+    'Sentinel embed not found.': 'Aucun embed Sentinel géré ne correspond à cet ID.',
     'Unknown moderation action.': 'Action de modération inconnue.',
     'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
   };
@@ -78,7 +81,9 @@ function dashboardErrorMessage(message) {
     'Sentinel does not have the required Discord permission.': firstFix || 'Ouvre le diagnostic permissions du dashboard et corrige la permission indiquée.',
     'Invalid Discord user ID.': 'Copie l’ID Discord numérique complet de la personne, pas son pseudo.',
     'Text channel not found.': 'Choisis un salon textuel accessible par Sentinel.',
+    'Role not found.': 'Choisis un rôle Discord toujours présent sur le serveur.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
+    'Sentinel embed not found.': 'Copie l’ID depuis la liste “Embeds gérés”. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
   };
   const resolution = resolutionByMessage[message];
@@ -1045,16 +1050,21 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
 
 function customEmbedQuota(state) {
   const quota = state.customEmbeds?.quota;
+  const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
 
   if (!quota) {
-    return 'Quota indisponible';
+    return language === 'en' ? 'Quota unavailable' : 'Quota indisponible';
   }
 
   if (quota.unlimited) {
-    return 'Premium : création illimitée, modifications illimitées.';
+    return language === 'en'
+      ? 'Premium: unlimited access to Sentinel embeds, with unlimited creation and edits.'
+      : 'Premium : accès illimité aux embeds Sentinel, créations et modifications illimitées.';
   }
 
-  return `Gratuit : ${quota.used}/${quota.limit} embeds actifs utilisés. Restant : ${quota.remaining}. Modifications illimitées.`;
+  return language === 'en'
+    ? `Free: ${quota.used}/${quota.limit} active embeds used. Remaining: ${quota.remaining}. Edits are unlimited; Premium will unlock unlimited embeds.`
+    : `Gratuit : ${quota.used}/${quota.limit} embeds actifs utilisés. Restant : ${quota.remaining}. Les modifications sont illimitées ; le Premium donnera un accès illimité aux embeds.`;
 }
 
 function customEmbedList(state) {
@@ -1118,16 +1128,21 @@ function dossierPriorityLabel(priority) {
 
 function dossierQuotaText(state) {
   const quota = state.dossiers?.panelQuota;
+  const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
 
   if (!quota) {
-    return 'Quota indisponible';
+    return language === 'en' ? 'Quota unavailable' : 'Quota indisponible';
   }
 
   if (quota.unlimited) {
-    return 'Premium : panneaux illimités, historique long et réglages avancés.';
+    return language === 'en'
+      ? 'Premium: unlimited panels, longer history, and advanced settings.'
+      : 'Premium : panneaux illimités, historique long et réglages avancés.';
   }
 
-  return `Gratuit : ${quota.used}/${quota.limit} panneau publié. ${quota.remaining} restant. Historique visible : ${state.dossiers?.historyLimit || 10} dossiers.`;
+  return language === 'en'
+    ? `Free: ${quota.used}/${quota.limit} published panel. ${quota.remaining} remaining. Visible history: ${state.dossiers?.historyLimit || 10} tickets.`
+    : `Gratuit : ${quota.used}/${quota.limit} panneau publié. ${quota.remaining} restant. Historique visible : ${state.dossiers?.historyLimit || 10} dossiers.`;
 }
 
 function categoryOptionList(categories = [], selectedId = null) {
@@ -1174,6 +1189,31 @@ function dossierPremiumSettings(state, premiumTag) {
       </div>
       <p class="muted">Plus tard, ce même espace accueillera les formulaires personnalisés, les priorités, les templates, le branding et les automatisations.</p>
     </article>
+  `;
+}
+
+function dossierRoles(state) {
+  return (state.dossiers?.roleIds || [])
+    .map((roleId) => resolveRole(state, roleId))
+    .filter(Boolean);
+}
+
+function dossierRoleList(state) {
+  const roles = dossierRoles(state);
+
+  if (roles.length === 0) {
+    return '<p class="muted">Aucun rôle responsable n’est configuré. Les rôles autorisés, le propriétaire et les membres avec les permissions Discord nécessaires peuvent encore gérer les tickets.</p>';
+  }
+
+  return `
+    <div class="role-chip-row">
+      ${roles.map((role) => `
+        <span class="role-chip">
+          @${escapeHtml(role.name)}
+          <button type="button" data-action-click="remove-dossier-role" data-role-id="${escapeHtml(role.id)}">Retirer</button>
+        </span>
+      `).join('')}
+    </div>
   `;
 }
 
@@ -1293,8 +1333,6 @@ function dossierDetailRow(item) {
 
 function dossierList(state) {
   const items = (state.dossiers?.items || []).filter(dossierMatchesFilters);
-  const advancedDisabled = state.advanced ? '' : ' disabled';
-  const advancedHint = state.advanced ? '' : '<small class="premium-inline-note">Premium</small>';
 
   if (items.length === 0) {
     return '<p class="muted">Aucun dossier Sentinel trouvé avec ces filtres.</p>';
@@ -1335,14 +1373,13 @@ function dossierList(state) {
                   ${isOpen ? `
                     <form class="table-action-form dossier-table-actions" data-action-form="dossier-status">
                       <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
-                      <select name="dossierStatus"${advancedDisabled}>${dossierStatusActionOptions(item.status)}</select>
-                      <button class="button button-small button-ghost" type="submit"${advancedDisabled}>Statut</button>
+                      <select name="dossierStatus">${dossierStatusActionOptions(item.status)}</select>
+                      <button class="button button-small button-ghost" type="submit">Statut</button>
                     </form>
                     <form class="table-action-form dossier-table-actions" data-action-form="dossier-claim">
                       <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
-                      <button class="button button-small button-ghost" type="submit"${advancedDisabled}>Prendre</button>
+                      <button class="button button-small button-ghost" type="submit">Prendre</button>
                     </form>
-                    ${advancedHint}
                     <form class="table-action-form dossier-table-actions" data-action-form="dossier-close">
                       <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
                       <button class="button button-small button-ghost" type="submit">Clôturer</button>
@@ -1370,6 +1407,8 @@ const AUDIT_ACTION_LABELS = {
   'dossier-status': 'Statut dossier',
   'dossier-claim': 'Dossier pris en charge',
   'set-dossier-category': 'Catégorie dossier',
+  'add-dossier-role': 'Rôle ticket ajouté',
+  'remove-dossier-role': 'Rôle ticket retiré',
   'dossier-add': 'Intervenant ajouté',
   'dossier-remove': 'Intervenant retiré',
   'dossier-transcript': 'Compte rendu dossier',
@@ -1971,6 +2010,7 @@ function renderDashboard() {
   const state = currentState;
   const roleOptions = optionList(state.roles, state.config.serviceRoleId, 'Choisir un rôle');
   const commandRoleOptions = optionList(state.roles, null, 'Choisir un rôle autorisé');
+  const dossierRoleOptions = optionList(state.roles, null, 'Choisir un rôle responsable');
   const pingRoleOptions = optionList(state.roles, null, 'Aucun ping de rôle');
   const channelOptions = optionList(state.channels, state.config.logChannelId, 'Choisir un salon');
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
@@ -2011,8 +2051,7 @@ function renderDashboard() {
           <button class="button" type="submit">Envoyer l’embed</button>
         </form>
         <form data-action-form="custom-embed-edit">
-          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message. Les modifications ne consomment pas de quota.')}
-          <select name="channelId">${channelOptions}</select>
+          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message. Les modifications ne consomment pas de quota et Sentinel retrouve le salon automatiquement.')}
           <input name="messageId" placeholder="ID du message embed" required>
           <input name="title" placeholder="Nouveau titre">
           <textarea name="description" placeholder="Nouveau message"></textarea>
@@ -2023,8 +2062,7 @@ function renderDashboard() {
           <button class="button" type="submit">Modifier sans quota</button>
         </form>
         <form data-action-form="custom-embed-delete">
-          ${labelHelp('Supprimer un embed Sentinel', 'Supprime un embed géré par Sentinel et libère son emplacement gratuit si le serveur n’est pas Premium.')}
-          <select name="channelId">${channelOptions}</select>
+          ${labelHelp('Supprimer un embed Sentinel', 'Supprime un embed géré par Sentinel avec son ID de message et libère son emplacement gratuit si le serveur n’est pas Premium.')}
           <input name="messageId" placeholder="ID du message embed" required>
           <button class="button button-ghost" type="submit">Supprimer</button>
         </form>
@@ -2059,10 +2097,18 @@ function renderDashboard() {
         </form>
         <article class="inline-form dossier-explain-card">
           ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est un ticket privé pour le support, un signalement, un recrutement, un partenariat ou une autre demande.')}
-          <p>En gratuit, le staff peut répondre, ajouter des intervenants, générer un compte rendu et clôturer le dossier. En Premium, il pourra aussi prendre officiellement un dossier en charge et suivre des statuts avancés.</p>
+          <p>En gratuit, les responsables peuvent répondre, ajouter des intervenants, prendre le ticket en charge, corriger son statut, générer un compte rendu et le clôturer.</p>
+        </article>
+        <article class="inline-form dossier-explain-card">
+          ${labelHelp('Rôles responsables', 'Ces rôles peuvent voir les tickets, les prendre en charge, changer leur statut, générer l’archive et clôturer le salon.')}
+          <form data-action-form="add-dossier-role">
+            <select name="roleId">${dossierRoleOptions}</select>
+            <button class="button" type="submit">Ajouter le rôle</button>
+          </form>
+          ${dossierRoleList(state)}
         </article>
         <article class="inline-form dossier-explain-card premium-roadmap">
-          ${labelHelp('Premium dossiers', 'Le Premium ajoutera les panneaux illimités, catégories personnalisées, formulaires avancés, prise en charge, statuts avancés, priorités, templates, historique complet, statistiques et automatisations.')}
+          ${labelHelp('Premium dossiers', 'Le Premium ajoutera les panneaux illimités, catégories personnalisées, formulaires avancés, priorités, templates, historique complet, statistiques et automatisations.')}
           <p>Le gratuit reste simple : ouvrir, suivre, clôturer et retrouver les 10 derniers dossiers. Le Premium servira aux gros staffs qui ont besoin de trier et automatiser beaucoup de demandes.</p>
         </article>
         ${dossierPremiumSettings(state, premiumTag)}

@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS guild_command_roles (
     PRIMARY KEY (guild_id, role_id)
 );
 
+CREATE TABLE IF NOT EXISTS sentinel_dossier_roles (
+    guild_id TEXT,
+    role_id TEXT,
+    PRIMARY KEY (guild_id, role_id)
+);
+
 CREATE TABLE IF NOT EXISTS moderation_cases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     guild_id TEXT NOT NULL,
@@ -182,6 +188,9 @@ ON service_sessions (guild_id, user_id, date);
 
 CREATE INDEX IF NOT EXISTS idx_guild_command_roles_guild
 ON guild_command_roles (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_sentinel_dossier_roles_guild
+ON sentinel_dossier_roles (guild_id);
 
 CREATE INDEX IF NOT EXISTS idx_moderation_cases_guild_target
 ON moderation_cases (guild_id, target_user_id, created_at);

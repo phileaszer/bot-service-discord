@@ -34,7 +34,8 @@ Sentinel Gratuit reste utilisable sans abonnement :
 - 2 embeds actifs, modifiables sans limite ;
 - 1 panneau de dossiers ;
 - 5 dossiers ouverts en même temps ;
-- 10 derniers dossiers visibles.
+- 10 derniers dossiers visibles ;
+- rôles responsables capables de prendre en charge, corriger le statut, archiver et clôturer un ticket.
 
 ## Premium prévu
 
@@ -43,10 +44,10 @@ Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion pl
 - statistiques mensuelles et annuelles ;
 - exports CSV, Excel ou PDF ;
 - rapports automatiques ;
-- embeds illimités ;
+- accès illimité aux embeds ;
 - panneaux de dossiers illimités ;
 - catégories et formulaires personnalisés ;
-- statuts avancés, priorités et prise en charge staff ;
+- priorités, templates et branding des dossiers ;
 - transcriptions complètes ;
 - historique complet et recherche avancée ;
 - automatisations de modération et de dossiers.
@@ -121,12 +122,12 @@ Main features:
 - duty panel, personal hours, active staff and leaderboards;
 - moderation commands: warn, timeout, kick, ban by ID, clear and cases;
 - private tickets, called Sentinel dossiers in the French interface;
-- announcement embeds;
+- announcement embeds, with unlimited access planned for Premium;
 - web dashboard;
 - per-server language selection;
 - SQLite storage with `better-sqlite3`.
 
-For setup, invite Sentinel, choose the server language, configure the duty role, configure the log channel, add authorized roles, then publish the duty panel or the ticket panel.
+For setup, invite Sentinel, choose the server language, configure the duty role, configure the log channel, add authorized roles, then publish the duty panel or the ticket panel. Ticket responsible roles can be configured from the dashboard.
 
 This repository is public for presentation and project tracking. The code is not released under an open-source license: copying, redistributing or reusing the bot requires prior permission.
 
