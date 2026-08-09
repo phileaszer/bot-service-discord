@@ -688,9 +688,10 @@ function checkDatabase() {
 function getAdvancedGuildIds() {
     return [
         SENTINEL_REFERENCE_GUILD_ID,
-        process.env.GUILD_ID,
-        process.env.AUTO_SYNC_GUILD_ID,
-        process.env.SENTINEL_REFERENCE_GUILD_ID
+        process.env.SENTINEL_REFERENCE_GUILD_ID,
+        process.env.SENTINEL_PREMIUM_GUILD_ID,
+        process.env.SENTINEL_PREMIUM_GUILD_IDS,
+        process.env.PREMIUM_GUILD_IDS
     ]
         .flatMap(value => String(value || '').split(','))
         .map(value => value.trim())
@@ -699,6 +700,43 @@ function getAdvancedGuildIds() {
 
 function isAdvancedGuild(guildId) {
     return Boolean(guildId && getAdvancedGuildIds().includes(String(guildId)));
+}
+
+function getPremiumRoleGuildIds() {
+    return [
+        SENTINEL_REFERENCE_GUILD_ID
+    ]
+        .flatMap(value => String(value || '').split(','))
+        .map(value => value.trim())
+        .filter(value => /^\d{17,20}$/.test(value));
+}
+
+function normalizeRoleName(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function getPremiumRoleNames() {
+    return [
+        ...SENTINEL_STAFF_ROLES,
+        process.env.SENTINEL_PREMIUM_ROLE_NAMES,
+        process.env.PREMIUM_ROLE_NAMES
+    ]
+        .flatMap(value => String(value || '').split(','))
+        .map(normalizeRoleName)
+        .filter(Boolean);
+}
+
+function hasAdvancedAccess(member, guildId = null) {
+    const resolvedGuildId = guildId || member?.guild?.id;
+
+    return Boolean(resolvedGuildId && (
+        isAdvancedGuild(resolvedGuildId)
+        || hasSentinelStaffRole(member)
+    ));
 }
 
 function isAdvancedCommand(commandName) {
@@ -880,13 +918,13 @@ function hasDossierRoleAccess(member) {
 }
 
 function hasSentinelStaffRole(member) {
-    if (!member || !isAdvancedGuild(member.guild.id)) {
+    if (!member?.guild?.id || !getPremiumRoleGuildIds().includes(String(member.guild.id))) {
         return false;
     }
 
-    return SENTINEL_STAFF_ROLES.some(staffRoleName =>
-        member.roles.cache.some(role => role.name === staffRoleName)
-    );
+    const premiumRoleNames = new Set(getPremiumRoleNames());
+
+    return member.roles.cache.some(role => premiumRoleNames.has(normalizeRoleName(role.name)));
 }
 
 function formatCommandRoleList(guildId, language = 'fr') {
@@ -1296,9 +1334,9 @@ function getDossierPanelCount(guildId) {
     return row?.count || 0;
 }
 
-function getDossierPanelQuota(guildId) {
+function getDossierPanelQuota(guildId, member = null) {
     const used = getDossierPanelCount(guildId);
-    const unlimited = isAdvancedGuild(guildId);
+    const unlimited = isAdvancedGuild(guildId) || hasAdvancedAccess(member);
     const limit = unlimited ? null : FREE_DOSSIER_PANEL_LIMIT;
 
     return {
@@ -1309,8 +1347,8 @@ function getDossierPanelQuota(guildId) {
     };
 }
 
-function assertDossierPanelQuota(guildId, language = 'fr') {
-    const quota = getDossierPanelQuota(guildId);
+function assertDossierPanelQuota(guildId, language = 'fr', member = null) {
+    const quota = getDossierPanelQuota(guildId, member);
 
     if (!quota.unlimited && quota.used >= quota.limit) {
         throw new Error(t(language, 'dossierPanelLimitReached', { limit: quota.limit }));
@@ -1319,8 +1357,8 @@ function assertDossierPanelQuota(guildId, language = 'fr') {
     return quota;
 }
 
-function assertOpenDossierQuota(guildId, language = 'fr') {
-    if (isAdvancedGuild(guildId)) {
+function assertOpenDossierQuota(guildId, language = 'fr', member = null) {
+    if (isAdvancedGuild(guildId) || hasAdvancedAccess(member)) {
         return;
     }
 
@@ -1768,10 +1806,10 @@ function getCustomEmbedCount(guildId) {
     return row?.count || 0;
 }
 
-function getCustomEmbedQuota(guildId) {
+function getCustomEmbedQuota(guildId, member = null) {
     const used = getCustomEmbedCount(guildId);
 
-    if (isAdvancedGuild(guildId)) {
+    if (isAdvancedGuild(guildId) || hasAdvancedAccess(member)) {
         return {
             unlimited: true,
             used,
@@ -1788,8 +1826,8 @@ function getCustomEmbedQuota(guildId) {
     };
 }
 
-function formatCustomEmbedQuota(guildId, language = 'fr') {
-    const quota = getCustomEmbedQuota(guildId);
+function formatCustomEmbedQuota(guildId, language = 'fr', member = null) {
+    const quota = getCustomEmbedQuota(guildId, member);
 
     if (quota.unlimited) {
         return t(language, 'customEmbedQuotaUnlimited');
@@ -3694,8 +3732,8 @@ function buildLegacyHelpEmbed(guild, requester) {
 
 const HELP_PAGE_DEFAULT = 'start';
 
-function buildHelpPageDefinitions(guild, language = 'fr') {
-    const isReferenceServer = isAdvancedGuild(guild.id);
+function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
+    const isReferenceServer = isAdvancedGuild(guild.id) || hasAdvancedAccess(member);
 
     if (language === 'en') {
         const pages = [
@@ -4300,8 +4338,8 @@ function buildHelpPageDefinitions(guild, language = 'fr') {
     return pages;
 }
 
-function getHelpPage(guild, language, pageId = HELP_PAGE_DEFAULT) {
-    const pages = buildHelpPageDefinitions(guild, language);
+function getHelpPage(guild, language, pageId = HELP_PAGE_DEFAULT, member = null) {
+    const pages = buildHelpPageDefinitions(guild, language, member);
     const page = pages.find(item => item.id === pageId) || pages[0];
 
     return {
@@ -4311,9 +4349,9 @@ function getHelpPage(guild, language, pageId = HELP_PAGE_DEFAULT) {
     };
 }
 
-function buildHelpEmbed(guild, requester, pageId = HELP_PAGE_DEFAULT) {
+function buildHelpEmbed(guild, requester, pageId = HELP_PAGE_DEFAULT, member = null) {
     const language = getGuildLanguage(guild.id);
-    const { pages, page, index } = getHelpPage(guild, language, pageId);
+    const { pages, page, index } = getHelpPage(guild, language, pageId, member);
     const pageLabel = language === 'en'
         ? `Page ${index + 1}/${pages.length}`
         : `Page ${index + 1}/${pages.length}`;
@@ -4331,9 +4369,9 @@ function buildHelpEmbed(guild, requester, pageId = HELP_PAGE_DEFAULT) {
     })));
 }
 
-function buildHelpMenuComponents(guild, requester, pageId = HELP_PAGE_DEFAULT) {
+function buildHelpMenuComponents(guild, requester, pageId = HELP_PAGE_DEFAULT, member = null) {
     const language = getGuildLanguage(guild.id);
-    const { pages, page } = getHelpPage(guild, language, pageId);
+    const { pages, page } = getHelpPage(guild, language, pageId, member);
     const placeholder = language === 'en'
         ? 'Choose a help section'
         : 'Choisis une rubrique d’aide';
@@ -4380,8 +4418,8 @@ async function handleHelpMenuInteraction(interaction) {
     const pageId = interaction.values[0] || HELP_PAGE_DEFAULT;
 
     return interaction.update({
-        embeds: [buildHelpEmbed(interaction.guild, interaction.user, pageId)],
-        components: buildHelpMenuComponents(interaction.guild, interaction.user, pageId)
+        embeds: [buildHelpEmbed(interaction.guild, interaction.user, pageId, interaction.member)],
+        components: buildHelpMenuComponents(interaction.guild, interaction.user, pageId, interaction.member)
     });
 }
 
@@ -4822,7 +4860,26 @@ const SENTINEL_STAFF_ROLES = [
     '✦ Sentinel | Fondateur',
     '◆ Sentinel | Administrateur',
     '◇ Sentinel | Moderateur',
-    '✚ Sentinel | Support'
+    '◇ Sentinel | Modérateur',
+    '✚ Sentinel | Support',
+    'Sentinel | Fondateur',
+    'Sentinel | Administrateur',
+    'Sentinel | Moderateur',
+    'Sentinel | Modérateur',
+    'Sentinel | Support',
+    'Co fondateur',
+    'Co-fondateur',
+    'Fondateur',
+    'Administrateur',
+    'Moderateur',
+    'Modérateur',
+    'Moderation',
+    'Modération',
+    'Modo',
+    'Modo temp',
+    'Staff',
+    'Responsable',
+    'Support'
 ];
 
 const SENTINEL_GENERAL_CHANNELS = {
@@ -4959,8 +5016,8 @@ function buildDossierPanelComponents(language = 'fr') {
     ];
 }
 
-async function publishDossierPanel(channel, requester, language = 'fr') {
-    assertDossierPanelQuota(channel.guild.id, language);
+async function publishDossierPanel(channel, requester, language = 'fr', member = null) {
+    assertDossierPanelQuota(channel.guild.id, language, member);
 
     const message = await channel.send({
         embeds: [buildDossierPanelEmbed(channel.guild, requester, language)],
@@ -5303,7 +5360,7 @@ async function handleSentinelLanguageButton(interaction) {
 
     const hasBypassView = member.id === guild.ownerId
         || member.permissions.has(PermissionsBitField.Flags.Administrator)
-        || SENTINEL_STAFF_ROLES.some(staffRoleName => member.roles.cache.some(role => role.name === staffRoleName));
+        || hasSentinelStaffRole(member);
     const baseMessage = language === 'fr'
         ? `Langue configuree : ${selectedRole}.`
         : `Language set: ${selectedRole}.`;
@@ -5392,7 +5449,7 @@ async function handleSentinelTicketButton(interaction) {
     }
 
     try {
-        assertOpenDossierQuota(interaction.guild.id, language);
+        assertOpenDossierQuota(interaction.guild.id, language, interaction.member);
     } catch (error) {
         return interaction.reply({
             content: error.message,
@@ -5410,7 +5467,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
     const subject = String(details.subject || '').trim().slice(0, 120);
     const descriptionText = String(details.description || '').trim().slice(0, 1500);
 
-    assertOpenDossierQuota(interaction.guild.id, language);
+    assertOpenDossierQuota(interaction.guild.id, language, interaction.member);
 
     const supportCategory = findCategoryByName(interaction.guild, [
         '✦ SENTINEL // SUPPORT',
@@ -5473,7 +5530,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
         content: `${interaction.user}`,
         embeds: [embed],
         components: buildDossierControlComponents(language, {
-            advanced: isAdvancedGuild(interaction.guild.id)
+            advanced: hasAdvancedAccess(interaction.member)
         })
     });
     await sendSentinelStaffLog(interaction.guild, `📁 Dossier Sentinel #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`);
@@ -5640,7 +5697,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
         }
 
         try {
-            await publishDossierPanel(channel, interaction.user, language);
+            await publishDossierPanel(channel, interaction.user, language, interaction.member);
         } catch (error) {
             await interaction.reply({
                 content: error.message,
@@ -6608,7 +6665,7 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
             return true;
         }
 
-        const quota = getCustomEmbedQuota(guildId);
+        const quota = getCustomEmbedQuota(guildId, interaction.member);
 
         if (!quota.unlimited && quota.used >= quota.limit) {
             await interaction.reply({
@@ -6657,7 +6714,7 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
             content: t(language, 'customEmbedCreated', {
                 channel,
                 messageId: sentMessage.id,
-                quota: formatCustomEmbedQuota(guildId, language)
+                quota: formatCustomEmbedQuota(guildId, language, interaction.member)
             }),
             flags: MessageFlags.Ephemeral
         });
@@ -7032,6 +7089,7 @@ client.once(Events.ClientReady, async () => {
             getUserSessionCount,
             getUserTargetErrorById,
             hasCommandRoleAccess,
+            hasAdvancedAccess,
             memberCanManageDossier,
             hasModerationAccess,
             isAdvancedGuild,
@@ -7157,8 +7215,8 @@ client.on(Events.InteractionCreate, async interaction => {
 
         if (commandName === 'aide') {
             return interaction.reply({
-                embeds: [buildHelpEmbed(interaction.guild, interaction.user)],
-                components: buildHelpMenuComponents(interaction.guild, interaction.user),
+                embeds: [buildHelpEmbed(interaction.guild, interaction.user, HELP_PAGE_DEFAULT, interaction.member)],
+                components: buildHelpMenuComponents(interaction.guild, interaction.user, HELP_PAGE_DEFAULT, interaction.member),
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -7171,7 +7229,7 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
-        if (isAdvancedCommand(commandName) && !isAdvancedGuild(guildId)) {
+        if (isAdvancedCommand(commandName) && !hasAdvancedAccess(interaction.member)) {
             return interaction.reply({
                 content: getAdvancedUnavailableMessage(language, commandName),
                 flags: MessageFlags.Ephemeral
@@ -7406,7 +7464,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
         if (commandName === 'historique-service') {
             const requestedMember = interaction.options.getMember('membre');
-            const isAdvancedServer = isAdvancedGuild(guildId);
+            const isAdvancedServer = hasAdvancedAccess(interaction.member);
 
             if (!isAdvancedServer && requestedMember && requestedMember.id !== interaction.member.id) {
                 return interaction.reply({
@@ -7481,7 +7539,7 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         if (commandName === 'resume-service') {
-            if (!isAdvancedGuild(guildId)) {
+            if (!hasAdvancedAccess(interaction.member)) {
                 return interaction.reply({
                     content: getAdvancedUnavailableMessage(language),
                     flags: MessageFlags.Ephemeral
@@ -7498,7 +7556,7 @@ client.on(Events.InteractionCreate, async interaction => {
         if (commandName === 'top-service') {
             const classement = getTopService(guildId);
             const embed = buildTopServiceEmbed(interaction.user, classement, {
-                isReferenceServer: isAdvancedGuild(guildId)
+                isReferenceServer: hasAdvancedAccess(interaction.member)
             });
 
             if (!embed) {
@@ -7856,8 +7914,8 @@ client.on(Events.MessageCreate, async message => {
 
     if (/^!(aide|help)$/i.test(content)) {
         return message.reply({
-            embeds: [buildHelpEmbed(message.guild, message.author)],
-            components: buildHelpMenuComponents(message.guild, message.author)
+            embeds: [buildHelpEmbed(message.guild, message.author, HELP_PAGE_DEFAULT, message.member)],
+            components: buildHelpMenuComponents(message.guild, message.author, HELP_PAGE_DEFAULT, message.member)
         });
     }
 
@@ -7887,11 +7945,11 @@ client.on(Events.MessageCreate, async message => {
         return message.reply(t(language, language === 'en' ? 'languageSetEn' : 'languageSet'));
     }
 
-    if (/^!(reset-heures-all|reset-hours-all)$/i.test(content) && !isAdvancedGuild(guildId)) {
+    if (/^!(reset-heures-all|reset-hours-all)$/i.test(content) && !hasAdvancedAccess(message.member)) {
         return message.reply(getAdvancedUnavailableMessage(language, 'reset-heures-all'));
     }
 
-    if (isAdvancedTextCommand(content) && !isAdvancedGuild(guildId)) {
+    if (isAdvancedTextCommand(content) && !hasAdvancedAccess(message.member)) {
         return message.reply(getAdvancedUnavailableMessage(language));
     }
 
@@ -7912,7 +7970,7 @@ client.on(Events.MessageCreate, async message => {
         }
 
         try {
-            await publishDossierPanel(message.channel, message.author, language);
+            await publishDossierPanel(message.channel, message.author, language, message.member);
         } catch (error) {
             return message.reply(error.message);
         }
@@ -8002,7 +8060,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     if (/^!(historique-service|history)\b/i.test(content)) {
-        const isAdvancedServer = isAdvancedGuild(guildId);
+        const isAdvancedServer = hasAdvancedAccess(message.member);
         const mentionedMember = message.mentions.members.first();
 
         if (!isAdvancedServer && mentionedMember && mentionedMember.id !== message.member.id) {
@@ -8083,7 +8141,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     if (/^!(resume-service|summary)$/i.test(content)) {
-        if (!isAdvancedGuild(guildId)) {
+        if (!hasAdvancedAccess(message.member)) {
             return message.reply(getAdvancedUnavailableMessage(language));
         }
 
@@ -8095,7 +8153,7 @@ client.on(Events.MessageCreate, async message => {
     if (content === '!top-service') {
         const classement = getTopService(guildId);
         const embed = buildTopServiceEmbed(message.author, classement, {
-            isReferenceServer: isAdvancedGuild(guildId)
+            isReferenceServer: hasAdvancedAccess(message.member)
         });
 
         if (!embed) {

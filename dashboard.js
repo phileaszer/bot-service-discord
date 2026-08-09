@@ -829,8 +829,12 @@ function requireBotPermission(guild, permissionFlag) {
     }
 }
 
-function requireAdvanced(ctx, guildId) {
-    if (!ctx.helpers.isAdvancedGuild(guildId)) {
+function requireAdvanced(ctx, guildId, member = null) {
+    const hasAccess = ctx.helpers.hasAdvancedAccess
+        ? ctx.helpers.hasAdvancedAccess(member, guildId)
+        : ctx.helpers.isAdvancedGuild(guildId);
+
+    if (!hasAccess) {
         throw createHttpError(402, 'This action is reserved for Sentinel Premium.');
     }
 }
@@ -1044,7 +1048,13 @@ function getStatusListFromEnv(name) {
 async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
     const member = await guild.members.fetch(userId).catch(() => null);
     const user = member?.user || await ctx.client.users.fetch(userId).catch(() => null);
-    const advanced = ctx.helpers.isAdvancedGuild(guild.id) || isCreatorUser(session?.user?.id);
+    const viewerMember = session?.user?.id
+        ? await guild.members.fetch(session.user.id).catch(() => null)
+        : null;
+    const advanced = (ctx.helpers.hasAdvancedAccess
+        ? ctx.helpers.hasAdvancedAccess(viewerMember, guild.id)
+        : ctx.helpers.isAdvancedGuild(guild.id))
+        || isCreatorUser(session?.user?.id);
     const sessionLimit = advanced ? 25 : 5;
     const caseLimit = advanced ? 25 : 10;
     const userData = ctx.helpers.getUserData(guild.id, userId);
@@ -1094,6 +1104,13 @@ async function buildGuildState(ctx, guild, session = null) {
     const config = ctx.helpers.getGuildConfig(guild.id);
     const summary = ctx.helpers.getServiceSummary(guild.id);
     const viewerUserId = session?.user?.id || null;
+    const viewerMember = viewerUserId
+        ? await guild.members.fetch(viewerUserId).catch(() => null)
+        : null;
+    const advanced = (ctx.helpers.hasAdvancedAccess
+        ? ctx.helpers.hasAdvancedAccess(viewerMember, guild.id)
+        : ctx.helpers.isAdvancedGuild(guild.id))
+        || isCreatorUser(session?.user?.id);
     const viewerData = viewerUserId ? ctx.helpers.getUserData(guild.id, viewerUserId) : null;
     const viewerSessions = viewerUserId && ctx.helpers.getUserSessions
         ? ctx.helpers.getUserSessions(guild.id, viewerUserId, 8)
@@ -1105,11 +1122,11 @@ async function buildGuildState(ctx, guild, session = null) {
     const dossierRoleIds = ctx.helpers.getDossierRoleIds
         ? ctx.helpers.getDossierRoleIds(guild.id)
         : [];
-    const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id);
+    const customEmbedQuota = ctx.helpers.getCustomEmbedQuota(guild.id, viewerMember);
     const canViewGlobalAudit = isCreatorUser(session?.user?.id);
-    const auditLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 50 : 10;
-    const moderationCaseLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 25 : 10;
-    const dossierHistoryLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 100 : 10;
+    const auditLimit = advanced || canViewGlobalAudit ? 50 : 10;
+    const moderationCaseLimit = advanced || canViewGlobalAudit ? 25 : 10;
+    const dossierHistoryLimit = advanced || canViewGlobalAudit ? 100 : 10;
     const moderationCases = ctx.helpers.getRecentModerationCases
         ? ctx.helpers.getRecentModerationCases(guild.id, moderationCaseLimit)
         : [];
@@ -1144,7 +1161,7 @@ async function buildGuildState(ctx, guild, session = null) {
             name: guild.name,
             icon: guild.iconURL()
         },
-        advanced: ctx.helpers.isAdvancedGuild(guild.id),
+        advanced,
         inviteUrl: getInviteUrl(ctx, guild.id),
         config: {
             ...config,
@@ -1208,7 +1225,7 @@ async function buildGuildState(ctx, guild, session = null) {
             historyLimit: dossierHistoryLimit,
             roleIds: dossierRoleIds,
             panelQuota: ctx.helpers.getDossierPanelQuota
-                ? ctx.helpers.getDossierPanelQuota(guild.id)
+                ? ctx.helpers.getDossierPanelQuota(guild.id, viewerMember)
                 : { used: 0, limit: 1, unlimited: false, remaining: 1 },
             settings: ctx.helpers.getDossierTypeSettings
                 ? ctx.helpers.getDossierTypeSettings(guild.id)
@@ -1369,7 +1386,7 @@ async function moderationAction(ctx, guild, actor, body) {
 
     if (action === 'ban' || action === 'tempban') {
         if (action === 'tempban') {
-            requireAdvanced(ctx, guild.id);
+            requireAdvanced(ctx, guild.id, actor);
         }
 
         requireModerationAccess(ctx, actor, PermissionsBitField.Flags.BanMembers);
@@ -1411,7 +1428,7 @@ async function moderationAction(ctx, guild, actor, body) {
     }
 
     if (action === 'unban') {
-        requireAdvanced(ctx, guild.id);
+        requireAdvanced(ctx, guild.id, actor);
         requireModerationAccess(ctx, actor, PermissionsBitField.Flags.BanMembers);
         requireBotPermission(guild, PermissionsBitField.Flags.BanMembers);
 
@@ -1437,7 +1454,7 @@ async function moderationAction(ctx, guild, actor, body) {
     }
 
     if (['lock', 'unlock', 'slowmode'].includes(action)) {
-        requireAdvanced(ctx, guild.id);
+        requireAdvanced(ctx, guild.id, actor);
         requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ManageChannels);
         requireBotPermission(guild, PermissionsBitField.Flags.ManageChannels);
 
@@ -1480,7 +1497,7 @@ async function moderationAction(ctx, guild, actor, body) {
     }
 
     if (['edit-case', 'delete-case', 'unwarn'].includes(action)) {
-        requireAdvanced(ctx, guild.id);
+        requireAdvanced(ctx, guild.id, actor);
         requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ModerateMembers);
 
         const caseId = Number(body.caseId);
@@ -1528,7 +1545,7 @@ async function customEmbedAction(ctx, guild, actor, body) {
             throw createHttpError(403, channelError);
         }
 
-        const quota = ctx.helpers.getCustomEmbedQuota(guild.id);
+        const quota = ctx.helpers.getCustomEmbedQuota(guild.id, actor);
 
         if (!quota.unlimited && quota.used >= quota.limit) {
             throw createHttpError(402, `Quota gratuit atteint : ${quota.limit} embeds actifs.`);
@@ -1559,7 +1576,7 @@ async function customEmbedAction(ctx, guild, actor, body) {
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, sentMessage.id, actor.id, data);
 
-        return `Embed Sentinel envoye dans #${channel.name}. ID : ${sentMessage.id}. ${ctx.helpers.formatCustomEmbedQuota(guild.id, language)}`;
+        return `Embed Sentinel envoye dans #${channel.name}. ID : ${sentMessage.id}. ${ctx.helpers.formatCustomEmbedQuota(guild.id, language, actor)}`;
     }
 
     const messageId = String(body.messageId || '').trim();
@@ -1644,7 +1661,7 @@ async function dossierAction(ctx, guild, actor, body) {
 
         const channel = getTextChannel(guild, body.channelId);
         const quota = ctx.helpers.getDossierPanelQuota
-            ? ctx.helpers.getDossierPanelQuota(guild.id)
+            ? ctx.helpers.getDossierPanelQuota(guild.id, actor)
             : { unlimited: false, used: 0, limit: 1 };
 
         if (!quota.unlimited && quota.used >= quota.limit) {
@@ -1740,7 +1757,7 @@ async function dossierAction(ctx, guild, actor, body) {
 
     if (action === 'set-dossier-category') {
         requireCommandAccess(ctx, actor);
-        requireAdvanced(ctx, guild.id);
+        requireAdvanced(ctx, guild.id, actor);
 
         const dossierType = String(body.dossierType || '').trim();
         const categoryId = String(body.categoryId || '').trim() || null;
@@ -1834,14 +1851,14 @@ async function runDashboardAction(ctx, guild, member, body) {
     }
 
     if (action === 'reset-guild') {
-        requireAdvanced(ctx, guild.id);
+        requireAdvanced(ctx, guild.id, member);
         requireCommandAccess(ctx, member);
         ctx.helpers.resetGuild(guild.id);
         return 'Toutes les heures du serveur ont ete reinitialisees.';
     }
 
     if (action === 'sync-service') {
-        requireAdvanced(ctx, guild.id);
+        requireAdvanced(ctx, guild.id, member);
         requireCommandAccess(ctx, member);
         const result = await ctx.helpers.syncServiceState(guild);
         return `Synchronisation terminee : ${result.closedSessions} session(s) fermee(s), ${result.removedRoles} role(s) retire(s).`;
@@ -1936,11 +1953,15 @@ async function handleApi(req, res, ctx, url) {
         for (const oauthGuild of oauthGuilds) {
             const installed = ctx.client.guilds.cache.has(oauthGuild.id);
             let memberAccess = false;
+            let advanced = ctx.helpers.isAdvancedGuild(oauthGuild.id);
 
             if (installed) {
                 const guild = ctx.client.guilds.cache.get(oauthGuild.id);
                 const member = await guild.members.fetch(session.user.id).catch(() => null);
                 memberAccess = member ? ctx.helpers.hasCommandRoleAccess(member) : false;
+                advanced = ctx.helpers.hasAdvancedAccess
+                    ? ctx.helpers.hasAdvancedAccess(member, oauthGuild.id)
+                    : advanced;
             }
 
             if (!userCanManageOauthGuild(oauthGuild) && !memberAccess) {
@@ -1955,7 +1976,7 @@ async function handleApi(req, res, ctx, url) {
                     : null,
                 installed,
                 inviteUrl: installed ? null : getInviteUrl(ctx, oauthGuild.id),
-                advanced: ctx.helpers.isAdvancedGuild(oauthGuild.id)
+                advanced
             });
         }
 
@@ -1973,9 +1994,12 @@ async function handleApi(req, res, ctx, url) {
 
     const casesMatch = /^\/api\/guilds\/(\d{17,20})\/moderation-cases$/.exec(url.pathname);
     if (req.method === 'GET' && casesMatch) {
-        const { guild } = await getDashboardAccess(ctx, session, casesMatch[1]);
+        const { guild, member } = await getDashboardAccess(ctx, session, casesMatch[1]);
         const canViewGlobalAudit = isCreatorUser(session.user.id);
-        const maxLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 100 : 10;
+        const advanced = (ctx.helpers.hasAdvancedAccess
+            ? ctx.helpers.hasAdvancedAccess(member, guild.id)
+            : ctx.helpers.isAdvancedGuild(guild.id)) || canViewGlobalAudit;
+        const maxLimit = advanced ? 100 : 10;
         const limit = Math.min(Number(url.searchParams.get('limit')) || maxLimit, maxLimit);
         const targetUserId = normalizeAuditValue(url.searchParams.get('userId'));
         const action = normalizeAuditValue(url.searchParams.get('action'));
@@ -2011,9 +2035,12 @@ async function handleApi(req, res, ctx, url) {
 
     const auditMatch = /^\/api\/guilds\/(\d{17,20})\/audit$/.exec(url.pathname);
     if (req.method === 'GET' && auditMatch) {
-        const { guild } = await getDashboardAccess(ctx, session, auditMatch[1]);
+        const { guild, member } = await getDashboardAccess(ctx, session, auditMatch[1]);
         const canViewGlobalAudit = isCreatorUser(session.user.id);
-        const maxLimit = ctx.helpers.isAdvancedGuild(guild.id) || canViewGlobalAudit ? 100 : 10;
+        const advanced = (ctx.helpers.hasAdvancedAccess
+            ? ctx.helpers.hasAdvancedAccess(member, guild.id)
+            : ctx.helpers.isAdvancedGuild(guild.id)) || canViewGlobalAudit;
+        const maxLimit = advanced ? 100 : 10;
         const limit = Math.min(Number(url.searchParams.get('limit')) || maxLimit, maxLimit);
 
         json(res, 200, {
