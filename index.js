@@ -935,37 +935,6 @@ function getDatabaseBackupStatus() {
     };
 }
 
-function getDiskUsageStatus() {
-    const targetPath = fs.existsSync(DATABASE_BACKUP_DIR)
-        ? DATABASE_BACKUP_DIR
-        : path.dirname(DATABASE_FILE_PATH);
-
-    try {
-        if (typeof fs.statfsSync !== 'function') {
-            return { available: false, reason: 'statfs unavailable' };
-        }
-
-        const stat = fs.statfsSync(targetPath);
-        const totalBytes = stat.blocks * stat.bsize;
-        const freeBytes = stat.bavail * stat.bsize;
-        const usedBytes = Math.max(totalBytes - freeBytes, 0);
-        const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 1000) / 10 : null;
-
-        return {
-            available: true,
-            usedBytes,
-            freeBytes,
-            totalBytes,
-            usedPercent
-        };
-    } catch (error) {
-        return {
-            available: false,
-            reason: error.message
-        };
-    }
-}
-
 function getSentinelSyncStatus() {
     return {
         lastAt: lastSentinelServerSync ? new Date(lastSentinelServerSync).toISOString() : null,
@@ -7399,7 +7368,6 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbedQuota,
             getCustomEmbedRecord,
             getDatabaseBackupStatus,
-            getDiskUsageStatus,
             getDossierRoleIds,
             getGuildConfig,
             getGuildLanguage,

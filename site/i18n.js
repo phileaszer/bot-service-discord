@@ -623,9 +623,7 @@
     'Synchronisation Discord': 'Discord sync',
     'Dernière synchronisation du serveur Sentinel.': 'Latest Sentinel server sync.',
     'Commandes slash': 'Slash commands',
-    'Vérification des commandes Discord enregistrées.': 'Check of registered Discord commands.',
-    'Stockage Railway': 'Railway storage',
-    'Espace utilisé par l’environnement Sentinel.': 'Storage used by the Sentinel environment.'
+    'Vérification des commandes Discord enregistrées.': 'Check of registered Discord commands.'
   });
 
   const placeholderEn = {

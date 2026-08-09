@@ -1895,7 +1895,6 @@ async function handleApi(req, res, ctx, url) {
                 backup: ctx.helpers.getDatabaseBackupStatus?.() || null,
                 sync: ctx.helpers.getSentinelSyncStatus?.() || null,
                 slashCommands: ctx.helpers.getSlashCommandStatus?.() || null,
-                disk: ctx.helpers.getDiskUsageStatus?.() || null,
                 incidents,
                 maintenance
             }

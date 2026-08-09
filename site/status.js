@@ -15,7 +15,6 @@
       backupDisabledDetail: 'Les sauvegardes automatiques ne sont pas activées.',
       backupDetail: (count, keep) => `${count} sauvegarde(s) conservée(s), limite actuelle : ${keep}.`,
       backupUnavailable: 'Aucune sauvegarde trouvée',
-      diskDetail: (used, total, free) => `${used} utilisés sur ${total}. Libre : ${free}.`,
       slashDetail: (globalCount, guildCount) => `Globales : ${globalCount}. Avancées : ${guildCount}.`,
       slashDetailNoGuild: (globalCount) => `Globales : ${globalCount}. Commandes avancées non vérifiées.`,
       slashError: 'À vérifier',
@@ -49,7 +48,6 @@
       backupDisabledDetail: 'Automatic backups are not enabled.',
       backupDetail: (count, keep) => `${count} backup(s) kept, current limit: ${keep}.`,
       backupUnavailable: 'No backup found',
-      diskDetail: (used, total, free) => `${used} used out of ${total}. Free: ${free}.`,
       slashDetail: (globalCount, guildCount) => `Global: ${globalCount}. Advanced: ${guildCount}.`,
       slashDetailNoGuild: (globalCount) => `Global: ${globalCount}. Advanced commands not checked.`,
       slashError: 'Check needed',
@@ -132,25 +130,6 @@
     }
 
     return `${minutes}min`;
-  }
-
-  function formatBytes(bytes) {
-    const value = Number(bytes);
-
-    if (!Number.isFinite(value) || value < 0) {
-      return t('unavailable');
-    }
-
-    const units = ['o', 'Ko', 'Mo', 'Go', 'To'];
-    let size = value;
-    let index = 0;
-
-    while (size >= 1024 && index < units.length - 1) {
-      size /= 1024;
-      index += 1;
-    }
-
-    return `${size >= 10 || index === 0 ? Math.round(size) : size.toFixed(1)} ${units[index]}`;
   }
 
   function escapeHtml(value) {
@@ -259,18 +238,6 @@
       : t('slashDetailNoGuild', globalCount));
   }
 
-  function renderDiskStatus(disk = {}) {
-    if (!disk.available) {
-      setText('[data-status-disk]', t('unavailable'));
-      setText('[data-status-disk-detail]', disk.reason || t('unavailable'));
-      return;
-    }
-
-    const percent = Number.isFinite(Number(disk.usedPercent)) ? `${disk.usedPercent}%` : t('unavailable');
-    setText('[data-status-disk]', percent);
-    setText('[data-status-disk-detail]', t('diskDetail', formatBytes(disk.usedBytes), formatBytes(disk.totalBytes), formatBytes(disk.freeBytes)));
-  }
-
   function renderStatus(status = {}) {
     setDot('bot', Boolean(status.botOnline));
     setDot('dashboard', Boolean(status.dashboardOnline));
@@ -290,7 +257,6 @@
     renderBackupStatus(status.backup);
     renderSyncStatus(status.sync);
     renderSlashStatus(status.slashCommands);
-    renderDiskStatus(status.disk);
     renderList('[data-status-incidents]', status.incidents, t('noIncidents'));
     renderList('[data-status-maintenance]', status.maintenance ? [status.maintenance] : [], t('noMaintenance'));
   }
@@ -329,8 +295,6 @@
       setText('[data-status-sync-detail]', t('unavailable'));
       setText('[data-status-slash]', t('unavailable'));
       setText('[data-status-slash-detail]', t('unavailable'));
-      setText('[data-status-disk]', t('unavailable'));
-      setText('[data-status-disk-detail]', t('unavailable'));
     } finally {
       statusRequestInFlight = false;
     }
