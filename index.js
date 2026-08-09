@@ -95,7 +95,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-06-23-v1';
+const SENTINEL_BUILD = 'community-suite-2026-08-09-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -110,6 +110,14 @@ const DATABASE_BACKUP_KEEP = Math.max(Number.parseInt(process.env.DATABASE_BACKU
 const DATABASE_BACKUP_DIR = process.env.DATABASE_BACKUP_DIR || path.join(path.dirname(DATABASE_FILE_PATH), 'backups');
 let lastSentinelServerSync = null;
 let lastSentinelServerSyncResult = null;
+let lastDatabaseBackup = null;
+let lastSlashCommandCheck = {
+    status: 'pending',
+    checkedAt: null,
+    globalCount: null,
+    guildCount: null,
+    error: null
+};
 let databaseBackupTimer = null;
 
 const SUPPORTED_LANGUAGES = new Set(['fr', 'en']);
@@ -206,7 +214,7 @@ const I18N = {
         helpTitle: 'Sentinel | Guide de démarrage',
         helpDescription: 'Commence ici. Ce guide explique comment installer Sentinel, choisir la langue du serveur, le configurer, puis l utiliser sans connaitre les bots Discord.',
         moderationAccessDenied: '❌ Tu n’as pas accès à cette commande de modération.',
-        moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
+        moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.\nOuvre le dashboard > Sécurité > Diagnostic, ou ajoute la permission manquante au rôle Sentinel.',
         moderationMemberRequired: '❌ Tu dois choisir un membre du serveur.',
         moderationUserRequired: '❌ Tu dois choisir un utilisateur.',
         moderationTargetRequired: '❌ Choisis un membre ou indique son ID Discord.',
@@ -216,7 +224,7 @@ const I18N = {
         moderationSelfDenied: '❌ Tu ne peux pas te modérer toi-même avec Sentinel.',
         moderationOwnerDenied: '❌ Sentinel ne peut pas modérer le propriétaire du serveur.',
         moderationBotDenied: '❌ Sentinel ne peut pas modérer cet utilisateur.',
-        moderationHierarchyDenied: '❌ Le rôle de cette personne est trop haut dans la hiérarchie Discord.',
+        moderationHierarchyDenied: '❌ Le rôle de cette personne est trop haut dans la hiérarchie Discord.\nMonte le rôle Sentinel au-dessus du rôle de cette personne, puis réessaie.',
         moderationWarned: '✅ {member} a reçu un avertissement. Cas #{caseId}.',
         moderationTimeout: '✅ {member} a été timeout pendant **{duration}**. Cas #{caseId}.',
         moderationUntimeout: '✅ Le timeout de {member} a été retiré. Cas #{caseId}.',
@@ -229,7 +237,7 @@ const I18N = {
         moderationTempbanActive: 'ℹ️ Un ban temporaire est déjà programmé pour cet utilisateur jusqu’à {expiresAt}. La nouvelle commande le remplace.',
         moderationClear: '✅ **{count}** message(s) supprimé(s).',
         moderationCasesEmpty: 'Aucune sanction enregistrée pour {member}.',
-        moderationFailed: '❌ L’action de modération a échoué. Vérifie les permissions et la hiérarchie des rôles.',
+        moderationFailed: '❌ L’action de modération a échoué.\nVérifie que Sentinel a la bonne permission Discord et que son rôle est placé au-dessus de la cible. Tu peux aussi lancer `/diagnostic`.',
         moderationNoChannel: '❌ Cette commande doit être utilisée dans un salon textuel.',
         moderationCasesTitle: 'Sentinel | Sanctions',
         moderationCaseTitle: 'Sentinel | Cas de modération',
@@ -347,7 +355,7 @@ const I18N = {
         helpTitle: 'Sentinel | Getting started',
         helpDescription: 'Start here. This guide explains how to install Sentinel, choose the server language, configure it, and use it without knowing Discord bots.',
         moderationAccessDenied: '❌ You do not have access to this moderation command.',
-        moderationBotPermissionMissing: '❌ Sentinel does not have the required Discord permission for this action.',
+        moderationBotPermissionMissing: '❌ Sentinel does not have the required Discord permission for this action.\nOpen Dashboard > Security > Diagnostic, or add the missing permission to Sentinel role.',
         moderationMemberRequired: '❌ You must choose a server member.',
         moderationUserRequired: '❌ You must choose a user.',
         moderationTargetRequired: '❌ Choose a member or provide their Discord ID.',
@@ -357,7 +365,7 @@ const I18N = {
         moderationSelfDenied: '❌ You cannot moderate yourself with Sentinel.',
         moderationOwnerDenied: '❌ Sentinel cannot moderate the server owner.',
         moderationBotDenied: '❌ Sentinel cannot moderate this user.',
-        moderationHierarchyDenied: '❌ This person role is too high in the Discord hierarchy.',
+        moderationHierarchyDenied: '❌ This person role is too high in the Discord hierarchy.\nMove Sentinel role above this person role, then try again.',
         moderationWarned: '✅ {member} has been warned. Case #{caseId}.',
         moderationTimeout: '✅ {member} has been timed out for **{duration}**. Case #{caseId}.',
         moderationUntimeout: '✅ Timeout removed from {member}. Case #{caseId}.',
@@ -370,7 +378,7 @@ const I18N = {
         moderationTempbanActive: 'ℹ️ A temporary ban is already scheduled for this user until {expiresAt}. The new command replaces it.',
         moderationClear: '✅ **{count}** message(s) deleted.',
         moderationCasesEmpty: 'No moderation case recorded for {member}.',
-        moderationFailed: '❌ Moderation action failed. Check permissions and role hierarchy.',
+        moderationFailed: '❌ Moderation action failed.\nCheck that Sentinel has the right Discord permission and that its role is above the target. You can also run `/diagnostic`.',
         moderationNoChannel: '❌ This command must be used in a text channel.',
         moderationCasesTitle: 'Sentinel | Moderation cases',
         moderationCaseTitle: 'Sentinel | Moderation case',
@@ -853,18 +861,32 @@ function pruneDatabaseBackups() {
         return;
     }
 
-    const backups = fs.readdirSync(DATABASE_BACKUP_DIR)
-        .filter(fileName => /^service-.*\.db$/i.test(fileName))
-        .map(fileName => {
-            const fullPath = path.join(DATABASE_BACKUP_DIR, fileName);
-            const stat = fs.statSync(fullPath);
-            return { fileName, fullPath, mtimeMs: stat.mtimeMs };
-        })
-        .sort((a, b) => b.mtimeMs - a.mtimeMs);
+    const backups = listDatabaseBackups();
 
     for (const backup of backups.slice(DATABASE_BACKUP_KEEP)) {
         fs.unlinkSync(backup.fullPath);
     }
+}
+
+function listDatabaseBackups() {
+    if (!fs.existsSync(DATABASE_BACKUP_DIR)) {
+        return [];
+    }
+
+    return fs.readdirSync(DATABASE_BACKUP_DIR)
+        .filter(fileName => /^service-.*\.db$/i.test(fileName))
+        .map(fileName => {
+            const fullPath = path.join(DATABASE_BACKUP_DIR, fileName);
+            const stat = fs.statSync(fullPath);
+            return {
+                fileName,
+                fullPath,
+                sizeBytes: stat.size,
+                createdAt: stat.mtime.toISOString(),
+                mtimeMs: stat.mtimeMs
+            };
+        })
+        .sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 
 async function createDatabaseBackup(reason = 'auto') {
@@ -873,6 +895,11 @@ async function createDatabaseBackup(reason = 'auto') {
     const backupPath = path.join(DATABASE_BACKUP_DIR, getDatabaseBackupFilename(reason));
     await db.backup(backupPath);
     pruneDatabaseBackups();
+    lastDatabaseBackup = {
+        createdAt: new Date().toISOString(),
+        fileName: path.basename(backupPath),
+        reason
+    };
 
     return backupPath;
 }
@@ -891,6 +918,95 @@ function startDatabaseBackupSchedule() {
             .then(backupPath => console.log(`Sauvegarde SQLite creee : ${backupPath}`))
             .catch(error => console.error('Erreur sauvegarde SQLite planifiee :', error));
     }, DATABASE_BACKUP_INTERVAL_MS);
+}
+
+function getDatabaseBackupStatus() {
+    const backups = listDatabaseBackups();
+    const latest = backups[0] || null;
+
+    return {
+        enabled: DATABASE_BACKUP_ENABLED,
+        latestAt: lastDatabaseBackup?.createdAt || latest?.createdAt || null,
+        latestFile: lastDatabaseBackup?.fileName || latest?.fileName || null,
+        latestReason: lastDatabaseBackup?.reason || null,
+        count: backups.length,
+        keep: DATABASE_BACKUP_KEEP,
+        intervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000)
+    };
+}
+
+function getDiskUsageStatus() {
+    const targetPath = fs.existsSync(DATABASE_BACKUP_DIR)
+        ? DATABASE_BACKUP_DIR
+        : path.dirname(DATABASE_FILE_PATH);
+
+    try {
+        if (typeof fs.statfsSync !== 'function') {
+            return { available: false, reason: 'statfs unavailable' };
+        }
+
+        const stat = fs.statfsSync(targetPath);
+        const totalBytes = stat.blocks * stat.bsize;
+        const freeBytes = stat.bavail * stat.bsize;
+        const usedBytes = Math.max(totalBytes - freeBytes, 0);
+        const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 1000) / 10 : null;
+
+        return {
+            available: true,
+            usedBytes,
+            freeBytes,
+            totalBytes,
+            usedPercent
+        };
+    } catch (error) {
+        return {
+            available: false,
+            reason: error.message
+        };
+    }
+}
+
+function getSentinelSyncStatus() {
+    return {
+        lastAt: lastSentinelServerSync ? new Date(lastSentinelServerSync).toISOString() : null,
+        result: lastSentinelServerSyncResult || null
+    };
+}
+
+async function refreshSlashCommandStatus() {
+    const checkedAt = new Date().toISOString();
+
+    try {
+        const globalCommands = await client.application.commands.fetch();
+        const advancedGuildId = getAdvancedGuildIds()[0] || null;
+        const advancedGuild = advancedGuildId ? client.guilds.cache.get(advancedGuildId) : null;
+        const guildCommands = advancedGuild ? await advancedGuild.commands.fetch().catch(() => null) : null;
+
+        lastSlashCommandCheck = {
+            status: 'ok',
+            checkedAt,
+            globalCount: globalCommands.size,
+            guildCount: guildCommands ? guildCommands.size : null,
+            guildId: advancedGuildId,
+            error: null
+        };
+    } catch (error) {
+        lastSlashCommandCheck = {
+            status: 'error',
+            checkedAt,
+            globalCount: null,
+            guildCount: null,
+            guildId: getAdvancedGuildIds()[0] || null,
+            error: error.message
+        };
+        console.error('Erreur verification commandes slash :', error);
+    }
+
+    return lastSlashCommandCheck;
+}
+
+function getSlashCommandStatus() {
+    return lastSlashCommandCheck;
 }
 
 function getAdvancedGuildIds() {
@@ -7282,6 +7398,8 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbeds,
             getCustomEmbedQuota,
             getCustomEmbedRecord,
+            getDatabaseBackupStatus,
+            getDiskUsageStatus,
             getDossierRoleIds,
             getGuildConfig,
             getGuildLanguage,
@@ -7300,6 +7418,8 @@ client.once(Events.ClientReady, async () => {
             getReason,
             getServiceRole,
             getServiceSummary,
+            getSentinelSyncStatus,
+            getSlashCommandStatus,
             getTemporaryBan,
             getTopService,
             getTopWeek,
@@ -7336,6 +7456,7 @@ client.once(Events.ClientReady, async () => {
     });
 
     try {
+        await refreshSlashCommandStatus();
         const syncResult = await syncSentinelServer(client);
         lastSentinelServerSync = Date.now();
         lastSentinelServerSyncResult = syncResult;
@@ -7351,6 +7472,7 @@ client.once(Events.ClientReady, async () => {
         console.error('Erreur synchronisation serveur Sentinel :', error);
     }
 
+    setInterval(refreshSlashCommandStatus, 6 * 60 * 60 * 1000);
     setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
     setInterval(processExpiredTemporaryBans, 60 * 1000);
 });

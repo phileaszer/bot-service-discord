@@ -11,6 +11,18 @@
 
   const copy = {
     fr: {
+      backupDisabled: 'Désactivée',
+      backupDisabledDetail: 'Les sauvegardes automatiques ne sont pas activées.',
+      backupDetail: (count, keep) => `${count} sauvegarde(s) conservée(s), limite actuelle : ${keep}.`,
+      backupUnavailable: 'Aucune sauvegarde trouvée',
+      diskDetail: (used, total, free) => `${used} utilisés sur ${total}. Libre : ${free}.`,
+      slashDetail: (globalCount, guildCount) => `Globales : ${globalCount}. Avancées : ${guildCount}.`,
+      slashDetailNoGuild: (globalCount) => `Globales : ${globalCount}. Commandes avancées non vérifiées.`,
+      slashError: 'À vérifier',
+      slashOk: 'OK',
+      syncDone: (created, updated) => `${created} création(s), ${updated} mise(s) à jour.`,
+      syncSkipped: (reason) => `Ignorée : ${reason}.`,
+      syncUnavailable: 'Pas encore lancée',
       unavailable: 'Indisponible',
       checking: 'En attente',
       botOnline: 'En ligne',
@@ -33,6 +45,18 @@
       premiumReady: 'Sentinel a atteint l’objectif communautaire. Le Premium peut être ouvert.'
     },
     en: {
+      backupDisabled: 'Disabled',
+      backupDisabledDetail: 'Automatic backups are not enabled.',
+      backupDetail: (count, keep) => `${count} backup(s) kept, current limit: ${keep}.`,
+      backupUnavailable: 'No backup found',
+      diskDetail: (used, total, free) => `${used} used out of ${total}. Free: ${free}.`,
+      slashDetail: (globalCount, guildCount) => `Global: ${globalCount}. Advanced: ${guildCount}.`,
+      slashDetailNoGuild: (globalCount) => `Global: ${globalCount}. Advanced commands not checked.`,
+      slashError: 'Check needed',
+      slashOk: 'OK',
+      syncDone: (created, updated) => `${created} created, ${updated} updated.`,
+      syncSkipped: (reason) => `Skipped: ${reason}.`,
+      syncUnavailable: 'Not run yet',
       unavailable: 'Unavailable',
       checking: 'Waiting',
       botOnline: 'Online',
@@ -110,6 +134,25 @@
     return `${minutes}min`;
   }
 
+  function formatBytes(bytes) {
+    const value = Number(bytes);
+
+    if (!Number.isFinite(value) || value < 0) {
+      return t('unavailable');
+    }
+
+    const units = ['o', 'Ko', 'Mo', 'Go', 'To'];
+    let size = value;
+    let index = 0;
+
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index += 1;
+    }
+
+    return `${size >= 10 || index === 0 ? Math.round(size) : size.toFixed(1)} ${units[index]}`;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -175,6 +218,59 @@
     }
   }
 
+  function renderBackupStatus(backup = {}) {
+    if (!backup.enabled) {
+      setText('[data-status-backup]', t('backupDisabled'));
+      setText('[data-status-backup-detail]', t('backupDisabledDetail'));
+      return;
+    }
+
+    setText('[data-status-backup]', backup.latestAt ? formatDate(backup.latestAt) : t('backupUnavailable'));
+    setText('[data-status-backup-detail]', t('backupDetail', backup.count ?? 0, backup.keep ?? 0));
+  }
+
+  function renderSyncStatus(sync = {}) {
+    const result = sync.result || null;
+    setText('[data-status-sync]', sync.lastAt ? formatDate(sync.lastAt) : t('syncUnavailable'));
+
+    if (!result) {
+      setText('[data-status-sync-detail]', t('syncUnavailable'));
+      return;
+    }
+
+    setText('[data-status-sync-detail]', result.skipped
+      ? t('syncSkipped', result.reason || 'no change')
+      : t('syncDone', result.created ?? 0, result.updated ?? 0));
+  }
+
+  function renderSlashStatus(slash = {}) {
+    const ok = slash.status === 'ok';
+    setText('[data-status-slash]', ok ? t('slashOk') : t('slashError'));
+
+    if (!ok) {
+      setText('[data-status-slash-detail]', slash.error || t('unavailable'));
+      return;
+    }
+
+    const globalCount = slash.globalCount ?? 0;
+    const guildCount = slash.guildCount;
+    setText('[data-status-slash-detail]', Number.isFinite(Number(guildCount))
+      ? t('slashDetail', globalCount, guildCount)
+      : t('slashDetailNoGuild', globalCount));
+  }
+
+  function renderDiskStatus(disk = {}) {
+    if (!disk.available) {
+      setText('[data-status-disk]', t('unavailable'));
+      setText('[data-status-disk-detail]', disk.reason || t('unavailable'));
+      return;
+    }
+
+    const percent = Number.isFinite(Number(disk.usedPercent)) ? `${disk.usedPercent}%` : t('unavailable');
+    setText('[data-status-disk]', percent);
+    setText('[data-status-disk-detail]', t('diskDetail', formatBytes(disk.usedBytes), formatBytes(disk.totalBytes), formatBytes(disk.freeBytes)));
+  }
+
   function renderStatus(status = {}) {
     setDot('bot', Boolean(status.botOnline));
     setDot('dashboard', Boolean(status.dashboardOnline));
@@ -191,6 +287,10 @@
     renderPremiumGoal(status.guildCount);
     setText('[data-status-uptime]', formatUptime(status.uptimeSeconds));
     setText('[data-status-build]', status.build || 'Sentinel');
+    renderBackupStatus(status.backup);
+    renderSyncStatus(status.sync);
+    renderSlashStatus(status.slashCommands);
+    renderDiskStatus(status.disk);
     renderList('[data-status-incidents]', status.incidents, t('noIncidents'));
     renderList('[data-status-maintenance]', status.maintenance ? [status.maintenance] : [], t('noMaintenance'));
   }
@@ -223,6 +323,14 @@
       setText('[data-status-guilds]', t('unavailable'));
       renderPremiumGoal(null);
       setText('[data-status-uptime]', t('unavailable'));
+      setText('[data-status-backup]', t('unavailable'));
+      setText('[data-status-backup-detail]', t('unavailable'));
+      setText('[data-status-sync]', t('unavailable'));
+      setText('[data-status-sync-detail]', t('unavailable'));
+      setText('[data-status-slash]', t('unavailable'));
+      setText('[data-status-slash-detail]', t('unavailable'));
+      setText('[data-status-disk]', t('unavailable'));
+      setText('[data-status-disk-detail]', t('unavailable'));
     } finally {
       statusRequestInFlight = false;
     }

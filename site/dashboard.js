@@ -554,6 +554,48 @@ function dossierPermissionAlert(state) {
   `;
 }
 
+function permissionStatusOverview(state) {
+  const diagnostics = state.diagnostics;
+
+  if (!diagnostics?.checks?.length) {
+    return '';
+  }
+
+  const priorityIds = ['ban', 'timeout', 'kick', 'purge', 'manageChannels', 'manageRoles', 'roleOrder'];
+  const priorityChecks = diagnostics.checks.filter((check) => priorityIds.includes(check.id));
+  const firstFixes = (diagnostics.fixes || []).slice(0, 3);
+
+  return `
+    <div class="permission-overview">
+      <div class="home-block-heading">
+        <h3>Diagnostic permissions</h3>
+        <button class="button button-small button-ghost" type="button" data-dashboard-tab="moderation">Voir tout</button>
+      </div>
+      <div class="permission-pill-grid">
+        ${priorityChecks.map((check) => `
+          <span class="permission-pill ${check.ok ? 'is-ready' : 'is-warning'}">
+            <strong>${escapeHtml(check.label)}</strong>
+            <small>${escapeHtml(check.value)}</small>
+          </span>
+        `).join('')}
+      </div>
+      ${firstFixes.length ? `
+        <div class="dashboard-alert is-warning">
+          <strong>Correction conseillÃ©e</strong>
+          <ul>
+            ${firstFixes.map((fix) => `<li>${escapeHtml(fix)}</li>`).join('')}
+          </ul>
+        </div>
+      ` : `
+        <div class="dashboard-alert is-ready">
+          <strong>Permissions prÃªtes</strong>
+          <p>Sentinel peut appliquer les actions prÃ©vues sur ce serveur.</p>
+        </div>
+      `}
+    </div>
+  `;
+}
+
 function recentActions(state, limit = 5) {
   const items = (state.recentActions || state.auditLogs?.items || []).slice(0, limit);
 
@@ -613,6 +655,7 @@ function renderServerHome(state, premiumBadge) {
           <h3>Alertes</h3>
           ${configAlerts(state)}
           ${dossierPermissionAlert(state)}
+          ${permissionStatusOverview(state)}
         </article>
         <article class="home-block">
           <div class="home-block-heading">
@@ -1612,6 +1655,7 @@ function permissionDiagnosticsPanel(state) {
         <div>
           <p class="eyebrow">Diagnostic permissions</p>
           <h3>Ce que Sentinel peut faire</h3>
+          <p class="muted">Si une action est refusÃ©e, corrige dâ€™abord la ligne indiquÃ©e ici : permission manquante, salon inaccessible ou rÃ´le Sentinel placÃ© trop bas.</p>
         </div>
         ${statusBadge(headline, diagnostics.fixes.length === 0)}
       </div>

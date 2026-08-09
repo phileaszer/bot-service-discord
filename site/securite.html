@@ -30,9 +30,9 @@
 
   <main>
     <section class="page-hero">
-      <p class="eyebrow">Sécurité</p>
-      <h1>Des limites claires avant chaque action importante.</h1>
-      <p>Sentinel respecte Discord, les rôles de ton serveur et ne garde que les données dont il a besoin pour fonctionner.</p>
+      <p class="eyebrow">Sécurité & confiance</p>
+      <h1>Tu dois savoir exactement ce que Sentinel fait.</h1>
+      <p>Sentinel aide à gérer les services, les sanctions, les annonces et les tickets. Il respecte les permissions Discord et ne garde que les informations nécessaires au fonctionnement du serveur.</p>
     </section>
 
     <section class="section section-dark">
@@ -67,7 +67,7 @@
           <div>
             <p class="eyebrow">Données</p>
             <h2>Le stockage reste limité.</h2>
-            <p>Sentinel garde seulement ce qui sert aux services, aux logs, aux réglages serveur et aux sanctions.</p>
+            <p>Sentinel garde seulement ce qui sert aux services, aux logs, aux réglages serveur, aux sanctions, aux tickets et au dashboard.</p>
           </div>
           <ul class="check-list">
             <li>Données séparées par serveur</li>
@@ -83,28 +83,38 @@
         <div class="section-heading">
           <p class="eyebrow">Transparence</p>
           <h2>Ce qu’un admin doit savoir avant d’inviter Sentinel.</h2>
-          <p>Les permissions servent à faire les actions demandées par ton serveur. Elles ne permettent pas à Sentinel de dépasser les règles Discord.</p>
+          <p>Les permissions servent à faire les actions demandées par ton serveur. Sentinel ne contourne pas Discord : si son rôle est trop bas ou si une permission manque, l’action est refusée.</p>
         </div>
         <div class="trust-grid security-trust-grid">
           <article class="trust-card">
             <span class="feature-icon">01</span>
             <h3>Ce qui est stocké</h3>
-            <p>Identifiants du serveur, des utilisateurs, des rôles et des salons configurés, temps de service, sessions, logs utiles et dossiers de modération.</p>
+            <p>Identifiants Discord du serveur, des utilisateurs, des rôles et des salons configurés, temps de service, sessions, sanctions, tickets, annonces, sessions dashboard et journal des actions.</p>
           </article>
           <article class="trust-card">
             <span class="feature-icon">02</span>
             <h3>Ce qui n’est pas stocké</h3>
-            <p>Pas de mot de passe, pas de token utilisateur, pas de paiement, pas de vente de données et pas d’enregistrement de messages privés.</p>
+            <p>Pas de mot de passe, pas de token utilisateur, pas d’informations de paiement, pas de vente de données et pas d’enregistrement de messages privés.</p>
           </article>
           <article class="trust-card">
             <span class="feature-icon">03</span>
             <h3>Pourquoi ces permissions</h3>
-            <p>Le bot doit pouvoir envoyer des messages, gérer le rôle de service, appliquer une sanction demandée et écrire dans les salons de logs.</p>
+            <p>Le bot doit envoyer ses messages, gérer le rôle de service, créer les salons de tickets, joindre les comptes rendus, appliquer les sanctions demandées et écrire dans les logs.</p>
           </article>
           <article class="trust-card">
             <span class="feature-icon">04</span>
             <h3>Comment garder la main</h3>
             <p>Place le rôle Sentinel assez haut, limite les rôles autorisés, utilise <code>/diagnostic</code> et garde les logs visibles par le staff.</p>
+          </article>
+          <article class="trust-card">
+            <span class="feature-icon">05</span>
+            <h3>Supprimer des données</h3>
+            <p>Les heures d’un membre peuvent être remises à zéro avec <code>/reset-heures</code>. Pour une demande plus large sur les données d’un serveur, passe par le serveur support.</p>
+          </article>
+          <article class="trust-card">
+            <span class="feature-icon">06</span>
+            <h3>Sauvegardes</h3>
+            <p>La base SQLite est sauvegardée pour éviter une perte de données après un incident. Ces sauvegardes restent internes et ne sont pas affichées publiquement.</p>
           </article>
         </div>
       </div>
@@ -137,6 +147,10 @@
           <details>
             <summary>Est-ce que Sentinel lit les messages privés ?</summary>
             <p>Non. Sentinel ne lit pas les messages privés et ne stocke pas les conversations privées des utilisateurs.</p>
+          </details>
+          <details>
+            <summary>Comment demander la suppression de données ?</summary>
+            <p>Pour les heures d’un membre, utilise <code>/reset-heures</code>. Pour une demande concernant les données d’un serveur, contacte le support Sentinel avec l’ID du serveur concerné.</p>
           </details>
         </div>
       </div>

@@ -2001,6 +2001,45 @@ code {
   padding-left: 18px;
 }
 
+.permission-overview {
+  display: grid;
+  gap: 14px;
+}
+
+.permission-pill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.permission-pill {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(234, 242, 255, 0.1);
+  color: var(--muted);
+  background: rgba(7, 10, 16, 0.42);
+  clip-path: var(--cut);
+}
+
+.permission-pill strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.permission-pill small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.permission-pill.is-ready small {
+  color: var(--mint);
+}
+
+.permission-pill.is-warning small {
+  color: var(--pink);
+}
+
 .recent-action-list {
   display: grid;
   gap: 10px;
@@ -3094,6 +3133,7 @@ code {
   }
 
   .diagnostic-grid,
+  .permission-pill-grid,
   .dossier-category-grid,
   .user-profile-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3243,6 +3283,7 @@ code {
   .audit-filters,
   .audit-detail-grid,
   .diagnostic-grid,
+  .permission-pill-grid,
   .dossier-category-grid,
   .case-detail-card,
   .user-profile-stats,

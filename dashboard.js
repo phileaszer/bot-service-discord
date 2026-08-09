@@ -1892,6 +1892,10 @@ async function handleApi(req, res, ctx, url) {
                 lastUpdate: dashboardStartedAt,
                 lastCheck: new Date().toISOString(),
                 build: ctx.build || null,
+                backup: ctx.helpers.getDatabaseBackupStatus?.() || null,
+                sync: ctx.helpers.getSentinelSyncStatus?.() || null,
+                slashCommands: ctx.helpers.getSlashCommandStatus?.() || null,
+                disk: ctx.helpers.getDiskUsageStatus?.() || null,
                 incidents,
                 maintenance
             }
