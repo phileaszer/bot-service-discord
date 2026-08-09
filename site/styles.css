@@ -475,7 +475,6 @@ h3 {
   font-size: 1.15rem;
 }
 
-.hero-note,
 .premium-launch-note {
   border: 1px solid rgba(255, 45, 154, 0.32);
   background:
@@ -484,23 +483,9 @@ h3 {
   clip-path: var(--cut);
 }
 
-.hero-note {
-  display: grid;
-  gap: 6px;
-  max-width: 620px;
-  margin-top: 18px;
-  padding: 14px 16px;
-}
-
-.hero-note strong,
 .premium-launch-note strong {
   color: var(--text);
   font-weight: 950;
-}
-
-.hero-note span {
-  color: var(--muted);
-  line-height: 1.55;
 }
 
 .premium-launch-note {
@@ -521,6 +506,28 @@ h3 {
   font-weight: 950;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.premium-goal-panel {
+  border-color: rgba(255, 45, 154, 0.34);
+}
+
+.status-progress {
+  overflow: hidden;
+  height: 9px;
+  margin-top: 14px;
+  border: 1px solid rgba(234, 242, 255, 0.12);
+  background: rgba(3, 5, 9, 0.62);
+  clip-path: var(--cut);
+}
+
+.status-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--pink));
+  box-shadow: 0 0 18px rgba(23, 231, 255, 0.28);
+  transition: width 280ms ease;
 }
 
 .dashboard-kpi {
