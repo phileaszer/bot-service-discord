@@ -475,6 +475,54 @@ h3 {
   font-size: 1.15rem;
 }
 
+.hero-note,
+.premium-launch-note {
+  border: 1px solid rgba(255, 45, 154, 0.32);
+  background:
+    linear-gradient(135deg, rgba(255, 45, 154, 0.12), rgba(23, 231, 255, 0.055)),
+    rgba(9, 13, 22, 0.74);
+  clip-path: var(--cut);
+}
+
+.hero-note {
+  display: grid;
+  gap: 6px;
+  max-width: 620px;
+  margin-top: 18px;
+  padding: 14px 16px;
+}
+
+.hero-note strong,
+.premium-launch-note strong {
+  color: var(--text);
+  font-weight: 950;
+}
+
+.hero-note span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.premium-launch-note {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+  margin-top: 28px;
+  padding: 18px 20px;
+}
+
+.premium-launch-note p {
+  margin: 0;
+}
+
+.launch-kicker {
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .dashboard-kpi {
   display: grid;
   gap: 6px;
