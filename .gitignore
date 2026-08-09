@@ -8,6 +8,7 @@ database/*.db
 database/*.db-*
 database/*.sqlite
 database/*.sqlite-*
+database/backups/
 bot.log
 bot.err
 *.log

@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-Dernière mise à jour : 1 août 2026
+Dernière mise à jour : 9 août 2026
 
 Cette politique explique quelles données Sentinel collecte, pourquoi elles sont utilisées et comment elles sont conservées.
 
@@ -88,7 +88,7 @@ Pour toute question concernant la confidentialité, utilisez le serveur support 
 
 # Privacy Policy
 
-Last updated: August 1, 2026
+Last updated: August 9, 2026
 
 This policy explains what data Sentinel collects, why it is used and how it is retained.
 

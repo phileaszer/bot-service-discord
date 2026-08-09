@@ -8,7 +8,8 @@
     "start": "node --use-system-ca index.js",
     "announce": "node --use-system-ca tools/announce-discord.js",
     "deploy:commands": "node --use-system-ca deploy-commands.js",
-    "check": "node --check index.js && node --check dashboard.js && node --check site/dashboard.js && node --check deploy-commands.js && node --check database/database.js && node --check server-sync.js && node --check tools/announce-discord.js"
+    "backup:db": "node --use-system-ca tools/backup-database.js",
+    "check": "node --check index.js && node --check dashboard.js && node --check site/dashboard.js && node --check deploy-commands.js && node --check database/database.js && node --check server-sync.js && node --check tools/announce-discord.js && node --check tools/backup-database.js"
   },
   "keywords": [
     "discord",
@@ -23,10 +24,10 @@
   "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "discord.js": "^14.26.4",
+    "discord.js": "^14.27.0",
     "dotenv": "^17.4.2"
   },
   "overrides": {
-    "undici": "https://github.com/nodejs/undici/archive/refs/tags/v6.27.0.tar.gz"
+    "undici": "^6.28.0"
   }
 }

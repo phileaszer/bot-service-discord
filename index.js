@@ -1,5 +1,8 @@
 ﻿require('dotenv').config();
 
+const fs = require('fs');
+const path = require('path');
+
 const {
     Client,
     GatewayIntentBits,
@@ -94,8 +97,20 @@ const SENTINEL_COLORS = {
 };
 const SENTINEL_BUILD = 'community-suite-2026-06-23-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
+const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
+const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
+const PREMIUM_SERVER_GOAL = Number.parseInt(process.env.PREMIUM_SERVER_GOAL || '50', 10);
+const DATABASE_FILE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db');
+const DATABASE_BACKUP_ENABLED = String(process.env.DATABASE_BACKUP_ENABLED || 'true').toLowerCase() !== 'false';
+const DATABASE_BACKUP_INTERVAL_MS = Math.max(
+    Number.parseInt(process.env.DATABASE_BACKUP_INTERVAL_HOURS || '24', 10),
+    1
+) * 60 * 60 * 1000;
+const DATABASE_BACKUP_KEEP = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_KEEP || '14', 10), 1);
+const DATABASE_BACKUP_DIR = process.env.DATABASE_BACKUP_DIR || path.join(path.dirname(DATABASE_FILE_PATH), 'backups');
 let lastSentinelServerSync = null;
 let lastSentinelServerSyncResult = null;
+let databaseBackupTimer = null;
 
 const SUPPORTED_LANGUAGES = new Set(['fr', 'en']);
 const MODERATION_ACTION_LABELS = {
@@ -460,6 +475,8 @@ function resolveCommandName(commandName) {
         aide: 'aide',
         help: 'aide',
         dashboard: 'dashboard',
+        premium: 'premium',
+        support: 'support',
         'config-langue': 'config-langue',
         language: 'config-langue',
         'config-role': 'config-role',
@@ -553,6 +570,13 @@ function getDashboardUrl(pathname = '/dashboard') {
     const cleanPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
 
     return `${baseUrl}${cleanPath}`;
+}
+
+function getPublicSiteUrl(pathname = '') {
+    const baseUrl = String(process.env.PUBLIC_SITE_URL || DEFAULT_PUBLIC_SITE_URL).replace(/\/$/, '');
+    const cleanPath = String(pathname || '').replace(/^\/+/, '');
+
+    return cleanPath ? `${baseUrl}/${cleanPath}` : `${baseUrl}/`;
 }
 
 function getGuildInstallRequiredMessage() {
@@ -660,6 +684,135 @@ function buildDashboardComponents(language = 'fr') {
     ];
 }
 
+function buildPremiumEmbed(guild, requester, member = null) {
+    const language = getGuildLanguage(guild.id);
+    const guildCount = client.guilds.cache.size || 0;
+    const remaining = Math.max(PREMIUM_SERVER_GOAL - guildCount, 0);
+    const progressPercent = PREMIUM_SERVER_GOAL > 0
+        ? Math.min(Math.round((guildCount / PREMIUM_SERVER_GOAL) * 100), 100)
+        : 0;
+    const hasReferenceAccess = hasAdvancedAccess(member, guild.id);
+
+    const embed = createSentinelEmbed({
+        color: SENTINEL_COLORS.advanced,
+        title: language === 'en' ? 'Sentinel | Premium' : 'Sentinel | Premium',
+        description: language === 'en'
+            ? [
+                'Sentinel Premium is not publicly open yet.',
+                `It will become available when Sentinel reaches **${PREMIUM_SERVER_GOAL} servers**.`,
+                '',
+                hasReferenceAccess
+                    ? 'This server already has reference access to the advanced tools.'
+                    : 'Until then, the free version keeps the essential service, moderation, embeds and ticket features.'
+            ].join('\n')
+            : [
+                'Sentinel Premium n’est pas encore ouvert publiquement.',
+                `Il deviendra disponible quand Sentinel aura atteint **${PREMIUM_SERVER_GOAL} serveurs**.`,
+                '',
+                hasReferenceAccess
+                    ? 'Ce serveur dispose déjà de l’accès de référence aux outils avancés.'
+                    : 'En attendant, le gratuit garde les bases utiles : service, modération, embeds et dossiers/tickets.'
+            ].join('\n'),
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    });
+
+    embed.addFields(
+        {
+            name: language === 'en' ? 'Current progress' : 'Progression actuelle',
+            value: language === 'en'
+                ? `**${guildCount}/${PREMIUM_SERVER_GOAL}** servers (${progressPercent}%).`
+                : `**${guildCount}/${PREMIUM_SERVER_GOAL}** serveurs (${progressPercent}%).`,
+            inline: true
+        },
+        {
+            name: language === 'en' ? 'Remaining' : 'Restant',
+            value: language === 'en'
+                ? (remaining === 0 ? 'Goal reached.' : `${remaining} server(s).`)
+                : (remaining === 0 ? 'Objectif atteint.' : `${remaining} serveur(s).`),
+            inline: true
+        },
+        {
+            name: language === 'en' ? 'Where to follow it' : 'Où suivre ça',
+            value: language === 'en'
+                ? `[Premium page](${getPublicSiteUrl('premium.html')})\n[Sentinel status](${getPublicSiteUrl('statut.html')})`
+                : `[Page Premium](${getPublicSiteUrl('premium.html')})\n[Statut Sentinel](${getPublicSiteUrl('statut.html')})`,
+            inline: false
+        }
+    );
+
+    return embed;
+}
+
+function buildPremiumComponents(language = 'fr') {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Premium page' : 'Page Premium')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getPublicSiteUrl('premium.html')),
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Status' : 'Statut')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getPublicSiteUrl('statut.html'))
+        )
+    ];
+}
+
+function buildSupportEmbed(guild, requester) {
+    const language = getGuildLanguage(guild.id);
+    const dashboardUrl = getDashboardUrl('/dashboard');
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.accent,
+        title: language === 'en' ? 'Sentinel | Support' : 'Sentinel | Support',
+        description: language === 'en'
+            ? [
+                'Need help with setup, permissions, service tracking, moderation, embeds, or tickets?',
+                'Use the support server for questions, bug reports and follow-up.'
+            ].join('\n')
+            : [
+                'Besoin d’aide pour l’installation, les permissions, les services, la modération, les embeds ou les dossiers/tickets ?',
+                'Le serveur support est là pour les questions, les bugs et les demandes qui doivent être suivies.'
+            ].join('\n'),
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    }).addFields(
+        {
+            name: language === 'en' ? 'Useful links' : 'Liens utiles',
+            value: language === 'en'
+                ? `[Support server](${SUPPORT_SERVER_URL})\n[Official website](${getPublicSiteUrl()})\n[Dashboard](${dashboardUrl})\n[Status page](${getPublicSiteUrl('statut.html')})`
+                : `[Serveur support](${SUPPORT_SERVER_URL})\n[Site officiel](${getPublicSiteUrl()})\n[Dashboard](${dashboardUrl})\n[Page statut](${getPublicSiteUrl('statut.html')})`,
+            inline: false
+        }
+    );
+}
+
+function buildSupportComponents(language = 'fr') {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Support server' : 'Serveur support')
+                .setStyle(ButtonStyle.Link)
+                .setURL(SUPPORT_SERVER_URL),
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Website' : 'Site officiel')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getPublicSiteUrl()),
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Dashboard' : 'Dashboard')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getDashboardUrl('/dashboard')),
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Status' : 'Statut')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getPublicSiteUrl('statut.html'))
+        )
+    ];
+}
+
 function getRankLabel(index) {
     if (index === 0) return '01';
     if (index === 1) return '02';
@@ -683,6 +836,61 @@ function formatDuration(ms) {
 
 function checkDatabase() {
     db.prepare('SELECT 1').get();
+}
+
+function getDatabaseBackupFilename(reason = 'auto') {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const cleanReason = String(reason || 'auto')
+        .replace(/[^a-z0-9_-]/gi, '-')
+        .replace(/-+/g, '-')
+        .slice(0, 32) || 'auto';
+
+    return `service-${cleanReason}-${stamp}.db`;
+}
+
+function pruneDatabaseBackups() {
+    if (!fs.existsSync(DATABASE_BACKUP_DIR)) {
+        return;
+    }
+
+    const backups = fs.readdirSync(DATABASE_BACKUP_DIR)
+        .filter(fileName => /^service-.*\.db$/i.test(fileName))
+        .map(fileName => {
+            const fullPath = path.join(DATABASE_BACKUP_DIR, fileName);
+            const stat = fs.statSync(fullPath);
+            return { fileName, fullPath, mtimeMs: stat.mtimeMs };
+        })
+        .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    for (const backup of backups.slice(DATABASE_BACKUP_KEEP)) {
+        fs.unlinkSync(backup.fullPath);
+    }
+}
+
+async function createDatabaseBackup(reason = 'auto') {
+    fs.mkdirSync(DATABASE_BACKUP_DIR, { recursive: true });
+
+    const backupPath = path.join(DATABASE_BACKUP_DIR, getDatabaseBackupFilename(reason));
+    await db.backup(backupPath);
+    pruneDatabaseBackups();
+
+    return backupPath;
+}
+
+function startDatabaseBackupSchedule() {
+    if (!DATABASE_BACKUP_ENABLED || databaseBackupTimer) {
+        return;
+    }
+
+    createDatabaseBackup('startup')
+        .then(backupPath => console.log(`Sauvegarde SQLite creee : ${backupPath}`))
+        .catch(error => console.error('Erreur sauvegarde SQLite au demarrage :', error));
+
+    databaseBackupTimer = setInterval(() => {
+        createDatabaseBackup('auto')
+            .then(backupPath => console.log(`Sauvegarde SQLite creee : ${backupPath}`))
+            .catch(error => console.error('Erreur sauvegarde SQLite planifiee :', error));
+    }, DATABASE_BACKUP_INTERVAL_MS);
 }
 
 function getAdvancedGuildIds() {
@@ -3759,6 +3967,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         value: [
                             '`/config-view` shows the current setup.',
                             '`/dashboard` opens the web dashboard.',
+                            '`/support` shows support and official links.',
+                            '`/premium` shows the Premium launch progress.',
                             '`/diagnostic` checks permissions and role order.',
                             '`/ping` checks whether Sentinel and SQLite respond.'
                         ].join('\n')
@@ -3923,6 +4133,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Staff',
                         value: [
                             '`/dashboard` gives the web dashboard link.',
+                            '`/support` gives official support links.',
+                            '`/premium` shows when Premium will open.',
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/embed create` sends an announcement as Sentinel.',
                             'Free servers can keep 2 active Sentinel embeds. Edits are unlimited.'
@@ -3980,7 +4192,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                                 `Personal history: last ${FREE_HISTORY_LIMIT} sessions.`,
                                 `Public ranking: top ${FREE_TOP_LIMIT}.`,
                                 `Sentinel embeds: ${FREE_CUSTOM_EMBED_LIMIT} active embeds, unlimited edits.`,
-                                '`/reset-hours-all` will be reserved for Sentinel Premium.'
+                                '`/reset-hours-all` will be reserved for Sentinel Premium.',
+                                `Premium is planned when Sentinel reaches ${PREMIUM_SERVER_GOAL} servers.`
                             ].join('\n')
                         }
                     ]
@@ -4060,6 +4273,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     value: [
                         '`/config-voir` affiche les réglages actuels.',
                         '`/dashboard` ouvre le dashboard web.',
+                        '`/support` affiche les liens officiels et le serveur support.',
+                        '`/premium` affiche la progression avant l’ouverture Premium.',
                         '`/diagnostic` vérifie les permissions et l’ordre des rôles.',
                         '`/ping` vérifie que Sentinel et SQLite répondent.'
                     ].join('\n')
@@ -4224,6 +4439,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     name: 'Staff',
                     value: [
                         '`/dashboard` donne le lien du dashboard web.',
+                        '`/support` donne les liens officiels et le serveur support.',
+                        '`/premium` indique quand le Premium ouvrira.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
                         `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
@@ -4281,7 +4498,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             `Historique personnel : ${FREE_HISTORY_LIMIT} dernières sessions.`,
                             `Classement public : top ${FREE_TOP_LIMIT}.`,
                             `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs, modifications illimitées.`,
-                            '`/reset-heures-all` sera réservé à Sentinel Premium.'
+                            '`/reset-heures-all` sera réservé à Sentinel Premium.',
+                            `Premium est prévu quand Sentinel aura atteint ${PREMIUM_SERVER_GOAL} serveurs.`
                         ].join('\n')
                     }
                 ]
@@ -7032,6 +7250,7 @@ async function handleModerationMessage(message, language) {
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
+    startDatabaseBackupSchedule();
 
     startDashboardServer({
         client,
@@ -7225,6 +7444,22 @@ client.on(Events.InteractionCreate, async interaction => {
             return interaction.reply({
                 embeds: [buildDashboardEmbed(interaction.guild, interaction.user)],
                 components: buildDashboardComponents(language),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (commandName === 'premium') {
+            return interaction.reply({
+                embeds: [buildPremiumEmbed(interaction.guild, interaction.user, interaction.member)],
+                components: buildPremiumComponents(language),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (commandName === 'support') {
+            return interaction.reply({
+                embeds: [buildSupportEmbed(interaction.guild, interaction.user)],
+                components: buildSupportComponents(language),
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -7923,6 +8158,20 @@ client.on(Events.MessageCreate, async message => {
         return message.reply({
             embeds: [buildDashboardEmbed(message.guild, message.author)],
             components: buildDashboardComponents(language)
+        });
+    }
+
+    if (/^!premium$/i.test(content)) {
+        return message.reply({
+            embeds: [buildPremiumEmbed(message.guild, message.author, message.member)],
+            components: buildPremiumComponents(language)
+        });
+    }
+
+    if (/^!support$/i.test(content)) {
+        return message.reply({
+            embeds: [buildSupportEmbed(message.guild, message.author)],
+            components: buildSupportComponents(language)
         });
     }
 

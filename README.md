@@ -62,7 +62,7 @@ Le gratuit reste volontairement simple. Le Premium apportera surtout du confort,
 4. Configure le rôle de service avec `/config-role`.
 5. Configure le salon de logs avec `/config-logs`.
 6. Ajoute les rôles autorisés avec `/config-permissions`.
-7. Publie le panneau de service avec `/service-panel`.
+7. Publie le panneau de service avec `!service-panel`.
 8. Publie le panneau de dossiers avec `/dossier-panel` si tu veux utiliser les tickets.
 
 Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit gérer ou modérer.
@@ -77,6 +77,9 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
+| `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
+| `/premium` | `/premium` | Voir l'objectif avant l'ouverture Premium |
+| `/support` | `/support` | Obtenir les liens officiels et le serveur support |
 | `/mes-heures` | `/my-hours` | Voir ses heures |
 | `/en-service` | `/on-duty` | Voir les agents en service |
 | `/top-service` | `/top-service` | Voir le classement global |

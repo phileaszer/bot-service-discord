@@ -34,6 +34,10 @@ const publicCommands = [
 
     command('dashboard', 'dashboard', 'Donne le lien du dashboard web Sentinel.', 'Shows the Sentinel web dashboard link.'),
 
+    command('premium', 'premium', 'Affiche l objectif Premium de Sentinel.', 'Shows the Sentinel Premium goal.'),
+
+    command('support', 'support', 'Affiche les liens utiles et le serveur support.', 'Shows useful links and the support server.'),
+
     command('config-langue', 'language', 'Configure la langue de ce serveur.', 'Sets this server language.')
         .addStringOption(option =>
             option

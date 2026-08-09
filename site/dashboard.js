@@ -17,9 +17,44 @@ let expandedModerationCaseId = null;
 let selectedUserProfile = null;
 let dossierFilters = {};
 let expandedDossierId = null;
+const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
+
+function readStoredLastGuildId() {
+  try {
+    const value = localStorage.getItem(LAST_GUILD_STORAGE_KEY);
+    return /^\d{17,20}$/.test(String(value || '')) ? value : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function storeLastGuildId(guildId) {
+  if (!/^\d{17,20}$/.test(String(guildId || ''))) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(LAST_GUILD_STORAGE_KEY, guildId);
+  } catch (error) {
+    // Some browsers block local storage; the backend setting remains the source of truth.
+  }
+
+  window.SentinelAuth?.saveSettings?.({ lastGuildId: guildId });
+}
+
+function getRestorableGuildId() {
+  const candidates = [
+    currentSettings?.lastGuildId,
+    readStoredLastGuildId()
+  ].filter(Boolean);
+
+  return candidates.find((guildId) => (
+    guilds.some((guild) => guild.id === guildId && guild.installed)
+  )) || null;
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -2534,11 +2569,10 @@ async function bootstrap() {
     renderUser();
     await loadGuilds();
 
-    if (
-      currentSettings?.lastGuildId
-      && guilds.some((guild) => guild.id === currentSettings.lastGuildId && guild.installed)
-    ) {
-      await selectGuild(currentSettings.lastGuildId);
+    const restorableGuildId = getRestorableGuildId();
+
+    if (restorableGuildId) {
+      await selectGuild(restorableGuildId);
     }
   } catch (error) {
     currentUser = null;
@@ -2644,6 +2678,7 @@ $('[data-logout]')?.addEventListener('click', async () => {
   dossierFilters = {};
   expandedDossierId = null;
   localStorage.removeItem('sentinel-discord-profile');
+  localStorage.removeItem(LAST_GUILD_STORAGE_KEY);
   renderUser();
   renderGuilds();
   renderDashboard();
