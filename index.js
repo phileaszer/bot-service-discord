@@ -42,6 +42,8 @@ const FREE_CUSTOM_EMBED_LIMIT = 2;
 const FREE_DOSSIER_PANEL_LIMIT = 1;
 const FREE_OPEN_DOSSIER_LIMIT = 5;
 const FREE_DOSSIER_HISTORY_LIMIT = 10;
+const DEFAULT_PAY_CURRENCY = '$';
+const MAX_PAY_RATE = 100000000;
 const REFERENCE_HISTORY_LIMIT = 100;
 const REFERENCE_TOP_LIMIT = 25;
 const REFERENCE_DOSSIER_HISTORY_LIMIT = 100;
@@ -95,7 +97,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-08-09-v1';
+const SENTINEL_BUILD = 'community-suite-2026-08-14-payroll-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -184,6 +186,9 @@ const I18N = {
         invalidChannelId: '❌ ID de salon invalide.',
         channelNotText: '❌ Aucun salon textuel accessible ne correspond à cet ID.',
         logChannelSet: '✅ Le salon de logs a été configuré sur {channel}.',
+        payRateInvalid: '❌ Montant horaire invalide. Exemple : `/config-paie montant:500 devise:$`.',
+        paySettingsUpdated: '✅ Paie RP configurée : **{rate}** par heure.',
+        payrollEmpty: '📄 Aucune heure de service enregistrée sur la semaine en cours.',
         pingOk: '🏓 Pong ! SQLite OK. Latence Discord : **{ping}ms**',
         pingDbError: '❌ Le bot répond, mais SQLite ne répond pas correctement.',
         freeHistoryOwnOnly: 'En gratuit, tu peux consulter seulement ton historique personnel et les {limit} dernières sessions.',
@@ -325,6 +330,9 @@ const I18N = {
         invalidChannelId: '❌ Invalid channel ID.',
         channelNotText: '❌ No accessible text channel matches this ID.',
         logChannelSet: '✅ The log channel has been set to {channel}.',
+        payRateInvalid: '❌ Invalid hourly amount. Example: `/payroll-config hourly_rate:500 currency:$`.',
+        paySettingsUpdated: '✅ RP payroll configured: **{rate}** per hour.',
+        payrollEmpty: '📄 No service time recorded for the current week.',
         pingOk: '🏓 Pong! SQLite OK. Discord latency: **{ping}ms**',
         pingDbError: '❌ The bot is responding, but SQLite is not responding correctly.',
         freeHistoryOwnOnly: 'In free mode, you can only view your personal history and the last {limit} sessions.',
@@ -490,6 +498,8 @@ function resolveCommandName(commandName) {
         'config-role': 'config-role',
         'config-logs': 'config-logs',
         'config-channel': 'config-logs',
+        'config-paie': 'config-paie',
+        'payroll-config': 'config-paie',
         'config-voir': 'config-voir',
         'config-view': 'config-voir',
         'mes-heures': 'mes-heures',
@@ -503,6 +513,8 @@ function resolveCommandName(commandName) {
         'top-service': 'top-service',
         'top-semaine': 'top-semaine',
         'top-week': 'top-semaine',
+        'paie-semaine': 'paie-semaine',
+        'weekly-payroll': 'paie-semaine',
         ping: 'ping',
         diagnostic: 'diagnostic',
         'sync-service': 'sync-service',
@@ -2069,6 +2081,242 @@ function getTopWeek(guildId) {
         .sort((a, b) => b.totalTime - a.totalTime);
 }
 
+function getWeekStartDate(value = new Date()) {
+    const source = value instanceof Date ? value : new Date(value);
+    const date = Number.isNaN(source.getTime()) ? new Date() : source;
+    const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = utcDate.getUTCDay() || 7;
+
+    utcDate.setUTCDate(utcDate.getUTCDate() - day + 1);
+
+    return utcDate.toISOString().slice(0, 10);
+}
+
+function getWeekRange(weekStart = null) {
+    const normalizedWeekStart = /^\d{4}-\d{2}-\d{2}$/.test(String(weekStart || ''))
+        ? String(weekStart)
+        : getWeekStartDate();
+    const startDate = new Date(`${normalizedWeekStart}T00:00:00.000Z`);
+    const endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    return {
+        weekStart: normalizedWeekStart,
+        startMs: startDate.getTime(),
+        endMs: endDate.getTime(),
+        startIso: startDate.toISOString(),
+        endIso: endDate.toISOString()
+    };
+}
+
+function normalizePayRate(value) {
+    const rate = Number(value);
+
+    if (!Number.isFinite(rate) || rate < 0) {
+        return null;
+    }
+
+    return Math.min(rate, MAX_PAY_RATE);
+}
+
+function normalizeCurrency(value) {
+    const currency = String(value || DEFAULT_PAY_CURRENCY)
+        .replace(/[\r\n\t]/g, '')
+        .trim()
+        .slice(0, 8);
+
+    return currency || DEFAULT_PAY_CURRENCY;
+}
+
+function getGuildPaySettings(guildId) {
+    let row = db.prepare(`
+        SELECT hourly_rate, currency, updated_at
+        FROM guild_pay_settings
+        WHERE guild_id = ?
+    `).get(guildId);
+
+    if (!row) {
+        const timestamp = new Date().toISOString();
+
+        db.prepare(`
+            INSERT INTO guild_pay_settings (guild_id, hourly_rate, currency, updated_at)
+            VALUES (?, 0, ?, ?)
+        `).run(guildId, DEFAULT_PAY_CURRENCY, timestamp);
+
+        row = {
+            hourly_rate: 0,
+            currency: DEFAULT_PAY_CURRENCY,
+            updated_at: timestamp
+        };
+    }
+
+    return {
+        hourlyRate: Number(row.hourly_rate) || 0,
+        currency: row.currency || DEFAULT_PAY_CURRENCY,
+        updatedAt: row.updated_at
+    };
+}
+
+function updateGuildPaySettings(guildId, hourlyRate, currency = DEFAULT_PAY_CURRENCY) {
+    const normalizedRate = normalizePayRate(hourlyRate);
+
+    if (normalizedRate === null) {
+        return null;
+    }
+
+    const normalizedCurrency = normalizeCurrency(currency);
+    const timestamp = new Date().toISOString();
+
+    db.prepare(`
+        INSERT INTO guild_pay_settings (guild_id, hourly_rate, currency, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET
+            hourly_rate = excluded.hourly_rate,
+            currency = excluded.currency,
+            updated_at = excluded.updated_at
+    `).run(guildId, normalizedRate, normalizedCurrency, timestamp);
+
+    return getGuildPaySettings(guildId);
+}
+
+function setWeeklyPaymentStatus(guildId, userId, weekStart, paid, paidByUserId = null) {
+    const range = getWeekRange(weekStart);
+    const timestamp = new Date().toISOString();
+    const paidValue = paid ? 1 : 0;
+
+    db.prepare(`
+        INSERT INTO weekly_payments (
+            guild_id,
+            user_id,
+            week_start,
+            paid,
+            paid_by_user_id,
+            paid_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(guild_id, user_id, week_start) DO UPDATE SET
+            paid = excluded.paid,
+            paid_by_user_id = excluded.paid_by_user_id,
+            paid_at = excluded.paid_at,
+            updated_at = excluded.updated_at
+    `).run(
+        guildId,
+        userId,
+        range.weekStart,
+        paidValue,
+        paidValue ? paidByUserId : null,
+        paidValue ? timestamp : null,
+        timestamp
+    );
+
+    return db.prepare(`
+        SELECT guild_id, user_id, week_start, paid, paid_by_user_id, paid_at, updated_at
+        FROM weekly_payments
+        WHERE guild_id = ? AND user_id = ? AND week_start = ?
+    `).get(guildId, userId, range.weekStart);
+}
+
+function formatPayAmount(amount, currency = DEFAULT_PAY_CURRENCY, language = 'fr') {
+    const locale = language === 'en' ? 'en-US' : 'fr-FR';
+    const roundedAmount = Math.round((Number(amount) || 0) * 100) / 100;
+    const formatted = roundedAmount.toLocaleString(locale, {
+        minimumFractionDigits: Number.isInteger(roundedAmount) ? 0 : 2,
+        maximumFractionDigits: 2
+    });
+
+    return `${formatted} ${currency || DEFAULT_PAY_CURRENCY}`;
+}
+
+function getWeeklyPayroll(guildId, options = {}) {
+    const language = options.language || getGuildLanguage(guildId);
+    const settings = getGuildPaySettings(guildId);
+    const range = getWeekRange(options.weekStart);
+    const rows = db.prepare(`
+        SELECT user_id, SUM(duration) AS total_time
+        FROM service_sessions
+        WHERE guild_id = ? AND date >= ? AND date < ?
+        GROUP BY user_id
+    `).all(guildId, range.startIso, range.endIso);
+    const totalsByUser = new Map();
+
+    for (const row of rows) {
+        totalsByUser.set(row.user_id, row.total_time || 0);
+    }
+
+    const now = Date.now();
+    const activeEnd = Math.min(now, range.endMs);
+    const activeRows = db.prepare(`
+        SELECT user_id, start_time
+        FROM service_times
+        WHERE guild_id = ? AND start_time IS NOT NULL
+    `).all(guildId);
+
+    for (const row of activeRows) {
+        const startTime = Number(row.start_time) || 0;
+
+        if (startTime >= range.endMs || activeEnd <= range.startMs) {
+            continue;
+        }
+
+        const countedStartTime = Math.max(startTime, range.startMs);
+        const duration = Math.max(0, activeEnd - countedStartTime);
+        const currentTotal = totalsByUser.get(row.user_id) || 0;
+
+        totalsByUser.set(row.user_id, currentTotal + duration);
+    }
+
+    const paymentRows = db.prepare(`
+        SELECT user_id, paid, paid_by_user_id, paid_at, updated_at
+        FROM weekly_payments
+        WHERE guild_id = ? AND week_start = ?
+    `).all(guildId, range.weekStart);
+    const paymentsByUser = new Map(paymentRows.map(row => [row.user_id, row]));
+
+    const items = Array.from(totalsByUser.entries())
+        .map(([userId, totalTime]) => {
+            const payment = paymentsByUser.get(userId) || {};
+            const amount = (totalTime / (60 * 60 * 1000)) * settings.hourlyRate;
+
+            return {
+                userId,
+                totalTime,
+                totalTimeLabel: formatDuration(totalTime),
+                amount,
+                amountLabel: formatPayAmount(amount, settings.currency, language),
+                paid: Boolean(payment.paid),
+                paidByUserId: payment.paid_by_user_id || null,
+                paidAt: payment.paid_at || null,
+                updatedAt: payment.updated_at || null
+            };
+        })
+        .filter(item => item.totalTime > 0)
+        .sort((a, b) => b.totalTime - a.totalTime);
+
+    const totalTime = items.reduce((sum, item) => sum + item.totalTime, 0);
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+    const paidAmount = items.filter(item => item.paid).reduce((sum, item) => sum + item.amount, 0);
+
+    return {
+        weekStart: range.weekStart,
+        weekEnd: range.endIso.slice(0, 10),
+        settings,
+        totals: {
+            userCount: items.length,
+            totalTime,
+            totalTimeLabel: formatDuration(totalTime),
+            totalAmount,
+            totalAmountLabel: formatPayAmount(totalAmount, settings.currency, language),
+            paidAmount,
+            paidAmountLabel: formatPayAmount(paidAmount, settings.currency, language),
+            unpaidAmount: totalAmount - paidAmount,
+            unpaidAmountLabel: formatPayAmount(totalAmount - paidAmount, settings.currency, language),
+            paidCount: items.filter(item => item.paid).length,
+            unpaidCount: items.filter(item => !item.paid).length
+        },
+        items
+    };
+}
+
 function getUserSessions(guildId, userId, limit = 10) {
     return db.prepare(`
         SELECT date, duration
@@ -3398,6 +3646,75 @@ function buildServiceSummaryEmbed(guild, requester) {
         );
 }
 
+function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
+    const language = getGuildLanguage(guild.id);
+    const payroll = getWeeklyPayroll(guild.id, { language });
+    const displayLimit = options.isReferenceServer ? REFERENCE_TOP_LIMIT : FREE_TOP_LIMIT;
+    const displayedItems = payroll.items.slice(0, displayLimit);
+    const isEnglish = language === 'en';
+    const lines = displayedItems.map((item, index) => {
+        const status = item.paid
+            ? (isEnglish ? 'Paid' : 'Payé')
+            : (isEnglish ? 'To pay' : 'À payer');
+
+        return `**${getRankLabel(index)}.** <@${item.userId}> - **${item.totalTimeLabel}** - **${item.amountLabel}** - ${status}`;
+    });
+    const hiddenCount = payroll.items.length - displayedItems.length;
+
+    if (hiddenCount > 0) {
+        lines.push(isEnglish
+            ? `... and **${hiddenCount}** other agent(s).`
+            : `... et **${hiddenCount}** autre(s) agent(s).`);
+    }
+
+    const description = lines.length > 0
+        ? lines.join('\n')
+        : t(language, 'payrollEmpty');
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.accent,
+        title: isEnglish ? 'Sentinel | Weekly RP payroll' : 'Sentinel | Paie RP hebdomadaire',
+        description,
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    })
+        .addFields(
+            {
+                name: isEnglish ? 'Current week' : 'Semaine en cours',
+                value: `**${payroll.weekStart} → ${payroll.weekEnd}**`,
+                inline: true
+            },
+            {
+                name: isEnglish ? 'Hourly amount' : 'Montant horaire',
+                value: `**${formatPayAmount(payroll.settings.hourlyRate, payroll.settings.currency, language)}**`,
+                inline: true
+            },
+            {
+                name: isEnglish ? 'Total time' : 'Temps total',
+                value: `**${payroll.totals.totalTimeLabel}**`,
+                inline: true
+            },
+            {
+                name: isEnglish ? 'Already paid' : 'Déjà payé',
+                value: `**${payroll.totals.paidAmountLabel}**`,
+                inline: true
+            },
+            {
+                name: isEnglish ? 'Still to pay' : 'Reste à payer',
+                value: `**${payroll.totals.unpaidAmountLabel}**`,
+                inline: true
+            },
+            {
+                name: isEnglish ? 'Dashboard' : 'Dashboard',
+                value: isEnglish
+                    ? `Use ${getDashboardUrl('/dashboard')} to tick paid/unpaid lines.`
+                    : `Utilise ${getDashboardUrl('/dashboard')} pour cocher les lignes payé/non payé.`,
+                inline: false
+            }
+        );
+}
+
 function diagnosticLine(ok, label, detail = '') {
     return `${ok ? 'OK' : 'À vérifier'} - ${label}${detail ? ` : ${detail}` : ''}`;
 }
@@ -3772,6 +4089,8 @@ function buildLegacyHelpEmbed(guild, requester) {
                     '`/config-role role:@role` sets the service role.',
                     '`/config-channel channel_id:ID` sets the log channel.',
                     '`/config-view` shows the current configuration.',
+                    '`/payroll-config hourly_rate:500 currency:$` sets the weekly RP payroll amount.',
+                    '`/weekly-payroll` shows the current week paid/unpaid summary.',
                     '`/reset-hours member:@member` or `user_id:ID` resets one user hours, even after they left.'
                 ].join('\n'),
                 inline: false
@@ -3888,6 +4207,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             ? '`/top-service`, `/top-semaine`, `/resume-service` - classements et resume complet'
             : '`/top-service` - top 10 du serveur',
         '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
+        '`/config-paie`, `/paie-semaine` - regler et consulter la paie RP hebdomadaire',
         '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration',
         '`/embed creer` - publier une annonce sous l identite de Sentinel'
     ];
@@ -4221,6 +4541,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/support` gives official support links.',
                             '`/premium` shows when Premium will open.',
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
+                            '`/payroll-config` sets the hourly RP amount.',
+                            '`/weekly-payroll` shows who is paid or still to pay this week.',
                             '`/embed create` sends an announcement as Sentinel.',
                             'Free servers can keep 2 active Sentinel embeds. Edits are unlimited.'
                         ].join('\n')
@@ -4527,6 +4849,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/support` donne les liens officiels et le serveur support.',
                         '`/premium` indique quand le Premium ouvrira.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
+                        '`/config-paie` règle le montant horaire RP.',
+                        '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
                         `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
                     ].join('\n')
@@ -4867,6 +5191,14 @@ function mapDiscordAuditAction(interaction) {
         return 'set-log-channel';
     }
 
+    if (commandName === 'config-paie') {
+        return 'set-payroll-settings';
+    }
+
+    if (commandName === 'paie-semaine') {
+        return null;
+    }
+
     if (commandName === 'config-permissions') {
         const action = interaction.options.getString('action');
 
@@ -4978,6 +5310,10 @@ function getTextCommandAuditAction(content) {
         }
 
         return null;
+    }
+
+    if (/^!(config-paie|payroll-config)\b/i.test(trimmed)) {
+        return 'set-payroll-settings';
     }
 
     if (/^!sync-service$/i.test(trimmed)) {
@@ -7379,6 +7715,7 @@ client.once(Events.ClientReady, async () => {
             getFilteredModerationCases,
             getModerationCases,
             getModerationCase,
+            getGuildPaySettings,
             getRecentDossiers,
             getRecentModerationCases,
             getModerationTargetError,
@@ -7391,6 +7728,7 @@ client.once(Events.ClientReady, async () => {
             getTemporaryBan,
             getTopService,
             getTopWeek,
+            getWeeklyPayroll,
             getUserData,
             getUserSessions,
             getUserSessionCount,
@@ -7412,9 +7750,11 @@ client.once(Events.ClientReady, async () => {
             sendDossierTranscript,
             setDossierReferent,
             setGuildLanguage,
+            setWeeklyPaymentStatus,
             updateDossierStatus,
             updateDossierTypeCategory,
             syncServiceState,
+            updateGuildPaySettings,
             updateGuildConfig,
             updateCustomEmbedRecord,
             updateModerationCaseReason,
@@ -7699,6 +8039,36 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
+        if (commandName === 'config-paie') {
+            if (!hasCommandRoleAccess(interaction.member)) {
+                return interaction.reply({
+                    content: getCommandRoleAccessDeniedMessage(language),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const hourlyRate = interaction.options.getNumber('montant')
+                ?? interaction.options.getNumber('hourly_rate');
+            const currency = interaction.options.getString('devise')
+                || interaction.options.getString('currency')
+                || DEFAULT_PAY_CURRENCY;
+            const settings = updateGuildPaySettings(guildId, hourlyRate, currency);
+
+            if (!settings) {
+                return interaction.reply({
+                    content: t(language, 'payRateInvalid'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            return interaction.reply({
+                content: t(language, 'paySettingsUpdated', {
+                    rate: formatPayAmount(settings.hourlyRate, settings.currency, language)
+                }),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
         if (commandName === 'config-voir') {
             if (!hasCommandRoleAccess(interaction.member)) {
                 return interaction.reply({
@@ -7711,6 +8081,22 @@ client.on(Events.InteractionCreate, async interaction => {
 
             return interaction.reply({
                 embeds: [embed],
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (commandName === 'paie-semaine') {
+            if (!hasCommandRoleAccess(interaction.member)) {
+                return interaction.reply({
+                    content: getCommandRoleAccessDeniedMessage(language),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            return interaction.reply({
+                embeds: [buildWeeklyPayrollEmbed(interaction.guild, interaction.user, {
+                    isReferenceServer: hasAdvancedAccess(interaction.member)
+                })],
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -8375,6 +8761,37 @@ client.on(Events.MessageCreate, async message => {
         removeCommandRole(guildId, role.id);
 
         return message.reply(t(language, 'commandRoleRemoved', { role }));
+    }
+
+    if (/^!(config-paie|payroll-config)\b/i.test(content)) {
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        const args = content.split(/\s+/);
+        const hourlyRate = args[1] ? args[1].replace(',', '.') : null;
+        const currency = args.slice(2).join(' ').trim() || DEFAULT_PAY_CURRENCY;
+        const settings = updateGuildPaySettings(guildId, hourlyRate, currency);
+
+        if (!settings) {
+            return message.reply(t(language, 'payRateInvalid'));
+        }
+
+        return message.reply(t(language, 'paySettingsUpdated', {
+            rate: formatPayAmount(settings.hourlyRate, settings.currency, language)
+        }));
+    }
+
+    if (/^!(paie-semaine|weekly-payroll)$/i.test(content)) {
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        return message.reply({
+            embeds: [buildWeeklyPayrollEmbed(message.guild, message.author, {
+                isReferenceServer: hasAdvancedAccess(message.member)
+            })]
+        });
     }
 
     if (content === '!diagnostic') {

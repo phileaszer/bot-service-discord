@@ -100,6 +100,7 @@ function dashboardErrorMessage(message) {
     'Invalid timeout duration.': 'Durée de timeout invalide. Exemple : 10m, 2h, 7d.',
     'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
+    'Invalid hourly rate.': 'Montant horaire invalide.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
@@ -117,6 +118,7 @@ function dashboardErrorMessage(message) {
     'Invalid Discord user ID.': 'Copie l’ID Discord numérique complet de la personne, pas son pseudo.',
     'Text channel not found.': 'Choisis un salon textuel accessible par Sentinel.',
     'Role not found.': 'Choisis un rôle Discord toujours présent sur le serveur.',
+    'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Sentinel embed not found.': 'Copie l’ID depuis la liste “Embeds gérés”. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
@@ -1031,6 +1033,170 @@ function premiumServiceRoadmap(state, premiumTag) {
   `;
 }
 
+function payrollCopy() {
+  const isEnglish = document.documentElement.lang === 'en';
+
+  return isEnglish
+    ? {
+        eyebrow: 'RP payroll',
+        title: 'Weekly pay tracking',
+        description: 'Set an hourly RP amount, check the current week, and mark who has already been paid.',
+        rateLabel: 'Hourly amount',
+        rateHelp: 'Amount used to calculate the estimated RP pay from completed sessions and current duty time.',
+        currencyLabel: 'Currency / unit',
+        currencyHelp: 'Short label displayed after the amount, for example $, €, credits, or SA$.',
+        update: 'Update pay settings',
+        summary: 'Weekly summary',
+        week: 'Current week',
+        agents: 'Agents',
+        totalHours: 'Total hours',
+        estimatedPay: 'Estimated pay',
+        toPay: 'To pay',
+        alreadyPaid: 'Already paid',
+        status: 'Status',
+        paid: 'Paid',
+        unpaid: 'To pay',
+        markPaid: 'Mark paid',
+        markUnpaid: 'Mark unpaid',
+        paidBy: 'Paid by',
+        empty: 'No service time recorded for the current week.',
+        note: 'This is an internal RP tracking tool. Sentinel does not process real payments.'
+      }
+    : {
+        eyebrow: 'Paie RP',
+        title: 'Suivi hebdomadaire des paiements',
+        description: 'Définis un montant horaire RP, consulte la semaine en cours et coche qui a déjà été payé.',
+        rateLabel: 'Montant par heure',
+        rateHelp: 'Montant utilisé pour calculer la paie RP estimée à partir des sessions terminées et du service en cours.',
+        currencyLabel: 'Devise / unité',
+        currencyHelp: 'Texte court affiché après le montant, par exemple $, €, crédits ou SA$.',
+        update: 'Mettre à jour la paie',
+        summary: 'Résumé semaine',
+        week: 'Semaine en cours',
+        agents: 'Agents',
+        totalHours: 'Heures totales',
+        estimatedPay: 'Paie estimée',
+        toPay: 'À payer',
+        alreadyPaid: 'Déjà payé',
+        status: 'État',
+        paid: 'Payé',
+        unpaid: 'À payer',
+        markPaid: 'Marquer payé',
+        markUnpaid: 'Remettre à payer',
+        paidBy: 'Payé par',
+        empty: 'Aucune heure de service enregistrée sur la semaine en cours.',
+        note: 'Ce suivi reste interne au RP. Sentinel ne traite aucun paiement réel.'
+      };
+}
+
+function payrollSummaryCards(payroll, copy) {
+  const cards = [
+    [copy.week, `${payroll.weekStart} → ${payroll.weekEnd}`],
+    [copy.agents, payroll.totals?.userCount || 0],
+    [copy.totalHours, payroll.totals?.totalTimeLabel || '0h 0min 0s'],
+    [copy.toPay, payroll.totals?.unpaidAmountLabel || `0 ${payroll.settings?.currency || '$'}`],
+    [copy.alreadyPaid, payroll.totals?.paidAmountLabel || `0 ${payroll.settings?.currency || '$'}`]
+  ];
+
+  return `
+    <div class="payroll-summary">
+      ${cards.map(([label, value]) => `
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function payrollTable(payroll, copy) {
+  const items = payroll.items || [];
+
+  if (items.length === 0) {
+    return `<p class="muted">${escapeHtml(copy.empty)}</p>`;
+  }
+
+  return `
+    <div class="table-shell payroll-table-shell">
+      <table class="dashboard-table payroll-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>${escapeHtml(copy.totalHours)}</th>
+            <th>${escapeHtml(copy.estimatedPay)}</th>
+            <th>${escapeHtml(copy.status)}</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => {
+            const nextPaid = item.paid ? 'false' : 'true';
+            return `
+              <tr>
+                <td><code>${escapeHtml(item.userId)}</code></td>
+                <td><strong>${escapeHtml(item.totalTimeLabel)}</strong></td>
+                <td><strong>${escapeHtml(item.amountLabel)}</strong></td>
+                <td>
+                  ${statusBadge(item.paid ? copy.paid : copy.unpaid, item.paid)}
+                  ${item.paidAt ? `<small>${escapeHtml(formatSessionDate(item.paidAt))}</small>` : ''}
+                  ${item.paidByUserId ? `<small>${escapeHtml(copy.paidBy)} : ${escapeHtml(item.paidByUserId)}</small>` : ''}
+                </td>
+                <td>
+                  <form class="table-action-form payroll-action-form" data-action-form="toggle-payroll-paid">
+                    <input type="hidden" name="userId" value="${escapeHtml(item.userId)}">
+                    <input type="hidden" name="weekStart" value="${escapeHtml(payroll.weekStart)}">
+                    <input type="hidden" name="paid" value="${nextPaid}">
+                    <button class="button button-small${item.paid ? ' button-ghost' : ''}" type="submit">${escapeHtml(item.paid ? copy.markUnpaid : copy.markPaid)}</button>
+                  </form>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderPayrollPanel(state) {
+  const payroll = state.payroll || {
+    weekStart: '',
+    weekEnd: '',
+    settings: { hourlyRate: 0, currency: '$' },
+    totals: {},
+    items: []
+  };
+  const copy = payrollCopy();
+
+  return `
+    <section class="dashboard-panel payroll-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">${escapeHtml(copy.eyebrow)}</p>
+          <h2>${escapeHtml(copy.title)}</h2>
+          <p class="muted">${escapeHtml(copy.description)}</p>
+        </div>
+        <span class="status-badge">${escapeHtml(payroll.totals?.unpaidCount || 0)} ${escapeHtml(copy.unpaid)}</span>
+      </div>
+      <div class="payroll-grid">
+        <form data-action-form="set-payroll-settings">
+          ${labelHelp(copy.rateLabel, copy.rateHelp)}
+          <input name="hourlyRate" type="number" min="0" step="0.01" value="${escapeHtml(payroll.settings?.hourlyRate || 0)}">
+          ${labelHelp(copy.currencyLabel, copy.currencyHelp)}
+          <input name="currency" maxlength="8" value="${escapeHtml(payroll.settings?.currency || '$')}">
+          <button class="button" type="submit">${escapeHtml(copy.update)}</button>
+        </form>
+        <article class="inline-form payroll-summary-card">
+          ${labelHelp(copy.summary, copy.note)}
+          ${payrollSummaryCards(payroll, copy)}
+        </article>
+      </div>
+      ${payrollTable(payroll, copy)}
+    </section>
+  `;
+}
+
 function renderServicePanel(state, premiumBadge, premiumTag) {
   return `
     <section class="dashboard-panel service-overview-panel" id="service">
@@ -1083,6 +1249,8 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         </article>
       </div>
     </section>
+
+    ${renderPayrollPanel(state)}
 
     <section class="dashboard-panel">
       <div class="panel-heading">
@@ -1480,6 +1648,8 @@ const AUDIT_ACTION_LABELS = {
   'set-service-role': 'Rôle de service',
   'set-log-channel': 'Salon de logs',
   'publish-service-panel': 'Panneau de service',
+  'set-payroll-settings': 'Réglage paie RP',
+  'toggle-payroll-paid': 'Paie RP',
   'publish-dossier-panel': 'Bureau d’accueil',
   'dossier-close': 'Dossier clôturé',
   'dossier-status': 'Statut dossier',

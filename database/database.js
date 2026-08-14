@@ -35,6 +35,24 @@ CREATE TABLE IF NOT EXISTS service_sessions (
     duration INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS guild_pay_settings (
+    guild_id TEXT PRIMARY KEY,
+    hourly_rate REAL NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT '$',
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS weekly_payments (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    paid INTEGER NOT NULL DEFAULT 0,
+    paid_by_user_id TEXT,
+    paid_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id, week_start)
+);
+
 CREATE TABLE IF NOT EXISTS guild_command_roles (
     guild_id TEXT,
     role_id TEXT,
@@ -185,6 +203,12 @@ ON service_sessions (guild_id, date);
 
 CREATE INDEX IF NOT EXISTS idx_service_sessions_guild_user_date
 ON service_sessions (guild_id, user_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_payments_guild_week
+ON weekly_payments (guild_id, week_start);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_payments_user_week
+ON weekly_payments (guild_id, user_id, week_start);
 
 CREATE INDEX IF NOT EXISTS idx_guild_command_roles_guild
 ON guild_command_roles (guild_id);

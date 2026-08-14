@@ -2142,6 +2142,7 @@ code {
 }
 
 .form-grid form,
+.payroll-grid form,
 .inline-form,
 .split-mini article {
   display: grid;
@@ -2897,6 +2898,54 @@ code {
   gap: 14px;
 }
 
+.payroll-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.payroll-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1.45fr);
+  gap: 14px;
+}
+
+.payroll-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.payroll-summary div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(234, 242, 255, 0.08);
+  background: rgba(5, 7, 12, 0.32);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+
+.payroll-summary span,
+.payroll-table small {
+  color: var(--muted);
+}
+
+.payroll-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.payroll-table {
+  min-width: 760px;
+}
+
+.payroll-table .status-badge {
+  margin-bottom: 6px;
+}
+
+.payroll-action-form .button-small {
+  min-width: 132px;
+}
+
 .personal-service-head {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -3109,6 +3158,10 @@ code {
   }
 
   .server-home-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payroll-grid {
     grid-template-columns: 1fr;
   }
 

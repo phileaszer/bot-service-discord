@@ -159,6 +159,10 @@ function sanitizeAuditDetails(body = {}) {
         'dossierId',
         'dossierStatus',
         'dossierType',
+        'weekStart',
+        'paid',
+        'hourlyRate',
+        'currency',
         'duration',
         'count',
         'deleteDays',
@@ -1190,6 +1194,9 @@ async function buildGuildState(ctx, guild, session = null) {
             ...user,
             totalTimeLabel: ctx.helpers.formatDuration(user.totalTime)
         })),
+        payroll: ctx.helpers.getWeeklyPayroll
+            ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language })
+            : null,
         personalService: viewerUserId
             ? {
                 userId: viewerUserId,
@@ -1836,6 +1843,36 @@ async function runDashboardAction(ctx, guild, member, body) {
             components: ctx.helpers.buildServicePanelComponents(language)
         });
         return `Panneau de service publie dans #${channel.name}.`;
+    }
+
+    if (action === 'set-payroll-settings') {
+        requireCommandAccess(ctx, member);
+
+        const hourlyRate = Number(body.hourlyRate);
+
+        if (!Number.isFinite(hourlyRate) || hourlyRate < 0) {
+            throw createHttpError(400, 'Invalid hourly rate.');
+        }
+
+        const settings = ctx.helpers.updateGuildPaySettings(guild.id, hourlyRate, body.currency || '$');
+
+        if (!settings) {
+            throw createHttpError(400, 'Invalid hourly rate.');
+        }
+
+        return `Paie RP mise a jour : ${settings.hourlyRate} ${settings.currency}/h.`;
+    }
+
+    if (action === 'toggle-payroll-paid') {
+        requireCommandAccess(ctx, member);
+
+        const userId = normalizeUserId(ctx, body.userId);
+        const paid = String(body.paid || '').toLowerCase() === 'true' || body.paid === true || body.paid === '1';
+        ctx.helpers.setWeeklyPaymentStatus(guild.id, userId, body.weekStart, paid, member?.id || null);
+
+        return paid
+            ? `Paie RP marquee comme payee pour ${userId}.`
+            : `Paie RP remise a payer pour ${userId}.`;
     }
 
     if (action === 'start-service') {

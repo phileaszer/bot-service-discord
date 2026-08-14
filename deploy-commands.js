@@ -89,6 +89,27 @@ const publicCommands = [
                 .setRequired(true)
         ),
 
+    command('config-paie', 'payroll-config', 'Configure le montant horaire de la paie RP.', 'Configures the hourly amount for RP payroll.')
+        .addNumberOption(option =>
+            option
+                .setName('montant')
+                .setNameLocalizations(en('hourly_rate'))
+                .setDescription('Montant RP par heure de service')
+                .setDescriptionLocalizations(en('RP amount per service hour'))
+                .setMinValue(0)
+                .setMaxValue(100000000)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('devise')
+                .setNameLocalizations(en('currency'))
+                .setDescription('Devise ou unite affichee, exemple $, SA$ ou credits')
+                .setDescriptionLocalizations(en('Displayed currency or unit, for example $, SA$, or credits'))
+                .setMaxLength(8)
+                .setRequired(false)
+        ),
+
     command('config-permissions', 'config-permissions', 'Configure les roles autorises a gerer le bot.', 'Configures roles allowed to manage the bot.')
         .addStringOption(option =>
             option
@@ -111,6 +132,8 @@ const publicCommands = [
         ),
 
     command('config-voir', 'config-view', 'Affiche la configuration de service du serveur.', 'Shows this server service configuration.'),
+
+    command('paie-semaine', 'weekly-payroll', 'Affiche la paie RP estimee de la semaine.', 'Shows this week estimated RP payroll.'),
 
     command('avertir', 'warn', 'Ajoute un avertissement a un membre.', 'Adds a warning to a member.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)

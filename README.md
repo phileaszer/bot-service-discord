@@ -15,6 +15,7 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 ## Ce que fait Sentinel
 
 - Suivi des services : prise et fin de service, temps total, historique personnel, agents en service et classements.
+- Paie RP hebdomadaire : montant par heure, calcul estimé et suivi payé/non payé depuis le dashboard.
 - Modération : avertissements, timeout, expulsion, ban par ID, purge et consultation des sanctions.
 - Dossiers Sentinel : système de tickets privés pour le support, les signalements, les recrutements, les partenariats et les autres demandes.
 - Annonces : création et modification d'embeds publiés sous l'identité de Sentinel.
@@ -30,6 +31,7 @@ Sentinel Gratuit reste utilisable sans abonnement :
 - heures personnelles ;
 - historique personnel limité ;
 - classement global limité au top 10 ;
+- paie RP hebdomadaire avec suivi payé/non payé ;
 - modération essentielle ;
 - consultation simple des sanctions ;
 - 2 embeds actifs, modifiables sans limite ;
@@ -43,6 +45,7 @@ Sentinel Gratuit reste utilisable sans abonnement :
 Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion plus avancée :
 
 - statistiques mensuelles et annuelles ;
+- rapports et exports de paie RP ;
 - exports CSV, Excel ou PDF ;
 - rapports automatiques ;
 - accès illimité aux embeds ;
@@ -76,6 +79,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-langue` | `/language` | Choisir la langue du serveur |
 | `/config-role` | `/config-role` | Définir le rôle de service |
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
+| `/config-paie` | `/payroll-config` | Définir le montant horaire de la paie RP |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
 | `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
@@ -84,6 +88,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/mes-heures` | `/my-hours` | Voir ses heures |
 | `/en-service` | `/on-duty` | Voir les agents en service |
 | `/top-service` | `/top-service` | Voir le classement global |
+| `/paie-semaine` | `/weekly-payroll` | Voir la paie RP de la semaine |
 | `/reset-heures` | `/reset-hours` | Remettre les heures d'une personne à zéro |
 | `/avertir` | `/warn` | Ajouter un avertissement |
 | `/timeout` | `/timeout` | Mettre un membre en timeout |
@@ -127,6 +132,7 @@ Useful links:
 Main features:
 
 - duty panel, personal hours, active staff and leaderboards;
+- weekly RP payroll with estimated amounts and paid/unpaid tracking;
 - moderation commands: warn, timeout, kick, ban by ID, clear and cases;
 - private tickets, called Sentinel dossiers in the French interface;
 - announcement embeds, with unlimited access planned for Premium;
