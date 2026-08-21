@@ -18,6 +18,7 @@ yarn-error.log*
 pnpm-debug.log*
 outputs/
 railway-backups/
+docs/backup-restore.md
 .codex-remote-attachments/
 scripts/
 PREMIUM_ROADMAP.md
