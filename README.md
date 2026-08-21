@@ -111,8 +111,6 @@ Les données nécessaires au fonctionnement sont décrites dans la Politique de 
 
 Les informations d'exploitation du bot restent privées. Les fichiers `.env`, bases de données, logs et sauvegardes locales ne doivent jamais être publiés.
 
-Une procédure interne de sauvegarde et de restauration SQLite est disponible dans `docs/backup-restore.md`.
-
 ## Licence
 
 Sentinel est un projet propriétaire. Le dépôt est consultable publiquement pour présenter le bot et suivre son évolution, mais le code ne peut pas être copié, redistribué ou réutilisé sans autorisation préalable.
@@ -145,7 +143,5 @@ Main features:
 For setup, invite Sentinel, choose the server language, configure the duty role, configure the log channel, add authorized roles, then publish the duty panel or the ticket panel. Ticket responsible roles can be configured from the dashboard.
 
 This repository is public for presentation and project tracking. The code is not released under an open-source license: copying, redistributing or reusing the bot requires prior permission.
-
-An internal SQLite backup and restore procedure is available in `docs/backup-restore.md`.
 
 Never publish `.env` or any Discord token.

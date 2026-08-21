@@ -1967,16 +1967,7 @@ async function handleApi(req, res, ctx, url) {
             status: {
                 botOnline: Boolean(ctx.client?.isReady?.()),
                 dashboardOnline: true,
-                botPing: Number.isFinite(ctx.client?.ws?.ping) ? Math.round(ctx.client.ws.ping) : null,
-                startedAt: dashboardStartedAt,
-                uptimeSeconds: Math.floor(process.uptime()),
                 guildCount: ctx.client?.guilds?.cache?.size || 0,
-                lastUpdate: dashboardStartedAt,
-                lastCheck: new Date().toISOString(),
-                build: ctx.build || null,
-                backup: ctx.helpers.getDatabaseBackupStatus?.() || null,
-                sync: ctx.helpers.getSentinelSyncStatus?.() || null,
-                slashCommands: ctx.helpers.getSlashCommandStatus?.() || null,
                 incidents,
                 maintenance
             }

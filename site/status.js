@@ -11,17 +11,6 @@
 
   const copy = {
     fr: {
-      backupDisabled: 'Désactivée',
-      backupDisabledDetail: 'Les sauvegardes automatiques ne sont pas activées.',
-      backupDetail: (count, keep) => `${count} sauvegarde(s) conservée(s), limite actuelle : ${keep}.`,
-      backupUnavailable: 'Aucune sauvegarde trouvée',
-      slashDetail: (globalCount, guildCount) => `Globales : ${globalCount}. Avancées : ${guildCount}.`,
-      slashDetailNoGuild: (globalCount) => `Globales : ${globalCount}. Commandes avancées non vérifiées.`,
-      slashError: 'À vérifier',
-      slashOk: 'OK',
-      syncDone: (created, updated) => `${created} création(s), ${updated} mise(s) à jour.`,
-      syncSkipped: (reason) => `Ignorée : ${reason}.`,
-      syncUnavailable: 'Pas encore lancée',
       unavailable: 'Indisponible',
       checking: 'En attente',
       botOnline: 'En ligne',
@@ -29,7 +18,6 @@
       dashboardOnline: 'En ligne',
       dashboardOffline: 'Indisponible',
       discordActive: 'Connexion Discord active.',
-      discordActiveWithPing: (ping) => `Connexion Discord active. Ping : ${ping} ms.`,
       dashboardAccessible: 'Dashboard accessible.',
       statusReadFailed: 'Impossible de lire le statut en direct.',
       dashboardReadFailed: 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.',
@@ -44,17 +32,6 @@
       premiumReady: 'Sentinel a atteint l’objectif communautaire. Le Premium peut être ouvert.'
     },
     en: {
-      backupDisabled: 'Disabled',
-      backupDisabledDetail: 'Automatic backups are not enabled.',
-      backupDetail: (count, keep) => `${count} backup(s) kept, current limit: ${keep}.`,
-      backupUnavailable: 'No backup found',
-      slashDetail: (globalCount, guildCount) => `Global: ${globalCount}. Advanced: ${guildCount}.`,
-      slashDetailNoGuild: (globalCount) => `Global: ${globalCount}. Advanced commands not checked.`,
-      slashError: 'Check needed',
-      slashOk: 'OK',
-      syncDone: (created, updated) => `${created} created, ${updated} updated.`,
-      syncSkipped: (reason) => `Skipped: ${reason}.`,
-      syncUnavailable: 'Not run yet',
       unavailable: 'Unavailable',
       checking: 'Waiting',
       botOnline: 'Online',
@@ -62,7 +39,6 @@
       dashboardOnline: 'Online',
       dashboardOffline: 'Unavailable',
       discordActive: 'Discord connection active.',
-      discordActiveWithPing: (ping) => `Discord connection active. Ping: ${ping} ms.`,
       dashboardAccessible: 'Dashboard accessible.',
       statusReadFailed: 'Unable to read the live status.',
       dashboardReadFailed: 'The page is open, but Sentinel is not responding to the status check.',
@@ -92,44 +68,6 @@
     if (element) {
       element.textContent = value;
     }
-  }
-
-  function formatDate(value) {
-    if (!value) {
-      return t('unavailable');
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return t('unavailable');
-    }
-
-    return new Intl.DateTimeFormat(document.documentElement.lang === 'en' ? 'en-US' : 'fr-FR', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }).format(date);
-  }
-
-  function formatUptime(seconds) {
-    const value = Number(seconds);
-
-    if (!Number.isFinite(value) || value < 0) {
-      return t('unavailable');
-    }
-
-    const days = Math.floor(value / 86400);
-    const hours = Math.floor((value % 86400) / 3600);
-    const minutes = Math.floor((value % 3600) / 60);
-
-    if (days > 0) {
-      return `${days}j ${hours}h`;
-    }
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}min`;
-    }
-
-    return `${minutes}min`;
   }
 
   function escapeHtml(value) {
@@ -197,66 +135,15 @@
     }
   }
 
-  function renderBackupStatus(backup = {}) {
-    if (!backup.enabled) {
-      setText('[data-status-backup]', t('backupDisabled'));
-      setText('[data-status-backup-detail]', t('backupDisabledDetail'));
-      return;
-    }
-
-    setText('[data-status-backup]', backup.latestAt ? formatDate(backup.latestAt) : t('backupUnavailable'));
-    setText('[data-status-backup-detail]', t('backupDetail', backup.count ?? 0, backup.keep ?? 0));
-  }
-
-  function renderSyncStatus(sync = {}) {
-    const result = sync.result || null;
-    setText('[data-status-sync]', sync.lastAt ? formatDate(sync.lastAt) : t('syncUnavailable'));
-
-    if (!result) {
-      setText('[data-status-sync-detail]', t('syncUnavailable'));
-      return;
-    }
-
-    setText('[data-status-sync-detail]', result.skipped
-      ? t('syncSkipped', result.reason || 'no change')
-      : t('syncDone', result.created ?? 0, result.updated ?? 0));
-  }
-
-  function renderSlashStatus(slash = {}) {
-    const ok = slash.status === 'ok';
-    setText('[data-status-slash]', ok ? t('slashOk') : t('slashError'));
-
-    if (!ok) {
-      setText('[data-status-slash-detail]', slash.error || t('unavailable'));
-      return;
-    }
-
-    const globalCount = slash.globalCount ?? 0;
-    const guildCount = slash.guildCount;
-    setText('[data-status-slash-detail]', Number.isFinite(Number(guildCount))
-      ? t('slashDetail', globalCount, guildCount)
-      : t('slashDetailNoGuild', globalCount));
-  }
-
   function renderStatus(status = {}) {
     setDot('bot', Boolean(status.botOnline));
     setDot('dashboard', Boolean(status.dashboardOnline));
     setText('[data-status-bot]', status.botOnline ? t('botOnline') : t('botOffline'));
     setText('[data-status-dashboard]', status.dashboardOnline ? t('dashboardOnline') : t('dashboardOffline'));
-    setText('[data-status-bot-detail]', status.botPing === null || status.botPing === undefined
-      ? t('discordActive')
-      : t('discordActiveWithPing', status.botPing));
+    setText('[data-status-bot-detail]', t('discordActive'));
     setText('[data-status-dashboard-detail]', t('dashboardAccessible'));
-    setText('[data-status-updated]', formatDate(status.lastUpdate || status.startedAt));
-    setText('[data-status-checked]', formatDate(status.lastCheck));
-    setText('[data-status-ping]', status.botPing === null || status.botPing === undefined ? t('unavailable') : `${status.botPing} ms`);
     setText('[data-status-guilds]', status.guildCount === null || status.guildCount === undefined ? t('unavailable') : String(status.guildCount));
     renderPremiumGoal(status.guildCount);
-    setText('[data-status-uptime]', formatUptime(status.uptimeSeconds));
-    setText('[data-status-build]', status.build || 'Sentinel');
-    renderBackupStatus(status.backup);
-    renderSyncStatus(status.sync);
-    renderSlashStatus(status.slashCommands);
     renderList('[data-status-incidents]', status.incidents, t('noIncidents'));
     renderList('[data-status-maintenance]', status.maintenance ? [status.maintenance] : [], t('noMaintenance'));
   }
@@ -283,18 +170,8 @@
       setText('[data-status-dashboard]', t('unavailable'));
       setText('[data-status-bot-detail]', t('statusReadFailed'));
       setText('[data-status-dashboard-detail]', t('dashboardReadFailed'));
-      setText('[data-status-updated]', t('unavailable'));
-      setText('[data-status-checked]', t('unavailable'));
-      setText('[data-status-ping]', t('unavailable'));
       setText('[data-status-guilds]', t('unavailable'));
       renderPremiumGoal(null);
-      setText('[data-status-uptime]', t('unavailable'));
-      setText('[data-status-backup]', t('unavailable'));
-      setText('[data-status-backup-detail]', t('unavailable'));
-      setText('[data-status-sync]', t('unavailable'));
-      setText('[data-status-sync-detail]', t('unavailable'));
-      setText('[data-status-slash]', t('unavailable'));
-      setText('[data-status-slash-detail]', t('unavailable'));
     } finally {
       statusRequestInFlight = false;
     }
