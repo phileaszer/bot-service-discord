@@ -943,6 +943,7 @@ function permissionCheck(id, label, ok, fix, detail = null) {
 function buildPermissionDiagnostics(ctx, guild, config) {
     const botMember = guild.members.me;
     const serviceRole = config.serviceRoleId ? guild.roles.cache.get(config.serviceRoleId) : null;
+    const autoRole = config.autoRoleId ? guild.roles.cache.get(config.autoRoleId) : null;
     const logChannel = config.logChannelId ? guild.channels.cache.get(config.logChannelId) : null;
     const botPermissions = botMember?.permissions;
     const logPermissions = logChannel && botMember ? logChannel.permissionsFor(botMember) : null;
@@ -952,6 +953,11 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         serviceRole
         && botMember
         && botMember.roles.highest.comparePositionTo(serviceRole) <= 0
+    );
+    const autoRoleTooHigh = Boolean(
+        autoRole
+        && botMember
+        && botMember.roles.highest.comparePositionTo(autoRole) <= 0
     );
     const logChannelWritable = !logChannel || Boolean(
         logPermissions?.has(PermissionsBitField.Flags.ViewChannel)
@@ -1001,6 +1007,12 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             'Ajoute la permission “Gérer les rôles” au rôle Sentinel.'
         ),
         permissionCheck(
+            'autoRole',
+            'Rôle automatique d’arrivée',
+            !config.autoRoleId || Boolean(autoRole),
+            'Choisis un rôle automatique valide, ou désactive cette option.'
+        ),
+        permissionCheck(
             'serviceRole',
             'Rôle de service configuré',
             Boolean(serviceRole),
@@ -1015,6 +1027,16 @@ function buildPermissionDiagnostics(ctx, guild, config) {
                 ? `Monte le rôle Sentinel au-dessus du rôle “${serviceRole.name}”.`
                 : null,
             detail: serviceRole ? `Rôle de service : ${serviceRole.name}` : null
+        },
+        {
+            id: 'autoRoleOrder',
+            label: 'Auto-rôle trop haut',
+            ok: !autoRoleTooHigh,
+            value: autoRoleTooHigh ? 'Oui' : 'Non',
+            fix: autoRoleTooHigh
+                ? `Monte le rôle Sentinel au-dessus du rôle “${autoRole.name}”.`
+                : null,
+            detail: autoRole ? `Rôle automatique : ${autoRole.name}` : null
         },
         permissionCheck(
             'logs',
@@ -1035,7 +1057,9 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         canAttachFiles: has(PermissionsBitField.Flags.AttachFiles),
         canManageRoles,
         serviceRoleTooHigh,
+        autoRoleTooHigh,
         canManageServiceRole: Boolean(serviceRole && canManageRoles && !serviceRoleTooHigh),
+        canManageAutoRole: Boolean(autoRole && canManageRoles && !autoRoleTooHigh),
         logChannelWritable,
         checks,
         fixes: checks.filter(item => !item.ok).map(item => item.fix)
@@ -1809,6 +1833,27 @@ async function runDashboardAction(ctx, guild, member, body) {
 
         ctx.helpers.updateGuildConfig(guild.id, { serviceRoleId: role.id });
         return `Role de service configure : ${role.name}.`;
+    }
+
+    if (action === 'set-auto-role') {
+        requireCommandAccess(ctx, member);
+        const role = guild.roles.cache.get(body.roleId);
+        const error = ctx.helpers.getAssignableRoleError
+            ? ctx.helpers.getAssignableRoleError(guild, role, language)
+            : null;
+
+        if (error) {
+            throw createHttpError(400, error);
+        }
+
+        ctx.helpers.updateGuildConfig(guild.id, { autoRoleId: role.id });
+        return `Role automatique d arrivee configure : ${role.name}.`;
+    }
+
+    if (action === 'disable-auto-role') {
+        requireCommandAccess(ctx, member);
+        ctx.helpers.updateGuildConfig(guild.id, { autoRoleId: null });
+        return 'Role automatique d arrivee desactive.';
     }
 
     if (action === 'set-log-channel') {

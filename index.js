@@ -97,7 +97,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-08-14-payroll-v1';
+const SENTINEL_BUILD = 'community-suite-2026-08-22-autorole-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -183,6 +183,13 @@ const I18N = {
         commandRoleAdded: '✅ {role} peut maintenant utiliser les commandes de gestion du bot.',
         commandRoleRemoved: '✅ {role} ne peut plus utiliser les commandes de gestion du bot.',
         serviceRoleSet: '✅ Le rôle de service a été configuré sur {role}.',
+        autoRoleSet: '✅ Le rôle automatique d’arrivée a été configuré sur {role}. Les nouveaux membres le recevront automatiquement.',
+        autoRoleDisabled: '✅ Le rôle automatique d’arrivée est désactivé sur ce serveur.',
+        autoRoleCurrent: 'Rôle automatique d’arrivée : {role}',
+        autoRoleNotManageable: '❌ Sentinel ne peut pas donner ce rôle. Vérifie que Sentinel a `Gérer les rôles` et que son rôle Discord est placé au-dessus de {role}.',
+        autoRoleManagedDenied: '❌ Ce rôle est géré par une intégration Discord et ne peut pas être donné automatiquement.',
+        autoRoleAssignedLog: '🛡️ Rôle automatique donné à {member} : {role}.',
+        autoRoleFailedLog: '⚠️ Impossible de donner le rôle automatique à {member} : {role}. Vérifie la permission `Gérer les rôles` et la hiérarchie des rôles.',
         invalidChannelId: '❌ ID de salon invalide.',
         channelNotText: '❌ Aucun salon textuel accessible ne correspond à cet ID.',
         logChannelSet: '✅ Le salon de logs a été configuré sur {channel}.',
@@ -327,6 +334,13 @@ const I18N = {
         commandRoleAdded: '✅ {role} can now use bot management commands.',
         commandRoleRemoved: '✅ {role} can no longer use bot management commands.',
         serviceRoleSet: '✅ The service role has been set to {role}.',
+        autoRoleSet: '✅ The join auto-role has been set to {role}. New members will receive it automatically.',
+        autoRoleDisabled: '✅ The join auto-role is disabled on this server.',
+        autoRoleCurrent: 'Join auto-role: {role}',
+        autoRoleNotManageable: '❌ Sentinel cannot assign this role. Make sure Sentinel has `Manage Roles` and its Discord role is above {role}.',
+        autoRoleManagedDenied: '❌ This role is managed by a Discord integration and cannot be assigned automatically.',
+        autoRoleAssignedLog: '🛡️ Auto-role assigned to {member}: {role}.',
+        autoRoleFailedLog: '⚠️ Could not assign the auto-role to {member}: {role}. Check `Manage Roles` and the role hierarchy.',
         invalidChannelId: '❌ Invalid channel ID.',
         channelNotText: '❌ No accessible text channel matches this ID.',
         logChannelSet: '✅ The log channel has been set to {channel}.',
@@ -496,6 +510,8 @@ function resolveCommandName(commandName) {
         'config-langue': 'config-langue',
         language: 'config-langue',
         'config-role': 'config-role',
+        'config-autorole': 'config-autorole',
+        'autorole-config': 'config-autorole',
         'config-logs': 'config-logs',
         'config-channel': 'config-logs',
         'config-paie': 'config-paie',
@@ -1070,6 +1086,7 @@ function mapGuildConfig(row) {
     return {
         serviceRoleId: row?.role_id || null,
         logChannelId: row?.log_channel_id || null,
+        autoRoleId: row?.auto_role_id || null,
         language: normalizeLanguage(row?.language)
     };
 }
@@ -1124,20 +1141,21 @@ function saveDiscordUserProfile(user, options = {}) {
 
 function getGuildConfig(guildId) {
     let row = db.prepare(`
-        SELECT role_id, log_channel_id, language
+        SELECT role_id, log_channel_id, auto_role_id, language
         FROM guild_configs
         WHERE guild_id = ?
     `).get(guildId);
 
     if (!row) {
         db.prepare(`
-            INSERT INTO guild_configs (guild_id, role_id, log_channel_id, language)
-            VALUES (?, NULL, NULL, 'fr')
+            INSERT INTO guild_configs (guild_id, role_id, log_channel_id, auto_role_id, language)
+            VALUES (?, NULL, NULL, NULL, 'fr')
         `).run(guildId);
 
         row = {
             role_id: null,
             log_channel_id: null,
+            auto_role_id: null,
             language: 'fr'
         };
     }
@@ -1154,6 +1172,9 @@ function updateGuildConfig(guildId, newConfig) {
         logChannelId: Object.prototype.hasOwnProperty.call(newConfig, 'logChannelId')
             ? newConfig.logChannelId
             : currentConfig.logChannelId,
+        autoRoleId: Object.prototype.hasOwnProperty.call(newConfig, 'autoRoleId')
+            ? newConfig.autoRoleId
+            : currentConfig.autoRoleId,
         language: Object.prototype.hasOwnProperty.call(newConfig, 'language')
             ? normalizeLanguage(newConfig.language)
             : currentConfig.language
@@ -1161,9 +1182,9 @@ function updateGuildConfig(guildId, newConfig) {
 
     db.prepare(`
         UPDATE guild_configs
-        SET role_id = ?, log_channel_id = ?, language = ?
+        SET role_id = ?, log_channel_id = ?, auto_role_id = ?, language = ?
         WHERE guild_id = ?
-    `).run(nextConfig.serviceRoleId, nextConfig.logChannelId, nextConfig.language, guildId);
+    `).run(nextConfig.serviceRoleId, nextConfig.logChannelId, nextConfig.autoRoleId, nextConfig.language, guildId);
 
     return nextConfig;
 }
@@ -3372,6 +3393,85 @@ function getServiceRole(guild) {
     return guild.roles.cache.get(guildConfig.serviceRoleId);
 }
 
+function getAutoRole(guild) {
+    const guildConfig = getGuildConfig(guild.id);
+
+    if (!guildConfig.autoRoleId) {
+        return null;
+    }
+
+    return guild.roles.cache.get(guildConfig.autoRoleId);
+}
+
+function getAssignableRoleError(guild, role, language = 'fr') {
+    if (!role) {
+        return t(language, 'adminRoleRequired');
+    }
+
+    if (role.id === guild.id) {
+        return t(language, 'everyoneDenied');
+    }
+
+    if (role.managed) {
+        return t(language, 'autoRoleManagedDenied');
+    }
+
+    const botMember = guild.members.me;
+    const canManageRoles = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ManageRoles));
+    const botRoleAbove = Boolean(botMember && botMember.roles.highest.comparePositionTo(role) > 0);
+
+    if (!canManageRoles || !botRoleAbove) {
+        return t(language, 'autoRoleNotManageable', { role });
+    }
+
+    return null;
+}
+
+async function assignConfiguredAutoRole(member) {
+    if (!member?.guild || member.user?.bot) {
+        return;
+    }
+
+    const guild = member.guild;
+    const language = getGuildLanguage(guild.id);
+    const guildConfig = getGuildConfig(guild.id);
+
+    if (!guildConfig.autoRoleId) {
+        return;
+    }
+
+    const role = guild.roles.cache.get(guildConfig.autoRoleId)
+        || await guild.roles.fetch(guildConfig.autoRoleId).catch(() => null);
+
+    if (!role) {
+        return;
+    }
+
+    const logChannel = getLogChannel(guild);
+    const error = getAssignableRoleError(guild, role, language);
+
+    if (error) {
+        if (logChannel) {
+            await logChannel.send(t(language, 'autoRoleFailedLog', { member, role })).catch(() => {});
+        }
+        return;
+    }
+
+    try {
+        await member.roles.add(role, 'Sentinel auto-role on member join');
+
+        if (logChannel) {
+            await logChannel.send(t(language, 'autoRoleAssignedLog', { member, role })).catch(() => {});
+        }
+    } catch (error) {
+        console.error('Erreur auto-role Sentinel :', error);
+
+        if (logChannel) {
+            await logChannel.send(t(language, 'autoRoleFailedLog', { member, role })).catch(() => {});
+        }
+    }
+}
+
 function buildMyHoursEmbed(user, userData) {
     if (!userData) {
         return createSentinelEmbed({
@@ -3500,6 +3600,7 @@ function buildConfigEmbed(guild, requester) {
     const registeredUserCount = getRegisteredUserCount(guild.id);
     const roleValue = guildConfig.serviceRoleId ? `<@&${guildConfig.serviceRoleId}>` : 'Non configuré';
     const logChannelValue = guildConfig.logChannelId ? `<#${guildConfig.logChannelId}>` : 'Non configuré';
+    const autoRoleValue = guildConfig.autoRoleId ? `<@&${guildConfig.autoRoleId}>` : 'Désactivé';
     const commandRolesValue = formatCommandRoleList(guild.id);
 
     return createSentinelEmbed({
@@ -3517,6 +3618,11 @@ function buildConfigEmbed(guild, requester) {
             {
                 name: 'Salon de logs',
                 value: logChannelValue,
+                inline: true
+            },
+            {
+                name: 'Rôle automatique d’arrivée',
+                value: autoRoleValue,
                 inline: true
             },
             {
@@ -3722,6 +3828,7 @@ function diagnosticLine(ok, label, detail = '') {
 async function buildDiagnosticEmbed(guild, requester) {
     const guildConfig = getGuildConfig(guild.id);
     const role = getServiceRole(guild);
+    const autoRole = getAutoRole(guild);
     const botMember = guild.members.me || await guild.members.fetch(client.user.id).catch(() => null);
     const logChannel = guildConfig.logChannelId
         ? await guild.channels.fetch(guildConfig.logChannelId).catch(() => null)
@@ -3744,6 +3851,11 @@ async function buildDiagnosticEmbed(guild, requester) {
         !role
         || (botMember && botMember.roles.highest.comparePositionTo(role) > 0)
     );
+    const autoRolePositionOk = Boolean(
+        !autoRole
+        || (botMember && botMember.roles.highest.comparePositionTo(autoRole) > 0)
+    );
+    const autoRoleOk = Boolean(!guildConfig.autoRoleId || (autoRole && botCanManageRoles && autoRolePositionOk));
     const logChannelOk = Boolean(logChannel?.isTextBased());
     const logCanSend = Boolean(
         logChannelOk
@@ -3757,6 +3869,7 @@ async function buildDiagnosticEmbed(guild, requester) {
         && role
         && botCanManageRoles
         && rolePositionOk
+        && autoRoleOk
         && !hasLogIssue
         && !hasConsistencyIssue;
 
@@ -3782,6 +3895,16 @@ async function buildDiagnosticEmbed(guild, requester) {
                     diagnosticLine(Boolean(role), 'Rôle configuré', role ? `${role}` : 'à configurer avec `/config-role`'),
                     diagnosticLine(botCanManageRoles, 'Permission Manage Roles du bot'),
                     diagnosticLine(rolePositionOk, 'Position du rôle du bot', rolePositionOk ? 'OK' : 'le rôle du bot doit être au-dessus du rôle de service')
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Rôle automatique d’arrivée',
+                value: [
+                    diagnosticLine(!guildConfig.autoRoleId || Boolean(autoRole), 'Rôle configuré', autoRole ? `${autoRole}` : 'désactivé ou rôle supprimé'),
+                    diagnosticLine(autoRoleOk, 'Attribution possible', autoRole
+                        ? (autoRolePositionOk ? 'OK' : 'le rôle Sentinel doit être au-dessus du rôle automatique')
+                        : 'optionnelle')
                 ].join('\n'),
                 inline: false
             },
@@ -4087,6 +4210,7 @@ function buildLegacyHelpEmbed(guild, requester) {
                 name: 'Server setup',
                 value: [
                     '`/config-role role:@role` sets the service role.',
+                    '`/autorole-config` sets or disables the role given automatically when a member joins.',
                     '`/config-channel channel_id:ID` sets the log channel.',
                     '`/config-view` shows the current configuration.',
                     '`/payroll-config hourly_rate:500 currency:$` sets the weekly RP payroll amount.',
@@ -4173,7 +4297,10 @@ function buildLegacyHelpEmbed(guild, requester) {
         '**2. Salon de logs**',
         'Active le mode developpeur Discord, clic droit sur le salon, copie son ID, puis lance `/config-logs salon_id:ID`.',
         '',
-        '**3. Verification**',
+        '**3. Rôle automatique d’arrivée**',
+        '`/config-autorole action:definir role:@role` donne un rôle aux nouveaux membres. Utilise `action:desactiver` pour le couper.',
+        '',
+        '**4. Verification**',
         '`/config-voir` affiche le role, le salon de logs et les roles autorises.'
     ];
     const panelSteps = [
@@ -4208,7 +4335,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             : '`/top-service` - top 10 du serveur',
         '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
         '`/config-paie`, `/paie-semaine` - regler et consulter la paie RP hebdomadaire',
-        '`/config-role`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration',
+        '`/config-role`, `/config-autorole`, `/config-logs`, `/config-permissions`, `/config-voir` - configuration',
         '`/embed creer` - publier une annonce sous l identite de Sentinel'
     ];
     const moderationUsage = [
@@ -4417,6 +4544,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         value: [
                             '`/language language:English` chooses English for this server.',
                             '`/config-role role:@role` sets the duty role.',
+                            '`/autorole-config` sets or disables the role given to new members automatically.',
                             '`/config-channel channel_id:ID` sets the log channel by ID.',
                             '`/config-view` shows what is configured.'
                         ].join('\n')
@@ -4543,6 +4671,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/payroll-config` sets the hourly RP amount.',
                             '`/weekly-payroll` shows who is paid or still to pay this week.',
+                            '`/autorole-config` manages the role given to new members.',
                             '`/embed create` sends an announcement as Sentinel.',
                             'Free servers can keep 2 active Sentinel embeds. Edits are unlimited.'
                         ].join('\n')
@@ -4561,6 +4690,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Free moderation',
                         value: [
                             '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
+                            '`/autorole-config` can give a role automatically when a member joins.',
                             '`/ban` can use a Discord ID when the user is no longer in the server.',
                             '`/mod-cases` shows a limited view of the latest cases.'
                         ].join('\n')
@@ -4725,6 +4855,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     value: [
                         '`/config-langue langue:Français` choisit la langue du serveur.',
                         '`/config-role role:@role` choisit le rôle donné en service.',
+                        '`/config-autorole action:definir role:@role` donne un rôle aux nouveaux membres automatiquement.',
                         '`/config-logs salon_id:ID` choisit le salon de logs par ID.',
                         '`/config-voir` affiche ce qui est configuré.'
                     ].join('\n')
@@ -4783,7 +4914,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     name: 'Ce que tu peux faire dessus',
                     value: [
                         'Choisir un serveur lié à ton compte Discord.',
-                        'Configurer la langue, le rôle de service, le salon de logs, le panneau de service, les embeds, les sanctions et l’historique.',
+                        'Configurer la langue, le rôle de service, l’auto-rôle, le salon de logs, le panneau de service, les embeds, les sanctions et l’historique.',
                         'Si un serveur demande une autorisation, invite d’abord Sentinel comme vrai bot.'
                     ].join('\n')
                     }
@@ -4851,6 +4982,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/config-paie` règle le montant horaire RP.',
                         '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
+                        '`/config-autorole` gère le rôle donné automatiquement aux nouveaux membres.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
                         `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
                     ].join('\n')
@@ -4869,6 +5001,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     name: 'Modération gratuite',
                     value: [
                         '`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`.',
+                        '`/config-autorole` peut donner un rôle automatiquement quand un membre rejoint.',
                         '`/bannir` peut utiliser un ID Discord si la personne n’est plus sur le serveur.',
                         '`/sanctions` affiche une vue simple des derniers cas.'
                     ].join('\n')
@@ -5185,6 +5318,16 @@ function mapDiscordAuditAction(interaction) {
 
     if (commandName === 'config-role') {
         return 'set-service-role';
+    }
+
+    if (commandName === 'config-autorole') {
+        const action = interaction.options.getString('action');
+
+        if (action === 'desactiver' || action === 'disable') {
+            return 'disable-auto-role';
+        }
+
+        return action === 'voir' || action === 'view' ? null : 'set-auto-role';
     }
 
     if (commandName === 'config-logs') {
@@ -7707,6 +7850,8 @@ client.once(Events.ClientReady, async () => {
             getDossierRoleIds,
             getGuildConfig,
             getGuildLanguage,
+            getAutoRole,
+            getAssignableRoleError,
             getDossierByChannel,
             getDossierPanelQuota,
             getDossierTypeSettings,
@@ -7819,6 +7964,10 @@ client.on(Events.GuildCreate, async guild => {
         embeds: [buildServerOnboardingEmbed(guild, client.user)],
         components: buildLanguageButtons('fr')
     }).catch(() => {});
+});
+
+client.on(Events.GuildMemberAdd, async member => {
+    await assignConfiguredAutoRole(member);
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -7999,6 +8148,57 @@ client.on(Events.InteractionCreate, async interaction => {
 
             return interaction.reply({
                 content: t(language, 'serviceRoleSet', { role }),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (commandName === 'config-autorole') {
+            if (!hasCommandRoleAccess(interaction.member)) {
+                return interaction.reply({
+                    content: getCommandRoleAccessDeniedMessage(language),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const action = interaction.options.getString('action') || 'voir';
+            const role = interaction.options.getRole('role');
+
+            if (['voir', 'view'].includes(action)) {
+                const config = getGuildConfig(guildId);
+                const currentRole = config.autoRoleId ? `<@&${config.autoRoleId}>` : 'Désactivé';
+
+                return interaction.reply({
+                    content: t(language, 'autoRoleCurrent', { role: currentRole }),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            if (['desactiver', 'disable'].includes(action)) {
+                updateGuildConfig(guildId, {
+                    autoRoleId: null
+                });
+
+                return interaction.reply({
+                    content: t(language, 'autoRoleDisabled'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const error = getAssignableRoleError(interaction.guild, role, language);
+
+            if (error) {
+                return interaction.reply({
+                    content: error,
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            updateGuildConfig(guildId, {
+                autoRoleId: role.id
+            });
+
+            return interaction.reply({
+                content: t(language, 'autoRoleSet', { role }),
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -8761,6 +8961,43 @@ client.on(Events.MessageCreate, async message => {
         removeCommandRole(guildId, role.id);
 
         return message.reply(t(language, 'commandRoleRemoved', { role }));
+    }
+
+    if (/^!(config-autorole|autorole-config)\b/i.test(content)) {
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        const args = content.split(/\s+/);
+        const action = (args[1] || 'voir').toLowerCase();
+
+        if (['voir', 'view', 'liste', 'list'].includes(action)) {
+            const config = getGuildConfig(guildId);
+            const currentRole = config.autoRoleId ? `<@&${config.autoRoleId}>` : 'Désactivé';
+
+            return message.reply(t(language, 'autoRoleCurrent', { role: currentRole }));
+        }
+
+        if (['off', 'disable', 'desactiver', 'désactiver', 'retirer', 'remove'].includes(action)) {
+            updateGuildConfig(guildId, {
+                autoRoleId: null
+            });
+
+            return message.reply(t(language, 'autoRoleDisabled'));
+        }
+
+        const role = message.mentions.roles.first();
+        const error = getAssignableRoleError(message.guild, role, language);
+
+        if (error) {
+            return message.reply(error);
+        }
+
+        updateGuildConfig(guildId, {
+            autoRoleId: role.id
+        });
+
+        return message.reply(t(language, 'autoRoleSet', { role }));
     }
 
     if (/^!(config-paie|payroll-config)\b/i.test(content)) {

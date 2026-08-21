@@ -79,6 +79,27 @@ const publicCommands = [
                 .setRequired(true)
         ),
 
+    command('config-autorole', 'autorole-config', 'Configure le role donne automatiquement aux nouveaux membres.', 'Configures the role automatically given to new members.')
+        .addStringOption(option =>
+            option
+                .setName('action')
+                .setDescription('Action a effectuer')
+                .setDescriptionLocalizations(en('Action to perform'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Definir le role', name_localizations: en('Set role'), value: 'definir' },
+                    { name: 'Desactiver', name_localizations: en('Disable'), value: 'desactiver' },
+                    { name: 'Voir le role', name_localizations: en('View role'), value: 'voir' }
+                )
+        )
+        .addRoleOption(option =>
+            option
+                .setName('role')
+                .setDescription('Role a donner automatiquement quand un membre rejoint')
+                .setDescriptionLocalizations(en('Role to automatically give when a member joins'))
+                .setRequired(false)
+        ),
+
     command('config-logs', 'config-channel', 'Definit le salon ou envoyer les logs de service.', 'Sets the channel used for service logs.')
         .addStringOption(option =>
             option

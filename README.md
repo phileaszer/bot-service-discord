@@ -16,7 +16,7 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 
 - Suivi des services : prise et fin de service, temps total, historique personnel, agents en service et classements.
 - Paie RP hebdomadaire : montant par heure, calcul estimé et suivi payé/non payé depuis le dashboard.
-- Modération : avertissements, timeout, expulsion, ban par ID, purge et consultation des sanctions.
+- Modération : rôle automatique à l'arrivée, avertissements, timeout, expulsion, ban par ID, purge et consultation des sanctions.
 - Dossiers Sentinel : système de tickets privés pour le support, les signalements, les recrutements, les partenariats et les autres demandes.
 - Annonces : création et modification d'embeds publiés sous l'identité de Sentinel.
 - Dashboard : configuration du serveur, actions rapides, audit, suivi des services, sanctions, dossiers et annonces.
@@ -33,6 +33,7 @@ Sentinel Gratuit reste utilisable sans abonnement :
 - classement global limité au top 10 ;
 - paie RP hebdomadaire avec suivi payé/non payé ;
 - modération essentielle ;
+- rôle automatique à l'arrivée des membres ;
 - consultation simple des sanctions ;
 - 2 embeds actifs, modifiables sans limite ;
 - 1 panneau de dossiers ;
@@ -78,6 +79,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/aide` | `/help` | Guide intégré du bot |
 | `/config-langue` | `/language` | Choisir la langue du serveur |
 | `/config-role` | `/config-role` | Définir le rôle de service |
+| `/config-autorole` | `/autorole-config` | Définir le rôle automatique d'arrivée |
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
 | `/config-paie` | `/payroll-config` | Définir le montant horaire de la paie RP |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
@@ -133,7 +135,7 @@ Main features:
 
 - duty panel, personal hours, active staff and leaderboards;
 - weekly RP payroll with estimated amounts and paid/unpaid tracking;
-- moderation commands: warn, timeout, kick, ban by ID, clear and cases;
+- moderation commands: join auto-role, warn, timeout, kick, ban by ID, clear and cases;
 - private tickets, called Sentinel dossiers in the French interface;
 - announcement embeds, with unlimited access planned for Premium;
 - web dashboard;

@@ -399,6 +399,7 @@ function commandRoles(state) {
 
 function dashboardConfigStatus(state) {
   const serviceRole = resolveRole(state, state.config.serviceRoleId);
+  const autoRole = resolveRole(state, state.config.autoRoleId);
   const logChannel = resolveChannel(state, state.config.logChannelId);
   const allowedRoles = commandRoles(state);
   const alerts = [];
@@ -425,6 +426,7 @@ function dashboardConfigStatus(state) {
 
   return {
     serviceRole,
+    autoRole,
     logChannel,
     allowedRoles,
     alerts,
@@ -456,6 +458,13 @@ function configStatusCards(state) {
       label: 'Rôle de service',
       value: status.serviceRole ? `@${status.serviceRole.name}` : 'Non configuré',
       ready: Boolean(status.serviceRole)
+    },
+    {
+      label: 'Rôle automatique',
+      value: state.config.autoRoleId
+        ? (status.autoRole ? `@${status.autoRole.name}` : 'Rôle supprimé sur Discord')
+        : 'Désactivé',
+      ready: !state.config.autoRoleId || Boolean(status.autoRole)
     },
     {
       label: 'Salon de logs',
@@ -1646,6 +1655,8 @@ function dossierList(state) {
 const AUDIT_ACTION_LABELS = {
   'set-language': 'Langue',
   'set-service-role': 'Rôle de service',
+  'set-auto-role': 'Rôle automatique',
+  'disable-auto-role': 'Rôle automatique',
   'set-log-channel': 'Salon de logs',
   'publish-service-panel': 'Panneau de service',
   'set-payroll-settings': 'Réglage paie RP',
@@ -2258,6 +2269,7 @@ function renderDashboard() {
 
   const state = currentState;
   const roleOptions = optionList(state.roles, state.config.serviceRoleId, 'Choisir un rôle');
+  const autoRoleOptions = optionList(state.roles, state.config.autoRoleId, 'Choisir un rôle automatique');
   const commandRoleOptions = optionList(state.roles, null, 'Choisir un rôle autorisé');
   const dossierRoleOptions = optionList(state.roles, null, 'Choisir un rôle responsable');
   const pingRoleOptions = optionList(state.roles, null, 'Aucun ping de rôle');
@@ -2381,6 +2393,17 @@ function renderDashboard() {
       </div>
       ${permissionDiagnosticsPanel(state)}
       <div class="form-grid module-form-grid">
+        <article class="inline-form moderation-note">
+          ${labelHelp('Rôle automatique d’arrivée', 'Donne automatiquement un rôle aux nouveaux membres qui rejoignent le serveur. Sentinel doit avoir Gérer les rôles et être placé au-dessus du rôle choisi.')}
+          <p class="muted">Actuel : ${state.config.autoRoleId ? escapeHtml(resolveRole(state, state.config.autoRoleId)?.name || 'rôle supprimé sur Discord') : 'désactivé'}</p>
+          <form data-action-form="set-auto-role">
+            <select name="roleId">${autoRoleOptions}</select>
+            <button class="button" type="submit">Configurer l’auto-rôle</button>
+          </form>
+          <form data-action-form="disable-auto-role">
+            <button class="button button-ghost" type="submit">Désactiver l’auto-rôle</button>
+          </form>
+        </article>
         <form data-action-form="warn">
           ${labelHelp('Avertir par ID', 'Ajoute un avertissement au dossier de modération d’un utilisateur et l’enregistre dans les logs.')}
           <input name="userId" placeholder="ID Discord" required>
