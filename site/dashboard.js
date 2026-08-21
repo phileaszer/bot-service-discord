@@ -101,6 +101,7 @@ function dashboardErrorMessage(message) {
     'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Invalid hourly rate.': 'Montant horaire invalide.',
+    'Invalid payroll adjustment.': 'Ajustement de paie invalide.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
@@ -119,6 +120,7 @@ function dashboardErrorMessage(message) {
     'Text channel not found.': 'Choisis un salon textuel accessible par Sentinel.',
     'Role not found.': 'Choisis un rôle Discord toujours présent sur le serveur.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
+    'Invalid payroll adjustment.': 'Indique un ID Discord, un type, un montant positif et une raison courte.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Sentinel embed not found.': 'Copie l’ID depuis la liste “Embeds gérés”. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
@@ -1049,16 +1051,40 @@ function payrollCopy() {
     ? {
         eyebrow: 'RP payroll',
         title: 'Weekly pay tracking',
-        description: 'Set an hourly RP amount, check the current week, and mark who has already been paid.',
+        description: 'Set the free hourly amount, review role rates, add Premium adjustments, and mark who has been paid.',
         rateLabel: 'Hourly amount',
         rateHelp: 'Amount used to calculate the estimated RP pay from completed sessions and current duty time.',
         currencyLabel: 'Currency / unit',
         currencyHelp: 'Short label displayed after the amount, for example $, €, credits, or SA$.',
         update: 'Update pay settings',
+        roleRates: 'Premium role rates',
+        roleRatesHelp: 'A member uses the highest configured rate among their current Discord roles. If no role matches, Sentinel uses the global rate.',
+        roleLabel: 'Discord role',
+        roleRateLabel: 'Role hourly amount',
+        setRoleRate: 'Save role rate',
+        removeRoleRate: 'Remove',
+        roleRatesEmpty: 'No specific role rate yet.',
+        adjustments: 'Premium adjustments',
+        adjustmentsHelp: 'Add a bonus, deduction, or correction for the current week without changing the recorded hours.',
+        userId: 'User ID',
+        type: 'Type',
+        bonus: 'Bonus',
+        deduction: 'Deduction',
+        correction: 'Correction',
+        amount: 'Amount',
+        reason: 'Reason',
+        addAdjustment: 'Add adjustment',
+        adjustmentsEmpty: 'No adjustment for this week.',
+        archive: 'Archive week',
+        archiveHelp: 'Saves a snapshot of the current week: hours, amounts, paid status, and adjustments.',
+        archiveButton: 'Archive this week',
         summary: 'Weekly summary',
         week: 'Current week',
         agents: 'Agents',
         totalHours: 'Total hours',
+        hourlyRate: 'Rate',
+        basePay: 'Base pay',
+        adjustmentTotal: 'Adjustments',
         estimatedPay: 'Estimated pay',
         toPay: 'To pay',
         alreadyPaid: 'Already paid',
@@ -1069,21 +1095,46 @@ function payrollCopy() {
         markUnpaid: 'Mark unpaid',
         paidBy: 'Paid by',
         empty: 'No service time recorded for the current week.',
-        note: 'This is an internal RP tracking tool. Sentinel does not process real payments.'
+        note: 'This is an internal RP tracking tool. Sentinel does not process real payments.',
+        premiumOnly: 'Premium option'
       }
     : {
         eyebrow: 'Paie RP',
         title: 'Suivi hebdomadaire des paiements',
-        description: 'Définis un montant horaire RP, consulte la semaine en cours et coche qui a déjà été payé.',
+        description: 'Règle le montant gratuit, consulte les taux par rôle, ajoute des ajustements Premium et coche qui a été payé.',
         rateLabel: 'Montant par heure',
         rateHelp: 'Montant utilisé pour calculer la paie RP estimée à partir des sessions terminées et du service en cours.',
         currencyLabel: 'Devise / unité',
         currencyHelp: 'Texte court affiché après le montant, par exemple $, €, crédits ou SA$.',
         update: 'Mettre à jour la paie',
+        roleRates: 'Taux par rôle Premium',
+        roleRatesHelp: 'Un membre utilise le meilleur taux configuré parmi ses rôles Discord actuels. Si aucun rôle ne correspond, Sentinel utilise le taux global.',
+        roleLabel: 'Rôle Discord',
+        roleRateLabel: 'Montant par heure du rôle',
+        setRoleRate: 'Enregistrer le taux',
+        removeRoleRate: 'Retirer',
+        roleRatesEmpty: 'Aucun taux spécifique configuré pour le moment.',
+        adjustments: 'Ajustements Premium',
+        adjustmentsHelp: 'Ajoute une prime, une retenue ou une correction sur la semaine en cours sans modifier les heures enregistrées.',
+        userId: 'ID utilisateur',
+        type: 'Type',
+        bonus: 'Prime',
+        deduction: 'Retenue',
+        correction: 'Correction',
+        amount: 'Montant',
+        reason: 'Raison',
+        addAdjustment: 'Ajouter l’ajustement',
+        adjustmentsEmpty: 'Aucun ajustement sur cette semaine.',
+        archive: 'Archiver la semaine',
+        archiveHelp: 'Enregistre une capture de la semaine : heures, montants, état payé/non payé et ajustements.',
+        archiveButton: 'Archiver cette semaine',
         summary: 'Résumé semaine',
         week: 'Semaine en cours',
         agents: 'Agents',
         totalHours: 'Heures totales',
+        hourlyRate: 'Taux',
+        basePay: 'Base',
+        adjustmentTotal: 'Ajustements',
         estimatedPay: 'Paie estimée',
         toPay: 'À payer',
         alreadyPaid: 'Déjà payé',
@@ -1094,7 +1145,8 @@ function payrollCopy() {
         markUnpaid: 'Remettre à payer',
         paidBy: 'Payé par',
         empty: 'Aucune heure de service enregistrée sur la semaine en cours.',
-        note: 'Ce suivi reste interne au RP. Sentinel ne traite aucun paiement réel.'
+        note: 'Ce suivi reste interne au RP. Sentinel ne traite aucun paiement réel.',
+        premiumOnly: 'Option Premium'
       };
 }
 
@@ -1103,6 +1155,8 @@ function payrollSummaryCards(payroll, copy) {
     [copy.week, `${payroll.weekStart} → ${payroll.weekEnd}`],
     [copy.agents, payroll.totals?.userCount || 0],
     [copy.totalHours, payroll.totals?.totalTimeLabel || '0h 0min 0s'],
+    [copy.estimatedPay, payroll.totals?.totalAmountLabel || `0 ${payroll.settings?.currency || '$'}`],
+    [copy.adjustmentTotal, payroll.totals?.adjustmentAmountLabel || `0 ${payroll.settings?.currency || '$'}`],
     [copy.toPay, payroll.totals?.unpaidAmountLabel || `0 ${payroll.settings?.currency || '$'}`],
     [copy.alreadyPaid, payroll.totals?.paidAmountLabel || `0 ${payroll.settings?.currency || '$'}`]
   ];
@@ -1133,6 +1187,9 @@ function payrollTable(payroll, copy) {
           <tr>
             <th>Agent</th>
             <th>${escapeHtml(copy.totalHours)}</th>
+            <th>${escapeHtml(copy.hourlyRate)}</th>
+            <th>${escapeHtml(copy.basePay)}</th>
+            <th>${escapeHtml(copy.adjustmentTotal)}</th>
             <th>${escapeHtml(copy.estimatedPay)}</th>
             <th>${escapeHtml(copy.status)}</th>
             <th>Action</th>
@@ -1145,6 +1202,15 @@ function payrollTable(payroll, copy) {
               <tr>
                 <td><code>${escapeHtml(item.userId)}</code></td>
                 <td><strong>${escapeHtml(item.totalTimeLabel)}</strong></td>
+                <td>
+                  <strong>${escapeHtml(item.hourlyRateLabel || '')}</strong>
+                  ${item.payrollRoleName ? `<small>${escapeHtml(item.payrollRoleName)}</small>` : ''}
+                </td>
+                <td>${escapeHtml(item.baseAmountLabel || item.amountLabel)}</td>
+                <td>
+                  <strong>${escapeHtml(item.adjustmentAmountLabel || `0 ${payroll.settings?.currency || '$'}`)}</strong>
+                  ${item.adjustments?.length ? `<small>${escapeHtml(item.adjustments.length)} ligne(s)</small>` : ''}
+                </td>
                 <td><strong>${escapeHtml(item.amountLabel)}</strong></td>
                 <td>
                   ${statusBadge(item.paid ? copy.paid : copy.unpaid, item.paid)}
@@ -1168,6 +1234,52 @@ function payrollTable(payroll, copy) {
   `;
 }
 
+function payrollRoleRatesList(payroll, copy) {
+  const items = payroll.roleSettings || [];
+
+  if (!items.length) {
+    return `<p class="muted">${escapeHtml(copy.roleRatesEmpty)}</p>`;
+  }
+
+  return `
+    <div class="compact-record-list payroll-role-rates">
+      ${items.map((item) => `
+        <article>
+          <div>
+            <strong>${escapeHtml(item.roleName || item.roleId)}</strong>
+            <small>${escapeHtml(item.hourlyRateLabel || item.hourlyRate)}</small>
+          </div>
+          <form class="table-action-form" data-action-form="remove-payroll-role-rate">
+            <input type="hidden" name="roleId" value="${escapeHtml(item.roleId)}">
+            <button class="button button-small button-ghost" type="submit">${escapeHtml(copy.removeRoleRate)}</button>
+          </form>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function payrollAdjustmentList(payroll, copy) {
+  const adjustments = payroll.adjustments || [];
+
+  if (!adjustments.length) {
+    return `<p class="muted">${escapeHtml(copy.adjustmentsEmpty)}</p>`;
+  }
+
+  return `
+    <div class="compact-record-list payroll-adjustments">
+      ${adjustments.slice(0, 8).map((item) => `
+        <article>
+          <div>
+            <strong><code>${escapeHtml(item.userId)}</code> ${escapeHtml(item.amountLabel || item.amount)}</strong>
+            <small>${escapeHtml(item.label || item.type)}${item.reason ? ` · ${escapeHtml(item.reason)}` : ''}</small>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderPayrollPanel(state) {
   const payroll = state.payroll || {
     weekStart: '',
@@ -1177,6 +1289,9 @@ function renderPayrollPanel(state) {
     items: []
   };
   const copy = payrollCopy();
+  const roleOptions = optionList(state.roles || [], null, copy.roleLabel);
+  const premiumDisabled = state.advanced ? '' : ' disabled';
+  const premiumHint = state.advanced ? '' : `<p class="premium-inline-note">${escapeHtml(copy.premiumOnly)}</p>`;
 
   return `
     <section class="dashboard-panel payroll-panel">
@@ -1201,6 +1316,38 @@ function renderPayrollPanel(state) {
           ${payrollSummaryCards(payroll, copy)}
         </article>
       </div>
+      <div class="payroll-grid payroll-premium-grid">
+        <article class="inline-form">
+          ${labelHelp(copy.roleRates, copy.roleRatesHelp, `<span class="premium-tag">${escapeHtml(copy.premiumOnly)}</span>`)}
+          <form data-action-form="set-payroll-role-rate">
+            <select name="roleId"${premiumDisabled}>${roleOptions}</select>
+            <input name="hourlyRate" type="number" min="0" step="0.01" placeholder="${escapeHtml(copy.roleRateLabel)}"${premiumDisabled}>
+            <button class="button" type="submit"${premiumDisabled}>${escapeHtml(copy.setRoleRate)}</button>
+          </form>
+          ${premiumHint}
+          ${payrollRoleRatesList(payroll, copy)}
+        </article>
+        <article class="inline-form">
+          ${labelHelp(copy.adjustments, copy.adjustmentsHelp, `<span class="premium-tag">${escapeHtml(copy.premiumOnly)}</span>`)}
+          <form data-action-form="add-payroll-adjustment">
+            <input name="userId" placeholder="${escapeHtml(copy.userId)}"${premiumDisabled}>
+            <select name="adjustmentType"${premiumDisabled}>
+              <option value="bonus">${escapeHtml(copy.bonus)}</option>
+              <option value="deduction">${escapeHtml(copy.deduction)}</option>
+              <option value="correction">${escapeHtml(copy.correction)}</option>
+            </select>
+            <input name="amount" type="number" min="0.01" step="0.01" placeholder="${escapeHtml(copy.amount)}"${premiumDisabled}>
+            <input name="reason" maxlength="240" placeholder="${escapeHtml(copy.reason)}"${premiumDisabled}>
+            <button class="button" type="submit"${premiumDisabled}>${escapeHtml(copy.addAdjustment)}</button>
+          </form>
+          ${premiumHint}
+          ${payrollAdjustmentList(payroll, copy)}
+        </article>
+      </div>
+      <form class="payroll-archive-form" data-action-form="archive-payroll">
+        ${labelHelp(copy.archive, copy.archiveHelp)}
+        <button class="button button-ghost" type="submit">${escapeHtml(copy.archiveButton)}</button>
+      </form>
       ${payrollTable(payroll, copy)}
     </section>
   `;
@@ -1660,6 +1807,10 @@ const AUDIT_ACTION_LABELS = {
   'set-log-channel': 'Salon de logs',
   'publish-service-panel': 'Panneau de service',
   'set-payroll-settings': 'Réglage paie RP',
+  'set-payroll-role-rate': 'Taux paie par rôle',
+  'remove-payroll-role-rate': 'Taux paie retiré',
+  'add-payroll-adjustment': 'Ajustement paie',
+  'archive-payroll': 'Archive paie',
   'toggle-payroll-paid': 'Paie RP',
   'publish-dossier-panel': 'Bureau d’accueil',
   'dossier-close': 'Dossier clôturé',

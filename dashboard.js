@@ -1219,7 +1219,7 @@ async function buildGuildState(ctx, guild, session = null) {
             totalTimeLabel: ctx.helpers.formatDuration(user.totalTime)
         })),
         payroll: ctx.helpers.getWeeklyPayroll
-            ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language })
+            ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language, guild })
             : null,
         personalService: viewerUserId
             ? {
@@ -1906,6 +1906,78 @@ async function runDashboardAction(ctx, guild, member, body) {
         }
 
         return `Paie RP mise a jour : ${settings.hourlyRate} ${settings.currency}/h.`;
+    }
+
+    if (action === 'set-payroll-role-rate') {
+        requireAdvanced(ctx, guild.id, member);
+        requireCommandAccess(ctx, member);
+
+        const role = guild.roles.cache.get(body.roleId);
+        const hourlyRate = Number(body.hourlyRate);
+
+        if (!role || role.id === guild.id) {
+            throw createHttpError(400, 'Role not found.');
+        }
+
+        if (!Number.isFinite(hourlyRate) || hourlyRate < 0) {
+            throw createHttpError(400, 'Invalid hourly rate.');
+        }
+
+        const roleSettings = ctx.helpers.updateGuildPayRoleSettings(guild.id, role.id, hourlyRate);
+
+        if (!roleSettings) {
+            throw createHttpError(400, 'Invalid hourly rate.');
+        }
+
+        return `Taux de paie configure pour ${role.name} : ${roleSettings.hourlyRate}/h.`;
+    }
+
+    if (action === 'remove-payroll-role-rate') {
+        requireAdvanced(ctx, guild.id, member);
+        requireCommandAccess(ctx, member);
+
+        const role = guild.roles.cache.get(body.roleId);
+
+        if (!role || role.id === guild.id) {
+            throw createHttpError(400, 'Role not found.');
+        }
+
+        ctx.helpers.removeGuildPayRoleSettings(guild.id, role.id);
+        return `Taux de paie specifique retire pour ${role.name}.`;
+    }
+
+    if (action === 'add-payroll-adjustment') {
+        requireAdvanced(ctx, guild.id, member);
+        requireCommandAccess(ctx, member);
+
+        const userId = normalizeUserId(ctx, body.userId);
+        const amount = Number(body.amount);
+        const adjustment = ctx.helpers.addWeeklyPayAdjustment(
+            guild.id,
+            userId,
+            body.weekStart || null,
+            body.adjustmentType || body.type,
+            amount,
+            body.reason || '',
+            member?.id || null
+        );
+
+        if (!adjustment) {
+            throw createHttpError(400, 'Invalid payroll adjustment.');
+        }
+
+        return `Ajustement de paie ajoute pour ${userId}.`;
+    }
+
+    if (action === 'archive-payroll') {
+        requireCommandAccess(ctx, member);
+
+        const archive = ctx.helpers.archiveWeeklyPayroll(guild.id, member?.id || null, {
+            guild,
+            language
+        });
+
+        return `Paie RP archivee pour ${archive.weekStart} - ${archive.weekEnd}.`;
     }
 
     if (action === 'toggle-payroll-paid') {

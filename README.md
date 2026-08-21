@@ -47,6 +47,7 @@ Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion pl
 
 - statistiques mensuelles et annuelles ;
 - rapports et exports de paie RP ;
+- taux de paie par rôle, primes, retenues et corrections ;
 - exports CSV, Excel ou PDF ;
 - rapports automatiques ;
 - accès illimité aux embeds ;
@@ -81,7 +82,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-role` | `/config-role` | Définir le rôle de service |
 | `/config-autorole` | `/autorole-config` | Définir le rôle automatique d'arrivée |
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
-| `/config-paie` | `/payroll-config` | Définir le montant horaire de la paie RP |
+| `/config-paie` | `/payroll-config` | Définir le montant horaire global de la paie RP |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
 | `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
@@ -91,6 +92,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/en-service` | `/on-duty` | Voir les agents en service |
 | `/top-service` | `/top-service` | Voir le classement global |
 | `/paie-semaine` | `/weekly-payroll` | Voir la paie RP de la semaine |
+| `/paie-archive` | `/payroll-archive` | Archiver la paie RP de la semaine |
 | `/reset-heures` | `/reset-hours` | Remettre les heures d'une personne à zéro |
 | `/avertir` | `/warn` | Ajouter un avertissement |
 | `/timeout` | `/timeout` | Mettre un membre en timeout |
@@ -100,6 +102,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/sanctions` | `/mod-cases` | Voir les sanctions récentes |
 | `/embed` | `/embed` | Gérer les annonces Sentinel |
 | `/dossier-panel` | `/ticket-panel` | Publier le panneau de tickets |
+| `/paie-ajustement` | `/payroll-adjustment` | Premium : ajouter une prime, une retenue ou une correction |
 
 La liste complète et les explications détaillées sont disponibles sur le site.
 

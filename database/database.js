@@ -54,6 +54,41 @@ CREATE TABLE IF NOT EXISTS weekly_payments (
     PRIMARY KEY (guild_id, user_id, week_start)
 );
 
+CREATE TABLE IF NOT EXISTS guild_pay_role_settings (
+    guild_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    hourly_rate REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+);
+
+CREATE TABLE IF NOT EXISTS weekly_pay_adjustments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount REAL NOT NULL,
+    reason TEXT,
+    created_by_user_id TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS weekly_payroll_archives (
+    guild_id TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    week_end TEXT NOT NULL,
+    archived_by_user_id TEXT,
+    archived_at TEXT NOT NULL,
+    user_count INTEGER NOT NULL DEFAULT 0,
+    total_time INTEGER NOT NULL DEFAULT 0,
+    total_amount REAL NOT NULL DEFAULT 0,
+    paid_amount REAL NOT NULL DEFAULT 0,
+    unpaid_amount REAL NOT NULL DEFAULT 0,
+    details_json TEXT NOT NULL,
+    PRIMARY KEY (guild_id, week_start)
+);
+
 CREATE TABLE IF NOT EXISTS guild_command_roles (
     guild_id TEXT,
     role_id TEXT,
@@ -210,6 +245,18 @@ ON weekly_payments (guild_id, week_start);
 
 CREATE INDEX IF NOT EXISTS idx_weekly_payments_user_week
 ON weekly_payments (guild_id, user_id, week_start);
+
+CREATE INDEX IF NOT EXISTS idx_pay_role_settings_guild
+ON guild_pay_role_settings (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_pay_adjustments_guild_week
+ON weekly_pay_adjustments (guild_id, week_start);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_pay_adjustments_user_week
+ON weekly_pay_adjustments (guild_id, user_id, week_start);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_payroll_archives_guild_week
+ON weekly_payroll_archives (guild_id, week_start);
 
 CREATE INDEX IF NOT EXISTS idx_guild_command_roles_guild
 ON guild_command_roles (guild_id);
