@@ -253,11 +253,10 @@ img {
 
 .theme-toggle {
   position: relative;
-  justify-content: flex-start;
-  min-width: 162px;
-  padding-inline: 44px 18px;
+  gap: 9px;
+  min-width: 178px;
+  padding-inline: 18px;
   color: var(--text);
-  text-align: left;
   border-color: rgba(205, 232, 255, 0.16);
   background:
     linear-gradient(135deg, rgba(23, 231, 255, 0.07), rgba(255, 45, 154, 0.05)),
@@ -268,16 +267,13 @@ img {
 }
 
 .theme-toggle::before {
-  position: absolute;
-  left: 16px;
-  top: 50%;
+  flex: 0 0 auto;
   width: 14px;
   height: 14px;
   content: "";
   border-radius: 50%;
   background: linear-gradient(135deg, var(--cyan), var(--pink));
   box-shadow: 0 0 14px rgba(23, 231, 255, 0.28);
-  transform: translateY(-50%);
 }
 
 .theme-toggle:hover {
@@ -347,6 +343,22 @@ img {
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
     rgba(10, 15, 23, 0.8);
   box-shadow: none;
+}
+
+.button.theme-toggle {
+  justify-content: center;
+  gap: 9px;
+  min-width: 178px;
+  padding-inline: 18px;
+  clip-path: none;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.button.theme-toggle::before {
+  position: static;
+  flex: 0 0 auto;
+  transform: none;
 }
 
 .button:disabled {
@@ -4080,14 +4092,13 @@ code {
 
   .theme-toggle {
     flex: 0 0 auto;
-    min-width: 148px;
+    min-width: 166px;
     min-height: 38px;
-    padding-inline: 40px 12px;
+    padding-inline: 13px;
     font-size: 0.78rem;
   }
 
   .theme-toggle::before {
-    left: 14px;
     width: 11px;
     height: 11px;
   }
@@ -4104,9 +4115,14 @@ code {
   }
 
   .header-actions .theme-toggle {
-    min-width: 148px;
-    padding-inline: 40px 12px;
+    min-width: 166px;
+    padding-inline: 13px;
     font-size: 0.78rem;
+  }
+
+  .header-actions .button.theme-toggle {
+    min-width: 166px;
+    padding-inline: 13px;
   }
 
   .guild-panel.is-open {
