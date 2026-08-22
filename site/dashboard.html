@@ -16,7 +16,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260822-2">
 </head>
 <body class="dashboard-body">
   <header class="site-header dashboard-header">
@@ -33,6 +33,7 @@
       <a href="statut.html">Statut</a>
     </nav>
     <div class="header-actions">
+      <button class="theme-toggle button button-small button-ghost" type="button" data-theme-toggle data-i18n-ignore="true" aria-label="Changer de style">Western</button>
       <button class="button button-small button-ghost" type="button" data-logout hidden>Déconnexion</button>
       <a class="button button-small button-ghost" href="https://bot-service-discord-production.up.railway.app/auth/login" data-login data-discord-login hidden>Connexion</a>
       <a class="button button-small" href="https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands" data-public-invite>Inviter Sentinel</a>
@@ -141,7 +142,7 @@
   </main>
 
   <div class="toast-stack" data-toasts></div>
-  <script src="theme.js?v=20260822-1"></script>
+  <script src="theme.js?v=20260822-2"></script>
   <script src="i18n.js?v=20260801-2"></script>
   <script src="auth.js?v=20260801-2"></script>
   <script src="dashboard.js?v=20260801-2"></script>

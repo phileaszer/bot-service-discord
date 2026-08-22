@@ -5,18 +5,16 @@
 
   const labels = {
     fr: {
-      group: 'Style du site',
-      sentinel: 'Sentinel',
-      western: 'Western',
-      sentinelTitle: 'Style Sentinel futuriste',
-      westernTitle: 'Style western RP'
+      actionWestern: 'Style Western',
+      actionSentinel: 'Style Sentinel',
+      currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
+      currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.'
     },
     en: {
-      group: 'Website style',
-      sentinel: 'Sentinel',
-      western: 'Western',
-      sentinelTitle: 'Futuristic Sentinel style',
-      westernTitle: 'Western RP style'
+      actionWestern: 'Western style',
+      actionSentinel: 'Sentinel style',
+      currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
+      currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.'
     }
   };
 
@@ -36,6 +34,14 @@
     }
   }
 
+  function writeTheme(theme) {
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch (error) {
+      // The style choice is only a local preference; the site still works without storage.
+    }
+  }
+
   function setThemeColor(theme) {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
@@ -50,84 +56,79 @@
     return nextTheme;
   }
 
-  function updateSwitch(theme = readTheme()) {
+  function updateButtons(theme = readTheme()) {
     const language = pageLanguage();
     const text = labels[language];
+    const isWestern = theme === WESTERN_THEME;
 
-    document.querySelectorAll('[data-theme-switch]').forEach((switcher) => {
-      switcher.setAttribute('aria-label', text.group);
-
-      switcher.querySelectorAll('[data-theme-choice]').forEach((button) => {
-        const choice = normalizeTheme(button.dataset.themeChoice);
-        const active = choice === theme;
-        button.classList.toggle('is-active', active);
-        button.setAttribute('aria-pressed', String(active));
-        button.title = choice === WESTERN_THEME ? text.westernTitle : text.sentinelTitle;
-        button.textContent = choice === WESTERN_THEME ? text.western : text.sentinel;
-      });
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      button.textContent = isWestern ? text.actionSentinel : text.actionWestern;
+      button.dataset.currentTheme = theme;
+      button.classList.toggle('is-western', isWestern);
+      button.setAttribute('aria-pressed', String(isWestern));
+      button.setAttribute('aria-label', isWestern ? text.currentWestern : text.currentSentinel);
+      button.title = isWestern ? text.currentWestern : text.currentSentinel;
     });
   }
 
   function saveTheme(theme) {
     const nextTheme = applyRootTheme(theme);
-
-    try {
-      localStorage.setItem(STORAGE_KEY, nextTheme);
-    } catch (error) {
-      // The visual theme is only a local preference; failing silently is fine.
-    }
-
-    updateSwitch(nextTheme);
+    writeTheme(nextTheme);
+    updateButtons(nextTheme);
     window.dispatchEvent(new CustomEvent('sentinel:site-theme-change', {
       detail: { theme: nextTheme }
     }));
   }
 
-  function renderSwitch() {
+  function toggleTheme() {
+    saveTheme(readTheme() === WESTERN_THEME ? DEFAULT_THEME : WESTERN_THEME);
+  }
+
+  function ensureButton() {
     const host = document.querySelector('.header-actions') || document.querySelector('.not-found');
 
-    if (!host || host.querySelector('[data-theme-switch]')) {
-      updateSwitch();
+    if (!host || host.querySelector('[data-theme-toggle]')) {
+      updateButtons();
       return;
     }
 
-    const switcher = document.createElement('div');
-    switcher.className = 'theme-switch';
-    switcher.dataset.themeSwitch = 'true';
-    switcher.dataset.i18nIgnore = 'true';
-    switcher.innerHTML = `
-      <button type="button" data-theme-choice="sentinel"></button>
-      <button type="button" data-theme-choice="western"></button>
-    `;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'theme-toggle button button-small button-ghost';
+    button.dataset.themeToggle = 'true';
+    button.dataset.i18nIgnore = 'true';
 
     const languageSwitch = host.querySelector('.language-switch');
     if (languageSwitch) {
-      languageSwitch.after(switcher);
+      languageSwitch.after(button);
     } else {
-      host.prepend(switcher);
+      host.prepend(button);
     }
 
-    switcher.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-theme-choice]');
-      if (!button) return;
-      saveTheme(button.dataset.themeChoice);
-    });
-
-    updateSwitch();
+    updateButtons();
   }
 
   applyRootTheme(readTheme());
 
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-theme-toggle]')) {
+      return;
+    }
+
+    toggleTheme();
+  });
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderSwitch);
+    document.addEventListener('DOMContentLoaded', ensureButton);
   } else {
-    renderSwitch();
+    ensureButton();
   }
 
-  window.addEventListener('sentinel:site-language-change', () => updateSwitch());
+  window.addEventListener('sentinel:site-language-change', () => updateButtons());
 
   window.SentinelTheme = {
     set: saveTheme,
+    toggle: toggleTheme,
     current: readTheme
   };
 })();

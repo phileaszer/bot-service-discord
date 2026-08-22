@@ -244,47 +244,56 @@ img {
   background: var(--accent-gradient);
 }
 
-.theme-switch {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(66px, auto));
-  gap: 3px;
-  min-height: 40px;
-  padding: 4px;
-  border: 1px solid rgba(205, 232, 255, 0.16);
-  border-radius: var(--radius);
+.theme-toggle {
+  position: relative;
+  min-width: 132px;
+  padding-inline: 36px 14px;
+  color: var(--text);
+  border-color: rgba(205, 232, 255, 0.16);
   background:
-    linear-gradient(135deg, rgba(23, 231, 255, 0.055), rgba(255, 45, 154, 0.045)),
+    linear-gradient(135deg, rgba(23, 231, 255, 0.07), rgba(255, 45, 154, 0.05)),
     rgba(7, 10, 16, 0.9);
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  box-shadow: none;
 }
 
-.theme-switch button {
-  display: inline-grid;
-  place-items: center;
-  min-height: 32px;
-  min-width: 52px;
-  padding: 0 9px;
-  color: var(--muted);
-  border: 0;
-  border-radius: var(--radius);
-  background: transparent;
-  cursor: pointer;
-  font-weight: 950;
-  font-size: 0.78rem;
-  white-space: nowrap;
+.theme-toggle::before {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  content: "";
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan), var(--pink));
+  box-shadow: 0 0 14px rgba(23, 231, 255, 0.28);
+  transform: translateY(-50%);
 }
 
-.theme-switch button.is-active {
-  color: #030509;
-  background: var(--accent-gradient);
+.theme-toggle:hover {
+  border-color: rgba(23, 231, 255, 0.42);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.12), rgba(255, 45, 154, 0.08)),
+    rgba(7, 10, 16, 0.95);
 }
 
-:root[data-theme="western"] .language-switch,
-:root[data-theme="western"] .theme-switch {
+:root[data-theme="western"] .language-switch {
   border-color: rgba(237, 199, 126, 0.2);
   background:
     linear-gradient(135deg, rgba(240, 190, 102, 0.1), rgba(132, 177, 100, 0.065)),
     rgba(18, 12, 7, 0.92);
+}
+
+:root[data-theme="western"] .theme-toggle {
+  color: var(--text);
+  border-color: rgba(237, 199, 126, 0.24);
+  background:
+    linear-gradient(135deg, rgba(240, 190, 102, 0.12), rgba(132, 177, 100, 0.07)),
+    rgba(18, 12, 7, 0.92);
+}
+
+:root[data-theme="western"] .theme-toggle::before {
+  background: linear-gradient(135deg, #f3c66f, #85b164);
+  box-shadow: 0 0 14px rgba(240, 190, 102, 0.24);
 }
 
 .button {
@@ -3526,16 +3535,17 @@ code {
     grid-template-columns: repeat(2, 34px);
   }
 
-  .theme-switch {
-    grid-template-columns: repeat(2, minmax(56px, 1fr));
+  .theme-toggle {
+    min-width: 118px;
     min-height: 38px;
+    padding-inline: 31px 10px;
+    font-size: 0.78rem;
   }
 
-  .theme-switch button {
-    min-width: 44px;
-    min-height: 30px;
-    padding: 0 7px;
-    font-size: 0.72rem;
+  .theme-toggle::before {
+    left: 11px;
+    width: 11px;
+    height: 11px;
   }
 
   .discord-profile-button {
@@ -3547,6 +3557,12 @@ code {
     min-height: 38px;
     padding: 0 10px;
     font-size: 0.8rem;
+  }
+
+  .header-actions .theme-toggle {
+    min-width: 118px;
+    padding-inline: 31px 10px;
+    font-size: 0.78rem;
   }
 
   .guild-panel.is-open {
