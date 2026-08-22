@@ -6,6 +6,15 @@
   <title>Sentinel | Page introuvable</title>
   <meta name="robots" content="noindex">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel';
+      } catch (error) {
+        document.documentElement.dataset.theme = 'sentinel';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,6 +37,7 @@
     <a class="button" href="index.html">Retour au site</a>
     <a class="action-link" href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a>
   </main>
+  <script src="theme.js"></script>
   <script src="i18n.js"></script>
   <script src="auth.js"></script>
 </body>

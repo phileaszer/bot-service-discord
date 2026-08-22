@@ -7,6 +7,15 @@
   <meta name="description" content="Sécurité, permissions et confidentialité de Sentinel.">
   <meta name="robots" content="index, follow">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel';
+      } catch (error) {
+        document.documentElement.dataset.theme = 'sentinel';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -161,6 +170,7 @@
     <span>Sentinel</span>
     <div><a href="https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md">Conditions</a><a href="https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md">Confidentialité</a><a href="installation.html">Installation</a><a href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a></div>
   </footer>
+  <script src="theme.js"></script>
   <script src="i18n.js"></script>
   <script src="auth.js"></script>
 </body>

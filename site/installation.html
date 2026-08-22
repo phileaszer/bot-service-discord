@@ -7,6 +7,15 @@
   <meta name="description" content="Installer et configurer Sentinel sur un serveur Discord.">
   <meta name="robots" content="index, follow">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel';
+      } catch (error) {
+        document.documentElement.dataset.theme = 'sentinel';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -159,6 +168,7 @@
     <span>Sentinel</span>
     <div><a href="fonctionnalites.html">Fonctionnalités</a><a href="commandes.html">Commandes</a><a href="securite.html">Sécurité</a><a href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a></div>
   </footer>
+  <script src="theme.js"></script>
   <script src="i18n.js"></script>
   <script src="auth.js"></script>
 </body>

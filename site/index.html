@@ -14,6 +14,15 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#05070c">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel';
+      } catch (error) {
+        document.documentElement.dataset.theme = 'sentinel';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -172,6 +181,7 @@
       <a href="https://github.com/phileaszer/bot-service-discord">GitHub</a>
     </div>
   </footer>
+  <script src="theme.js"></script>
   <script src="i18n.js"></script>
   <script src="auth.js"></script>
 </body>

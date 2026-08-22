@@ -7,6 +7,15 @@
   <meta name="description" content="État du bot Sentinel, du dashboard, des maintenances et incidents connus.">
   <meta name="robots" content="index, follow">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel';
+      } catch (error) {
+        document.documentElement.dataset.theme = 'sentinel';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -98,6 +107,7 @@
     <span>Sentinel</span>
     <div><a href="pourquoi.html">Pourquoi Sentinel ?</a><a href="installation.html">Installation</a><a href="https://discord.gg/jzPqcUdVns" target="_blank" rel="noopener noreferrer">Serveur support</a></div>
   </footer>
+  <script src="theme.js"></script>
   <script src="i18n.js"></script>
   <script src="auth.js"></script>
   <script src="status.js"></script>

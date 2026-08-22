@@ -7,6 +7,15 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#05070c">
   <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel';
+      } catch (error) {
+        document.documentElement.dataset.theme = 'sentinel';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dashboard-body">
@@ -132,6 +141,7 @@
   </main>
 
   <div class="toast-stack" data-toasts></div>
+  <script src="theme.js?v=20260822-1"></script>
   <script src="i18n.js?v=20260801-2"></script>
   <script src="auth.js?v=20260801-2"></script>
   <script src="dashboard.js?v=20260801-2"></script>
