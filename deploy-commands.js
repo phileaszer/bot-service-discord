@@ -222,6 +222,40 @@ const publicCommands = [
 
     command('paie-archive', 'payroll-archive', 'Archive la paie RP de la semaine en cours.', 'Archives this week RP payroll.'),
 
+    command('paie-marquer', 'payroll-mark', 'Marque une paie hebdomadaire comme payee ou non payee.', 'Marks a weekly payroll line as paid or unpaid.')
+        .addBooleanOption(option =>
+            option
+                .setName('paye')
+                .setNameLocalizations(en('paid'))
+                .setDescription('Etat de paiement a appliquer')
+                .setDescriptionLocalizations(en('Payment status to apply'))
+                .setRequired(true)
+        )
+        .addUserOption(option =>
+            option
+                .setName('membre')
+                .setNameLocalizations(en('member'))
+                .setDescription('Membre present a marquer')
+                .setDescriptionLocalizations(en('Current member to mark'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si la personne a quitte le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the user left the server'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('semaine')
+                .setNameLocalizations(en('week'))
+                .setDescription('Lundi de la semaine, format AAAA-MM-JJ. Vide = semaine actuelle')
+                .setDescriptionLocalizations(en('Week Monday, YYYY-MM-DD format. Empty = current week'))
+                .setRequired(false)
+        ),
+
     command('avertir', 'warn', 'Ajoute un avertissement a un membre.', 'Adds a warning to a member.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
         .addUserOption(option =>
@@ -550,6 +584,45 @@ const publicCommands = [
                 .setDescriptionLocalizations(en('Channel where the reception panel will be published'))
                 .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                 .setRequired(false)
+        ),
+
+    command('dossier-roles', 'ticket-roles', 'Configure les roles responsables des dossiers Sentinel.', 'Configures Sentinel ticket manager roles.')
+        .addStringOption(option =>
+            option
+                .setName('action')
+                .setDescription('Action a effectuer')
+                .setDescriptionLocalizations(en('Action to perform'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Ajouter un role', name_localizations: en('Add a role'), value: 'ajouter' },
+                    { name: 'Retirer un role', name_localizations: en('Remove a role'), value: 'retirer' },
+                    { name: 'Voir les roles', name_localizations: en('View roles'), value: 'voir' }
+                )
+        )
+        .addRoleOption(option =>
+            option
+                .setName('role')
+                .setDescription('Role responsable a ajouter ou retirer')
+                .setDescriptionLocalizations(en('Manager role to add or remove'))
+                .setRequired(false)
+        ),
+
+    command('dossier-prendre', 'ticket-claim', 'Prend en charge le dossier Sentinel du salon actuel.', 'Takes over the Sentinel ticket in the current channel.'),
+
+    command('dossier-statut', 'ticket-status', 'Modifie le statut du dossier Sentinel du salon actuel.', 'Updates the current Sentinel ticket status.')
+        .addStringOption(option =>
+            option
+                .setName('statut')
+                .setNameLocalizations(en('status'))
+                .setDescription('Nouveau statut du dossier')
+                .setDescriptionLocalizations(en('New ticket status'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Ouvert', name_localizations: en('Open'), value: 'open' },
+                    { name: 'En cours', name_localizations: en('In progress'), value: 'in_progress' },
+                    { name: 'En attente', name_localizations: en('Waiting'), value: 'waiting' },
+                    { name: 'Resolu', name_localizations: en('Resolved'), value: 'resolved' }
+                )
         ),
 
     command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the Sentinel ticket in the current channel.'),

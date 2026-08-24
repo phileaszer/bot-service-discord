@@ -204,6 +204,12 @@ const I18N = {
         payAdjustmentInvalid: '❌ Ajustement invalide. Indique un membre, un type, un montant positif et une raison courte.',
         payAdjustmentAdded: '✅ Ajustement ajouté pour {member} : **{amount}** ({type}).',
         payrollArchived: '✅ Paie RP archivée pour la semaine **{weekStart} → {weekEnd}**. Total : **{amount}**.',
+        payrollWeekInvalid: '❌ Semaine invalide. Utilise le format `AAAA-MM-JJ`, par exemple `2026-08-17`.',
+        payrollMarkTargetRequired: '❌ Choisis un membre ou indique son ID Discord pour marquer la paie.',
+        payrollMarkNoLine: '❌ Aucune ligne de paie trouvée pour {target} sur cette semaine.',
+        payrollMarked: '✅ Paie de {target} marquée **{status}** pour la semaine **{weekStart} → {weekEnd}**. Montant : **{amount}**.',
+        payrollPaidStatus: 'payée',
+        payrollUnpaidStatus: 'non payée',
         payrollEmpty: '📄 Aucune heure de service enregistrée sur la semaine en cours.',
         pingOk: '🏓 Pong ! SQLite OK. Latence Discord : **{ping}ms**',
         pingDbError: '❌ Le bot répond, mais SQLite ne répond pas correctement.',
@@ -315,6 +321,10 @@ const I18N = {
         dossierStatusDenied: 'Tu dois avoir un rôle autorisé pour modifier le statut du dossier.',
         dossierStatusPremiumOnly: '⭐ Les options Premium des dossiers concernent surtout les volumes, les formulaires, les priorités et les automatisations.',
         dossierStatusUpdated: 'Statut du dossier mis à jour : **{status}**.',
+        dossierRoleAdded: '✅ {role} peut maintenant prendre en charge et gérer les dossiers Sentinel.',
+        dossierRoleRemoved: '✅ {role} ne peut plus prendre en charge les dossiers Sentinel.',
+        dossierRoleList: 'Rôles de dossiers Sentinel :\n{roles}',
+        dossierRoleListEmpty: 'Aucun rôle de dossiers configuré. Les rôles autorisés à gérer Sentinel et les membres avec les permissions Discord adaptées peuvent gérer les dossiers.',
         dossierAddDone: '✅ {member} a été ajouté comme intervenant du dossier.',
         dossierRemoveDone: '✅ {member} a été retiré du dossier.',
         dossierCommandOutside: '❌ Cette commande doit être utilisée dans un salon de dossier Sentinel.',
@@ -360,6 +370,12 @@ const I18N = {
         payAdjustmentInvalid: '❌ Invalid adjustment. Provide a member, type, positive amount, and short reason.',
         payAdjustmentAdded: '✅ Adjustment added for {member}: **{amount}** ({type}).',
         payrollArchived: '✅ RP payroll archived for **{weekStart} → {weekEnd}**. Total: **{amount}**.',
+        payrollWeekInvalid: '❌ Invalid week. Use the `YYYY-MM-DD` format, for example `2026-08-17`.',
+        payrollMarkTargetRequired: '❌ Choose a member or provide their Discord ID to mark payroll.',
+        payrollMarkNoLine: '❌ No payroll line found for {target} this week.',
+        payrollMarked: '✅ Payroll for {target} marked **{status}** for **{weekStart} → {weekEnd}**. Amount: **{amount}**.',
+        payrollPaidStatus: 'paid',
+        payrollUnpaidStatus: 'unpaid',
         payrollEmpty: '📄 No service time recorded for the current week.',
         pingOk: '🏓 Pong! SQLite OK. Discord latency: **{ping}ms**',
         pingDbError: '❌ The bot is responding, but SQLite is not responding correctly.',
@@ -471,6 +487,10 @@ const I18N = {
         dossierStatusDenied: 'You need an authorized role to update this dossier status.',
         dossierStatusPremiumOnly: '⭐ Premium dossier options mainly cover volume, forms, priorities, and automations.',
         dossierStatusUpdated: 'Dossier status updated: **{status}**.',
+        dossierRoleAdded: '✅ {role} can now take over and manage Sentinel dossiers.',
+        dossierRoleRemoved: '✅ {role} can no longer take over Sentinel dossiers.',
+        dossierRoleList: 'Sentinel dossier roles:\n{roles}',
+        dossierRoleListEmpty: 'No dossier role configured. Roles allowed to manage Sentinel and members with suitable Discord permissions can manage dossiers.',
         dossierAddDone: '✅ {member} has been added as a dossier participant.',
         dossierRemoveDone: '✅ {member} has been removed from this dossier.',
         dossierCommandOutside: '❌ This command must be used inside a Sentinel dossier channel.',
@@ -534,6 +554,8 @@ function resolveCommandName(commandName) {
         'payroll-adjustment': 'paie-ajustement',
         'paie-archive': 'paie-archive',
         'payroll-archive': 'paie-archive',
+        'paie-marquer': 'paie-marquer',
+        'payroll-mark': 'paie-marquer',
         'config-voir': 'config-voir',
         'config-view': 'config-voir',
         'mes-heures': 'mes-heures',
@@ -596,7 +618,13 @@ function resolveCommandName(commandName) {
         'dossier-retirer': 'dossier-retirer',
         'ticket-remove': 'dossier-retirer',
         'dossier-compte-rendu': 'dossier-compte-rendu',
-        'ticket-transcript': 'dossier-compte-rendu'
+        'ticket-transcript': 'dossier-compte-rendu',
+        'dossier-roles': 'dossier-roles',
+        'ticket-roles': 'dossier-roles',
+        'dossier-prendre': 'dossier-prendre',
+        'ticket-claim': 'dossier-prendre',
+        'dossier-statut': 'dossier-statut',
+        'ticket-status': 'dossier-statut'
     };
 
     return aliases[commandName] || commandName;
@@ -1318,6 +1346,16 @@ function hasCommandRoleAccess(member) {
 
 function getCommandRoleAccessDeniedMessage(language = 'fr') {
     return t(language, 'accessDenied');
+}
+
+function formatDossierRoleList(guildId, language = 'fr') {
+    const roleIds = getDossierRoleIds(guildId);
+
+    if (roleIds.length === 0) {
+        return t(language, 'dossierRoleListEmpty');
+    }
+
+    return roleIds.map(roleId => `<@&${roleId}>`).join('\n');
 }
 
 const DOSSIER_TYPES = {
@@ -4186,6 +4224,11 @@ async function buildDiagnosticEmbed(guild, requester) {
     }
 
     const botCanManageRoles = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ManageRoles));
+    const botCanModerate = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ModerateMembers));
+    const botCanKick = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.KickMembers));
+    const botCanBan = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.BanMembers));
+    const botCanManageMessages = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ManageMessages));
+    const botCanManageChannels = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ManageChannels));
     const rolePositionOk = Boolean(
         !role
         || (botMember && botMember.roles.highest.comparePositionTo(role) > 0)
@@ -4207,12 +4250,62 @@ async function buildDiagnosticEmbed(guild, requester) {
     const diagnosticOk = databaseOk
         && role
         && botCanManageRoles
+        && botCanModerate
+        && botCanKick
+        && botCanBan
+        && botCanManageMessages
+        && botCanManageChannels
         && rolePositionOk
         && autoRoleOk
         && !hasLogIssue
         && !hasConsistencyIssue;
+    const fixes = [];
 
-    return createSentinelEmbed({
+    if (!role) {
+        fixes.push('Configure le rôle de service avec `/config-role`.');
+    }
+
+    if (!botCanManageRoles) {
+        fixes.push('Ajoute `Gérer les rôles` au rôle Sentinel.');
+    }
+
+    if (!rolePositionOk) {
+        fixes.push('Monte le rôle Sentinel au-dessus du rôle de service.');
+    }
+
+    if (!autoRoleOk && autoRole) {
+        fixes.push('Monte le rôle Sentinel au-dessus du rôle automatique d’arrivée.');
+    }
+
+    if (!botCanModerate) {
+        fixes.push('Ajoute `Modérer les membres` pour les timeouts.');
+    }
+
+    if (!botCanKick) {
+        fixes.push('Ajoute `Expulser des membres` pour les expulsions.');
+    }
+
+    if (!botCanBan) {
+        fixes.push('Ajoute `Bannir des membres` pour les bans et unbans.');
+    }
+
+    if (!botCanManageMessages) {
+        fixes.push('Ajoute `Gérer les messages` pour `/purge`.');
+    }
+
+    if (!botCanManageChannels) {
+        fixes.push('Ajoute `Gérer les salons` pour les dossiers, lock et unlock.');
+    }
+
+    if (hasLogIssue) {
+        fixes.push('Vérifie le salon de logs : Sentinel doit le voir et y écrire.');
+    }
+
+    if (hasConsistencyIssue) {
+        fixes.push('Lance `/sync-service` pour réparer les incohérences de service.');
+    }
+
+    const embed = createSentinelEmbed({
         color: diagnosticOk ? SENTINEL_COLORS.success : SENTINEL_COLORS.warning,
         title: 'Sentinel | Diagnostic',
         description: `Contrôle technique de **${guild.name}**.`,
@@ -4257,6 +4350,24 @@ async function buildDiagnosticEmbed(guild, requester) {
                 inline: false
             },
             {
+                name: 'Modération',
+                value: [
+                    diagnosticLine(botCanModerate, 'Timeout / fin-timeout', botCanModerate ? 'OK' : 'ajoute `Modérer les membres`'),
+                    diagnosticLine(botCanKick, 'Expulsion', botCanKick ? 'OK' : 'ajoute `Expulser des membres`'),
+                    diagnosticLine(botCanBan, 'Ban et unban par ID', botCanBan ? 'OK' : 'ajoute `Bannir des membres`'),
+                    diagnosticLine(botCanManageMessages, 'Purge', botCanManageMessages ? 'OK' : 'ajoute `Gérer les messages`')
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Dossiers Sentinel',
+                value: [
+                    diagnosticLine(botCanManageChannels, 'Création et gestion des salons privés', botCanManageChannels ? 'OK' : 'ajoute `Gérer les salons`'),
+                    `Rôles responsables : ${formatDossierRoleList(guild.id)}`
+                ].join('\n'),
+                inline: false
+            },
+            {
                 name: 'Rôles autorisés',
                 value: formatCommandRoleList(guild.id),
                 inline: false
@@ -4273,6 +4384,16 @@ async function buildDiagnosticEmbed(guild, requester) {
                 inline: false
             }
         );
+
+    if (fixes.length > 0) {
+        embed.addFields({
+            name: 'Corrections conseillées',
+            value: fixes.slice(0, 8).map(item => `- ${item}`).join('\n'),
+            inline: false
+        });
+    }
+
+    return embed;
 }
 
 function buildSyncServiceEmbed(requester, result) {
@@ -4970,11 +5091,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Inside a dossier',
                         value: [
                             'Free servers can reply, add participants, generate a transcript, and close the dossier.',
+                            '`/ticket-roles action:add role:@role` gives a role access to dossier handling.',
+                            '`/ticket-claim` marks you as the dossier referent.',
+                            '`/ticket-status status:...` updates the visible status if the requester made a mistake or the situation changes.',
                             '`/close-ticket` closes the current dossier.',
                             '`/ticket-add member:@member` adds a participant.',
                             '`/ticket-remove member:@member` removes a participant.',
-                            '`/ticket-transcript` sends the transcript to the log channel when possible.',
-                            'Premium unlocks official assignment and advanced status tracking.'
+                            '`/ticket-transcript` sends the transcript to the log channel when possible.'
                         ].join('\n')
                     },
                     {
@@ -5012,6 +5135,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/payroll-config` sets the global hourly RP amount.',
                             '`/weekly-payroll` shows who is paid or still to pay this week.',
+                            '`/payroll-mark paid:true member:@member` marks a line as paid or unpaid.',
                             '`/payroll-archive` archives the current week payroll.',
                             '`/autorole-config` manages the role given to new members.',
                             '`/embed create` sends an announcement as Sentinel.',
@@ -5282,11 +5406,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Dans un dossier',
                         value: [
                             'En gratuit, le staff peut répondre, ajouter des intervenants, générer un compte rendu et clôturer le dossier.',
+                            '`/dossier-roles action:ajouter role:@rôle` donne accès à la gestion des dossiers.',
+                            '`/dossier-prendre` te marque comme référent du dossier.',
+                            '`/dossier-statut statut:...` corrige le statut visible si le demandeur s’est trompé ou si la situation change.',
                             '`/dossier-fermer` clôture le dossier actuel.',
                             '`/dossier-ajouter membre:@membre` ajoute un intervenant.',
                             '`/dossier-retirer membre:@membre` retire un intervenant.',
-                            '`/dossier-compte-rendu` envoie le compte rendu dans le salon de logs quand c’est possible.',
-                            'Premium débloque la prise en charge officielle et les statuts avancés.'
+                            '`/dossier-compte-rendu` envoie le compte rendu dans le salon de logs quand c’est possible.'
                         ].join('\n')
                     },
                     {
@@ -5324,6 +5450,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/config-paie` règle le montant horaire RP.',
                         '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
+                        '`/paie-marquer paye:true membre:@membre` marque une ligne comme payée ou non payée.',
                         '`/config-autorole` gère le rôle donné automatiquement aux nouveaux membres.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
                         `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
@@ -5699,6 +5826,10 @@ function mapDiscordAuditAction(interaction) {
         return 'archive-payroll';
     }
 
+    if (commandName === 'paie-marquer') {
+        return 'mark-payroll-status';
+    }
+
     if (commandName === 'config-permissions') {
         const action = interaction.options.getString('action');
 
@@ -5733,6 +5864,9 @@ function mapDiscordAuditAction(interaction) {
         unlock: 'unlock',
         slowmode: 'slowmode',
         'dossier-panel': 'publish-dossier-panel',
+        'dossier-roles': 'configure-dossier-roles',
+        'dossier-prendre': 'dossier-claim',
+        'dossier-statut': 'dossier-status',
         'dossier-fermer': 'dossier-close',
         'dossier-ajouter': 'dossier-add',
         'dossier-retirer': 'dossier-remove',
@@ -5753,8 +5887,8 @@ function getDiscordAuditTarget(interaction, action) {
         }
     }
 
-    const roleActions = new Set(['set-service-role', 'add-command-role', 'remove-command-role']);
-    const channelActions = new Set(['set-log-channel', 'publish-service-panel', 'publish-dossier-panel', 'dossier-close', 'dossier-transcript', 'purge', 'lock', 'unlock', 'slowmode']);
+    const roleActions = new Set(['set-service-role', 'add-command-role', 'remove-command-role', 'configure-dossier-roles']);
+    const channelActions = new Set(['set-log-channel', 'publish-service-panel', 'publish-dossier-panel', 'dossier-claim', 'dossier-status', 'dossier-close', 'dossier-transcript', 'purge', 'lock', 'unlock', 'slowmode']);
     const messageActions = new Set(['custom-embed-edit', 'custom-embed-delete']);
     const caseActions = new Set(['edit-case', 'delete-case', 'unwarn']);
 
@@ -5771,7 +5905,10 @@ function getDiscordAuditTarget(interaction, action) {
     }
 
     if (channelActions.has(action) || action?.startsWith('custom-embed-')) {
-        return { targetType: 'channel', targetId: getAuditOptionValue(interaction, ['salon', 'channel', 'salon_id', 'channel_id']) };
+        return {
+            targetType: 'channel',
+            targetId: getAuditOptionValue(interaction, ['salon', 'channel', 'salon_id', 'channel_id']) || interaction.channelId || interaction.channel?.id || null
+        };
     }
 
     const userId = getAuditOptionValue(interaction, ['membre', 'member', 'utilisateur', 'user', 'utilisateur_id', 'user_id']);
@@ -6817,7 +6954,10 @@ async function handleDossierInteraction(interaction, commandName, language) {
         'dossier-fermer',
         'dossier-ajouter',
         'dossier-retirer',
-        'dossier-compte-rendu'
+        'dossier-compte-rendu',
+        'dossier-roles',
+        'dossier-prendre',
+        'dossier-statut'
     ]);
 
     if (!dossierCommands.has(commandName)) {
@@ -6860,6 +7000,61 @@ async function handleDossierInteraction(interaction, commandName, language) {
         return true;
     }
 
+    if (commandName === 'dossier-roles') {
+        if (!hasCommandRoleAccess(interaction.member)) {
+            await interaction.reply({
+                content: getCommandRoleAccessDeniedMessage(language),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const action = interaction.options.getString('action') || 'voir';
+        const role = interaction.options.getRole('role');
+
+        if (action === 'voir' || action === 'view') {
+            await interaction.reply({
+                content: t(language, 'dossierRoleList', {
+                    roles: formatDossierRoleList(interaction.guild.id, language)
+                }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (!role) {
+            await interaction.reply({
+                content: t(language, 'adminRoleRequired'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (role.id === interaction.guild.id) {
+            await interaction.reply({
+                content: t(language, 'everyoneDenied'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (action === 'retirer' || action === 'remove') {
+            removeDossierRole(interaction.guild.id, role.id);
+            await interaction.reply({
+                content: t(language, 'dossierRoleRemoved', { role }),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        addDossierRole(interaction.guild.id, role.id);
+        await interaction.reply({
+            content: t(language, 'dossierRoleAdded', { role }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
     const channel = getDossierChannelFromInteraction(interaction);
 
     if (!channel) {
@@ -6883,6 +7078,46 @@ async function handleDossierInteraction(interaction, commandName, language) {
         const dossier = getDossierByChannel(interaction.guild.id, channel.id) || parseDossierChannelTopic(channel.topic);
         await sendDossierTranscript(channel, dossier, interaction.user, language);
         await interaction.editReply(t(language, 'dossierTranscriptDone'));
+        return true;
+    }
+
+    if (commandName === 'dossier-prendre') {
+        const dossier = setDossierReferent(interaction.guild.id, channel.id, interaction.user.id);
+        await channel.send(language === 'en'
+            ? `✅ ${interaction.user} is now the dossier referent.`
+            : `✅ ${interaction.user} prend ce dossier en charge.`
+        ).catch(() => {});
+        await sendSentinelStaffLog(interaction.guild, `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`);
+
+        await interaction.reply({
+            content: t(language, 'dossierClaimed', { member: interaction.user }),
+            flags: MessageFlags.Ephemeral
+        });
+        return true;
+    }
+
+    if (commandName === 'dossier-statut') {
+        const nextStatus = normalizeDossierStatus(
+            interaction.options.getString('statut') || interaction.options.getString('status')
+        );
+        const dossier = updateDossierStatus(interaction.guild.id, channel.id, nextStatus);
+        const label = getDossierStatusLabel(dossier?.status || nextStatus, language);
+
+        await channel.send(language === 'en'
+            ? `📌 ${interaction.user} updated the dossier status: **${label}**.`
+            : `📌 ${interaction.user} a mis à jour le statut du dossier : **${label}**.`
+        ).catch(() => {});
+        await sendSentinelStaffLog(
+            interaction.guild,
+            language === 'en'
+                ? `📌 Sentinel dossier #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
+                : `📌 Statut du dossier Sentinel #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
+        );
+
+        await interaction.reply({
+            content: t(language, 'dossierStatusUpdated', { status: label }),
+            flags: MessageFlags.Ephemeral
+        });
         return true;
     }
 
@@ -8750,6 +8985,69 @@ client.on(Events.InteractionCreate, async interaction => {
                     weekStart: archive.weekStart,
                     weekEnd: archive.weekEnd,
                     amount: archive.totals.totalAmountLabel
+                }),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (commandName === 'paie-marquer') {
+            if (!hasCommandRoleAccess(interaction.member)) {
+                return interaction.reply({
+                    content: getCommandRoleAccessDeniedMessage(language),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const member = interaction.options.getMember('membre');
+            const user = interaction.options.getUser('membre');
+            const userId = member?.id
+                || user?.id
+                || normalizeUserId(interaction.options.getString('utilisateur_id') || interaction.options.getString('user_id'));
+            const paid = interaction.options.getBoolean('paye')
+                ?? interaction.options.getBoolean('paid');
+            const requestedWeekStart = interaction.options.getString('semaine')
+                || interaction.options.getString('week')
+                || null;
+
+            if (!userId) {
+                return interaction.reply({
+                    content: t(language, 'payrollMarkTargetRequired'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            if (requestedWeekStart && !/^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart)) {
+                return interaction.reply({
+                    content: t(language, 'payrollWeekInvalid'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const range = getWeekRange(requestedWeekStart);
+            const payroll = getWeeklyPayroll(guildId, {
+                guild: interaction.guild,
+                language,
+                weekStart: range.weekStart
+            });
+            const line = payroll.items.find(item => item.userId === userId);
+            const targetLabel = member || user || `\`${userId}\``;
+
+            if (!line) {
+                return interaction.reply({
+                    content: t(language, 'payrollMarkNoLine', { target: targetLabel }),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            setWeeklyPaymentStatus(guildId, userId, range.weekStart, paid, interaction.user.id);
+
+            return interaction.reply({
+                content: t(language, 'payrollMarked', {
+                    target: targetLabel,
+                    status: t(language, paid ? 'payrollPaidStatus' : 'payrollUnpaidStatus'),
+                    weekStart: payroll.weekStart,
+                    weekEnd: payroll.weekEnd,
+                    amount: line.amountLabel
                 }),
                 flags: MessageFlags.Ephemeral
             });
