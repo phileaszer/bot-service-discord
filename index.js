@@ -42,6 +42,8 @@ const FREE_CUSTOM_EMBED_LIMIT = 2;
 const FREE_DOSSIER_PANEL_LIMIT = 1;
 const FREE_OPEN_DOSSIER_LIMIT = 5;
 const FREE_DOSSIER_HISTORY_LIMIT = 10;
+const DOSSIER_PANEL_CLICK_COOLDOWN_MS = 8 * 1000;
+const DOSSIER_CREATE_COOLDOWN_MS = 90 * 1000;
 const DEFAULT_PAY_CURRENCY = '$';
 const MAX_PAY_RATE = 100000000;
 const PAY_ADJUSTMENT_TYPES = new Set(['bonus', 'deduction', 'correction']);
@@ -101,7 +103,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-08-24-tickets-payroll-v2';
+const SENTINEL_BUILD = 'community-suite-2026-08-25-onboarding-tickets-v3';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -309,6 +311,8 @@ const I18N = {
         dossierModalDescriptionPlaceholder: 'Explique ta demande avec les détails utiles.',
         dossierOpenedTitle: 'Sentinel | Dossier ouvert',
         dossierAlreadyOpen: 'Tu as déjà un dossier ouvert : {channel}',
+        dossierCooldown: '⏳ Attends encore **{time}** avant d’ouvrir un nouveau dossier.',
+        dossierPanelCooldown: '⏳ Le panneau vient déjà d’être utilisé. Réessaie dans **{time}**.',
         dossierPanelLimitReached: '⭐ La version gratuite permet **{limit}** panneau de dossiers par serveur. Tu peux garder ce panneau, ou passer Premium pour publier plusieurs bureaux d’accueil.',
         dossierOpenLimitReached: '⭐ Ce serveur a déjà **{limit}** dossiers ouverts. Ferme un dossier terminé, ou passe Premium pour ouvrir plus de dossiers en même temps.',
         dossierCreated: 'Dossier créé : {channel}',
@@ -475,6 +479,8 @@ const I18N = {
         dossierModalDescriptionPlaceholder: 'Explain your request with useful details.',
         dossierOpenedTitle: 'Sentinel | Dossier opened',
         dossierAlreadyOpen: 'You already have an open dossier: {channel}',
+        dossierCooldown: '⏳ Wait another **{time}** before opening a new dossier.',
+        dossierPanelCooldown: '⏳ This panel was just used. Try again in **{time}**.',
         dossierPanelLimitReached: '⭐ The free version allows **{limit}** dossier panel per server. Keep this panel, or upgrade to Premium to publish multiple reception desks.',
         dossierOpenLimitReached: '⭐ This server already has **{limit}** open dossiers. Close a completed dossier, or upgrade to Premium to keep more dossiers open at once.',
         dossierCreated: 'Dossier created: {channel}',
@@ -921,6 +927,46 @@ function formatDuration(ms) {
     const seconds = totalSeconds % 60;
 
     return `${hours}h ${minutes}min ${seconds}s`;
+}
+
+function formatCooldownDuration(ms, language = 'fr') {
+    const totalSeconds = Math.max(1, Math.ceil(ms / 1000));
+
+    if (totalSeconds < 60) {
+        return language === 'en' ? `${totalSeconds}s` : `${totalSeconds}s`;
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (seconds === 0) {
+        return language === 'en' ? `${minutes} min` : `${minutes} min`;
+    }
+
+    return language === 'en'
+        ? `${minutes} min ${seconds}s`
+        : `${minutes} min ${seconds}s`;
+}
+
+function getCooldownKey(guildId, userId) {
+    return `${guildId}:${userId}`;
+}
+
+function getCooldownRemaining(cooldowns, guildId, userId) {
+    const key = getCooldownKey(guildId, userId);
+    const expiresAt = cooldowns.get(key) || 0;
+    const remaining = expiresAt - Date.now();
+
+    if (remaining <= 0) {
+        cooldowns.delete(key);
+        return 0;
+    }
+
+    return remaining;
+}
+
+function setCooldown(cooldowns, guildId, userId, duration) {
+    cooldowns.set(getCooldownKey(guildId, userId), Date.now() + duration);
 }
 
 function checkDatabase() {
@@ -4614,14 +4660,16 @@ function buildServerOnboardingEmbed(guild, requester) {
         color: SENTINEL_COLORS.accent,
         title: 'Sentinel | Premiers pas',
         description: [
-            'Merci d’avoir invité Sentinel. Pour que le bot fonctionne correctement, suis ces étapes dans l’ordre.',
+            'Merci d’avoir invité Sentinel. Le bot est prêt, il reste juste à le configurer pour ton serveur.',
             '',
             '`1.` Choisis la langue du serveur avec les boutons ci-dessous.',
             '`2.` Configure le rôle de service avec `/config-role role:@role`.',
             '`3.` Configure le salon de logs avec `/config-logs salon_id:ID`.',
-            '`4.` Publie le panneau dans le bon salon avec `!service-panel`.',
+            '`4.` Ajoute les rôles autorisés avec `/config-permissions action:ajouter role:@role`.',
+            '`5.` Publie le panneau de service dans le bon salon avec `!service-panel`.',
+            '`6.` Si tu veux les tickets privés, publie le bureau avec `/dossier-panel`.',
             '',
-            'Besoin d’un guide complet ? Utilise `/aide` ou `/dashboard`.'
+            'Besoin d’un guide plus simple ? Utilise `/aide` ou ouvre le dashboard.'
         ].join('\n'),
         requester,
         thumbnail: guild.iconURL(),
@@ -4631,12 +4679,32 @@ function buildServerOnboardingEmbed(guild, requester) {
             name: 'À vérifier',
             value: [
                 'Le rôle Sentinel doit être au-dessus du rôle de service.',
-                'Sentinel doit pouvoir voir et écrire dans le salon de logs.',
+                'Sentinel doit pouvoir voir/écrire dans les salons utiles et créer des salons pour les dossiers.',
                 'Le dashboard peut aussi guider toute la configuration.'
             ].join('\n'),
             inline: false
         }
     );
+}
+
+function buildServerOnboardingComponents(language = 'fr') {
+    return [
+        ...buildLanguageButtons(language),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Open dashboard' : 'Ouvrir le dashboard')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getDashboardUrl('/dashboard')),
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Full guide' : 'Guide complet')
+                .setStyle(ButtonStyle.Link)
+                .setURL(getPublicSiteUrl('installation.html')),
+            new ButtonBuilder()
+                .setLabel(language === 'en' ? 'Support server' : 'Serveur support')
+                .setStyle(ButtonStyle.Link)
+                .setURL(SUPPORT_SERVER_URL)
+        )
+    ];
 }
 
 function buildLegacyHelpEmbed(guild, requester) {
@@ -6165,6 +6233,8 @@ const SENTINEL_STAFF_ROLES = [
     'Responsable',
     'Support'
 ];
+const dossierPanelClickCooldowns = new Map();
+const dossierCreateCooldowns = new Map();
 
 const SENTINEL_GENERAL_CHANNELS = {
     fr: ['💬｜general'],
@@ -6732,6 +6802,28 @@ async function handleSentinelTicketButton(interaction) {
         });
     }
 
+    const creationCooldown = getCooldownRemaining(dossierCreateCooldowns, interaction.guild.id, interaction.user.id);
+
+    if (creationCooldown > 0) {
+        return interaction.reply({
+            content: t(language, 'dossierCooldown', {
+                time: formatCooldownDuration(creationCooldown, language)
+            }),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const panelCooldown = getCooldownRemaining(dossierPanelClickCooldowns, interaction.guild.id, interaction.user.id);
+
+    if (panelCooldown > 0) {
+        return interaction.reply({
+            content: t(language, 'dossierPanelCooldown', {
+                time: formatCooldownDuration(panelCooldown, language)
+            }),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
     try {
         assertOpenDossierQuota(interaction.guild.id, language, interaction.member);
     } catch (error) {
@@ -6740,6 +6832,8 @@ async function handleSentinelTicketButton(interaction) {
             flags: MessageFlags.Ephemeral
         });
     }
+
+    setCooldown(dossierPanelClickCooldowns, interaction.guild.id, interaction.user.id, DOSSIER_PANEL_CLICK_COOLDOWN_MS);
 
     return interaction.showModal(buildDossierOpenModal(dossierType, language));
 }
@@ -6750,6 +6844,13 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
     const meta = getDossierTypeMeta(dossierType, language);
     const subject = String(details.subject || '').trim().slice(0, 120);
     const descriptionText = String(details.description || '').trim().slice(0, 1500);
+    const creationCooldown = getCooldownRemaining(dossierCreateCooldowns, interaction.guild.id, interaction.user.id);
+
+    if (creationCooldown > 0) {
+        throw new Error(t(language, 'dossierCooldown', {
+            time: formatCooldownDuration(creationCooldown, language)
+        }));
+    }
 
     assertOpenDossierQuota(interaction.guild.id, language, interaction.member);
 
@@ -6818,6 +6919,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
         })
     });
     await sendSentinelStaffLog(interaction.guild, `📁 Dossier Sentinel #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`);
+    setCooldown(dossierCreateCooldowns, interaction.guild.id, interaction.user.id, DOSSIER_CREATE_COOLDOWN_MS);
 
     return interaction.reply({
         content: t(language, 'dossierCreated', { channel: ticketChannel }),
@@ -8550,25 +8652,32 @@ process.on('uncaughtException', error => {
 client.on(Events.GuildCreate, async guild => {
     getGuildConfig(guild.id);
 
-    const me = guild.members.me;
-    const channel = guild.systemChannel
-        || guild.channels.cache.find(candidate => (
-            typeof candidate.isTextBased === 'function'
-            && candidate.isTextBased()
-            && candidate.permissionsFor(me)?.has([
-                PermissionsBitField.Flags.ViewChannel,
-                PermissionsBitField.Flags.SendMessages
-            ])
-        ));
+    const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const payload = {
+        embeds: [buildServerOnboardingEmbed(guild, client.user)],
+        components: buildServerOnboardingComponents('fr')
+    };
+    const canSendOnboarding = candidate => Boolean(
+        me
+        && typeof candidate?.isTextBased === 'function'
+        && candidate.isTextBased()
+        && candidate.permissionsFor(me)?.has([
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.EmbedLinks
+        ])
+    );
+    const channel = canSendOnboarding(guild.systemChannel)
+        ? guild.systemChannel
+        : guild.channels.cache.find(canSendOnboarding);
 
-    if (!channel) {
+    if (channel) {
+        await channel.send(payload).catch(() => {});
         return;
     }
 
-    await channel.send({
-        embeds: [buildServerOnboardingEmbed(guild, client.user)],
-        components: buildLanguageButtons('fr')
-    }).catch(() => {});
+    const owner = await guild.fetchOwner().catch(() => null);
+    await owner?.send(payload).catch(() => {});
 });
 
 client.on(Events.GuildMemberAdd, async member => {
