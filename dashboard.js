@@ -1305,12 +1305,18 @@ async function startServiceForUser(ctx, guild, actor, body) {
         throw createHttpError(409, 'This user is already on duty.');
     }
 
-    ctx.helpers.updateUserTime(guild.id, userId, userData?.totalTime || 0, Date.now());
+    const serviceStartTime = Date.now();
+
+    ctx.helpers.updateUserTime(guild.id, userId, userData?.totalTime || 0, serviceStartTime);
     await member.roles.add(role).catch(() => {});
 
-    const logChannel = ctx.helpers.getLogChannel(guild);
-    if (logChannel) {
-        await logChannel.send(`🟢 ${member} a pris son service depuis le dashboard.`).catch(() => {});
+    if (ctx.helpers.sendServiceLog) {
+        await ctx.helpers.sendServiceLog(guild, member, 'start', {
+            startTime: serviceStartTime,
+            source: 'Dashboard',
+            actor: actor.user,
+            language: ctx.helpers.getGuildLanguage(guild.id)
+        });
     }
 
     return `${member.user.tag} est maintenant en service.`;
@@ -1338,9 +1344,15 @@ async function endServiceForUser(ctx, guild, actor, body) {
         await member.roles.remove(role).catch(() => {});
     }
 
-    const logChannel = ctx.helpers.getLogChannel(guild);
-    if (logChannel) {
-        await logChannel.send(`🔴 ${member || `user ID ${userId}`} a quitte son service depuis le dashboard. Duree : **${ctx.helpers.formatDuration(duration)}**`).catch(() => {});
+    if (ctx.helpers.sendServiceLog) {
+        await ctx.helpers.sendServiceLog(guild, member, 'end', {
+            duration,
+            totalTime,
+            userId,
+            source: 'Dashboard',
+            actor: actor.user,
+            language: ctx.helpers.getGuildLanguage(guild.id)
+        });
     }
 
     return `Service termine. Duree : ${ctx.helpers.formatDuration(duration)}.`;
@@ -1354,6 +1366,7 @@ async function resetUserFromDashboard(ctx, guild, actor, body) {
     const role = ctx.helpers.getServiceRole(guild);
 
     ctx.helpers.resetUser(guild.id, userId);
+    ctx.helpers.clearLongServiceAlert?.(guild.id, userId);
 
     if (member && role) {
         await member.roles.remove(role).catch(() => {});
@@ -2008,6 +2021,7 @@ async function runDashboardAction(ctx, guild, member, body) {
         requireAdvanced(ctx, guild.id, member);
         requireCommandAccess(ctx, member);
         ctx.helpers.resetGuild(guild.id);
+        ctx.helpers.clearLongServiceAlertsForGuild?.(guild.id);
         return 'Toutes les heures du serveur ont ete reinitialisees.';
     }
 

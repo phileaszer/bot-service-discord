@@ -2247,16 +2247,27 @@ function renderAuditPanel(state) {
   const auditLogs = state.auditLogs || {};
   const canViewGlobal = Boolean(auditLogs.canViewGlobal);
   const currentScope = canViewGlobal ? auditScope : 'server';
+  const auditItems = auditLogs.items || [];
+  const successCount = auditItems.filter((item) => item.status !== 'failed').length;
+  const failedCount = auditItems.filter((item) => item.status === 'failed').length;
+  const siteCount = auditItems.filter((item) => item.source === 'site').length;
+  const discordCount = auditItems.filter((item) => item.source === 'discord').length;
 
   return `
     <section class="dashboard-panel" id="audit">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Historique</p>
-          <h2>Ce qui a été fait</h2>
-          <p class="muted">Retrouve l’auteur, la cible, la date et le résultat d’une action.</p>
+          <h2>Journal des actions</h2>
+          <p class="muted">Chaque ligne indique qui a agi, depuis où, sur quoi, et si l’action a réussi.</p>
         </div>
         <span class="premium-badge">Premium sécurité</span>
+      </div>
+      <div class="audit-overview">
+        <article><span>Actions affichées</span><strong>${escapeHtml(auditItems.length)}</strong></article>
+        <article><span>Réussites</span><strong>${escapeHtml(successCount)}</strong></article>
+        <article><span>Échecs</span><strong>${escapeHtml(failedCount)}</strong></article>
+        <article><span>Site / Discord</span><strong>${escapeHtml(siteCount)} / ${escapeHtml(discordCount)}</strong></article>
       </div>
       <form class="audit-filters" data-audit-filter>
         <div class="audit-field">
@@ -2298,7 +2309,7 @@ function renderAuditPanel(state) {
         </div>
       </form>
       <div class="audit-scope-note">
-        <span>${currentScope === 'global' ? 'Vue privée créatrice' : 'Ce serveur uniquement'}</span>
+        <span>${currentScope === 'global' ? 'Vue créatrice, tous les serveurs' : 'Journal limité au serveur sélectionné'}</span>
         <small>${escapeHtml((state.auditLogs?.items || []).length)} entrée(s) affichée(s)</small>
       </div>
       ${auditLogList(state)}

@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const {
     Client,
@@ -44,6 +45,14 @@ const FREE_OPEN_DOSSIER_LIMIT = 5;
 const FREE_DOSSIER_HISTORY_LIMIT = 10;
 const DOSSIER_PANEL_CLICK_COOLDOWN_MS = 8 * 1000;
 const DOSSIER_CREATE_COOLDOWN_MS = 90 * 1000;
+const BUTTON_ACTION_COOLDOWN_MS = 3 * 1000;
+const SENSITIVE_CONFIRM_TIMEOUT_MS = 2 * 60 * 1000;
+const LONG_SERVICE_ALERT_HOURS = Math.max(Number.parseInt(process.env.LONG_SERVICE_ALERT_HOURS || '8', 10), 1);
+const LONG_SERVICE_ALERT_MS = LONG_SERVICE_ALERT_HOURS * 60 * 60 * 1000;
+const LONG_SERVICE_ALERT_INTERVAL_MS = Math.max(
+    Number.parseInt(process.env.LONG_SERVICE_ALERT_INTERVAL_MINUTES || '10', 10),
+    2
+) * 60 * 1000;
 const DEFAULT_PAY_CURRENCY = '$';
 const MAX_PAY_RATE = 100000000;
 const PAY_ADJUSTMENT_TYPES = new Set(['bonus', 'deduction', 'correction']);
@@ -103,7 +112,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-08-25-onboarding-tickets-v3';
+const SENTINEL_BUILD = 'community-suite-2026-08-25-safety-logs-v4';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -240,6 +249,30 @@ const I18N = {
         toggleLabel: 'Prendre / Quitter',
         confirm: 'Confirmer',
         cancel: 'Annuler',
+        buttonCooldown: '⏳ Action déjà en cours. Réessaie dans **{time}**.',
+        confirmationTitle: '⚠️ Confirmation Sentinel',
+        confirmationBody: '**Action :** {action}\n**Cible :** {target}\n{details}\n\nConfirme seulement si tout est correct. Cette confirmation expire dans 2 minutes.',
+        confirmationNotForYou: '❌ Cette confirmation ne t’est pas destinée.',
+        confirmationExpired: '⏳ Confirmation expirée. Relance la commande si nécessaire.',
+        confirmationCancelled: '✅ Action annulée.',
+        confirmPurge: 'Purge de messages',
+        confirmBan: 'Bannissement',
+        confirmKick: 'Expulsion',
+        confirmResetUser: 'Réinitialisation des heures',
+        confirmDossierClose: 'Clôture du dossier',
+        serviceLogStartTitle: 'Sentinel | Prise de service',
+        serviceLogEndTitle: 'Sentinel | Fin de service',
+        serviceLogLongTitle: 'Sentinel | Service prolongé',
+        serviceLogLongDescription: '{member} est en service depuis **{duration}**.',
+        serviceLogLongHint: 'Pense à vérifier si ce service est volontaire ou si la personne a oublié de quitter.',
+        serviceLogTarget: 'Agent',
+        serviceLogSource: 'Source',
+        serviceLogDuration: 'Durée',
+        serviceLogTotal: 'Total',
+        serviceLogStartedAt: 'Début',
+        serviceLogSourceDiscord: 'Discord',
+        serviceLogSourceDashboard: 'Dashboard',
+        staffLogTitle: 'Sentinel | Journal',
         helpTitle: 'Sentinel | Guide de démarrage',
         helpDescription: 'Commence ici. Ce guide explique comment installer Sentinel, choisir la langue du serveur, le configurer, puis l utiliser sans connaitre les bots Discord.',
         moderationAccessDenied: '❌ Tu n’as pas accès à cette commande de modération.',
@@ -408,6 +441,30 @@ const I18N = {
         toggleLabel: 'Start / End',
         confirm: 'Confirm',
         cancel: 'Cancel',
+        buttonCooldown: '⏳ Action already running. Try again in **{time}**.',
+        confirmationTitle: '⚠️ Sentinel confirmation',
+        confirmationBody: '**Action:** {action}\n**Target:** {target}\n{details}\n\nConfirm only if everything is correct. This confirmation expires in 2 minutes.',
+        confirmationNotForYou: '❌ This confirmation is not for you.',
+        confirmationExpired: '⏳ Confirmation expired. Run the command again if needed.',
+        confirmationCancelled: '✅ Action cancelled.',
+        confirmPurge: 'Message purge',
+        confirmBan: 'Ban',
+        confirmKick: 'Kick',
+        confirmResetUser: 'Hours reset',
+        confirmDossierClose: 'Dossier closure',
+        serviceLogStartTitle: 'Sentinel | Service started',
+        serviceLogEndTitle: 'Sentinel | Service ended',
+        serviceLogLongTitle: 'Sentinel | Long service',
+        serviceLogLongDescription: '{member} has been on duty for **{duration}**.',
+        serviceLogLongHint: 'Check whether this service is intentional or if the person forgot to end it.',
+        serviceLogTarget: 'Agent',
+        serviceLogSource: 'Source',
+        serviceLogDuration: 'Duration',
+        serviceLogTotal: 'Total',
+        serviceLogStartedAt: 'Started',
+        serviceLogSourceDiscord: 'Discord',
+        serviceLogSourceDashboard: 'Dashboard',
+        staffLogTitle: 'Sentinel | Log',
         helpTitle: 'Sentinel | Getting started',
         helpDescription: 'Start here. This guide explains how to install Sentinel, choose the server language, configure it, and use it without knowing Discord bots.',
         moderationAccessDenied: '❌ You do not have access to this moderation command.',
@@ -967,6 +1024,201 @@ function getCooldownRemaining(cooldowns, guildId, userId) {
 
 function setCooldown(cooldowns, guildId, userId, duration) {
     cooldowns.set(getCooldownKey(guildId, userId), Date.now() + duration);
+}
+
+function getButtonActionCooldownKey(interaction) {
+    return [
+        interaction.guildId || 'dm',
+        interaction.channelId || 'no-channel',
+        interaction.user?.id || 'anonymous',
+        interaction.customId || 'button'
+    ].join(':');
+}
+
+async function rejectDuplicateButtonAction(interaction, language = 'fr') {
+    const key = getButtonActionCooldownKey(interaction);
+    const expiresAt = buttonActionCooldowns.get(key) || 0;
+    const remaining = expiresAt - Date.now();
+
+    if (remaining > 0) {
+        await interaction.reply({
+            content: t(language, 'buttonCooldown', {
+                time: formatCooldownDuration(remaining, language)
+            }),
+            flags: MessageFlags.Ephemeral
+        }).catch(() => {});
+        return true;
+    }
+
+    buttonActionCooldowns.set(key, Date.now() + BUTTON_ACTION_COOLDOWN_MS);
+    return false;
+}
+
+function cleanupSensitiveConfirmations() {
+    const now = Date.now();
+
+    for (const [token, confirmation] of pendingSensitiveConfirmations.entries()) {
+        if (now - confirmation.createdAt > SENSITIVE_CONFIRM_TIMEOUT_MS) {
+            pendingSensitiveConfirmations.delete(token);
+        }
+    }
+}
+
+function createConfirmationToken() {
+    cleanupSensitiveConfirmations();
+    return crypto.randomBytes(8).toString('hex');
+}
+
+function buildSensitiveConfirmationComponents(token, language = 'fr') {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`sentinel_confirm:${token}:confirm`)
+                .setLabel(t(language, 'confirm'))
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`sentinel_confirm:${token}:cancel`)
+                .setLabel(t(language, 'cancel'))
+                .setStyle(ButtonStyle.Secondary)
+        )
+    ];
+}
+
+function formatConfirmationDetails(details = []) {
+    const lines = Array.isArray(details) ? details.filter(Boolean) : [details].filter(Boolean);
+
+    return lines.length > 0
+        ? lines.map(line => `• ${line}`).join('\n')
+        : '• Aucun détail supplémentaire.';
+}
+
+function parseSensitiveConfirmationId(customId) {
+    const match = /^sentinel_confirm:([a-f0-9]{16}):(confirm|cancel)$/.exec(customId || '');
+
+    if (!match) {
+        return null;
+    }
+
+    return {
+        token: match[1],
+        action: match[2]
+    };
+}
+
+async function requestSensitiveConfirmation(interaction, {
+    action,
+    actionLabel,
+    targetLabel,
+    details = [],
+    payload = {},
+    language = null
+}) {
+    const activeLanguage = language || getGuildLanguage(interaction.guild.id);
+    const token = createConfirmationToken();
+    const detailText = formatConfirmationDetails(details);
+
+    pendingSensitiveConfirmations.set(token, {
+        action,
+        actionLabel,
+        targetLabel,
+        details: detailText,
+        payload,
+        guildId: interaction.guild.id,
+        channelId: interaction.channelId,
+        requesterId: interaction.user.id,
+        createdAt: Date.now(),
+        language: activeLanguage
+    });
+
+    const embed = createSentinelEmbed({
+        color: SENTINEL_COLORS.warning,
+        title: t(activeLanguage, 'confirmationTitle'),
+        description: t(activeLanguage, 'confirmationBody', {
+            action: actionLabel,
+            target: targetLabel,
+            details: detailText
+        }),
+        requester: interaction.user,
+        thumbnail: interaction.guild.iconURL(),
+        language: activeLanguage
+    });
+
+    return interaction.reply({
+        embeds: [embed],
+        components: buildSensitiveConfirmationComponents(token, activeLanguage),
+        flags: MessageFlags.Ephemeral
+    });
+}
+
+async function handleSensitiveConfirmationButton(interaction) {
+    const parsed = parseSensitiveConfirmationId(interaction.customId);
+
+    if (!parsed) {
+        return false;
+    }
+
+    const language = interaction.inGuild() ? getGuildLanguage(interaction.guild.id) : 'fr';
+    const confirmation = pendingSensitiveConfirmations.get(parsed.token);
+
+    if (!confirmation) {
+        await interaction.update({
+            content: t(language, 'confirmationExpired'),
+            embeds: [],
+            components: []
+        }).catch(() => {});
+        return true;
+    }
+
+    if (interaction.user.id !== confirmation.requesterId) {
+        await interaction.reply({
+            content: t(confirmation.language, 'confirmationNotForYou'),
+            flags: MessageFlags.Ephemeral
+        }).catch(() => {});
+        return true;
+    }
+
+    if (Date.now() - confirmation.createdAt > SENSITIVE_CONFIRM_TIMEOUT_MS) {
+        pendingSensitiveConfirmations.delete(parsed.token);
+        await interaction.update({
+            content: t(confirmation.language, 'confirmationExpired'),
+            embeds: [],
+            components: []
+        }).catch(() => {});
+        return true;
+    }
+
+    if (parsed.action === 'cancel') {
+        pendingSensitiveConfirmations.delete(parsed.token);
+        await interaction.update({
+            content: t(confirmation.language, 'confirmationCancelled'),
+            embeds: [],
+            components: []
+        }).catch(() => {});
+        return true;
+    }
+
+    pendingSensitiveConfirmations.delete(parsed.token);
+
+    await interaction.deferUpdate();
+
+    try {
+        const result = await executeSensitiveConfirmation(interaction, confirmation);
+
+        await interaction.editReply({
+            content: result,
+            embeds: [],
+            components: []
+        });
+    } catch (error) {
+        console.error('Erreur confirmation Sentinel :', error);
+        await interaction.editReply({
+            content: error.message || t(confirmation.language, 'serviceError'),
+            embeds: [],
+            components: []
+        }).catch(() => {});
+    }
+
+    return true;
 }
 
 function checkDatabase() {
@@ -3776,14 +4028,393 @@ function getSentinelStaffLogChannel(guild) {
     return findGuildTextChannel(guild, SENTINEL_STAFF_LOG_CHANNELS) || getLogChannel(guild);
 }
 
-async function sendSentinelStaffLog(guild, message) {
+function getFallbackRequester() {
+    return client.user || {
+        username: 'Sentinel'
+    };
+}
+
+function buildSentinelStaffLogEmbed(guild, message, {
+    color = SENTINEL_COLORS.accent,
+    title = null,
+    requester = null,
+    language = null,
+    fields = []
+} = {}) {
+    const activeLanguage = language || getGuildLanguage(guild.id);
+    const embed = createSentinelEmbed({
+        color,
+        title: title || t(activeLanguage, 'staffLogTitle'),
+        description: String(message || '').slice(0, 4096),
+        requester: requester || getFallbackRequester(),
+        thumbnail: guild.iconURL(),
+        language: activeLanguage
+    });
+
+    if (Array.isArray(fields) && fields.length > 0) {
+        embed.addFields(fields.map(field => ({
+            name: String(field.name).slice(0, 256),
+            value: String(field.value || '-').slice(0, 1024),
+            inline: Boolean(field.inline)
+        })));
+    }
+
+    return embed;
+}
+
+async function sendSentinelStaffLog(guild, message, options = {}) {
     const channel = getSentinelStaffLogChannel(guild);
 
     if (!channel) {
         return;
     }
 
-    await channel.send(message).catch(() => {});
+    if (message && typeof message === 'object' && (message.embeds || message.content || message.files)) {
+        await channel.send(message).catch(() => {});
+        return;
+    }
+
+    await channel.send({
+        embeds: [buildSentinelStaffLogEmbed(guild, message, options)]
+    }).catch(() => {});
+}
+
+function formatServiceLogTarget(target, userId, language = 'fr') {
+    if (target?.id && target?.user) {
+        return `${target}`;
+    }
+
+    if (target?.id && target?.username) {
+        return `${target}`;
+    }
+
+    if (userId) {
+        return language === 'en'
+            ? `user ID \`${userId}\``
+            : `utilisateur ID \`${userId}\``;
+    }
+
+    return language === 'en' ? 'Unknown user' : 'Utilisateur inconnu';
+}
+
+function getServiceLogAvatar(target) {
+    if (typeof target?.displayAvatarURL === 'function') {
+        return target.displayAvatarURL();
+    }
+
+    if (typeof target?.user?.displayAvatarURL === 'function') {
+        return target.user.displayAvatarURL();
+    }
+
+    return null;
+}
+
+function getServiceLogRequester(target, actor = null) {
+    if (actor?.username) {
+        return actor;
+    }
+
+    if (target?.user?.username) {
+        return target.user;
+    }
+
+    if (target?.username) {
+        return target;
+    }
+
+    return getFallbackRequester();
+}
+
+function buildServiceLogEmbed(guild, target, action, {
+    duration = null,
+    totalTime = null,
+    startTime = null,
+    source = null,
+    actor = null,
+    userId = null,
+    language = null
+} = {}) {
+    const activeLanguage = language || getGuildLanguage(guild.id);
+    const targetLabel = formatServiceLogTarget(target, userId || target?.id, activeLanguage);
+    const isEnd = action === 'end';
+    const isLong = action === 'long';
+    const embed = createSentinelEmbed({
+        color: isEnd ? SENTINEL_COLORS.warning : (isLong ? SENTINEL_COLORS.danger : SENTINEL_COLORS.success),
+        title: isEnd
+            ? t(activeLanguage, 'serviceLogEndTitle')
+            : (isLong ? t(activeLanguage, 'serviceLogLongTitle') : t(activeLanguage, 'serviceLogStartTitle')),
+        description: isLong
+            ? [
+                t(activeLanguage, 'serviceLogLongDescription', {
+                    member: targetLabel,
+                    duration: formatDuration(duration || 0)
+                }),
+                t(activeLanguage, 'serviceLogLongHint')
+            ].join('\n')
+            : (isEnd
+                ? t(activeLanguage, 'serviceLeftLog', {
+                    member: targetLabel,
+                    duration: formatDuration(duration || 0),
+                    total: formatDuration(totalTime || 0)
+                })
+                : t(activeLanguage, 'serviceStartedLog', { member: targetLabel })),
+        requester: getServiceLogRequester(target, actor),
+        thumbnail: getServiceLogAvatar(target) || guild.iconURL(),
+        language: activeLanguage
+    });
+    const fields = [
+        {
+            name: t(activeLanguage, 'serviceLogTarget'),
+            value: targetLabel,
+            inline: true
+        },
+        {
+            name: t(activeLanguage, 'serviceLogSource'),
+            value: source || t(activeLanguage, 'serviceLogSourceDiscord'),
+            inline: true
+        }
+    ];
+
+    if (startTime) {
+        fields.push({
+            name: t(activeLanguage, 'serviceLogStartedAt'),
+            value: formatDiscordTime(startTime),
+            inline: true
+        });
+    }
+
+    if (duration !== null) {
+        fields.push({
+            name: t(activeLanguage, 'serviceLogDuration'),
+            value: formatDuration(duration),
+            inline: true
+        });
+    }
+
+    if (totalTime !== null) {
+        fields.push({
+            name: t(activeLanguage, 'serviceLogTotal'),
+            value: formatDuration(totalTime),
+            inline: true
+        });
+    }
+
+    return embed.addFields(fields);
+}
+
+async function sendServiceLog(guild, target, action, options = {}) {
+    const channel = getLogChannel(guild) || getSentinelStaffLogChannel(guild);
+
+    if (!channel) {
+        return;
+    }
+
+    await channel.send({
+        embeds: [buildServiceLogEmbed(guild, target, action, options)]
+    }).catch(() => {});
+}
+
+function clearLongServiceAlert(guildId, userId) {
+    const prefix = `${guildId}:${userId}:`;
+
+    for (const key of longServiceAlertedKeys) {
+        if (key.startsWith(prefix)) {
+            longServiceAlertedKeys.delete(key);
+        }
+    }
+}
+
+function clearLongServiceAlertsForGuild(guildId) {
+    const prefix = `${guildId}:`;
+
+    for (const key of longServiceAlertedKeys) {
+        if (key.startsWith(prefix)) {
+            longServiceAlertedKeys.delete(key);
+        }
+    }
+}
+
+async function checkLongServiceAlerts() {
+    for (const guild of client.guilds.cache.values()) {
+        const language = getGuildLanguage(guild.id);
+
+        for (const service of getActiveServices(guild.id)) {
+            if (service.duration < LONG_SERVICE_ALERT_MS) {
+                continue;
+            }
+
+            const key = `${guild.id}:${service.userId}:${service.startTime}`;
+
+            if (longServiceAlertedKeys.has(key)) {
+                continue;
+            }
+
+            longServiceAlertedKeys.add(key);
+            const member = await guild.members.fetch(service.userId).catch(() => null);
+
+            await sendServiceLog(guild, member, 'long', {
+                duration: service.duration,
+                startTime: service.startTime,
+                userId: service.userId,
+                source: 'Sentinel',
+                language
+            });
+        }
+    }
+}
+
+async function closeDossierChannelFromInteraction(interaction, channel, language) {
+    const topic = parseDossierChannelTopic(channel.topic);
+    const dossier = getDossierByChannel(interaction.guild.id, channel.id) || topic;
+    const closedDossier = closeDossierRecord(interaction.guild.id, channel.id, interaction.user.id) || {
+        ...dossier,
+        status: 'closed',
+        closedAt: new Date().toISOString(),
+        closedByUserId: interaction.user.id
+    };
+
+    await sendDossierTranscript(channel, closedDossier, interaction.user, language);
+    await sendSentinelStaffLog(
+        interaction.guild,
+        language === 'en'
+            ? `Sentinel dossier #${closedDossier?.id || channel.id} closed: **${channel.name}** by ${interaction.user}.`
+            : `Dossier Sentinel #${closedDossier?.id || channel.id} clôturé : **${channel.name}** par ${interaction.user}.`,
+        {
+            color: SENTINEL_COLORS.warning,
+            requester: interaction.user,
+            language
+        }
+    );
+
+    setTimeout(() => {
+        channel?.delete('Cloture dossier Sentinel').catch(() => {});
+    }, 5000);
+
+    return t(language, 'dossierClosed');
+}
+
+async function executeSensitiveConfirmation(interaction, confirmation) {
+    const language = confirmation.language || getGuildLanguage(interaction.guild.id);
+    const guild = interaction.guild;
+    const payload = confirmation.payload || {};
+
+    if (!guild || guild.id !== confirmation.guildId) {
+        throw new Error(t(language, 'serviceError'));
+    }
+
+    if (confirmation.action === 'purge') {
+        const channel = await guild.channels.fetch(payload.channelId).catch(() => null);
+
+        if (!channel?.isTextBased?.() || typeof channel.bulkDelete !== 'function') {
+            throw new Error(t(language, 'moderationNoChannel'));
+        }
+
+        const amount = clampNumber(payload.amount, 1, 100);
+        const deleted = await channel.bulkDelete(amount, true).catch(() => null);
+
+        if (!deleted) {
+            throw new Error(t(language, 'moderationFailed'));
+        }
+
+        const caseData = addModerationCase(
+            guild.id,
+            null,
+            interaction.user.id,
+            'clear',
+            `${amount} messages demandés dans #${channel.name}`,
+            null
+        );
+
+        await sendModerationLog(guild, interaction.user, caseData, `${channel}`, language);
+        return t(language, 'moderationClear', { count: deleted.size });
+    }
+
+    if (confirmation.action === 'ban') {
+        const userId = normalizeUserId(payload.userId);
+        const member = userId ? await guild.members.fetch(userId).catch(() => null) : null;
+        const targetError = getUserTargetErrorById(guild, interaction.member, userId, member, language);
+
+        if (targetError) {
+            throw new Error(targetError);
+        }
+
+        await guild.members.ban(userId, {
+            reason: payload.reason,
+            deleteMessageSeconds: clampNumber(payload.deleteDays || 0, 0, 7) * 24 * 60 * 60
+        }).catch(error => {
+            console.error('Erreur bannissement confirme :', error);
+            throw new Error(t(language, 'moderationFailed'));
+        });
+
+        const caseData = addModerationCase(guild.id, userId, interaction.user.id, 'ban', payload.reason, null);
+        await sendModerationLog(guild, interaction.user, caseData, payload.targetLabel || `<@${userId}>`, language);
+
+        return t(language, 'moderationBan', {
+            user: payload.targetLabel || `<@${userId}>`,
+            caseId: caseData.id
+        });
+    }
+
+    if (confirmation.action === 'kick') {
+        const member = await guild.members.fetch(payload.userId).catch(() => null);
+        const targetError = getModerationTargetError(interaction.member, member, language);
+
+        if (targetError) {
+            throw new Error(targetError);
+        }
+
+        await member.kick(payload.reason).catch(error => {
+            console.error('Erreur expulsion confirmee :', error);
+            throw new Error(t(language, 'moderationFailed'));
+        });
+
+        const caseData = addModerationCase(guild.id, member.id, interaction.user.id, 'kick', payload.reason, null);
+        await sendModerationLog(guild, interaction.user, caseData, `${member.user.tag}`, language);
+
+        return t(language, 'moderationKick', {
+            member: member.user.tag,
+            caseId: caseData.id
+        });
+    }
+
+    if (confirmation.action === 'reset-user') {
+        const userId = normalizeUserId(payload.userId);
+        const member = userId ? await guild.members.fetch(userId).catch(() => null) : null;
+
+        if (!hasCommandRoleAccess(interaction.member)) {
+            throw new Error(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        if (!hasUserRecord(guild.id, userId)) {
+            throw new Error(t(language, 'resetUserNoRecord', {
+                target: formatResetTarget(member, userId, language)
+            }));
+        }
+
+        resetUser(guild.id, userId);
+        clearLongServiceAlert(guild.id, userId);
+
+        return t(language, 'resetUser', {
+            member: formatResetTarget(member, userId, language)
+        });
+    }
+
+    if (confirmation.action === 'dossier-close') {
+        const channel = await guild.channels.fetch(payload.channelId).catch(() => null);
+        const topic = parseDossierChannelTopic(channel?.topic);
+
+        if (!channel || !topic) {
+            throw new Error(t(language, 'dossierNotInDossier'));
+        }
+
+        if (!memberCanManageDossier(interaction.member) && topic.ownerUserId !== interaction.user.id) {
+            throw new Error(t(language, 'dossierCloseDenied'));
+        }
+
+        return closeDossierChannelFromInteraction(interaction, channel, language);
+    }
+
+    throw new Error(t(language, 'serviceError'));
 }
 
 function getSentinelGeneralChannel(guild, language) {
@@ -6235,6 +6866,9 @@ const SENTINEL_STAFF_ROLES = [
 ];
 const dossierPanelClickCooldowns = new Map();
 const dossierCreateCooldowns = new Map();
+const buttonActionCooldowns = new Map();
+const pendingSensitiveConfirmations = new Map();
+const longServiceAlertedKeys = new Set();
 
 const SENTINEL_GENERAL_CHANNELS = {
     fr: ['💬｜general'],
@@ -6748,7 +7382,23 @@ async function handleSentinelButtonFailure(interaction, error) {
     }).catch(() => {});
 }
 
-function handleSentinelButton(interaction, handler) {
+function isProtectedButtonAction(customId) {
+    return [
+        'sentinel_dossier:claim',
+        'sentinel_dossier:transcript',
+        'sentinel_dossier:close',
+        'sentinel_ticket:close'
+    ].includes(customId);
+}
+
+async function handleSentinelButton(interaction, handler) {
+    const language = interaction.inGuild() ? getGuildLanguage(interaction.guildId) : 'fr';
+
+    if (isProtectedButtonAction(interaction.customId)
+        && await rejectDuplicateButtonAction(interaction, language)) {
+        return;
+    }
+
     return handler(interaction).catch(error => handleSentinelButtonFailure(interaction, error));
 }
 
@@ -7224,22 +7874,20 @@ async function handleDossierInteraction(interaction, commandName, language) {
     }
 
     if (commandName === 'dossier-fermer') {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        const topic = parseDossierChannelTopic(channel.topic);
-        const dossier = getDossierByChannel(interaction.guild.id, channel.id) || topic;
-        const closedDossier = closeDossierRecord(interaction.guild.id, channel.id, interaction.user.id) || {
-            ...dossier,
-            status: 'closed',
-            closedAt: new Date().toISOString(),
-            closedByUserId: interaction.user.id
-        };
-        await sendDossierTranscript(channel, closedDossier, interaction.user, language);
-        await sendSentinelStaffLog(interaction.guild, `🔒 Dossier Sentinel #${closedDossier?.id || channel.id} clôturé : **${channel.name}** par ${interaction.user}.`);
-        await interaction.editReply(t(language, 'dossierClosed'));
-
-        setTimeout(() => {
-            channel?.delete('Cloture dossier Sentinel').catch(() => {});
-        }, 5000);
+        await requestSensitiveConfirmation(interaction, {
+            action: 'dossier-close',
+            actionLabel: t(language, 'confirmDossierClose'),
+            targetLabel: `#${channel.name}`,
+            details: [
+                language === 'en'
+                    ? 'Sentinel will send the transcript, then close the channel.'
+                    : 'Sentinel enverra le compte rendu, puis fermera le salon.'
+            ],
+            payload: {
+                channelId: channel.id
+            },
+            language
+        });
         return true;
     }
 
@@ -7322,26 +7970,20 @@ async function handleSentinelTicketCloseButton(interaction) {
         });
     }
 
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-    const dossier = getDossierByChannel(interaction.guild.id, channel.id) || {
-        id: topic.dossierId,
-        ownerUserId: topic.ownerUserId,
-        type: topic.type
-    };
-    const closedDossier = closeDossierRecord(interaction.guild.id, channel.id, interaction.user.id) || {
-        ...dossier,
-        status: 'closed',
-        closedAt: new Date().toISOString(),
-        closedByUserId: interaction.user.id
-    };
-    await sendDossierTranscript(channel, closedDossier, interaction.user, language);
-    await sendSentinelStaffLog(interaction.guild, `🔒 Dossier Sentinel #${closedDossier?.id || channel.id} clôturé : **${channel.name}** par ${interaction.user}.`);
-    await interaction.editReply(t(language, 'dossierClosed'));
-
-    setTimeout(() => {
-        channel?.delete('Cloture dossier Sentinel').catch(() => {});
-    }, 5000);
+    return requestSensitiveConfirmation(interaction, {
+        action: 'dossier-close',
+        actionLabel: t(language, 'confirmDossierClose'),
+        targetLabel: `#${channel.name}`,
+        details: [
+            language === 'en'
+                ? 'Sentinel will send the transcript, then close the channel.'
+                : 'Sentinel enverra le compte rendu, puis fermera le salon.'
+        ],
+        payload: {
+            channelId: channel.id
+        },
+        language
+    });
 }
 
 async function handleSentinelVoteButton(interaction) {
@@ -7493,30 +8135,24 @@ async function handleModerationInteraction(interaction, commandName, language) {
         }
 
         const amount = clampNumber(interaction.options.getInteger('nombre'), 1, 100);
-        const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
 
-        if (!deleted) {
-            await interaction.reply({
-                content: t(language, 'moderationFailed'),
-                flags: MessageFlags.Ephemeral
-            });
-            return true;
-        }
-
-        const caseData = addModerationCase(
-            guildId,
-            null,
-            interaction.user.id,
-            'clear',
-            `${amount} messages demandés dans #${interaction.channel.name}`,
-            null
-        );
-
-        await sendModerationLog(interaction.guild, interaction.user, caseData, `${interaction.channel}`, language);
-
-        await interaction.reply({
-            content: t(language, 'moderationClear', { count: deleted.size }),
-            flags: MessageFlags.Ephemeral
+        await requestSensitiveConfirmation(interaction, {
+            action: 'purge',
+            actionLabel: t(language, 'confirmPurge'),
+            targetLabel: `${interaction.channel}`,
+            details: [
+                language === 'en'
+                    ? `${amount} recent message(s) will be deleted if Discord allows it.`
+                    : `${amount} message(s) récent(s) seront supprimés si Discord les autorise.`,
+                language === 'en'
+                    ? 'Messages older than 14 days cannot be removed by bulk purge.'
+                    : 'Les messages de plus de 14 jours ne peuvent pas être supprimés par purge groupée.'
+            ],
+            payload: {
+                channelId: interaction.channel.id,
+                amount
+            },
+            language
         });
         return true;
     }
@@ -7946,26 +8582,25 @@ async function handleModerationInteraction(interaction, commandName, language) {
         );
         const deleteDays = clampNumber(interaction.options.getInteger('jours_messages') || interaction.options.getInteger('delete_days') || 0, 0, 7);
 
-        try {
-            await interaction.guild.members.ban(target.userId, {
+        await requestSensitiveConfirmation(interaction, {
+            action: 'ban',
+            actionLabel: t(language, 'confirmBan'),
+            targetLabel: target.label,
+            details: [
+                language === 'en'
+                    ? `Reason: ${reason}`
+                    : `Raison : ${reason}`,
+                language === 'en'
+                    ? `Messages to delete: ${deleteDays} day(s).`
+                    : `Messages à supprimer : ${deleteDays} jour(s).`
+            ],
+            payload: {
+                userId: target.userId,
+                targetLabel: target.label,
                 reason,
-                deleteMessageSeconds: deleteDays * 24 * 60 * 60
-            });
-        } catch (error) {
-            console.error('Erreur bannissement :', error);
-            await interaction.reply({
-                content: t(language, 'moderationFailed'),
-                flags: MessageFlags.Ephemeral
-            });
-            return true;
-        }
-
-        const caseData = addModerationCase(guildId, target.userId, interaction.user.id, 'ban', reason, null);
-        await sendModerationLog(interaction.guild, interaction.user, caseData, target.label, language);
-
-        await interaction.reply({
-            content: t(language, 'moderationBan', { user: target.label, caseId: caseData.id }),
-            flags: MessageFlags.Ephemeral
+                deleteDays
+            },
+            language
         });
         return true;
     }
@@ -8061,23 +8696,21 @@ async function handleModerationInteraction(interaction, commandName, language) {
     }
 
     if (commandName === 'expulser') {
-        try {
-            await member.kick(reason);
-        } catch (error) {
-            console.error('Erreur expulsion :', error);
-            await interaction.reply({
-                content: t(language, 'moderationFailed'),
-                flags: MessageFlags.Ephemeral
-            });
-            return true;
-        }
-
-        const caseData = addModerationCase(guildId, member.id, interaction.user.id, 'kick', reason, null);
-        await sendModerationLog(interaction.guild, interaction.user, caseData, `${member.user.tag}`, language);
-
-        await interaction.reply({
-            content: t(language, 'moderationKick', { member: member.user.tag, caseId: caseData.id }),
-            flags: MessageFlags.Ephemeral
+        await requestSensitiveConfirmation(interaction, {
+            action: 'kick',
+            actionLabel: t(language, 'confirmKick'),
+            targetLabel: `${member.user.tag}`,
+            details: [
+                language === 'en'
+                    ? `Reason: ${reason}`
+                    : `Raison : ${reason}`
+            ],
+            payload: {
+                userId: member.id,
+                targetLabel: member.user.tag,
+                reason
+            },
+            language
         });
         return true;
     }
@@ -8538,6 +9171,8 @@ client.once(Events.ClientReady, async () => {
             buildDossierPanelComponents,
             buildDossierPanelEmbed,
             buildServicePanelComponents,
+            clearLongServiceAlert,
+            clearLongServiceAlertsForGuild,
             closeDossierRecord,
             createUserIfMissing,
             deleteCustomEmbedRecord,
@@ -8599,6 +9234,7 @@ client.once(Events.ClientReady, async () => {
             resetUser,
             sendModerationLog,
             sendDossierTranscript,
+            sendServiceLog,
             setDossierReferent,
             setGuildLanguage,
             setWeeklyPaymentStatus,
@@ -8635,6 +9271,8 @@ client.once(Events.ClientReady, async () => {
     setInterval(refreshSlashCommandStatus, 6 * 60 * 60 * 1000);
     setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
     setInterval(processExpiredTemporaryBans, 60 * 1000);
+    setInterval(checkLongServiceAlerts, LONG_SERVICE_ALERT_INTERVAL_MS);
+    setTimeout(checkLongServiceAlerts, 60 * 1000);
 });
 
 client.on(Events.Error, error => {
@@ -9420,13 +10058,20 @@ client.on(Events.InteractionCreate, async interaction => {
                 });
             }
 
-            resetUser(guildId, userId);
-
-            return interaction.reply({
-                content: t(language, 'resetUser', {
-                    member: formatResetTarget(member, userId, language)
-                }),
-                flags: MessageFlags.Ephemeral
+            return requestSensitiveConfirmation(interaction, {
+                action: 'reset-user',
+                actionLabel: t(language, 'confirmResetUser'),
+                targetLabel: formatResetTarget(member, userId, language),
+                details: [
+                    language === 'en'
+                        ? 'The user total and saved sessions will be reset to zero.'
+                        : 'Le total et les sessions enregistrées de cette personne seront remis à zéro.'
+                ],
+                payload: {
+                    userId,
+                    targetLabel: formatResetTarget(member, userId, language)
+                },
+                language
             });
         }
 
@@ -9465,6 +10110,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
     const buttonLanguage = getGuildLanguage(interaction.guild.id);
 
+    if (await handleSensitiveConfirmationButton(interaction)) {
+        return;
+    }
+
     if (interaction.customId.startsWith('set_language:')) {
         if (!hasCommandRoleAccess(interaction.member)) {
             return interaction.reply({
@@ -9484,6 +10133,10 @@ client.on(Events.InteractionCreate, async interaction => {
     const resetConfirmation = parseResetGuildConfirmation(interaction.customId);
 
     if (resetConfirmation) {
+        if (await rejectDuplicateButtonAction(interaction, buttonLanguage)) {
+            return;
+        }
+
         if (interaction.user.id !== resetConfirmation.requesterId) {
             return interaction.reply({
                 content: t(buttonLanguage, 'resetNotForYou'),
@@ -9515,6 +10168,7 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         resetGuild(interaction.guild.id);
+        clearLongServiceAlertsForGuild(interaction.guild.id);
 
         return interaction.update({
             content: t(buttonLanguage, 'resetGuildDone'),
@@ -9583,6 +10237,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.customId !== 'toggle_service') return;
 
+    if (await rejectDuplicateButtonAction(interaction, buttonLanguage)) {
+        return;
+    }
+
     try {
         const role = getServiceRole(interaction.guild);
 
@@ -9610,20 +10268,16 @@ client.on(Events.InteractionCreate, async interaction => {
             }
 
             updateUserTime(guildId, userId, totalTime, null);
+            clearLongServiceAlert(guildId, userId);
 
             await member.roles.remove(role);
 
-            const logChannel = getLogChannel(interaction.guild);
-
-            if (logChannel) {
-                await logChannel.send(
-                    t(buttonLanguage, 'serviceLeftLog', {
-                        member,
-                        duration: formatDuration(duration),
-                        total: formatDuration(totalTime)
-                    })
-                ).catch(() => {});
-            }
+            await sendServiceLog(interaction.guild, member, 'end', {
+                duration,
+                totalTime,
+                source: t(buttonLanguage, 'serviceLogSourceDiscord'),
+                language: buttonLanguage
+            });
 
             return interaction.reply({
                 content: t(buttonLanguage, 'serviceLeft', { duration: formatDuration(duration) }),
@@ -9631,15 +10285,18 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
-        updateUserTime(guildId, userId, userData.totalTime, Date.now());
+        const serviceStartTime = Date.now();
+
+        updateUserTime(guildId, userId, userData.totalTime, serviceStartTime);
+        clearLongServiceAlert(guildId, userId);
 
         await member.roles.add(role);
 
-        const logChannel = getLogChannel(interaction.guild);
-
-        if (logChannel) {
-            await logChannel.send(t(buttonLanguage, 'serviceStartedLog', { member })).catch(() => {});
-        }
+        await sendServiceLog(interaction.guild, member, 'start', {
+            startTime: serviceStartTime,
+            source: t(buttonLanguage, 'serviceLogSourceDiscord'),
+            language: buttonLanguage
+        });
 
         return interaction.reply({
             content: t(buttonLanguage, 'serviceStarted'),
@@ -10144,6 +10801,7 @@ client.on(Events.MessageCreate, async message => {
         }
 
         resetUser(guildId, userId);
+        clearLongServiceAlert(guildId, userId);
 
         return message.reply(t(language, 'resetUser', {
             member: formatResetTarget(resolvedMember, userId, language)
