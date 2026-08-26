@@ -18,6 +18,14 @@ const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
+const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
+const SERVER_PRESET_LABELS = {
+    standard: 'Standard',
+    'rp-modern': 'Police / EMS / Staff RP',
+    western: 'Époque 1900 / Western',
+    staff: 'Staff et modération',
+    community: 'Communauté Discord'
+};
 const CREATOR_USER_IDS = new Set(
     String(process.env.SENTINEL_CREATOR_USER_ID || process.env.CREATOR_USER_ID || '')
         .split(/[,\s]+/)
@@ -150,6 +158,7 @@ function getAuditTarget(body = {}) {
 function sanitizeAuditDetails(body = {}) {
     const allowedKeys = [
         'language',
+        'preset',
         'roleId',
         'channelId',
         'categoryId',
@@ -188,6 +197,11 @@ function sanitizeAuditDetails(body = {}) {
     }
 
     return details;
+}
+
+function normalizeServerPreset(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return SERVER_PRESET_IDS.has(normalized) ? normalized : null;
 }
 
 function mapAuditLog(row) {
@@ -1834,6 +1848,18 @@ async function runDashboardAction(ctx, guild, member, body) {
         const nextLanguage = body.language === 'en' ? 'en' : 'fr';
         ctx.helpers.setGuildLanguage(guild.id, nextLanguage);
         return `Langue du serveur mise a jour : ${nextLanguage}.`;
+    }
+
+    if (action === 'set-server-preset') {
+        requireCommandAccess(ctx, member);
+        const preset = normalizeServerPreset(body.preset);
+
+        if (!preset) {
+            throw createHttpError(400, 'Invalid server profile.');
+        }
+
+        ctx.helpers.updateGuildConfig(guild.id, { serverPreset: preset });
+        return `Profil serveur mis à jour : ${SERVER_PRESET_LABELS[preset] || preset}.`;
     }
 
     if (action === 'set-service-role') {

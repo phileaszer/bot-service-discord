@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS guild_configs (
     role_id TEXT,
     log_channel_id TEXT,
     auto_role_id TEXT,
-    language TEXT NOT NULL DEFAULT 'fr'
+    language TEXT NOT NULL DEFAULT 'fr',
+    server_preset TEXT NOT NULL DEFAULT 'standard'
 );
 
 CREATE TABLE IF NOT EXISTS service_times (
@@ -322,6 +323,10 @@ if (!guildConfigColumns.includes('language')) {
 
 if (!guildConfigColumns.includes('auto_role_id')) {
     db.prepare('ALTER TABLE guild_configs ADD COLUMN auto_role_id TEXT').run();
+}
+
+if (!guildConfigColumns.includes('server_preset')) {
+    db.prepare("ALTER TABLE guild_configs ADD COLUMN server_preset TEXT NOT NULL DEFAULT 'standard'").run();
 }
 
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()

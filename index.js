@@ -112,10 +112,11 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-08-25-dashboard-guidance-v5';
+const SENTINEL_BUILD = 'community-suite-2026-08-27-server-presets-v6';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
+const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const PREMIUM_SERVER_GOAL = Number.parseInt(process.env.PREMIUM_SERVER_GOAL || '50', 10);
 const DATABASE_FILE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db');
 const DATABASE_BACKUP_ENABLED = String(process.env.DATABASE_BACKUP_ENABLED || 'true').toLowerCase() !== 'false';
@@ -572,6 +573,11 @@ function normalizeLanguage(value) {
     }
 
     return 'fr';
+}
+
+function normalizeServerPreset(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return SERVER_PRESET_IDS.has(normalized) ? normalized : 'standard';
 }
 
 function interpolate(template, values = {}) {
@@ -1438,7 +1444,8 @@ function mapGuildConfig(row) {
         serviceRoleId: row?.role_id || null,
         logChannelId: row?.log_channel_id || null,
         autoRoleId: row?.auto_role_id || null,
-        language: normalizeLanguage(row?.language)
+        language: normalizeLanguage(row?.language),
+        serverPreset: normalizeServerPreset(row?.server_preset)
     };
 }
 
@@ -1492,22 +1499,23 @@ function saveDiscordUserProfile(user, options = {}) {
 
 function getGuildConfig(guildId) {
     let row = db.prepare(`
-        SELECT role_id, log_channel_id, auto_role_id, language
+        SELECT role_id, log_channel_id, auto_role_id, language, server_preset
         FROM guild_configs
         WHERE guild_id = ?
     `).get(guildId);
 
     if (!row) {
         db.prepare(`
-            INSERT INTO guild_configs (guild_id, role_id, log_channel_id, auto_role_id, language)
-            VALUES (?, NULL, NULL, NULL, 'fr')
+            INSERT INTO guild_configs (guild_id, role_id, log_channel_id, auto_role_id, language, server_preset)
+            VALUES (?, NULL, NULL, NULL, 'fr', 'standard')
         `).run(guildId);
 
         row = {
             role_id: null,
             log_channel_id: null,
             auto_role_id: null,
-            language: 'fr'
+            language: 'fr',
+            server_preset: 'standard'
         };
     }
 
@@ -1528,14 +1536,24 @@ function updateGuildConfig(guildId, newConfig) {
             : currentConfig.autoRoleId,
         language: Object.prototype.hasOwnProperty.call(newConfig, 'language')
             ? normalizeLanguage(newConfig.language)
-            : currentConfig.language
+            : currentConfig.language,
+        serverPreset: Object.prototype.hasOwnProperty.call(newConfig, 'serverPreset')
+            ? normalizeServerPreset(newConfig.serverPreset)
+            : currentConfig.serverPreset
     };
 
     db.prepare(`
         UPDATE guild_configs
-        SET role_id = ?, log_channel_id = ?, auto_role_id = ?, language = ?
+        SET role_id = ?, log_channel_id = ?, auto_role_id = ?, language = ?, server_preset = ?
         WHERE guild_id = ?
-    `).run(nextConfig.serviceRoleId, nextConfig.logChannelId, nextConfig.autoRoleId, nextConfig.language, guildId);
+    `).run(
+        nextConfig.serviceRoleId,
+        nextConfig.logChannelId,
+        nextConfig.autoRoleId,
+        nextConfig.language,
+        nextConfig.serverPreset,
+        guildId
+    );
 
     return nextConfig;
 }

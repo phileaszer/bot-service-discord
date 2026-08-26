@@ -18,6 +18,64 @@ let selectedUserProfile = null;
 let dossierFilters = {};
 let expandedDossierId = null;
 const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
+const SERVER_PRESETS = [
+  {
+    id: 'standard',
+    eyebrow: 'Base',
+    title: 'Standard',
+    summary: 'Une configuration simple pour démarrer Sentinel sans spécialiser le serveur.',
+    advice: [
+      'Choisis un rôle de service uniquement si ton serveur suit des heures.',
+      'Garde un salon de logs lisible pour retrouver les actions importantes.',
+      'Ajoute seulement les rôles staff qui doivent vraiment gérer Sentinel.'
+    ]
+  },
+  {
+    id: 'rp-modern',
+    eyebrow: 'RP moderne',
+    title: 'Police / EMS / Staff RP',
+    summary: 'Pensé pour les serveurs GTA, RP moderne ou équipes avec prises de service régulières.',
+    advice: [
+      'Utilise un rôle de service clair, par exemple En service ou Agent actif.',
+      'Publie le panneau de service dans un salon visible par les agents.',
+      'Garde les tickets pour support, signalement, recrutement et plaintes RP.'
+    ]
+  },
+  {
+    id: 'western',
+    eyebrow: 'RP western',
+    title: 'Époque 1900 / Western',
+    summary: 'Adapté aux serveurs Red Dead ou RP plus immersifs, avec un vocabulaire plus sobre.',
+    advice: [
+      'Prévois des tickets pour plaintes, recrutements, demandes RP et signalements.',
+      'Utilise la paie RP si les heures servent à payer les métiers ou services.',
+      'Le thème western du site peut être activé séparément selon la préférence de chacun.'
+    ]
+  },
+  {
+    id: 'staff',
+    eyebrow: 'Équipe',
+    title: 'Staff et modération',
+    summary: 'Pour un serveur qui veut surtout encadrer les sanctions, les logs et les demandes membres.',
+    advice: [
+      'Configure les rôles autorisés avant de donner l’accès au dashboard.',
+      'Vérifie que Sentinel peut bannir, timeout, expulser et purger.',
+      'Utilise les tickets pour centraliser les demandes et les signalements.'
+    ]
+  },
+  {
+    id: 'community',
+    eyebrow: 'Communauté',
+    title: 'Communauté Discord',
+    summary: 'Pour un serveur généraliste qui veut rester simple, clair et facile à administrer.',
+    advice: [
+      'Commence avec les logs, les rôles staff et les tickets de support.',
+      'Active l’auto-rôle seulement si tu as un rôle d’arrivée utile.',
+      'Garde la modération par ID pour pouvoir agir même si une personne quitte le serveur.'
+    ]
+  }
+];
+const SERVER_PRESET_MAP = new Map(SERVER_PRESETS.map((preset) => [preset.id, preset]));
 
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
@@ -106,6 +164,7 @@ function dashboardErrorMessage(message) {
     'This user must be in the server to start duty.': 'Cette personne doit être présente sur le serveur pour prendre son service depuis le dashboard.',
     'This user is already on duty.': 'Cette personne est déjà en service.',
     'This user is not on duty.': 'Cette personne n’est pas en service.',
+    'Invalid server profile.': 'Profil serveur invalide.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
@@ -129,6 +188,7 @@ function dashboardErrorMessage(message) {
     'This user must be in the server to start duty.': 'Vérifie l’ID Discord et assure-toi que la personne est encore sur ce serveur.',
     'This user is already on duty.': 'Utilise plutôt “Fin service” si tu veux arrêter sa session actuelle.',
     'This user is not on duty.': 'Aucune session active n’est trouvée pour cet ID sur ce serveur.',
+    'Invalid server profile.': 'Choisis un profil proposé dans l’assistant.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
     'Invalid payroll adjustment.': 'Indique un ID Discord, un type, un montant positif et une raison courte.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
@@ -413,6 +473,10 @@ function commandRoles(state) {
     .filter(Boolean);
 }
 
+function currentServerPreset(state) {
+  return SERVER_PRESET_MAP.get(state.config.serverPreset) || SERVER_PRESET_MAP.get('standard');
+}
+
 function dashboardConfigStatus(state) {
   const serviceRole = resolveRole(state, state.config.serviceRoleId);
   const autoRole = resolveRole(state, state.config.autoRoleId);
@@ -463,8 +527,14 @@ function statusText(isReady) {
 function configStatusCards(state) {
   const status = dashboardConfigStatus(state);
   const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
+  const preset = currentServerPreset(state);
 
   const rows = [
+    {
+      label: 'Profil serveur',
+      value: preset.title,
+      ready: true
+    },
     {
       label: 'Langue du serveur',
       value: languageLabel,
@@ -868,6 +938,44 @@ function setupStep({ index, title, description, done, current, content }) {
   `;
 }
 
+function serverPresetSelector(state) {
+  const activePreset = currentServerPreset(state);
+
+  return `
+    <article class="server-preset-panel">
+      <div class="panel-mini-heading">
+        <div>
+          <p class="eyebrow">Profil du serveur</p>
+          <h3>Adapte Sentinel à ton usage</h3>
+          <p class="muted">Choisis le profil le plus proche de ton Discord. Ça ne remplace pas les 4 étapes : ça t’aide à configurer le serveur dans le bon sens.</p>
+        </div>
+        ${statusBadge(activePreset.title, true)}
+      </div>
+      <div class="server-preset-grid">
+        ${SERVER_PRESETS.map((preset) => {
+          const active = preset.id === activePreset.id;
+
+          return `
+            <form class="server-preset-card ${active ? 'is-active' : ''}" data-action-form="set-server-preset">
+              <input type="hidden" name="preset" value="${escapeHtml(preset.id)}">
+              <span>${escapeHtml(preset.eyebrow)}</span>
+              <strong>${escapeHtml(preset.title)}</strong>
+              <p>${escapeHtml(preset.summary)}</p>
+              <button class="button button-small ${active ? 'button-ghost' : ''}" type="submit" ${active ? 'disabled' : ''}>${active ? 'Actif' : 'Choisir'}</button>
+            </form>
+          `;
+        }).join('')}
+      </div>
+      <div class="server-preset-advice">
+        <strong>Conseils pour ce profil</strong>
+        <ul>
+          ${activePreset.advice.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+        </ul>
+      </div>
+    </article>
+  `;
+}
+
 function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions) {
   const status = dashboardConfigStatus(state);
   const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
@@ -887,6 +995,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         </div>
         <span class="setup-progress">${status.completedSteps}/4</span>
       </div>
+      ${serverPresetSelector(state)}
       <div class="setup-steps">
         ${setupStep({
           index: '01',
@@ -957,7 +1066,13 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
 function configSummaryList(state) {
   const status = dashboardConfigStatus(state);
   const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
+  const preset = currentServerPreset(state);
   const rows = [
+    {
+      label: 'Profil',
+      value: preset.title,
+      ready: true
+    },
     {
       label: 'Langue',
       value: languageLabel,
@@ -1970,6 +2085,7 @@ function dossierList(state) {
 
 const AUDIT_ACTION_LABELS = {
   'set-language': 'Langue',
+  'set-server-preset': 'Profil serveur',
   'set-service-role': 'Rôle de service',
   'set-auto-role': 'Rôle automatique',
   'disable-auto-role': 'Rôle automatique',
