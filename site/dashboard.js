@@ -102,9 +102,15 @@ function dashboardErrorMessage(message) {
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Invalid hourly rate.': 'Montant horaire invalide.',
     'Invalid payroll adjustment.': 'Ajustement de paie invalide.',
+    'No service role is configured.': 'Aucun rôle de service n’est configuré.',
+    'This user must be in the server to start duty.': 'Cette personne doit être présente sur le serveur pour prendre son service depuis le dashboard.',
+    'This user is already on duty.': 'Cette personne est déjà en service.',
+    'This user is not on duty.': 'Cette personne n’est pas en service.',
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
+    'Sentinel cannot send this embed in the selected channel.': 'Sentinel ne peut pas envoyer cet embed dans le salon choisi.',
+    'No embed field provided.': 'Indique au moins un champ à modifier.',
     'Sentinel embed not found.': 'Aucun embed Sentinel géré ne correspond à cet ID.',
     'Unknown moderation action.': 'Action de modération inconnue.',
     'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
@@ -119,10 +125,18 @@ function dashboardErrorMessage(message) {
     'Invalid Discord user ID.': 'Copie l’ID Discord numérique complet de la personne, pas son pseudo.',
     'Text channel not found.': 'Choisis un salon textuel accessible par Sentinel.',
     'Role not found.': 'Choisis un rôle Discord toujours présent sur le serveur.',
+    'No service role is configured.': 'Va dans l’assistant et choisis le rôle donné aux membres en service.',
+    'This user must be in the server to start duty.': 'Vérifie l’ID Discord et assure-toi que la personne est encore sur ce serveur.',
+    'This user is already on duty.': 'Utilise plutôt “Fin service” si tu veux arrêter sa session actuelle.',
+    'This user is not on duty.': 'Aucune session active n’est trouvée pour cet ID sur ce serveur.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
     'Invalid payroll adjustment.': 'Indique un ID Discord, un type, un montant positif et une raison courte.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
+    'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
+    'Sentinel cannot send this embed in the selected channel.': firstFix || 'Autorise Sentinel à voir le salon et à y envoyer des messages.',
+    'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
     'Sentinel embed not found.': 'Copie l’ID depuis la liste “Embeds gérés”. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
+    'This channel is not a Sentinel dossier.': 'Choisis un salon de ticket Sentinel ouvert.',
     'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
   };
   const resolution = resolutionByMessage[message];
@@ -516,29 +530,6 @@ function configStatusCards(state) {
   `;
 }
 
-function configAlerts(state) {
-  const status = dashboardConfigStatus(state);
-
-  if (status.ready) {
-    return `
-      <div class="dashboard-alert is-ready">
-        <strong>Configuration prête</strong>
-        <p>Sentinel peut gérer les services et publier ses logs sur ce serveur.</p>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="dashboard-alert is-warning">
-      <strong>À vérifier avant utilisation</strong>
-      <ul>
-        ${status.alerts.map((alert) => `<li>${escapeHtml(alert)}</li>`).join('')}
-      </ul>
-      <button class="button button-small" type="button" data-dashboard-tab="setup">Ouvrir l’assistant</button>
-    </div>
-  `;
-}
-
 function getPublicInviteUrl() {
   return $('[data-public-invite]')?.href || 'https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands';
 }
@@ -567,44 +558,224 @@ function dossierPermissionAlert(state) {
   `;
 }
 
-function permissionStatusOverview(state) {
-  const diagnostics = state.diagnostics;
+const DIAGNOSTIC_LABELS = {
+  ban: 'Sentinel peut bannir',
+  timeout: 'Sentinel peut timeout',
+  kick: 'Sentinel peut expulser',
+  purge: 'Sentinel peut purger',
+  manageChannels: 'Sentinel peut créer des salons',
+  attachFiles: 'Sentinel peut joindre des fichiers',
+  manageRoles: 'Sentinel peut gérer les rôles',
+  autoRole: 'Rôle automatique d’arrivée',
+  serviceRole: 'Rôle de service configuré',
+  roleOrder: 'Rôle Sentinel trop bas',
+  autoRoleOrder: 'Auto-rôle trop haut',
+  logs: 'Salon de logs accessible'
+};
 
-  if (!diagnostics?.checks?.length) {
-    return '';
+const DIAGNOSTIC_FIXES = {
+  ban: 'Ajoute la permission “Bannir des membres” au rôle Sentinel.',
+  timeout: 'Ajoute la permission “Modérer les membres” au rôle Sentinel.',
+  kick: 'Ajoute la permission “Expulser des membres” au rôle Sentinel.',
+  purge: 'Ajoute la permission “Gérer les messages” au rôle Sentinel.',
+  manageChannels: 'Ajoute la permission “Gérer les salons” au rôle Sentinel.',
+  attachFiles: 'Ajoute la permission “Joindre des fichiers” au rôle Sentinel pour les comptes rendus.',
+  manageRoles: 'Ajoute la permission “Gérer les rôles” au rôle Sentinel.',
+  autoRole: 'Choisis un rôle automatique valide, ou désactive cette option.',
+  serviceRole: 'Choisis le rôle de service dans l’assistant de configuration.',
+  roleOrder: 'Place le rôle Sentinel au-dessus du rôle de service dans les paramètres Discord.',
+  autoRoleOrder: 'Place le rôle Sentinel au-dessus du rôle automatique d’arrivée dans les paramètres Discord.',
+  logs: 'Autorise Sentinel à voir et écrire dans le salon de logs.'
+};
+
+const DIAGNOSTIC_TAB_TARGETS = {
+  ban: 'moderation',
+  timeout: 'moderation',
+  kick: 'moderation',
+  purge: 'moderation',
+  manageChannels: 'dossiers',
+  attachFiles: 'dossiers',
+  manageRoles: 'configuration',
+  autoRole: 'moderation',
+  serviceRole: 'setup',
+  roleOrder: 'configuration',
+  autoRoleOrder: 'moderation',
+  logs: 'setup'
+};
+
+const DIAGNOSTIC_AREAS = {
+  ban: 'Permissions',
+  timeout: 'Permissions',
+  kick: 'Permissions',
+  purge: 'Permissions',
+  manageChannels: 'Tickets',
+  attachFiles: 'Tickets',
+  manageRoles: 'Configuration',
+  autoRole: 'Modération',
+  serviceRole: 'Service',
+  roleOrder: 'Configuration',
+  autoRoleOrder: 'Modération',
+  logs: 'Configuration'
+};
+
+function diagnosticLabelText(check) {
+  return DIAGNOSTIC_LABELS[check.id] || check.label || 'Diagnostic';
+}
+
+function diagnosticFixText(check) {
+  return DIAGNOSTIC_FIXES[check.id] || check.fix || 'Ouvre le diagnostic complet pour voir quoi corriger.';
+}
+
+function addResolutionItem(items, item) {
+  if (!item?.title || !item?.detail) {
+    return;
   }
 
-  const priorityIds = ['ban', 'timeout', 'kick', 'purge', 'manageChannels', 'manageRoles', 'roleOrder'];
-  const priorityChecks = diagnostics.checks.filter((check) => priorityIds.includes(check.id));
-  const firstFixes = (diagnostics.fixes || []).slice(0, 3);
+  items.push({
+    area: item.area || 'Configuration',
+    title: item.title,
+    detail: item.detail,
+    tab: item.tab || 'configuration'
+  });
+}
+
+function dedupeResolutionItems(items) {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const key = `${item.area}|${item.title}|${item.detail}`.toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function dashboardResolutionItems(state) {
+  const status = dashboardConfigStatus(state);
+  const items = [];
+  const coveredChecks = new Set();
+
+  if (!state.config.language) {
+    addResolutionItem(items, {
+      area: 'Configuration',
+      title: 'Choisir la langue',
+      detail: 'Ouvre l’assistant et valide la langue utilisée par ce serveur.',
+      tab: 'setup'
+    });
+  }
+
+  if (!state.config.serviceRoleId) {
+    coveredChecks.add('serviceRole');
+    addResolutionItem(items, {
+      area: 'Service',
+      title: 'Configurer le rôle de service',
+      detail: 'Choisis le rôle ajouté quand un membre prend son service.',
+      tab: 'setup'
+    });
+  } else if (!status.serviceRole) {
+    coveredChecks.add('serviceRole');
+    addResolutionItem(items, {
+      area: 'Service',
+      title: 'Remplacer le rôle de service',
+      detail: 'Le rôle enregistré n’existe plus sur Discord. Choisis un rôle valide.',
+      tab: 'setup'
+    });
+  }
+
+  if (state.config.autoRoleId && !status.autoRole) {
+    coveredChecks.add('autoRole');
+    addResolutionItem(items, {
+      area: 'Modération',
+      title: 'Corriger l’auto-rôle',
+      detail: 'Le rôle automatique d’arrivée enregistré n’existe plus. Choisis un rôle valide ou désactive l’option.',
+      tab: 'moderation'
+    });
+  }
+
+  if (!state.config.logChannelId) {
+    coveredChecks.add('logs');
+    addResolutionItem(items, {
+      area: 'Configuration',
+      title: 'Configurer le salon de logs',
+      detail: 'Choisis le salon où Sentinel publie les services, sanctions et actions importantes.',
+      tab: 'setup'
+    });
+  } else if (!status.logChannel) {
+    coveredChecks.add('logs');
+    addResolutionItem(items, {
+      area: 'Configuration',
+      title: 'Remplacer le salon de logs',
+      detail: 'Le salon enregistré n’est plus accessible. Choisis un salon textuel valide.',
+      tab: 'setup'
+    });
+  }
+
+  if (status.allowedRoles.length === 0) {
+    addResolutionItem(items, {
+      area: 'Configuration',
+      title: 'Ajouter les rôles autorisés',
+      detail: 'Ajoute les rôles staff qui peuvent gérer Sentinel sans passer par toi.',
+      tab: 'setup'
+    });
+  }
+
+  (state.diagnostics?.checks || [])
+    .filter((check) => !check.ok && !coveredChecks.has(check.id))
+    .forEach((check) => addResolutionItem(items, {
+      area: DIAGNOSTIC_AREAS[check.id] || 'Permissions',
+      title: diagnosticLabelText(check),
+      detail: diagnosticFixText(check),
+      tab: DIAGNOSTIC_TAB_TARGETS[check.id] || 'moderation'
+    }));
+
+  return dedupeResolutionItems(items);
+}
+
+function resolutionAssistant(state) {
+  const items = dashboardResolutionItems(state);
+
+  if (items.length === 0) {
+    return `
+      <div class="dashboard-alert is-ready resolution-assistant">
+        <div class="resolution-heading">
+          <div>
+            <strong>Tout est prêt</strong>
+            <p>Sentinel peut gérer ce serveur. Garde le diagnostic sous la main si Discord refuse une action.</p>
+          </div>
+          ${statusBadge('Prêt', true)}
+        </div>
+        <button class="button button-small button-ghost" type="button" data-dashboard-tab="moderation">Voir le diagnostic</button>
+      </div>
+    `;
+  }
+
+  const visibleItems = items.slice(0, 5);
+  const hiddenCount = items.length - visibleItems.length;
 
   return `
-    <div class="permission-overview">
-      <div class="home-block-heading">
-        <h3>Diagnostic permissions</h3>
-        <button class="button button-small button-ghost" type="button" data-dashboard-tab="moderation">Voir tout</button>
+    <div class="dashboard-alert is-warning resolution-assistant">
+      <div class="resolution-heading">
+        <div>
+          <strong>À faire maintenant</strong>
+          <p>Voici les points qui peuvent bloquer Sentinel. Chaque bouton t’emmène à l’endroit où les régler.</p>
+        </div>
+        ${statusBadge('À vérifier', false)}
       </div>
-      <div class="permission-pill-grid">
-        ${priorityChecks.map((check) => `
-          <span class="permission-pill ${check.ok ? 'is-ready' : 'is-warning'}">
-            <strong>${escapeHtml(check.label)}</strong>
-            <small>${escapeHtml(check.value)}</small>
-          </span>
+      <div class="resolution-list">
+        ${visibleItems.map((item) => `
+          <div class="resolution-item">
+            <div class="resolution-copy">
+              <span>${escapeHtml(item.area)}</span>
+              <strong>${escapeHtml(item.title)}</strong>
+              <p>${escapeHtml(item.detail)}</p>
+            </div>
+            <button class="button button-small button-ghost" type="button" data-dashboard-tab="${escapeHtml(item.tab)}">Corriger</button>
+          </div>
         `).join('')}
       </div>
-      ${firstFixes.length ? `
-        <div class="dashboard-alert is-warning">
-          <strong>Correction conseillÃ©e</strong>
-          <ul>
-            ${firstFixes.map((fix) => `<li>${escapeHtml(fix)}</li>`).join('')}
-          </ul>
-        </div>
-      ` : `
-        <div class="dashboard-alert is-ready">
-          <strong>Permissions prÃªtes</strong>
-          <p>Sentinel peut appliquer les actions prÃ©vues sur ce serveur.</p>
-        </div>
-      `}
+      ${hiddenCount > 0 ? '<p class="resolution-more">D’autres points sont visibles dans le diagnostic complet.</p>' : ''}
     </div>
   `;
 }
@@ -666,9 +837,7 @@ function renderServerHome(state, premiumBadge) {
         </article>
         <article class="home-block">
           <h3>Alertes</h3>
-          ${configAlerts(state)}
-          ${dossierPermissionAlert(state)}
-          ${permissionStatusOverview(state)}
+          ${resolutionAssistant(state)}
         </article>
         <article class="home-block">
           <div class="home-block-heading">
@@ -1989,16 +2158,16 @@ function permissionDiagnosticsPanel(state) {
         <div>
           <p class="eyebrow">Diagnostic permissions</p>
           <h3>Ce que Sentinel peut faire</h3>
-          <p class="muted">Si une action est refusÃ©e, corrige dâ€™abord la ligne indiquÃ©e ici : permission manquante, salon inaccessible ou rÃ´le Sentinel placÃ© trop bas.</p>
+          <p class="muted">Si une action est refusée, corrige d’abord la ligne indiquée ici : permission manquante, salon inaccessible ou rôle Sentinel placé trop bas.</p>
         </div>
         ${statusBadge(headline, diagnostics.fixes.length === 0)}
       </div>
       <div class="diagnostic-grid">
         ${diagnostics.checks.map((check) => `
           <div class="diagnostic-check ${check.ok ? 'is-ready' : 'is-warning'}">
-            <span>${escapeHtml(check.label)}</span>
+            <span>${escapeHtml(diagnosticLabelText(check))}</span>
             <strong>${escapeHtml(check.value)}</strong>
-            ${check.ok ? '' : `<small>${escapeHtml(check.fix)}</small>`}
+            ${check.ok ? '' : `<small>${escapeHtml(diagnosticFixText(check))}</small>`}
           </div>
         `).join('')}
       </div>

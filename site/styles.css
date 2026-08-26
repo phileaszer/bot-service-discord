@@ -1281,6 +1281,19 @@ h3 {
     rgba(14, 9, 6, 0.56);
 }
 
+:root[data-theme="western"] .resolution-item {
+  border-color: rgba(224, 169, 87, 0.22);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(224, 169, 87, 0.09), transparent 50%, rgba(91, 54, 26, 0.1)),
+    rgba(18, 11, 7, 0.58);
+  clip-path: none;
+}
+
+:root[data-theme="western"] .resolution-copy span {
+  color: #efc578;
+}
+
 :root[data-theme="western"] .status-pill,
 :root[data-theme="western"] .premium-inline-note,
 :root[data-theme="western"] .premium-badge,
@@ -2773,43 +2786,67 @@ code {
   padding-left: 18px;
 }
 
-.permission-overview {
-  display: grid;
+.resolution-assistant {
+  align-content: start;
+}
+
+.resolution-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 14px;
 }
 
-.permission-pill-grid {
+.resolution-heading > div {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
-.permission-pill {
+.resolution-list {
   display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid rgba(234, 242, 255, 0.1);
-  color: var(--muted);
-  background: rgba(7, 10, 16, 0.42);
+  gap: 10px;
+}
+
+.resolution-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(234, 242, 255, 0.11);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.08), transparent 46%, rgba(255, 45, 154, 0.05)),
+    rgba(7, 10, 16, 0.46);
   clip-path: var(--cut);
 }
 
-.permission-pill strong {
-  color: var(--text);
-  font-size: 0.84rem;
+.resolution-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
-.permission-pill small {
+.resolution-copy span {
+  color: var(--cyan);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.resolution-copy strong,
+.resolution-copy p {
+  overflow-wrap: anywhere;
+}
+
+.resolution-copy p {
   color: var(--muted);
-  font-weight: 900;
+  font-size: 0.92rem;
 }
 
-.permission-pill.is-ready small {
-  color: var(--mint);
-}
-
-.permission-pill.is-warning small {
-  color: var(--pink);
+.resolution-more {
+  color: var(--muted);
+  font-weight: 850;
 }
 
 .recent-action-list {
@@ -4081,7 +4118,6 @@ code {
   }
 
   .diagnostic-grid,
-  .permission-pill-grid,
   .dossier-category-grid,
   .user-profile-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4255,7 +4291,6 @@ code {
   .audit-filters,
   .audit-detail-grid,
   .diagnostic-grid,
-  .permission-pill-grid,
   .dossier-category-grid,
   .case-detail-card,
   .user-profile-stats,
@@ -4351,9 +4386,14 @@ code {
 
   .dashboard-command-bar,
   .command-bar-status,
-  .home-block-heading {
+  .home-block-heading,
+  .resolution-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .resolution-item {
+    grid-template-columns: 1fr;
   }
 
   .home-block-config {
