@@ -80,13 +80,31 @@ const SERVER_PRESET_MAP = new Map(SERVER_PRESETS.map((preset) => [preset.id, pre
 const publicDashboardHost = window.location.pathname.endsWith('/dashboard.html')
   || window.location.hostname.endsWith('github.io');
 
+function lastGuildStorageKeys() {
+  const keys = [];
+
+  if (currentUser?.id) {
+    keys.push(`${LAST_GUILD_STORAGE_KEY}:${currentUser.id}`);
+  }
+
+  keys.push(LAST_GUILD_STORAGE_KEY);
+  return keys;
+}
+
 function readStoredLastGuildId() {
   try {
-    const value = localStorage.getItem(LAST_GUILD_STORAGE_KEY);
-    return /^\d{17,20}$/.test(String(value || '')) ? value : null;
+    for (const key of lastGuildStorageKeys()) {
+      const value = localStorage.getItem(key);
+
+      if (/^\d{17,20}$/.test(String(value || ''))) {
+        return value;
+      }
+    }
   } catch (error) {
     return null;
   }
+
+  return null;
 }
 
 function storeLastGuildId(guildId) {
@@ -100,7 +118,9 @@ function storeLastGuildId(guildId) {
   };
 
   try {
-    localStorage.setItem(LAST_GUILD_STORAGE_KEY, guildId);
+    for (const key of lastGuildStorageKeys()) {
+      localStorage.setItem(key, guildId);
+    }
   } catch (error) {
     // Some browsers block local storage; the backend setting remains the source of truth.
   }
@@ -113,7 +133,9 @@ function forgetLastGuildId(guildId = null) {
 
   if (!guildId || guildId === storedGuildId) {
     try {
-      localStorage.removeItem(LAST_GUILD_STORAGE_KEY);
+      for (const key of lastGuildStorageKeys()) {
+        localStorage.removeItem(key);
+      }
     } catch (error) {
       // Storage can be blocked by browser settings.
     }
@@ -128,15 +150,19 @@ function forgetLastGuildId(guildId = null) {
   }
 }
 
-function getRestorableGuildId() {
+function getRestorableGuildIds() {
   const candidates = [
     readStoredLastGuildId(),
     currentSettings?.lastGuildId
   ].filter((guildId, index, list) => guildId && list.indexOf(guildId) === index);
 
-  return candidates.find((guildId) => (
+  return candidates.filter((guildId) => (
     guilds.some((guild) => guild.id === guildId && guild.installed)
-  )) || null;
+  ));
+}
+
+function getRestorableGuildId() {
+  return getRestorableGuildIds()[0] || null;
 }
 
 async function api(path, options = {}) {
@@ -3391,11 +3417,17 @@ async function bootstrap() {
     renderUser();
     await loadGuilds();
 
-    const restorableGuildId = getRestorableGuildId();
+    let restoredGuild = false;
 
-    if (restorableGuildId) {
-      await selectGuild(restorableGuildId, { restored: true });
-    } else {
+    for (const guildId of getRestorableGuildIds()) {
+      restoredGuild = await selectGuild(guildId, { restored: true });
+
+      if (restoredGuild) {
+        break;
+      }
+    }
+
+    if (!restoredGuild) {
       renderDashboard();
     }
   } catch (error) {
@@ -3494,6 +3526,8 @@ document.addEventListener('scroll', () => {
 }, true);
 
 $('[data-logout]')?.addEventListener('click', async () => {
+  const guildKeysToClear = lastGuildStorageKeys();
+
   await api('/api/logout', { method: 'POST', body: '{}' }).catch(() => {});
   currentUser = null;
   guilds = [];
@@ -3503,7 +3537,11 @@ $('[data-logout]')?.addEventListener('click', async () => {
   dossierFilters = {};
   expandedDossierId = null;
   localStorage.removeItem('sentinel-discord-profile');
-  localStorage.removeItem(LAST_GUILD_STORAGE_KEY);
+  try {
+    guildKeysToClear.forEach((key) => localStorage.removeItem(key));
+  } catch (error) {
+    // Storage can be blocked by browser settings.
+  }
   renderUser();
   renderGuilds();
   renderDashboard();
