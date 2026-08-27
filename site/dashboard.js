@@ -94,6 +94,11 @@ function storeLastGuildId(guildId) {
     return;
   }
 
+  currentSettings = {
+    ...(currentSettings || {}),
+    lastGuildId: guildId
+  };
+
   try {
     localStorage.setItem(LAST_GUILD_STORAGE_KEY, guildId);
   } catch (error) {
@@ -103,11 +108,31 @@ function storeLastGuildId(guildId) {
   window.SentinelAuth?.saveSettings?.({ lastGuildId: guildId });
 }
 
+function forgetLastGuildId(guildId = null) {
+  const storedGuildId = readStoredLastGuildId();
+
+  if (!guildId || guildId === storedGuildId) {
+    try {
+      localStorage.removeItem(LAST_GUILD_STORAGE_KEY);
+    } catch (error) {
+      // Storage can be blocked by browser settings.
+    }
+  }
+
+  if (!guildId || currentSettings?.lastGuildId === guildId) {
+    currentSettings = {
+      ...(currentSettings || {}),
+      lastGuildId: null
+    };
+    window.SentinelAuth?.saveSettings?.({ lastGuildId: null });
+  }
+}
+
 function getRestorableGuildId() {
   const candidates = [
-    currentSettings?.lastGuildId,
-    readStoredLastGuildId()
-  ].filter(Boolean);
+    readStoredLastGuildId(),
+    currentSettings?.lastGuildId
+  ].filter((guildId, index, list) => guildId && list.indexOf(guildId) === index);
 
   return candidates.find((guildId) => (
     guilds.some((guild) => guild.id === guildId && guild.installed)
@@ -897,6 +922,7 @@ function renderServerHome(state, premiumBadge) {
         </div>
       </div>
       ${metricCards(state)}
+      ${dashboardPath(state)}
       <div class="server-home-grid pro-home-grid">
         <article class="home-block home-block-config">
           <div class="home-block-heading">
@@ -918,6 +944,65 @@ function renderServerHome(state, premiumBadge) {
         </article>
       </div>
     </section>
+  `;
+}
+
+function dashboardPath(state) {
+  const status = dashboardConfigStatus(state);
+  const preset = currentServerPreset(state);
+  const items = [
+    {
+      step: '01',
+      title: status.ready ? 'Configuration prête' : 'Finaliser les bases',
+      detail: status.ready
+        ? 'Langue, service, logs et accès staff sont en place.'
+        : 'Commence par l’assistant pour régler la langue, le rôle de service, les logs et les accès staff.',
+      tab: status.ready ? 'configuration' : 'setup',
+      label: status.ready ? 'Relire' : 'Commencer'
+    },
+    {
+      step: '02',
+      title: 'Gérer les services',
+      detail: 'Suis les agents en service, les heures, la paie RP et les paiements de la semaine.',
+      tab: 'service',
+      label: 'Ouvrir'
+    },
+    {
+      step: '03',
+      title: 'Traiter les tickets',
+      detail: 'Publie le bureau d’accueil et garde les demandes privées au même endroit.',
+      tab: 'dossiers',
+      label: 'Ouvrir'
+    },
+    {
+      step: '04',
+      title: 'Contrôler le serveur',
+      detail: 'Modère par ID, vérifie les permissions et retrouve les actions dans l’historique.',
+      tab: 'moderation',
+      label: 'Ouvrir'
+    }
+  ];
+
+  return `
+    <article class="dashboard-path">
+      <div class="home-block-heading">
+        <div>
+          <p class="eyebrow">Parcours conseillé</p>
+          <h3>${escapeHtml(preset.title)}</h3>
+        </div>
+        <button class="button button-small button-ghost" type="button" data-dashboard-tab="setup">Personnaliser</button>
+      </div>
+      <div class="dashboard-path-grid">
+        ${items.map((item) => `
+          <div class="dashboard-path-card">
+            <span>${escapeHtml(item.step)}</span>
+            <strong>${escapeHtml(item.title)}</strong>
+            <p>${escapeHtml(item.detail)}</p>
+            <button class="button button-small button-ghost" type="button" data-dashboard-tab="${escapeHtml(item.tab)}">${escapeHtml(item.label)}</button>
+          </div>
+        `).join('')}
+      </div>
+    </article>
   `;
 }
 
@@ -946,8 +1031,8 @@ function serverPresetSelector(state) {
       <div class="panel-mini-heading">
         <div>
           <p class="eyebrow">Profil du serveur</p>
-          <h3>Adapte Sentinel à ton usage</h3>
-          <p class="muted">Choisis le profil le plus proche de ton Discord. Ça ne remplace pas les 4 étapes : ça t’aide à configurer le serveur dans le bon sens.</p>
+          <h3>Personnaliser les conseils</h3>
+          <p class="muted">Optionnel : choisis le profil le plus proche de ton Discord pour afficher des conseils adaptés, sans remplacer les réglages de base.</p>
         </div>
         ${statusBadge(activePreset.title, true)}
       </div>
@@ -995,7 +1080,6 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         </div>
         <span class="setup-progress">${status.completedSteps}/4</span>
       </div>
-      ${serverPresetSelector(state)}
       <div class="setup-steps">
         ${setupStep({
           index: '01',
@@ -1053,6 +1137,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
           `
         })}
       </div>
+      ${serverPresetSelector(state)}
       <div class="setup-footer">
         ${status.ready
           ? '<p>Configuration complète. Tu peux publier le panneau de service ou gérer le serveur depuis les autres onglets.</p>'
@@ -2616,50 +2701,73 @@ const DASHBOARD_TABS = [
   {
     id: 'overview',
     label: 'Accueil',
-    eyebrow: 'Vue',
-    title: 'Accueil serveur'
+    eyebrow: 'Vue claire',
+    title: 'Accueil serveur',
+    description: 'État, alertes et actions récentes'
+  },
+  {
+    id: 'setup',
+    label: 'Premiers pas',
+    eyebrow: 'Guide',
+    title: 'Configuration guidée',
+    description: 'Installer dans le bon ordre'
   },
   {
     id: 'configuration',
-    label: 'Configuration',
-    eyebrow: 'Réglages',
-    title: 'Paramètres'
+    label: 'Réglages',
+    eyebrow: 'Base',
+    title: 'Configuration',
+    description: 'Langue, rôles et logs'
   },
   {
     id: 'service',
-    label: 'Service',
-    eyebrow: 'Equipe',
-    title: 'Prises de service'
+    label: 'Service & paie',
+    eyebrow: 'Heures',
+    title: 'Service et paie',
+    description: 'Présences, salaires et paiements'
+  },
+  {
+    id: 'dossiers',
+    label: 'Tickets',
+    eyebrow: 'Support',
+    title: 'Tickets et dossiers',
+    description: 'Demandes privées et suivi staff'
   },
   {
     id: 'moderation',
     label: 'Modération',
     eyebrow: 'Sécurité',
-    title: 'Actions rapides'
+    title: 'Sanctions',
+    description: 'Sanctions, auto-rôle et permissions'
   },
   {
     id: 'embeds',
     label: 'Annonces',
-    eyebrow: 'Embeds',
-    title: 'Messages Sentinel'
-  },
-  {
-    id: 'dossiers',
-    label: 'Dossiers',
-    eyebrow: 'Support',
-    title: 'Dossiers Sentinel'
+    eyebrow: 'Messages',
+    title: 'Embeds et annonces',
+    description: 'Messages propres sous Sentinel'
   },
   {
     id: 'audit',
     label: 'Historique',
-    eyebrow: 'Suivi',
-    title: 'Ce qui a été fait'
+    eyebrow: 'Traces',
+    title: 'Journal des actions',
+    description: 'Retrouver qui a fait quoi'
+  }
+];
+
+const DASHBOARD_TAB_GROUPS = [
+  {
+    label: 'Démarrer',
+    tabs: ['overview', 'setup', 'configuration']
   },
   {
-    id: 'setup',
-    label: 'Assistant',
-    eyebrow: 'Guide',
-    title: 'Configuration guidée'
+    label: 'Gérer',
+    tabs: ['service', 'dossiers', 'moderation', 'embeds']
+  },
+  {
+    label: 'Contrôler',
+    tabs: ['audit']
   }
 ];
 
@@ -2677,17 +2785,25 @@ function renderDashboardTabs(state, premiumBadge) {
         ${premiumBadge}
         <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
       </div>
-      <nav class="dashboard-tabs" aria-label="Sections du dashboard">
-        ${DASHBOARD_TABS.map((tab) => `
-          <button
-            type="button"
-            class="dashboard-tab${tab.id === activeDashboardTab ? ' is-active' : ''}"
-            data-dashboard-tab="${tab.id}"
-            aria-pressed="${tab.id === activeDashboardTab ? 'true' : 'false'}"
-          >
-            <span>${escapeHtml(tab.eyebrow)}</span>
-            <strong>${escapeHtml(tab.label)}</strong>
-          </button>
+      <nav class="dashboard-tab-groups" aria-label="Sections du dashboard">
+        ${DASHBOARD_TAB_GROUPS.map((group) => `
+          <section class="dashboard-tab-group">
+            <span class="dashboard-tab-group-label">${escapeHtml(group.label)}</span>
+            <div class="dashboard-tabs">
+              ${group.tabs.map((tabId) => DASHBOARD_TABS.find((tab) => tab.id === tabId)).filter(Boolean).map((tab) => `
+                <button
+                  type="button"
+                  class="dashboard-tab${tab.id === activeDashboardTab ? ' is-active' : ''}"
+                  data-dashboard-tab="${tab.id}"
+                  aria-pressed="${tab.id === activeDashboardTab ? 'true' : 'false'}"
+                >
+                  <span>${escapeHtml(tab.eyebrow)}</span>
+                  <strong>${escapeHtml(tab.label)}</strong>
+                  <small>${escapeHtml(tab.description)}</small>
+                </button>
+              `).join('')}
+            </div>
+          </section>
         `).join('')}
       </nav>
     </section>
@@ -3204,7 +3320,25 @@ async function loadGuilds() {
   renderGuilds();
 }
 
-async function selectGuild(guildId) {
+async function selectGuild(guildId, { restored = false } = {}) {
+  const guild = guilds.find((item) => item.id === guildId);
+
+  if (!guild || !guild.installed) {
+    if (restored) {
+      forgetLastGuildId(guildId);
+    }
+
+    selectedGuildId = null;
+    currentState = null;
+    renderGuilds();
+    renderDashboard();
+
+    if (!restored) {
+      toast(dashboardErrorMessage('Sentinel is not installed on this server.'), 'error');
+    }
+    return false;
+  }
+
   selectedGuildId = guildId;
   auditScope = 'server';
   auditFilters = {};
@@ -3215,25 +3349,27 @@ async function selectGuild(guildId) {
   expandedDossierId = null;
   renderGuilds();
 
-  const guild = guilds.find((item) => item.id === guildId);
-  if (guild && !guild.installed) {
-    currentState = null;
-    renderDashboard();
-    toast(dashboardErrorMessage('Sentinel is not installed on this server.'), 'error');
-    return;
-  }
-
-  window.SentinelAuth?.saveSettings?.({ lastGuildId: guildId });
-
   try {
     await refreshGuildState();
+    storeLastGuildId(guildId);
+    return true;
   } catch (error) {
+    if (restored) {
+      forgetLastGuildId(guildId);
+      selectedGuildId = null;
+      currentState = null;
+      renderGuilds();
+      renderDashboard();
+      return false;
+    }
+
     if (error.payload?.inviteUrl) {
       toast('Sentinel doit être autorisé sur ce serveur.', 'error');
       window.open(error.payload.inviteUrl, '_blank', 'noopener');
-      return;
+      return false;
     }
     toast(error.message, 'error');
+    return false;
   }
 }
 
@@ -3258,12 +3394,15 @@ async function bootstrap() {
     const restorableGuildId = getRestorableGuildId();
 
     if (restorableGuildId) {
-      await selectGuild(restorableGuildId);
+      await selectGuild(restorableGuildId, { restored: true });
+    } else {
+      renderDashboard();
     }
   } catch (error) {
     currentUser = null;
     currentSettings = null;
     renderUser();
+    renderDashboard();
   }
 }
 
