@@ -17,7 +17,11 @@ let expandedModerationCaseId = null;
 let selectedUserProfile = null;
 let dossierFilters = {};
 let expandedDossierId = null;
+let dashboardHydrating = false;
+let selectedGuildPreview = null;
 const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
+const GUILD_PREVIEW_CACHE_PREFIX = 'sentinel-dashboard-guild-preview';
+const PROFILE_STORAGE_KEY = 'sentinel-discord-profile';
 const SERVER_PRESETS = [
   {
     id: 'standard',
@@ -91,6 +95,21 @@ function lastGuildStorageKeys() {
   return keys;
 }
 
+function readStoredProfileUser() {
+  try {
+    const payload = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || 'null');
+    const user = payload?.user;
+
+    if (!user || !/^\d{17,20}$/.test(String(user.id || ''))) {
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    return null;
+  }
+}
+
 function readStoredLastGuildId() {
   try {
     for (const key of lastGuildStorageKeys()) {
@@ -105,6 +124,102 @@ function readStoredLastGuildId() {
   }
 
   return null;
+}
+
+function guildPreviewCacheKey(userId, guildId) {
+  if (!/^\d{17,20}$/.test(String(userId || '')) || !/^\d{17,20}$/.test(String(guildId || ''))) {
+    return null;
+  }
+
+  return `${GUILD_PREVIEW_CACHE_PREFIX}:${userId}:${guildId}`;
+}
+
+function readCachedGuildPreview(userId, guildId) {
+  const key = guildPreviewCacheKey(userId, guildId);
+
+  if (!key) {
+    return null;
+  }
+
+  try {
+    const preview = JSON.parse(localStorage.getItem(key) || 'null');
+
+    if (!preview || preview.id !== guildId || !preview.name) {
+      return null;
+    }
+
+    return preview;
+  } catch (error) {
+    return null;
+  }
+}
+
+function storeCachedGuildPreview(guild) {
+  const key = guildPreviewCacheKey(currentUser?.id, guild?.id);
+
+  if (!key) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      id: guild.id,
+      name: guild.name,
+      icon: guild.icon || null,
+      advanced: Boolean(guild.advanced),
+      cachedAt: new Date().toISOString()
+    }));
+  } catch (error) {
+    // Local cache only stores the server identity for instant display.
+  }
+}
+
+function rememberCurrentGuildPreview() {
+  if (!currentState?.guild) {
+    return;
+  }
+
+  selectedGuildPreview = {
+    ...currentState.guild,
+    advanced: Boolean(currentState.advanced)
+  };
+  storeCachedGuildPreview(selectedGuildPreview);
+}
+
+function removeCachedGuildPreview(userId, guildId) {
+  const key = guildPreviewCacheKey(userId, guildId);
+
+  if (!key) {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    // Storage can be blocked by browser settings.
+  }
+}
+
+function showCachedDashboardPreview() {
+  const storedUser = readStoredProfileUser();
+
+  if (storedUser && !currentUser) {
+    currentUser = storedUser;
+    renderUser();
+  }
+
+  const guildId = readStoredLastGuildId();
+
+  if (!currentUser?.id || !guildId) {
+    return false;
+  }
+
+  selectedGuildId = guildId;
+  dashboardHydrating = true;
+  selectedGuildPreview = readCachedGuildPreview(currentUser.id, guildId);
+  currentState = null;
+  renderDashboard();
+  return true;
 }
 
 function storeLastGuildId(guildId) {
@@ -163,6 +278,25 @@ function getRestorableGuildIds() {
 
 function getRestorableGuildId() {
   return getRestorableGuildIds()[0] || null;
+}
+
+function renderDashboardLoadingState(preview = selectedGuildPreview) {
+  const serverName = preview?.name || 'ton dernier serveur';
+  const serverIcon = preview?.icon
+    ? `<img src="${escapeHtml(preview.icon)}" alt="">`
+    : '<span class="guild-fallback">S</span>';
+
+  return `
+    <div class="empty-state dashboard-loading-state">
+      <img src="assets/sentinel-mark.png" alt="">
+      <span class="status-badge is-site">Dernier serveur</span>
+      <h2>${escapeHtml(serverName)}</h2>
+      <div class="dashboard-loading-server">${serverIcon}<strong>Réouverture du dashboard</strong></div>
+      <p>Sentinel remet ton dernier serveur en place et vérifie tes accès Discord.</p>
+      <div class="dashboard-loading-bar" aria-hidden="true"><span></span></div>
+      <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
+    </div>
+  `;
 }
 
 async function api(path, options = {}) {
@@ -2799,6 +2933,9 @@ const DASHBOARD_TAB_GROUPS = [
 
 function renderDashboardTabs(state, premiumBadge) {
   const activeTab = DASHBOARD_TABS.find((tab) => tab.id === activeDashboardTab) || DASHBOARD_TABS[0];
+  const syncBadge = dashboardHydrating
+    ? '<span class="status-badge is-syncing">Actualisation</span>'
+    : '';
 
   return `
     <section class="dashboard-control-panel">
@@ -2808,6 +2945,7 @@ function renderDashboardTabs(state, premiumBadge) {
         <p>${escapeHtml(state.guild.name)}</p>
       </div>
       <div class="control-status">
+        ${syncBadge}
         ${premiumBadge}
         <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
       </div>
@@ -2848,13 +2986,15 @@ function renderDashboard() {
   const main = $('[data-dashboard-main]');
 
   if (!currentState) {
-    main.innerHTML = `
-      <div class="empty-state">
-        <img src="assets/sentinel-mark.png" alt="">
-        <h2>Sélectionne un serveur</h2>
-        <p>Choisis un serveur pour voir les réglages et les actions disponibles.</p>
-      </div>
-    `;
+    main.innerHTML = dashboardHydrating || selectedGuildId
+      ? renderDashboardLoadingState()
+      : `
+        <div class="empty-state">
+          <img src="assets/sentinel-mark.png" alt="">
+          <h2>Sélectionne un serveur</h2>
+          <p>Choisis un serveur pour voir les réglages et les actions disponibles.</p>
+        </div>
+      `;
     return;
   }
 
@@ -3134,6 +3274,8 @@ async function refreshGuildState() {
   if (!selectedGuildId) return;
   const payload = await api(`/api/guilds/${selectedGuildId}/state`);
   currentState = payload.state;
+  dashboardHydrating = false;
+  rememberCurrentGuildPreview();
   renderDashboard();
 }
 
@@ -3147,6 +3289,8 @@ async function runAction(action, data, button = null) {
       body: JSON.stringify({ action, ...data })
     });
     currentState = payload.state;
+    dashboardHydrating = false;
+    rememberCurrentGuildPreview();
     renderDashboard();
     renderGuilds();
     toast(payload.message || 'Action terminée.');
@@ -3178,6 +3322,7 @@ async function loadAuditLogs(filters = auditFilters, scope = auditScope, button 
     auditScope = scope === 'global' && payload.auditLogs?.canViewGlobal ? 'global' : 'server';
     auditFilters = { ...filters };
     currentState.auditLogs = payload.auditLogs;
+    rememberCurrentGuildPreview();
     renderDashboard();
   } catch (error) {
     toast(dashboardErrorMessage(error.message), 'error');
@@ -3204,6 +3349,7 @@ async function loadModerationCases(filters = moderationFilters, button = null) {
     moderationFilters = { ...filters };
     expandedModerationCaseId = null;
     currentState.moderationCases = payload.moderationCases;
+    rememberCurrentGuildPreview();
     renderDashboard();
   } catch (error) {
     toast(dashboardErrorMessage(error.message), 'error');
@@ -3343,6 +3489,7 @@ function attachDashboardHandlers() {
 async function loadGuilds() {
   const payload = await api('/api/guilds');
   guilds = payload.guilds;
+  selectedGuildPreview = guilds.find((guild) => guild.id === selectedGuildId) || selectedGuildPreview;
   renderGuilds();
 }
 
@@ -3354,8 +3501,11 @@ async function selectGuild(guildId, { restored = false } = {}) {
       forgetLastGuildId(guildId);
     }
 
+    removeCachedGuildPreview(currentUser?.id, guildId);
     selectedGuildId = null;
     currentState = null;
+    selectedGuildPreview = null;
+    dashboardHydrating = false;
     renderGuilds();
     renderDashboard();
 
@@ -3373,7 +3523,11 @@ async function selectGuild(guildId, { restored = false } = {}) {
   selectedUserProfile = null;
   dossierFilters = {};
   expandedDossierId = null;
+  dashboardHydrating = true;
+  selectedGuildPreview = guild || readCachedGuildPreview(currentUser?.id, guildId);
+  currentState = null;
   renderGuilds();
+  renderDashboard();
 
   try {
     await refreshGuildState();
@@ -3382,19 +3536,26 @@ async function selectGuild(guildId, { restored = false } = {}) {
   } catch (error) {
     if (restored) {
       forgetLastGuildId(guildId);
+      removeCachedGuildPreview(currentUser?.id, guildId);
       selectedGuildId = null;
       currentState = null;
+      selectedGuildPreview = null;
+      dashboardHydrating = false;
       renderGuilds();
       renderDashboard();
       return false;
     }
 
+    dashboardHydrating = false;
+
     if (error.payload?.inviteUrl) {
       toast('Sentinel doit être autorisé sur ce serveur.', 'error');
       window.open(error.payload.inviteUrl, '_blank', 'noopener');
+      renderDashboard();
       return false;
     }
     toast(error.message, 'error');
+    renderDashboard();
     return false;
   }
 }
@@ -3409,6 +3570,7 @@ async function bootstrap() {
   $('[data-public-dashboard]')?.setAttribute('hidden', '');
   $('[data-login]')?.removeAttribute('hidden');
   $('[data-public-invite]')?.setAttribute('hidden', '');
+  showCachedDashboardPreview();
 
   try {
     const session = await api('/api/session');
@@ -3428,11 +3590,17 @@ async function bootstrap() {
     }
 
     if (!restoredGuild) {
+      selectedGuildId = null;
+      currentState = null;
+      dashboardHydrating = false;
       renderDashboard();
     }
   } catch (error) {
     currentUser = null;
     currentSettings = null;
+    selectedGuildId = null;
+    currentState = null;
+    dashboardHydrating = false;
     renderUser();
     renderDashboard();
   }
@@ -3527,6 +3695,8 @@ document.addEventListener('scroll', () => {
 
 $('[data-logout]')?.addEventListener('click', async () => {
   const guildKeysToClear = lastGuildStorageKeys();
+  const cachedUserId = currentUser?.id;
+  const cachedGuildId = selectedGuildId || readStoredLastGuildId();
 
   await api('/api/logout', { method: 'POST', body: '{}' }).catch(() => {});
   currentUser = null;
@@ -3534,9 +3704,12 @@ $('[data-logout]')?.addEventListener('click', async () => {
   selectedGuildId = null;
   currentState = null;
   currentSettings = null;
+  selectedGuildPreview = null;
+  dashboardHydrating = false;
   dossierFilters = {};
   expandedDossierId = null;
   localStorage.removeItem('sentinel-discord-profile');
+  removeCachedGuildPreview(cachedUserId, cachedGuildId);
   try {
     guildKeysToClear.forEach((key) => localStorage.removeItem(key));
   } catch (error) {
