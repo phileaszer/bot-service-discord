@@ -2522,6 +2522,16 @@ code {
 .global-lookup-panel {
   display: grid;
   gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(234, 242, 255, 0.1);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.055), transparent 48%, rgba(255, 45, 154, 0.045)),
+    rgba(7, 11, 20, 0.42);
+  clip-path: var(--cut);
+}
+
+.global-lookup-panel .panel-heading {
+  margin-bottom: 0;
 }
 
 .global-lookup-form {

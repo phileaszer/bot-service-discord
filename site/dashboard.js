@@ -1227,21 +1227,21 @@ function globalLookupPanel(state) {
   const value = selectedUserProfile?.user?.id || '';
 
   return `
-    <section class="dashboard-panel global-lookup-panel">
+    <article class="global-lookup-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Recherche rapide</p>
-          <h2>Retrouver une personne par ID</h2>
-          <p class="muted">Entre un ID Discord pour retrouver les heures, sanctions, tickets, paie et dernières actions liées à cette personne. Les résultats restent limités au serveur sélectionné.</p>
+          <p class="eyebrow">Recherche par ID</p>
+          <h2>Retrouver une personne dans l’historique</h2>
+          <p class="muted">Entre un ID Discord pour ouvrir la fiche liée à cette personne : heures, sanctions, tickets, paie et dernières actions.</p>
         </div>
-        <span class="status-badge is-site">Serveur sélectionné</span>
+        <span class="status-badge is-site">Historique serveur</span>
       </div>
       <form class="global-lookup-form" data-user-lookup>
         <input name="userId" placeholder="ID Discord" value="${escapeHtml(value)}" required>
         <button class="button" type="submit">Rechercher</button>
       </form>
       ${selectedUserProfile ? userProfilePanel(selectedUserProfile) : '<p class="muted">La recherche reste limitée au serveur sélectionné. Rien n’est affiché publiquement.</p>'}
-    </section>
+    </article>
   `;
 }
 
@@ -3037,6 +3037,7 @@ function renderAuditPanel(state) {
         </div>
         <span class="premium-badge">Premium sécurité</span>
       </div>
+      ${globalLookupPanel(state)}
       <div class="audit-overview">
         <article><span>Actions affichées</span><strong>${escapeHtml(auditItems.length)}</strong></article>
         <article><span>Réussites</span><strong>${escapeHtml(successCount)}</strong></article>
@@ -3254,7 +3255,6 @@ function renderDashboard() {
 
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
-    ${globalLookupPanel(state)}
     <div class="dashboard-tab-stage">
       ${tabPanel('overview', renderServerHome(state, premiumBadge))}
 
