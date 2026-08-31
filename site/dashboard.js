@@ -325,7 +325,83 @@ function dashboardErrorMessage(message) {
   const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
 
   if (language === 'en') {
-    return message || 'Action failed.';
+    const firstFix = currentState?.diagnostics?.fixes?.[0] || null;
+
+    if (/^Quota gratuit atteint/.test(message || '')) {
+      return `${message}\nFix: delete an existing embed from “Announcements”, or wait for Premium to create unlimited embeds.`;
+    }
+
+    if (/^Le gratuit permet/.test(message || '')) {
+      return `${message}\nFix: keep the current panel, delete the old one if needed, or wait for Premium to publish several reception panels.`;
+    }
+
+    const translated = {
+      'Login required.': 'Log in with Discord to use the dashboard.',
+      'Sentinel is not installed on this server.': 'Invite Sentinel to this server before using the dashboard.',
+      'You do not have access to this server dashboard.': 'You do not have access to this server dashboard.',
+      'You do not have permission to manage Sentinel on this server.': 'You do not have an allowed role to manage Sentinel on this server.',
+      'You do not have permission to manage Sentinel dossiers on this server.': 'You do not have a responsible role to manage Sentinel tickets on this server.',
+      'You do not have permission for this moderation action.': 'Your Discord role cannot perform this moderation action.',
+      'Sentinel does not have the required Discord permission.': 'Sentinel does not have the required Discord permission.',
+      'This action is reserved for Sentinel Premium.': 'This action is reserved for Sentinel Premium.',
+      'Invalid Discord user ID.': 'The Discord ID is not valid.',
+      'Text channel not found.': 'Text channel not found.',
+      'Role not found.': 'Discord role not found.',
+      'Invalid timeout duration.': 'Invalid timeout duration. Example: 10m, 2h, 7d.',
+      'Invalid temporary ban duration.': 'Invalid temporary ban duration.',
+      'Invalid slowmode duration.': 'Invalid slowmode duration.',
+      'Invalid hourly rate.': 'Invalid hourly rate.',
+      'Invalid payroll adjustment.': 'Invalid payroll adjustment.',
+      'Invalid message ID.': 'Invalid message ID.',
+      'No service role is configured.': 'No duty role is configured.',
+      'This user must be in the server to start duty.': 'This person must be in the server to start duty from the dashboard.',
+      'This user is already on duty.': 'This person is already on duty.',
+      'This user is not on duty.': 'This person is not on duty.',
+      'Invalid server profile.': 'Invalid server profile.',
+      'Case not found.': 'No case was found with this ID.',
+      'Missing dossier type.': 'Ticket type is missing.',
+      'Category not found.': 'Discord category not found.',
+      'Sentinel cannot send this embed in the selected channel.': 'Sentinel cannot send this embed in the selected channel.',
+      'No embed field provided.': 'Choose at least one embed field to update.',
+      'Sentinel embed not found.': 'No managed Sentinel embed matches this ID.',
+      'Unknown moderation action.': 'Unknown moderation action.',
+      'This channel is not a Sentinel dossier.': 'This channel is not a Sentinel ticket.'
+    };
+
+    const resolutionByMessage = {
+      'You do not have permission for this moderation action.': 'Check that your Discord role has the right permission, or add your role to Sentinel allowed roles.',
+      'Sentinel does not have the required Discord permission.': firstFix || 'Open the permissions diagnostic and fix the permission shown there.',
+      'Invalid Discord user ID.': 'Copy the full numeric Discord ID, not the username.',
+      'Text channel not found.': 'Choose a text channel that Sentinel can access.',
+      'Role not found.': 'Choose a Discord role that still exists on the server.',
+      'No service role is configured.': 'Open the assistant and choose the role given to members on duty.',
+      'This user must be in the server to start duty.': 'Check the Discord ID and make sure this person is still in the server.',
+      'This user is already on duty.': 'Use “End duty” if you want to stop the current session.',
+      'This user is not on duty.': 'No active duty session was found for this ID on this server.',
+      'Invalid server profile.': 'Choose one of the profiles shown in the assistant.',
+      'Invalid hourly rate.': 'Enter a positive hourly amount, for example 500 or 1250.',
+      'Invalid payroll adjustment.': 'Enter a Discord ID, a type, a positive amount, and a short reason.',
+      'Invalid message ID.': 'Copy the full numeric ID of the message sent by Sentinel.',
+      'Case not found.': 'Check the case ID in the latest cases table.',
+      'Category not found.': 'Choose a Discord category that still exists.',
+      'Sentinel cannot send this embed in the selected channel.': firstFix || 'Allow Sentinel to view the channel and send messages there.',
+      'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
+      'Sentinel embed not found.': 'Copy the ID from “Managed embeds”. If the Discord message was deleted, its slot will be freed.',
+      'This channel is not a Sentinel dossier.': 'Choose an open Sentinel ticket channel.',
+      'This action is reserved for Sentinel Premium.': 'This option is shown to prepare Premium, but it stays locked on free servers.'
+    };
+    const base = translated[message] || message || 'Action failed.';
+    const resolution = resolutionByMessage[message];
+
+    return resolution ? `${base}\nFix: ${resolution}` : base;
+  }
+
+  if (/^Quota gratuit atteint/.test(message || '')) {
+    return `${message}\nÀ faire : supprime un embed existant depuis “Annonces”, ou attends l’ouverture du Premium pour créer des embeds illimités.`;
+  }
+
+  if (/^Le gratuit permet/.test(message || '')) {
+    return `${message}\nÀ faire : garde le panneau actuel, supprime l’ancien panneau si besoin, ou attends le Premium pour publier plusieurs bureaux d’accueil.`;
   }
 
   const translated = {
@@ -345,6 +421,7 @@ function dashboardErrorMessage(message) {
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Invalid hourly rate.': 'Montant horaire invalide.',
     'Invalid payroll adjustment.': 'Ajustement de paie invalide.',
+    'Invalid message ID.': 'ID de message invalide.',
     'No service role is configured.': 'Aucun rôle de service n’est configuré.',
     'This user must be in the server to start duty.': 'Cette personne doit être présente sur le serveur pour prendre son service depuis le dashboard.',
     'This user is already on duty.': 'Cette personne est déjà en service.',
@@ -376,6 +453,7 @@ function dashboardErrorMessage(message) {
     'Invalid server profile.': 'Choisis un profil proposé dans l’assistant.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
     'Invalid payroll adjustment.': 'Indique un ID Discord, un type, un montant positif et une raison courte.',
+    'Invalid message ID.': 'Copie l’ID numérique complet du message envoyé par Sentinel.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
     'Sentinel cannot send this embed in the selected channel.': firstFix || 'Autorise Sentinel à voir le salon et à y envoyer des messages.',
@@ -1066,6 +1144,107 @@ function recentActions(state, limit = 5) {
   `;
 }
 
+function todayOverviewCards(state) {
+  const status = dashboardConfigStatus(state);
+  const alerts = dashboardResolutionItems(state);
+  const lastAction = (state.recentActions || state.auditLogs?.items || [])[0] || null;
+  const payroll = state.payroll || {};
+  const cards = [
+    {
+      eyebrow: 'Configuration',
+      value: status.ready ? 'Prête' : `${status.completedSteps}/4`,
+      detail: status.ready ? 'Les bases sont en place.' : 'L’assistant indique ce qui manque.',
+      ready: status.ready
+    },
+    {
+      eyebrow: 'Service',
+      value: state.summary.activeCount,
+      detail: 'agent(s) actuellement en service.',
+      ready: true
+    },
+    {
+      eyebrow: 'Tickets',
+      value: state.dossiers?.openCount || 0,
+      detail: 'dossier(s) ouverts à traiter.',
+      ready: true
+    },
+    {
+      eyebrow: 'Paie RP',
+      value: payroll.totals?.unpaidCount || 0,
+      detail: 'ligne(s) encore à payer cette semaine.',
+      ready: true
+    },
+    {
+      eyebrow: 'Alertes',
+      value: alerts.length,
+      detail: alerts.length ? 'point(s) à corriger.' : 'Aucun blocage visible.',
+      ready: alerts.length === 0
+    },
+    {
+      eyebrow: 'Dernière action',
+      value: lastAction ? formatAuditDate(lastAction.createdAt) : 'Aucune',
+      detail: lastAction ? (AUDIT_ACTION_LABELS[lastAction.action] || lastAction.action) : 'Pas encore d’action récente.',
+      ready: true
+    }
+  ];
+
+  return `
+    <div class="today-grid">
+      ${cards.map((card) => `
+        <article class="today-card ${card.ready ? 'is-ready' : 'is-warning'}">
+          <span>${escapeHtml(card.eyebrow)}</span>
+          <strong>${escapeHtml(card.value)}</strong>
+          <p>${escapeHtml(card.detail)}</p>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function planScopeCards(state) {
+  const premiumLabel = state.advanced ? 'Premium actif' : 'Premium préparé';
+  const premiumDetail = state.advanced
+    ? 'Historique plus long, options avancées, exports et automatisations selon les modules activés.'
+    : 'Le Premium servira aux gros staffs : exports, historique complet, panneaux illimités et automatisations.';
+
+  return `
+    <div class="plan-scope-grid">
+      <article class="plan-scope-card is-free">
+        <span>Gratuit actif</span>
+        <strong>Les bases utiles restent accessibles</strong>
+        <p>Service, paie simple, modération par ID, tickets, logs, dashboard et embeds limités.</p>
+      </article>
+      <article class="plan-scope-card ${state.advanced ? 'is-premium' : 'is-planned'}">
+        <span>${escapeHtml(premiumLabel)}</span>
+        <strong>Confort avancé pour les staffs</strong>
+        <p>${escapeHtml(premiumDetail)}</p>
+      </article>
+    </div>
+  `;
+}
+
+function globalLookupPanel(state) {
+  const value = selectedUserProfile?.user?.id || '';
+
+  return `
+    <section class="dashboard-panel global-lookup-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Recherche rapide</p>
+          <h2>Retrouver une personne par ID</h2>
+          <p class="muted">Entre un ID Discord pour retrouver les heures, sanctions, tickets, paie et dernières actions liées à cette personne. Les résultats restent limités au serveur sélectionné.</p>
+        </div>
+        <span class="status-badge is-site">Serveur sélectionné</span>
+      </div>
+      <form class="global-lookup-form" data-user-lookup>
+        <input name="userId" placeholder="ID Discord" value="${escapeHtml(value)}" required>
+        <button class="button" type="submit">Rechercher</button>
+      </form>
+      ${selectedUserProfile ? userProfilePanel(selectedUserProfile) : '<p class="muted">La recherche reste limitée au serveur sélectionné. Rien n’est affiché publiquement.</p>'}
+    </section>
+  `;
+}
+
 function renderServerHome(state, premiumBadge) {
   const status = dashboardConfigStatus(state);
 
@@ -1081,8 +1260,9 @@ function renderServerHome(state, premiumBadge) {
           ${premiumBadge}
         </div>
       </div>
-      ${metricCards(state)}
+      ${todayOverviewCards(state)}
       ${dashboardPath(state)}
+      ${planScopeCards(state)}
       <div class="server-home-grid pro-home-grid">
         <article class="home-block home-block-config">
           <div class="home-block-heading">
@@ -2665,14 +2845,61 @@ function moderationCaseList(state) {
   `;
 }
 
+function profileDossierList(dossiers) {
+  if (!dossiers.length) {
+    return '<p class="muted">Aucun ticket lié à cet ID.</p>';
+  }
+
+  return `
+    <ul class="compact-list">
+      ${dossiers.slice(0, 6).map((item) => `
+        <li>
+          <span>#${escapeHtml(item.id)} ${escapeHtml(dossierTypeLabel(item.type))}</span>
+          <small>${escapeHtml(dossierStatusLabel(item.status))} - ${escapeHtml(item.subject || 'Sans sujet')}</small>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+function profilePayrollSummary(payroll) {
+  if (!payroll) {
+    return '<p class="muted">La paie RP n’est pas disponible sur ce serveur.</p>';
+  }
+
+  if (!payroll.line) {
+    return '<p class="muted">Aucune ligne de paie trouvée pour cette semaine.</p>';
+  }
+
+  return `
+    <div class="profile-payroll-card">
+      <div>
+        <span>Semaine</span>
+        <strong>${escapeHtml(payroll.weekStart)} → ${escapeHtml(payroll.weekEnd)}</strong>
+      </div>
+      <div>
+        <span>Montant estimé</span>
+        <strong>${escapeHtml(payroll.line.amountLabel)}</strong>
+      </div>
+      <div>
+        <span>Statut</span>
+        <strong>${payroll.line.paid ? 'Payé' : 'À payer'}</strong>
+        ${payroll.line.paidAt ? `<small>${escapeHtml(formatSessionDate(payroll.line.paidAt))}</small>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 function userProfilePanel(profile) {
   if (!profile) {
-    return '<p class="muted">Entre un ID Discord pour voir les heures, sanctions et actions liées à cette personne.</p>';
+    return '<p class="muted">Entre un ID Discord pour voir les heures, sanctions, tickets, paie et actions liées à cette personne.</p>';
   }
 
   const sessions = profile.service?.sessions || [];
   const cases = profile.moderationCases?.items || [];
+  const dossiers = profile.dossiers?.items || [];
   const actions = profile.actions || [];
+  const payrollLine = profile.payroll?.line || null;
   const tag = profile.user.tag || profile.user.username || profile.user.id;
 
   return `
@@ -2703,6 +2930,15 @@ function userProfilePanel(profile) {
           <span>Sanctions</span>
           <strong>${escapeHtml(cases.length)}</strong>
         </article>
+        <article>
+          <span>Tickets</span>
+          <strong>${escapeHtml(dossiers.length)}</strong>
+        </article>
+        <article>
+          <span>Paie semaine</span>
+          <strong>${payrollLine ? escapeHtml(payrollLine.amountLabel) : 'Aucune'}</strong>
+          ${payrollLine ? `<small>${payrollLine.paid ? 'Payé' : 'À payer'}</small>` : ''}
+        </article>
       </div>
       <div class="user-profile-columns">
         <div>
@@ -2716,6 +2952,14 @@ function userProfilePanel(profile) {
           ${cases.length
             ? `<ul class="compact-list">${cases.map((item) => `<li><span>#${escapeHtml(item.id)} ${escapeHtml(AUDIT_ACTION_LABELS[item.action] || item.action)}</span><small>${escapeHtml(item.reason || 'Aucune raison')}</small></li>`).join('')}</ul>`
             : '<p class="muted">Aucune sanction enregistrée.</p>'}
+        </div>
+        <div>
+          <h4>Tickets liés</h4>
+          ${profileDossierList(dossiers)}
+        </div>
+        <div>
+          <h4>Paie de la semaine</h4>
+          ${profilePayrollSummary(profile.payroll)}
         </div>
         <div class="user-profile-wide">
           <h4>Dernières actions liées</h4>
@@ -3010,6 +3254,7 @@ function renderDashboard() {
 
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
+    ${globalLookupPanel(state)}
     <div class="dashboard-tab-stage">
       ${tabPanel('overview', renderServerHome(state, premiumBadge))}
 
@@ -3177,14 +3422,6 @@ function renderDashboard() {
           ${labelHelp('Derniers dossiers', 'Affiche les dernières sanctions enregistrées sur ce serveur. Les ID restent visibles même si la personne a quitté le Discord.')}
           ${moderationCaseFilters(state)}
           ${moderationCaseList(state)}
-        </article>
-        <article class="inline-form user-lookup-note">
-          ${labelHelp('Historique utilisateur', 'Entre un ID Discord pour consulter les heures, les sanctions et les actions liées à une personne.')}
-          <form class="inline-lookup-form" data-user-lookup>
-            <input name="userId" placeholder="ID Discord" required>
-            <button class="button" type="submit">Chercher</button>
-          </form>
-          ${userProfilePanel(selectedUserProfile)}
         </article>
         <article class="inline-form moderation-note">
           <h3>Inclus en gratuit</h3>
@@ -3597,12 +3834,16 @@ async function bootstrap() {
     }
   } catch (error) {
     currentUser = null;
+    guilds = [];
     currentSettings = null;
     selectedGuildId = null;
     currentState = null;
+    selectedUserProfile = null;
+    selectedGuildPreview = null;
     dashboardHydrating = false;
     renderUser();
-    renderDashboard();
+    renderGuilds();
+    showPublicDashboardGuide();
   }
 }
 

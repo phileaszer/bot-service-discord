@@ -927,20 +927,37 @@ function mapModerationCase(ctx, item) {
 function mapDossier(item) {
     return {
         id: item.id,
-        guildId: item.guildId,
-        channelId: item.channelId,
-        ownerUserId: item.ownerUserId,
-        openerUserId: item.openerUserId,
+        guildId: item.guildId || item.guild_id,
+        channelId: item.channelId || item.channel_id,
+        ownerUserId: item.ownerUserId || item.owner_user_id,
+        openerUserId: item.openerUserId || item.opener_user_id,
         type: item.type,
         status: item.status,
         priority: item.priority || 'normal',
         subject: item.subject || null,
         description: item.description || null,
-        referentUserId: item.referentUserId,
-        createdAt: item.createdAt,
-        closedAt: item.closedAt,
-        closedByUserId: item.closedByUserId
+        referentUserId: item.referentUserId || item.referent_user_id,
+        createdAt: item.createdAt || item.created_at,
+        closedAt: item.closedAt || item.closed_at,
+        closedByUserId: item.closedByUserId || item.closed_by_user_id
     };
+}
+
+function getUserDossiersForProfile(guildId, userId, limit = 10) {
+    const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
+
+    return db.prepare(`
+        SELECT *
+        FROM sentinel_dossiers
+        WHERE guild_id = ?
+          AND (
+            owner_user_id = ?
+            OR opener_user_id = ?
+            OR referent_user_id = ?
+          )
+        ORDER BY status != 'closed' DESC, datetime(created_at) DESC, id DESC
+        LIMIT ?
+    `).all(guildId, userId, userId, userId, safeLimit).map(mapDossier);
 }
 
 function permissionCheck(id, label, ok, fix, detail = null) {
@@ -1099,9 +1116,18 @@ async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
         || isCreatorUser(session?.user?.id);
     const sessionLimit = advanced ? 25 : 5;
     const caseLimit = advanced ? 25 : 10;
+    const dossierLimit = advanced ? 25 : 10;
     const userData = ctx.helpers.getUserData(guild.id, userId);
     const sessions = ctx.helpers.getUserSessions(guild.id, userId, sessionLimit);
     const cases = ctx.helpers.getModerationCases(guild.id, userId, caseLimit);
+    const dossiers = getUserDossiersForProfile(guild.id, userId, dossierLimit);
+    const payroll = ctx.helpers.getWeeklyPayroll
+        ? ctx.helpers.getWeeklyPayroll(guild.id, {
+            language: ctx.helpers.getGuildLanguage(guild.id),
+            guild
+        })
+        : null;
+    const payrollLine = payroll?.items?.find(item => item.userId === userId) || null;
     const actionsByTarget = getDashboardAuditLogs({ guildId: guild.id, targetId: userId, limit: 10 });
     const actionsByActor = getDashboardAuditLogs({ guildId: guild.id, actorUserId: userId, limit: 10 });
     const actions = Array.from(
@@ -1135,6 +1161,27 @@ async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
             limit: caseLimit,
             items: cases.map(item => mapModerationCase(ctx, item))
         },
+        dossiers: {
+            limit: dossierLimit,
+            items: dossiers
+        },
+        payroll: payroll
+            ? {
+                weekStart: payroll.weekStart,
+                weekEnd: payroll.weekEnd,
+                line: payrollLine
+                    ? {
+                        totalTimeLabel: payrollLine.totalTimeLabel,
+                        hourlyRateLabel: payrollLine.hourlyRateLabel,
+                        adjustmentAmountLabel: payrollLine.adjustmentAmountLabel,
+                        amountLabel: payrollLine.amountLabel,
+                        paid: payrollLine.paid,
+                        paidAt: payrollLine.paidAt,
+                        paidByUserId: payrollLine.paidByUserId
+                    }
+                    : null
+            }
+            : null,
         actions
     };
 }
