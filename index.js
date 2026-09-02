@@ -112,10 +112,13 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-08-31-dashboard-polish-v11';
+const SENTINEL_BUILD = 'community-suite-2026-09-02-reference-service-v12';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
+const REFERENCE_SERVICE_ROLE_NAME = '🟢 Sentinel | En service';
+const REFERENCE_LOG_CHANNEL_NAMES = ['📂｜logs'];
+const REFERENCE_AUTO_ROLE_NAME = '◌ Sentinel | Nouveau';
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const PREMIUM_SERVER_GOAL = Number.parseInt(process.env.PREMIUM_SERVER_GOAL || '50', 10);
 const DATABASE_FILE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db');
@@ -1620,6 +1623,63 @@ function hasSentinelStaffRole(member) {
     const premiumRoleNames = new Set(getPremiumRoleNames());
 
     return member.roles.cache.some(role => premiumRoleNames.has(normalizeRoleName(role.name)));
+}
+
+async function ensureReferenceGuildRuntimeConfig() {
+    const guild = client.guilds.cache.get(SENTINEL_REFERENCE_GUILD_ID)
+        || await client.guilds.fetch(SENTINEL_REFERENCE_GUILD_ID).catch(() => null);
+
+    if (!guild) {
+        return {
+            skipped: true,
+            reason: 'serveur de reference inaccessible'
+        };
+    }
+
+    await Promise.all([
+        guild.roles.fetch().catch(() => null),
+        guild.channels.fetch().catch(() => null)
+    ]);
+
+    const config = getGuildConfig(guild.id);
+    const serviceRole = findRoleByName(guild, REFERENCE_SERVICE_ROLE_NAME);
+    const logChannel = findGuildTextChannel(guild, REFERENCE_LOG_CHANNEL_NAMES);
+    const autoRole = findRoleByName(guild, REFERENCE_AUTO_ROLE_NAME);
+    const nextConfig = {};
+
+    if (serviceRole && (!config.serviceRoleId || !guild.roles.cache.has(config.serviceRoleId))) {
+        nextConfig.serviceRoleId = serviceRole.id;
+    }
+
+    if (logChannel && (!config.logChannelId || !guild.channels.cache.has(config.logChannelId))) {
+        nextConfig.logChannelId = logChannel.id;
+    }
+
+    if (autoRole && (!config.autoRoleId || !guild.roles.cache.has(config.autoRoleId))) {
+        nextConfig.autoRoleId = autoRole.id;
+    }
+
+    if (Object.keys(nextConfig).length > 0) {
+        updateGuildConfig(guild.id, nextConfig);
+    }
+
+    const staffRoles = SENTINEL_STAFF_ROLES
+        .map(roleName => findRoleByName(guild, roleName))
+        .filter(Boolean);
+
+    for (const role of staffRoles) {
+        addCommandRole(guild.id, role.id);
+        addDossierRole(guild.id, role.id);
+    }
+
+    return {
+        skipped: false,
+        updated: Object.keys(nextConfig),
+        serviceRole: serviceRole?.name || null,
+        logChannel: logChannel?.name || null,
+        autoRole: autoRole?.name || null,
+        staffRoles: staffRoles.map(role => role.name)
+    };
 }
 
 function formatCommandRoleList(guildId, language = 'fr') {
@@ -9280,6 +9340,22 @@ client.once(Events.ClientReady, async () => {
         } else {
             console.log(`Synchronisation serveur Sentinel terminee : ${syncResult.created} creation(s), ${syncResult.updated} mise(s) a jour.`);
         }
+
+        const referenceConfig = await ensureReferenceGuildRuntimeConfig();
+
+        if (referenceConfig.skipped) {
+            console.log(`Configuration serveur Sentinel ignoree : ${referenceConfig.reason}`);
+        } else {
+            console.log([
+                'Configuration serveur Sentinel verifiee',
+                `role service=${referenceConfig.serviceRole || 'absent'}`,
+                `logs=${referenceConfig.logChannel || 'absent'}`,
+                `auto-role=${referenceConfig.autoRole || 'absent'}`,
+                `roles staff=${referenceConfig.staffRoles.length}`,
+                `maj=${referenceConfig.updated.length || 0}`
+            ].join(' | '));
+        }
+
         await updateAllSentinelStatusPanels();
         await processExpiredTemporaryBans();
     } catch (error) {

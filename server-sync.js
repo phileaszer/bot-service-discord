@@ -28,6 +28,7 @@ const ROLES = [
     { name: '◆ Sentinel | Administrateur', color: 0xd91b7d, hoist: true },
     { name: '◇ Sentinel | Moderateur', color: COLORS.violet, hoist: true },
     { name: '✚ Sentinel | Support', color: COLORS.cyan, hoist: true },
+    { name: '🟢 Sentinel | En service', color: 0x2ecc71, hoist: true },
     { name: '⚡ Sentinel | Testeur beta', aliases: ['⚡ Sentinel | Beta Tester'], color: 0x00b8ff, hoist: false },
     { name: '◈ Sentinel | Membre', color: 0x2f3136, hoist: false },
     { name: '◌ Sentinel | Nouveau', color: 0x777777, hoist: false },
