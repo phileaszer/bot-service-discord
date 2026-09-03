@@ -712,8 +712,16 @@ async function ensurePanel(channel, panel, clientUserId, result) {
     }
 
     const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+    const expectedTitles = new Set(
+        (payload.embeds || [])
+            .map(panelEmbed => panelEmbed?.data?.title || panelEmbed?.title)
+            .filter(Boolean)
+    );
     const botMessages = messages
-        ? messages.filter(message => message.author.id === clientUserId)
+        ? messages.filter(message =>
+            message.author.id === clientUserId
+            && message.embeds.some(messageEmbed => expectedTitles.has(messageEmbed.title))
+        )
         : null;
 
     if (botMessages?.size) {
@@ -722,10 +730,6 @@ async function ensurePanel(channel, panel, clientUserId, result) {
             await channel.send(payload);
             result.created += 1;
         });
-
-        for (const message of botMessages.filter(message => message.id !== first.id).values()) {
-            await message.delete().catch(() => {});
-        }
 
         result.updated += 1;
         return;

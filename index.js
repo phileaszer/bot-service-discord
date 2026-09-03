@@ -112,7 +112,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-03-service-diagnostic-v13';
+const SENTINEL_BUILD = 'community-suite-2026-09-03-panel-safe-sync-v14';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
