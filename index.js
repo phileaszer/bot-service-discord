@@ -112,7 +112,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-02-reference-service-v12';
+const SENTINEL_BUILD = 'community-suite-2026-09-03-service-diagnostic-v13';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -243,11 +243,15 @@ const I18N = {
         resetCancelled: '✅ Réinitialisation annulée.',
         resetGuildDone: '✅ Toutes les heures de service de ce serveur ont été réinitialisées.',
         noServiceRole: '❌ Aucun rôle de service n’est configuré sur ce serveur.\nUtilise `/config-role` pour en définir un.',
+        serviceRoleEveryoneDenied: '❌ Le rôle de service ne peut pas être `@everyone`.\nChoisis un vrai rôle avec `/config-role`, puis réessaie.',
+        serviceRoleManagedDenied: '❌ Sentinel ne peut pas gérer le rôle de service {role}, car il est contrôlé par une intégration Discord.\nChoisis un rôle classique avec `/config-role`, puis réessaie.',
+        serviceRoleMissingManageRoles: '❌ Sentinel ne peut pas gérer le rôle de service, car il n’a pas la permission `Gérer les rôles`.\nAjoute cette permission au rôle Sentinel, puis réessaie.',
+        serviceRoleTooHigh: '❌ Sentinel ne peut pas gérer le rôle de service {role}, car ce rôle est placé trop haut.\nMonte le rôle {botRole} au-dessus de {role} dans les réglages Discord, puis réessaie.',
         serviceLeftLog: '🔴 {member} a quitté son service.\n⏱️ Durée : **{duration}**\n📊 Total : **{total}**',
         serviceLeft: '🔴 Tu as quitté ton service.\n⏱️ Durée de cette session : **{duration}**',
         serviceStartedLog: '🟢 {member} a pris son service.',
         serviceStarted: '🟢 Tu as pris ton service.',
-        serviceError: '❌ Une erreur est survenue. Regarde le terminal du bot.',
+        serviceError: '❌ Sentinel n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
         showMyHoursLabel: 'Mes heures',
         activeLabel: 'En service',
         toggleLabel: 'Prendre / Quitter',
@@ -435,11 +439,15 @@ const I18N = {
         resetCancelled: '✅ Reset cancelled.',
         resetGuildDone: '✅ All service hours on this server have been reset.',
         noServiceRole: '❌ No service role is configured on this server.\nUse `/config-role` to set one.',
+        serviceRoleEveryoneDenied: '❌ The service role cannot be `@everyone`.\nChoose a real role with `/config-role`, then try again.',
+        serviceRoleManagedDenied: '❌ Sentinel cannot manage the service role {role}, because it is controlled by a Discord integration.\nChoose a normal role with `/config-role`, then try again.',
+        serviceRoleMissingManageRoles: '❌ Sentinel cannot manage the service role because it does not have the `Manage Roles` permission.\nAdd this permission to the Sentinel role, then try again.',
+        serviceRoleTooHigh: '❌ Sentinel cannot manage the service role {role}, because this role is too high.\nMove {botRole} above {role} in Discord settings, then try again.',
         serviceLeftLog: '🔴 {member} ended their service.\n⏱️ Duration: **{duration}**\n📊 Total: **{total}**',
         serviceLeft: '🔴 You ended your service.\n⏱️ Session duration: **{duration}**',
         serviceStartedLog: '🟢 {member} started their service.',
         serviceStarted: '🟢 You started your service.',
-        serviceError: '❌ An error occurred. Check the bot terminal.',
+        serviceError: '❌ Sentinel could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
         showMyHoursLabel: 'My hours',
         activeLabel: 'On duty',
         toggleLabel: 'Start / End',
@@ -4511,6 +4519,35 @@ function getServiceRole(guild) {
     }
 
     return guild.roles.cache.get(guildConfig.serviceRoleId);
+}
+
+function getServiceRoleManageError(guild, role, language = 'fr') {
+    if (!role) {
+        return t(language, 'noServiceRole');
+    }
+
+    if (role.id === guild.id) {
+        return t(language, 'serviceRoleEveryoneDenied');
+    }
+
+    if (role.managed) {
+        return t(language, 'serviceRoleManagedDenied', { role });
+    }
+
+    const botMember = guild.members.me;
+    const botRole = botMember?.roles.highest || 'Sentinel';
+    const canManageRoles = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ManageRoles));
+    const botRoleAbove = Boolean(botMember && botMember.roles.highest.comparePositionTo(role) > 0);
+
+    if (!canManageRoles) {
+        return t(language, 'serviceRoleMissingManageRoles');
+    }
+
+    if (!botRoleAbove) {
+        return t(language, 'serviceRoleTooHigh', { role, botRole });
+    }
+
+    return null;
 }
 
 function getAutoRole(guild) {
@@ -10345,6 +10382,18 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
+        const roleManageError = getServiceRoleManageError(interaction.guild, role, buttonLanguage);
+
+        if (roleManageError) {
+            auditStatus = 'failed';
+            auditSummary = roleManageError;
+
+            return interaction.reply({
+                content: roleManageError,
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
         const member = interaction.member;
         const guildId = interaction.guild.id;
         const userId = member.id;
@@ -10358,13 +10407,16 @@ client.on(Events.InteractionCreate, async interaction => {
             if (startTime) {
                 duration = Date.now() - startTime;
                 totalTime += duration;
+            }
+
+            await member.roles.remove(role);
+
+            if (duration > 0) {
                 addSession(guildId, userId, duration);
             }
 
             updateUserTime(guildId, userId, totalTime, null);
             clearLongServiceAlert(guildId, userId);
-
-            await member.roles.remove(role);
 
             await sendServiceLog(interaction.guild, member, 'end', {
                 duration,
@@ -10381,10 +10433,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
         const serviceStartTime = Date.now();
 
+        await member.roles.add(role);
+
         updateUserTime(guildId, userId, userData.totalTime, serviceStartTime);
         clearLongServiceAlert(guildId, userId);
-
-        await member.roles.add(role);
 
         await sendServiceLog(interaction.guild, member, 'start', {
             startTime: serviceStartTime,
