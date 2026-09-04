@@ -112,7 +112,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-03-panel-safe-sync-v14';
+const SENTINEL_BUILD = 'community-suite-2026-09-04-final-polish-v15';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -226,8 +226,8 @@ const I18N = {
         payrollPaidStatus: 'payée',
         payrollUnpaidStatus: 'non payée',
         payrollEmpty: '📄 Aucune heure de service enregistrée sur la semaine en cours.',
-        pingOk: '🏓 Pong ! SQLite OK. Latence Discord : **{ping}ms**',
-        pingDbError: '❌ Le bot répond, mais SQLite ne répond pas correctement.',
+        pingOk: '🏓 Pong ! Données internes OK. Latence Discord : **{ping}ms**',
+        pingDbError: '❌ Le bot répond, mais les données internes ne répondent pas correctement.',
         freeHistoryOwnOnly: 'En gratuit, tu peux consulter seulement ton historique personnel et les {limit} dernières sessions.',
         noMemberHours: '⏱️ {member} n’a encore aucune heure enregistrée sur ce serveur.',
         noActive: '🟢 Aucun agent n’est actuellement en service sur ce serveur.',
@@ -422,8 +422,8 @@ const I18N = {
         payrollPaidStatus: 'paid',
         payrollUnpaidStatus: 'unpaid',
         payrollEmpty: '📄 No service time recorded for the current week.',
-        pingOk: '🏓 Pong! SQLite OK. Discord latency: **{ping}ms**',
-        pingDbError: '❌ The bot is responding, but SQLite is not responding correctly.',
+        pingOk: '🏓 Pong! Internal data OK. Discord latency: **{ping}ms**',
+        pingDbError: '❌ The bot is responding, but internal data is not responding correctly.',
         freeHistoryOwnOnly: 'In free mode, you can only view your personal history and the last {limit} sessions.',
         noMemberHours: '⏱️ {member} does not have any recorded hours on this server yet.',
         noActive: '🟢 No agent is currently on duty on this server.',
@@ -1306,13 +1306,13 @@ function startDatabaseBackupSchedule() {
     }
 
     createDatabaseBackup('startup')
-        .then(backupPath => console.log(`Sauvegarde SQLite creee : ${backupPath}`))
-        .catch(error => console.error('Erreur sauvegarde SQLite au demarrage :', error));
+        .then(backupPath => console.log(`Sauvegarde locale créée : ${backupPath}`))
+        .catch(error => console.error('Erreur sauvegarde locale au demarrage :', error));
 
     databaseBackupTimer = setInterval(() => {
         createDatabaseBackup('auto')
-            .then(backupPath => console.log(`Sauvegarde SQLite creee : ${backupPath}`))
-            .catch(error => console.error('Erreur sauvegarde SQLite planifiee :', error));
+            .then(backupPath => console.log(`Sauvegarde locale créée : ${backupPath}`))
+            .catch(error => console.error('Erreur sauvegarde locale planifiee :', error));
     }, DATABASE_BACKUP_INTERVAL_MS);
 }
 
@@ -3948,6 +3948,23 @@ function buildCustomAnnouncementEmbed(data, language = 'fr') {
     return embed;
 }
 
+function mapCustomEmbedMessageData(message) {
+    const embed = message?.embeds?.[0];
+
+    if (!embed?.title || !embed?.description) {
+        return null;
+    }
+
+    return {
+        title: embed.title,
+        description: embed.description,
+        color: embed.hexColor || '#ff2d9a',
+        imageUrl: embed.image?.url || null,
+        thumbnailUrl: embed.thumbnail?.url || null,
+        footer: embed.footer?.text || null
+    };
+}
+
 function getCustomEmbedChannelError(guild, channel, roleToPing = null, language = 'fr') {
     if (!channel || !channel.isTextBased()) {
         return t(language, 'channelNotText');
@@ -5107,7 +5124,7 @@ async function buildDiagnosticEmbed(guild, requester) {
             {
                 name: 'Base de données',
                 value: [
-                    diagnosticLine(databaseOk, 'SQLite répond'),
+                    diagnosticLine(databaseOk, 'Données internes disponibles'),
                     `Agents suivis : **${getRegisteredUserCount(guild.id)}**`,
                     `Services actifs : **${getActiveServices(guild.id).length}**`
                 ].join('\n'),
@@ -5201,7 +5218,7 @@ function buildSyncServiceEmbed(requester, result) {
     return createSentinelEmbed({
         color: result.failedRoleRemovals > 0 ? SENTINEL_COLORS.warning : SENTINEL_COLORS.success,
         title: 'Sentinel | Synchronisation',
-        description: 'La base SQLite et le rôle de service ont été remis en cohérence.',
+        description: 'Les données de service et le rôle Discord ont été remis en cohérence.',
         requester
     })
         .addFields(
@@ -5296,8 +5313,8 @@ function buildSentinelStatusEmbed(guild, requester = client.user) {
             inline: false
         },
         {
-            name: 'SQLite',
-            value: databaseOk ? 'OK - base disponible' : 'A verifier - base indisponible',
+            name: 'Données internes',
+            value: databaseOk ? 'OK - données accessibles' : 'À vérifier - données indisponibles',
             inline: true
         },
         {
@@ -5651,7 +5668,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs gratuits, modifications illimitees.`,
             '`/reset-heures-all` sera reserve a l abonnement Premium Sentinel.',
             'Moderation gratuite : avertissements, timeout, kick, ban par ID, purge et consultation simple des 10 derniers cas.',
-            'Les donnees restent stockees en SQLite pour le fonctionnement du bot.',
+            'Les données restent limitées à ce qui est nécessaire au fonctionnement du bot.',
             'Les options avancees ne sont pas ouvertes publiquement pour le moment.'
         ];
     const troubleshooting = [
@@ -5778,7 +5795,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/support` shows support and official links.',
                             '`/premium` shows the Premium launch progress.',
                             '`/diagnostic` checks permissions and role order.',
-                            '`/ping` checks whether Sentinel and SQLite respond.'
+                            '`/ping` checks whether Sentinel and its internal data respond.'
                         ].join('\n')
                     }
                 ]
@@ -6093,7 +6110,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/support` affiche les liens officiels et le serveur support.',
                         '`/premium` affiche la progression avant l’ouverture Premium.',
                         '`/diagnostic` vérifie les permissions et l’ordre des rôles.',
-                        '`/ping` vérifie que Sentinel et SQLite répondent.'
+                        '`/ping` vérifie que Sentinel et ses données internes répondent.'
                     ].join('\n')
                 }
             ]
@@ -8845,15 +8862,12 @@ function getCustomEmbedInteractionInput(interaction) {
 }
 
 async function fetchManagedCustomEmbedMessage(guildId, fallbackChannel, messageId) {
-    const record = getCustomEmbedRecord(guildId, messageId);
-
-    if (!record) {
-        return { record: null, message: null, channel: null };
-    }
-
     const guild = fallbackChannel?.guild || client.guilds.cache.get(guildId);
-    const channel = guild?.channels.cache.get(record.channel_id)
-        || await guild?.channels.fetch(record.channel_id).catch(() => null);
+    const existingRecord = getCustomEmbedRecord(guildId, messageId);
+    const channelId = existingRecord?.channel_id || fallbackChannel?.id || null;
+    const channel = channelId
+        ? guild?.channels.cache.get(channelId) || await guild?.channels.fetch(channelId).catch(() => null)
+        : null;
 
     if (!channel || !channel.isTextBased()) {
         return { record: null, message: null, channel: null };
@@ -8862,9 +8876,24 @@ async function fetchManagedCustomEmbedMessage(guildId, fallbackChannel, messageI
     const message = await channel.messages.fetch(messageId).catch(() => null);
 
     if (!message || message.author.id !== client.user.id) {
-        deleteCustomEmbedRecord(guildId, messageId);
+        if (existingRecord) {
+            deleteCustomEmbedRecord(guildId, messageId);
+        }
         return { record: null, message: null, channel: null };
     }
+
+    if (existingRecord) {
+        return { record: existingRecord, message, channel };
+    }
+
+    const data = mapCustomEmbedMessageData(message);
+
+    if (!data) {
+        return { record: null, message: null, channel: null };
+    }
+
+    addCustomEmbedRecord(guildId, channel.id, message.id, client.user.id, data);
+    const record = getCustomEmbedRecord(guildId, message.id);
 
     return { record, message, channel };
 }
@@ -9320,6 +9349,7 @@ client.once(Events.ClientReady, async () => {
             getRecentModerationCases,
             getModerationTargetError,
             getCustomEmbedChannelError,
+            getServiceRoleManageError,
             getReason,
             getServiceRole,
             getServiceSummary,
@@ -9336,6 +9366,7 @@ client.once(Events.ClientReady, async () => {
             hasCommandRoleAccess,
             hasAdvancedAccess,
             memberCanManageDossier,
+            mapCustomEmbedMessageData,
             hasModerationAccess,
             isAdvancedGuild,
             normalizeUserId,
@@ -9624,6 +9655,14 @@ client.on(Events.InteractionCreate, async interaction => {
             }
 
             const role = interaction.options.getRole('role');
+            const roleError = getServiceRoleManageError(interaction.guild, role, language);
+
+            if (roleError) {
+                return interaction.reply({
+                    content: roleError,
+                    flags: MessageFlags.Ephemeral
+                });
+            }
 
             updateGuildConfig(guildId, {
                 serviceRoleId: role.id
@@ -9972,7 +10011,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     flags: MessageFlags.Ephemeral
                 });
             } catch (error) {
-                console.error('Erreur ping SQLite :', error);
+                console.error('Erreur ping données internes :', error);
 
                 return interaction.reply({
                     content: t(language, 'pingDbError'),
@@ -10615,7 +10654,7 @@ client.on(Events.MessageCreate, async message => {
 
             return message.reply(t(language, 'pingOk', { ping: client.ws.ping }));
         } catch (error) {
-            console.error('Erreur ping SQLite :', error);
+            console.error('Erreur ping données internes :', error);
 
             return message.reply(t(language, 'pingDbError'));
         }

@@ -21,7 +21,6 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 - Annonces : création et modification d'embeds publiés sous l'identité de Sentinel.
 - Dashboard : configuration du serveur, actions rapides, audit, suivi des services, sanctions, dossiers et annonces.
 - Langues : français et anglais, avec un choix propre à chaque serveur.
-- Stockage : base SQLite locale avec `better-sqlite3`.
 
 ## Version gratuite
 
@@ -112,7 +111,7 @@ Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe, ne 
 
 Les données nécessaires au fonctionnement sont décrites dans la Politique de confidentialité : identifiants Discord, configuration serveur, temps de service, sanctions, dossiers, annonces, sessions dashboard et journal d'audit.
 
-Les informations d'exploitation du bot restent privées. Les fichiers `.env`, bases de données, logs et sauvegardes locales ne doivent jamais être publiés.
+Les informations d'exploitation du bot restent privées. Les fichiers de configuration, données internes, logs et sauvegardes locales ne doivent jamais être publiés.
 
 ## Licence
 
@@ -141,7 +140,6 @@ Main features:
 - announcement embeds, with unlimited access planned for Premium;
 - web dashboard;
 - per-server language selection;
-- SQLite storage with `better-sqlite3`.
 
 For setup, invite Sentinel, choose the server language, configure the duty role, configure the log channel, add authorized roles, then publish the duty panel or the ticket panel. Ticket responsible roles can be configured from the dashboard.
 

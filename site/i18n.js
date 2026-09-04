@@ -1523,6 +1523,7 @@
 
   Object.assign(en, {
     'Premium : accès illimité aux embeds Sentinel, créations et modifications illimitées.': 'Premium: unlimited access to Sentinel embeds, with unlimited creation and edits.',
+    'Modifie un embed Sentinel déjà envoyé avec son ID de message. Choisis le salon si l’embed n’apparaît pas encore dans la liste gérée.': 'Edits an already sent Sentinel embed with its message ID. Choose the channel if the embed does not appear in the managed list yet.',
     'Modifie un embed Sentinel déjà envoyé avec son ID de message. Les modifications ne consomment pas de quota et Sentinel retrouve le salon automatiquement.': 'Edits an already sent Sentinel embed with its message ID. Edits do not consume quota and Sentinel finds the channel automatically.',
     'Supprime un embed géré par Sentinel avec son ID de message et libère son emplacement gratuit si le serveur n’est pas Premium.': 'Deletes a Sentinel-managed embed with its message ID and frees its free slot if the server is not Premium.',
     'En gratuit, les responsables peuvent répondre, ajouter des intervenants, prendre le ticket en charge, corriger son statut, générer un compte rendu et le clôturer.': 'On free servers, responsible roles can reply, add participants, take over the ticket, correct its status, generate a transcript, and close it.',

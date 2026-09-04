@@ -38,8 +38,8 @@ function pruneBackups() {
     pruneBackups();
     db.close();
 
-    console.log(`Sauvegarde SQLite creee : ${destination}`);
+    console.log(`Sauvegarde locale créée : ${destination}`);
 })().catch(error => {
-    console.error('Erreur sauvegarde SQLite :', error);
+    console.error('Erreur sauvegarde locale :', error);
     process.exitCode = 1;
 });

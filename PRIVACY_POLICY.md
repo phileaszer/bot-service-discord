@@ -72,7 +72,7 @@ Une demande peut nécessiter de vérifier que la personne est autorisée à agir
 
 ## Sécurité
 
-Les données sont stockées dans une base SQLite utilisée par le bot. Des mesures raisonnables sont prises pour limiter l'accès aux données aux besoins techniques du service.
+Les données sont conservées dans l'environnement technique de Sentinel. Des mesures raisonnables sont prises pour limiter l'accès aux données aux besoins du service.
 
 Aucun système ne peut être garanti comme totalement sécurisé. Il est donc recommandé de ne pas stocker d'informations sensibles dans les raisons de sanctions, les dossiers/tickets, les annonces ou les messages destinés au bot.
 
@@ -160,7 +160,7 @@ A request may require verification that the requester is authorized to act for t
 
 ## Security
 
-Data is stored in a SQLite database used by the bot. Reasonable measures are taken to limit access to what is technically required for the service.
+Data is stored in Sentinel's technical environment. Reasonable measures are taken to limit access to what is required for the service.
 
 No system can be guaranteed to be fully secure. Servers should avoid storing sensitive information in moderation reasons, tickets, announcements or messages sent to the bot.
 

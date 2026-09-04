@@ -363,7 +363,7 @@ function dashboardErrorMessage(message) {
       'Category not found.': 'Discord category not found.',
       'Sentinel cannot send this embed in the selected channel.': 'Sentinel cannot send this embed in the selected channel.',
       'No embed field provided.': 'Choose at least one embed field to update.',
-      'Sentinel embed not found.': 'No managed Sentinel embed matches this ID.',
+      'Sentinel embed not found.': 'No Sentinel embed was found with this ID in the selected channel.',
       'Unknown moderation action.': 'Unknown moderation action.',
       'This channel is not a Sentinel dossier.': 'This channel is not a Sentinel ticket.'
     };
@@ -386,7 +386,7 @@ function dashboardErrorMessage(message) {
       'Category not found.': 'Choose a Discord category that still exists.',
       'Sentinel cannot send this embed in the selected channel.': firstFix || 'Allow Sentinel to view the channel and send messages there.',
       'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
-      'Sentinel embed not found.': 'Copy the ID from “Managed embeds”. If the Discord message was deleted, its slot will be freed.',
+      'Sentinel embed not found.': 'Choose the channel where the embed is posted, then paste the message ID. If the Discord message was deleted, its slot will be freed.',
       'This channel is not a Sentinel dossier.': 'Choose an open Sentinel ticket channel.',
       'This action is reserved for Sentinel Premium.': 'This option is shown to prepare Premium, but it stays locked on free servers.'
     };
@@ -432,7 +432,7 @@ function dashboardErrorMessage(message) {
     'Category not found.': 'Catégorie Discord introuvable.',
     'Sentinel cannot send this embed in the selected channel.': 'Sentinel ne peut pas envoyer cet embed dans le salon choisi.',
     'No embed field provided.': 'Indique au moins un champ à modifier.',
-    'Sentinel embed not found.': 'Aucun embed Sentinel géré ne correspond à cet ID.',
+    'Sentinel embed not found.': 'Aucun embed Sentinel n’a été trouvé avec cet ID dans le salon choisi.',
     'Unknown moderation action.': 'Action de modération inconnue.',
     'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
   };
@@ -458,7 +458,7 @@ function dashboardErrorMessage(message) {
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
     'Sentinel cannot send this embed in the selected channel.': firstFix || 'Autorise Sentinel à voir le salon et à y envoyer des messages.',
     'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
-    'Sentinel embed not found.': 'Copie l’ID depuis la liste “Embeds gérés”. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
+    'Sentinel embed not found.': 'Choisis le salon où se trouve l’embed, puis colle l’ID du message. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This channel is not a Sentinel dossier.': 'Choisis un salon de ticket Sentinel ouvert.',
     'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
   };
@@ -3288,7 +3288,8 @@ function renderDashboard() {
           <button class="button" type="submit">Envoyer l’embed</button>
         </form>
         <form data-action-form="custom-embed-edit">
-          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message. Les modifications ne consomment pas de quota et Sentinel retrouve le salon automatiquement.')}
+          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message. Choisis le salon si l’embed n’apparaît pas encore dans la liste gérée.')}
+          <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <input name="title" placeholder="Nouveau titre">
           <textarea name="description" placeholder="Nouveau message"></textarea>
@@ -3300,6 +3301,7 @@ function renderDashboard() {
         </form>
         <form data-action-form="custom-embed-delete">
           ${labelHelp('Supprimer un embed Sentinel', 'Supprime un embed géré par Sentinel avec son ID de message et libère son emplacement gratuit si le serveur n’est pas Premium.')}
+          <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <button class="button button-ghost" type="submit">Supprimer</button>
         </form>

@@ -1349,34 +1349,43 @@ async function startServiceForUser(ctx, guild, actor, body) {
 
     const userId = normalizeUserId(ctx, body.userId);
     const role = ctx.helpers.getServiceRole(guild);
+    const language = ctx.helpers.getGuildLanguage(guild.id);
 
     if (!role) {
-        throw createHttpError(400, 'No service role is configured.');
+        throw createHttpError(400, 'Aucun rôle de service n’est configuré.');
+    }
+
+    const roleError = ctx.helpers.getServiceRoleManageError
+        ? ctx.helpers.getServiceRoleManageError(guild, role, language)
+        : null;
+
+    if (roleError) {
+        throw createHttpError(400, roleError);
     }
 
     const member = await guild.members.fetch(userId).catch(() => null);
 
     if (!member) {
-        throw createHttpError(400, 'This user must be in the server to start duty.');
+        throw createHttpError(400, 'Cette personne doit être présente sur le serveur pour prendre son service.');
     }
 
     const userData = ctx.helpers.createUserIfMissing(guild.id, userId);
 
     if (userData?.startTime) {
-        throw createHttpError(409, 'This user is already on duty.');
+        throw createHttpError(409, 'Cette personne est déjà en service.');
     }
 
     const serviceStartTime = Date.now();
 
+    await member.roles.add(role);
     ctx.helpers.updateUserTime(guild.id, userId, userData?.totalTime || 0, serviceStartTime);
-    await member.roles.add(role).catch(() => {});
 
     if (ctx.helpers.sendServiceLog) {
         await ctx.helpers.sendServiceLog(guild, member, 'start', {
             startTime: serviceStartTime,
             source: 'Dashboard',
             actor: actor.user,
-            language: ctx.helpers.getGuildLanguage(guild.id)
+            language
         });
     }
 
@@ -1388,9 +1397,10 @@ async function endServiceForUser(ctx, guild, actor, body) {
 
     const userId = normalizeUserId(ctx, body.userId);
     const userData = ctx.helpers.getUserData(guild.id, userId);
+    const language = ctx.helpers.getGuildLanguage(guild.id);
 
     if (!userData?.startTime) {
-        throw createHttpError(409, 'This user is not on duty.');
+        throw createHttpError(409, 'Cette personne n’est pas en service.');
     }
 
     const duration = Date.now() - userData.startTime;
@@ -1398,12 +1408,20 @@ async function endServiceForUser(ctx, guild, actor, body) {
     const member = await guild.members.fetch(userId).catch(() => null);
     const role = ctx.helpers.getServiceRole(guild);
 
+    if (member && role) {
+        const roleError = ctx.helpers.getServiceRoleManageError
+            ? ctx.helpers.getServiceRoleManageError(guild, role, language)
+            : null;
+
+        if (roleError) {
+            throw createHttpError(400, roleError);
+        }
+
+        await member.roles.remove(role);
+    }
+
     ctx.helpers.addSession(guild.id, userId, duration);
     ctx.helpers.updateUserTime(guild.id, userId, totalTime, null);
-
-    if (member && role) {
-        await member.roles.remove(role).catch(() => {});
-    }
 
     if (ctx.helpers.sendServiceLog) {
         await ctx.helpers.sendServiceLog(guild, member, 'end', {
@@ -1412,11 +1430,11 @@ async function endServiceForUser(ctx, guild, actor, body) {
             userId,
             source: 'Dashboard',
             actor: actor.user,
-            language: ctx.helpers.getGuildLanguage(guild.id)
+            language
         });
     }
 
-    return `Service termine. Duree : ${ctx.helpers.formatDuration(duration)}.`;
+    return `Service terminé. Durée : ${ctx.helpers.formatDuration(duration)}.`;
 }
 
 async function resetUserFromDashboard(ctx, guild, actor, body) {
@@ -1425,15 +1443,24 @@ async function resetUserFromDashboard(ctx, guild, actor, body) {
     const userId = normalizeUserId(ctx, body.userId);
     const member = await guild.members.fetch(userId).catch(() => null);
     const role = ctx.helpers.getServiceRole(guild);
+    const language = ctx.helpers.getGuildLanguage(guild.id);
+
+    if (member && role) {
+        const roleError = ctx.helpers.getServiceRoleManageError
+            ? ctx.helpers.getServiceRoleManageError(guild, role, language)
+            : null;
+
+        if (roleError) {
+            throw createHttpError(400, roleError);
+        }
+
+        await member.roles.remove(role);
+    }
 
     ctx.helpers.resetUser(guild.id, userId);
     ctx.helpers.clearLongServiceAlert?.(guild.id, userId);
 
-    if (member && role) {
-        await member.roles.remove(role).catch(() => {});
-    }
-
-    return `Heures reinitialisees pour ${member?.user?.tag || userId}.`;
+    return `Heures réinitialisées pour ${member?.user?.tag || userId}.`;
 }
 
 async function moderationAction(ctx, guild, actor, body) {
@@ -1690,14 +1717,13 @@ async function customEmbedAction(ctx, guild, actor, body) {
         throw createHttpError(400, 'Invalid message ID.');
     }
 
-    const record = ctx.helpers.getCustomEmbedRecord(guild.id, messageId);
+    let record = ctx.helpers.getCustomEmbedRecord(guild.id, messageId);
+    const fallbackChannel = body.channelId ? getTextChannel(guild, body.channelId) : null;
+    const channelId = record?.channel_id || fallbackChannel?.id || null;
+    const channel = channelId
+        ? guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null)
+        : null;
 
-    if (!record) {
-        throw createHttpError(404, 'Sentinel embed not found.');
-    }
-
-    const channel = guild.channels.cache.get(record.channel_id)
-        || await guild.channels.fetch(record.channel_id).catch(() => null);
     const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, null, language);
 
     if (channelError) {
@@ -1707,8 +1733,23 @@ async function customEmbedAction(ctx, guild, actor, body) {
     const message = await channel.messages.fetch(messageId).catch(() => null);
 
     if (!message || message.author.id !== ctx.client.user.id) {
-        ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
+        if (record) {
+            ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
+        }
         throw createHttpError(404, 'Sentinel embed not found.');
+    }
+
+    if (!record) {
+        const data = ctx.helpers.mapCustomEmbedMessageData
+            ? ctx.helpers.mapCustomEmbedMessageData(message)
+            : null;
+
+        if (!data) {
+            throw createHttpError(404, 'Sentinel embed not found.');
+        }
+
+        ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, message.id, actor.id, data);
+        record = ctx.helpers.getCustomEmbedRecord(guild.id, message.id);
     }
 
     if (action === 'custom-embed-delete') {
@@ -1894,7 +1935,7 @@ async function runDashboardAction(ctx, guild, member, body) {
         requireCommandAccess(ctx, member);
         const nextLanguage = body.language === 'en' ? 'en' : 'fr';
         ctx.helpers.setGuildLanguage(guild.id, nextLanguage);
-        return `Langue du serveur mise a jour : ${nextLanguage}.`;
+        return `Langue du serveur mise à jour : ${nextLanguage}.`;
     }
 
     if (action === 'set-server-preset') {
@@ -1914,11 +1955,19 @@ async function runDashboardAction(ctx, guild, member, body) {
         const role = guild.roles.cache.get(body.roleId);
 
         if (!role) {
-            throw createHttpError(400, 'Role not found.');
+            throw createHttpError(400, 'Rôle introuvable.');
+        }
+
+        const roleError = ctx.helpers.getServiceRoleManageError
+            ? ctx.helpers.getServiceRoleManageError(guild, role, language)
+            : null;
+
+        if (roleError) {
+            throw createHttpError(400, roleError);
         }
 
         ctx.helpers.updateGuildConfig(guild.id, { serviceRoleId: role.id });
-        return `Role de service configure : ${role.name}.`;
+        return `Rôle de service configuré : ${role.name}.`;
     }
 
     if (action === 'set-auto-role') {
@@ -1933,20 +1982,20 @@ async function runDashboardAction(ctx, guild, member, body) {
         }
 
         ctx.helpers.updateGuildConfig(guild.id, { autoRoleId: role.id });
-        return `Role automatique d arrivee configure : ${role.name}.`;
+        return `Rôle automatique d’arrivée configuré : ${role.name}.`;
     }
 
     if (action === 'disable-auto-role') {
         requireCommandAccess(ctx, member);
         ctx.helpers.updateGuildConfig(guild.id, { autoRoleId: null });
-        return 'Role automatique d arrivee desactive.';
+        return 'Rôle automatique d’arrivée désactivé.';
     }
 
     if (action === 'set-log-channel') {
         requireCommandAccess(ctx, member);
         const channel = getTextChannel(guild, body.channelId);
         ctx.helpers.updateGuildConfig(guild.id, { logChannelId: channel.id });
-        return `Salon de logs configure : #${channel.name}.`;
+        return `Salon de logs configuré : #${channel.name}.`;
     }
 
     if (action === 'add-command-role' || action === 'remove-command-role') {
@@ -1954,26 +2003,35 @@ async function runDashboardAction(ctx, guild, member, body) {
         const role = guild.roles.cache.get(body.roleId);
 
         if (!role || role.id === guild.id) {
-            throw createHttpError(400, 'Role not found.');
+            throw createHttpError(400, 'Rôle introuvable.');
         }
 
         if (action === 'add-command-role') {
             ctx.helpers.addCommandRole(guild.id, role.id);
-            return `Role autorise ajoute : ${role.name}.`;
+            return `Rôle autorisé ajouté : ${role.name}.`;
         }
 
         ctx.helpers.removeCommandRole(guild.id, role.id);
-        return `Role autorise retire : ${role.name}.`;
+        return `Rôle autorisé retiré : ${role.name}.`;
     }
 
     if (action === 'publish-service-panel') {
         requireCommandAccess(ctx, member);
         const channel = getTextChannel(guild, body.channelId);
+        const role = ctx.helpers.getServiceRole(guild);
+        const roleError = ctx.helpers.getServiceRoleManageError
+            ? ctx.helpers.getServiceRoleManageError(guild, role, language)
+            : null;
+
+        if (roleError) {
+            throw createHttpError(400, roleError);
+        }
+
         await channel.send({
             content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
             components: ctx.helpers.buildServicePanelComponents(language)
         });
-        return `Panneau de service publie dans #${channel.name}.`;
+        return `Panneau de service publié dans #${channel.name}.`;
     }
 
     if (action === 'set-payroll-settings') {
