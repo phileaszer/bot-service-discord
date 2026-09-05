@@ -210,7 +210,7 @@ const I18N = {
         autoRoleAssignedLog: '🛡️ Rôle automatique donné à {member} : {role}.',
         autoRoleFailedLog: '⚠️ Impossible de donner le rôle automatique à {member} : {role}. Vérifie la permission `Gérer les rôles` et la hiérarchie des rôles.',
         invalidChannelId: '❌ ID de salon invalide.',
-        channelNotText: '❌ Aucun salon textuel accessible ne correspond à cet ID.',
+        channelNotText: '❌ Choisis un salon texte encore présent et visible par Sentinel.',
         logChannelSet: '✅ Le salon de logs a été configuré sur {channel}.',
         payRateInvalid: '❌ Montant horaire invalide. Exemple : `/config-paie montant:500 devise:$`.',
         paySettingsUpdated: '✅ Paie RP configurée : **{rate}** par heure.',
@@ -284,7 +284,13 @@ const I18N = {
         helpTitle: 'Sentinel | Guide de démarrage',
         helpDescription: 'Commence ici. Ce guide explique comment installer Sentinel, choisir la langue du serveur, le configurer, puis l utiliser sans connaitre les bots Discord.',
         moderationAccessDenied: '❌ Tu n’as pas accès à cette commande de modération.',
+        moderationAccessDeniedSpecific: '❌ Tu ne peux pas lancer cette sanction.\nÀ faire : donne la permission “{permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Sentinel.',
         moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.\nOuvre le dashboard > Sécurité > Diagnostic, ou ajoute la permission manquante au rôle Sentinel.',
+        moderationBotPermissionMissingSpecific: '❌ Sentinel ne peut pas faire cette action.\nÀ faire : ajoute la permission “{permission}” au rôle Sentinel, puis réessaie.',
+        moderationDiscordRefused: '❌ Discord a refusé l’action.\nÀ faire : {fix}',
+        moderationBotPermissionFix: 'ajoute la permission “{permission}” au rôle Sentinel, puis réessaie.',
+        moderationRoleOrderFix: 'place mon rôle au-dessus de “{role}”, puis réessaie.',
+        moderationBanNotFound: '❌ Aucun bannissement Discord n’a été trouvé pour cet ID.\nÀ faire : vérifie l’ID Discord complet, puis réessaie seulement si cette personne est encore bannie.',
         moderationMemberRequired: '❌ Tu dois choisir un membre du serveur.',
         moderationUserRequired: '❌ Tu dois choisir un utilisateur.',
         moderationTargetRequired: '❌ Choisis un membre ou indique son ID Discord.',
@@ -326,7 +332,10 @@ const I18N = {
         moderationSlowmodeTooLong: '❌ Discord limite le mode lent à 6 heures maximum.',
         premiumModerationHelp: 'Premium modération : `/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
         customEmbedBotPermissionMissing: '❌ Sentinel doit pouvoir voir le salon, envoyer des messages et intégrer des liens dans {channel}.',
-        customEmbedMentionPermissionMissing: '❌ Sentinel ne peut pas mentionner ce rôle. Rends le rôle mentionnable ou donne à Sentinel la permission de mentionner les rôles.',
+        customEmbedChannelViewMissing: '❌ Sentinel ne voit pas {channel}.\nÀ faire : autorise Sentinel à voir ce salon.',
+        customEmbedChannelSendMissing: '❌ Sentinel ne peut pas écrire dans {channel}.\nÀ faire : autorise Sentinel à envoyer des messages dans ce salon.',
+        customEmbedChannelEmbedMissing: '❌ Sentinel ne peut pas envoyer d’embed dans {channel}.\nÀ faire : ajoute la permission “Intégrer des liens” à Sentinel dans ce salon.',
+        customEmbedMentionPermissionMissing: '❌ Sentinel ne peut pas mentionner ce rôle.\nÀ faire : rends le rôle mentionnable, ou donne à Sentinel la permission de mentionner les rôles.',
         customEmbedInvalidColor: '❌ Couleur invalide. Utilise `rose`, `cyan`, `vert`, `rouge`, `violet` ou un code comme `#ff2d9a`.',
         customEmbedInvalidUrl: '❌ URL invalide pour {field}. Utilise une URL `https://` ou indique `retirer` pendant une modification.',
         customEmbedTooLarge: '❌ Cet embed est trop long. Garde le titre sous 256 caractères, le message sous 4000 caractères et le total sous 6000 caractères.',
@@ -406,7 +415,7 @@ const I18N = {
         autoRoleAssignedLog: '🛡️ Auto-role assigned to {member}: {role}.',
         autoRoleFailedLog: '⚠️ Could not assign the auto-role to {member}: {role}. Check `Manage Roles` and the role hierarchy.',
         invalidChannelId: '❌ Invalid channel ID.',
-        channelNotText: '❌ No accessible text channel matches this ID.',
+        channelNotText: '❌ Choose a text channel that still exists and is visible to Sentinel.',
         logChannelSet: '✅ The log channel has been set to {channel}.',
         payRateInvalid: '❌ Invalid hourly amount. Example: `/payroll-config hourly_rate:500 currency:$`.',
         paySettingsUpdated: '✅ RP payroll configured: **{rate}** per hour.',
@@ -480,7 +489,13 @@ const I18N = {
         helpTitle: 'Sentinel | Getting started',
         helpDescription: 'Start here. This guide explains how to install Sentinel, choose the server language, configure it, and use it without knowing Discord bots.',
         moderationAccessDenied: '❌ You do not have access to this moderation command.',
+        moderationAccessDeniedSpecific: '❌ You cannot run this moderation action.\nFix: give your Discord role the “{permission}” permission, or add your role to Sentinel allowed roles.',
         moderationBotPermissionMissing: '❌ Sentinel does not have the required Discord permission for this action.\nOpen Dashboard > Security > Diagnostic, or add the missing permission to Sentinel role.',
+        moderationBotPermissionMissingSpecific: '❌ Sentinel cannot perform this action.\nFix: add the “{permission}” permission to the Sentinel role, then try again.',
+        moderationDiscordRefused: '❌ Discord refused the action.\nFix: {fix}',
+        moderationBotPermissionFix: 'add the “{permission}” permission to the Sentinel role, then try again.',
+        moderationRoleOrderFix: 'move my role above “{role}”, then try again.',
+        moderationBanNotFound: '❌ No Discord ban was found for this ID.\nFix: check the full Discord ID, then try again only if this user is still banned.',
         moderationMemberRequired: '❌ You must choose a server member.',
         moderationUserRequired: '❌ You must choose a user.',
         moderationTargetRequired: '❌ Choose a member or provide their Discord ID.',
@@ -522,7 +537,10 @@ const I18N = {
         moderationSlowmodeTooLong: '❌ Discord limits slowmode to 6 hours maximum.',
         premiumModerationHelp: 'Premium moderation: `/case`, `/edit-case`, `/delete-case`, `/unwarn`, `/mod-profile`, `/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
         customEmbedBotPermissionMissing: '❌ Sentinel must be able to view the channel, send messages, and embed links in {channel}.',
-        customEmbedMentionPermissionMissing: '❌ Sentinel cannot mention this role. Make the role mentionable or give Sentinel permission to mention roles.',
+        customEmbedChannelViewMissing: '❌ Sentinel cannot see {channel}.\nFix: allow Sentinel to view this channel.',
+        customEmbedChannelSendMissing: '❌ Sentinel cannot write in {channel}.\nFix: allow Sentinel to send messages in this channel.',
+        customEmbedChannelEmbedMissing: '❌ Sentinel cannot send embeds in {channel}.\nFix: give Sentinel the “Embed Links” permission in this channel.',
+        customEmbedMentionPermissionMissing: '❌ Sentinel cannot mention this role.\nFix: make the role mentionable, or give Sentinel permission to mention roles.',
         customEmbedInvalidColor: '❌ Invalid color. Use `pink`, `cyan`, `green`, `red`, `purple`, or a code like `#ff2d9a`.',
         customEmbedInvalidUrl: '❌ Invalid URL for {field}. Use an `https://` URL, or enter `remove` while editing.',
         customEmbedTooLarge: '❌ This embed is too long. Keep the title under 256 characters, the message under 4000 characters, and the total under 6000 characters.',
@@ -3497,6 +3515,79 @@ function botHasPermission(guild, permissionFlag) {
     return Boolean(guild.members.me?.permissions.has(permissionFlag));
 }
 
+const DISCORD_PERMISSION_LABELS = {
+    fr: new Map([
+        [PermissionsBitField.Flags.ManageMessages, 'Gérer les messages'],
+        [PermissionsBitField.Flags.ManageChannels, 'Gérer les salons'],
+        [PermissionsBitField.Flags.ManageRoles, 'Gérer les rôles'],
+        [PermissionsBitField.Flags.ModerateMembers, 'Exclure temporairement des membres'],
+        [PermissionsBitField.Flags.KickMembers, 'Expulser des membres'],
+        [PermissionsBitField.Flags.BanMembers, 'Bannir des membres'],
+        [PermissionsBitField.Flags.ViewChannel, 'Voir le salon'],
+        [PermissionsBitField.Flags.SendMessages, 'Envoyer des messages'],
+        [PermissionsBitField.Flags.EmbedLinks, 'Intégrer des liens'],
+        [PermissionsBitField.Flags.MentionEveryone, 'Mentionner @everyone et les rôles']
+    ]),
+    en: new Map([
+        [PermissionsBitField.Flags.ManageMessages, 'Manage Messages'],
+        [PermissionsBitField.Flags.ManageChannels, 'Manage Channels'],
+        [PermissionsBitField.Flags.ManageRoles, 'Manage Roles'],
+        [PermissionsBitField.Flags.ModerateMembers, 'Moderate Members'],
+        [PermissionsBitField.Flags.KickMembers, 'Kick Members'],
+        [PermissionsBitField.Flags.BanMembers, 'Ban Members'],
+        [PermissionsBitField.Flags.ViewChannel, 'View Channel'],
+        [PermissionsBitField.Flags.SendMessages, 'Send Messages'],
+        [PermissionsBitField.Flags.EmbedLinks, 'Embed Links'],
+        [PermissionsBitField.Flags.MentionEveryone, 'Mention @everyone and roles']
+    ])
+};
+
+function getDiscordPermissionLabel(permissionFlag, language = 'fr') {
+    const lang = language === 'en' ? 'en' : 'fr';
+    return DISCORD_PERMISSION_LABELS[lang].get(permissionFlag)
+        || (lang === 'en' ? 'the required permission' : 'la permission nécessaire');
+}
+
+function getModerationAccessDeniedMessage(permissionFlag, language = 'fr') {
+    return t(language, 'moderationAccessDeniedSpecific', {
+        permission: getDiscordPermissionLabel(permissionFlag, language)
+    });
+}
+
+function getModerationBotPermissionMissingMessage(permissionFlag, language = 'fr') {
+    return t(language, 'moderationBotPermissionMissingSpecific', {
+        permission: getDiscordPermissionLabel(permissionFlag, language)
+    });
+}
+
+function getModerationActionFailureMessage(error, guild, permissionFlag, targetMember, language = 'fr') {
+    const discordCode = Number(error?.code || error?.rawError?.code || 0) || null;
+    const message = String(error?.message || '');
+    const botMember = guild?.members?.me;
+
+    if (discordCode === 10026) {
+        return t(language, 'moderationBanNotFound');
+    }
+
+    if (discordCode === 50013 || /Missing Permissions/i.test(message)) {
+        const targetRole = targetMember?.roles?.highest;
+
+        if (botMember && targetRole && targetRole.comparePositionTo(botMember.roles.highest) >= 0) {
+            return t(language, 'moderationDiscordRefused', {
+                fix: t(language, 'moderationRoleOrderFix', { role: targetRole.name })
+            });
+        }
+
+        return t(language, 'moderationDiscordRefused', {
+            fix: t(language, 'moderationBotPermissionFix', {
+                permission: getDiscordPermissionLabel(permissionFlag, language)
+            })
+        });
+    }
+
+    return t(language, 'moderationFailed');
+}
+
 function getModerationTargetError(moderatorMember, targetMember, language = 'fr') {
     if (!targetMember) {
         return t(language, 'moderationMemberRequired');
@@ -3972,12 +4063,16 @@ function getCustomEmbedChannelError(guild, channel, roleToPing = null, language 
 
     const permissions = channel.permissionsFor(guild.members.me);
 
-    if (!permissions?.has([
-        PermissionsBitField.Flags.ViewChannel,
-        PermissionsBitField.Flags.SendMessages,
-        PermissionsBitField.Flags.EmbedLinks
-    ])) {
-        return t(language, 'customEmbedBotPermissionMissing', { channel });
+    if (!permissions?.has(PermissionsBitField.Flags.ViewChannel)) {
+        return t(language, 'customEmbedChannelViewMissing', { channel });
+    }
+
+    if (!permissions.has(PermissionsBitField.Flags.SendMessages)) {
+        return t(language, 'customEmbedChannelSendMissing', { channel });
+    }
+
+    if (!permissions.has(PermissionsBitField.Flags.EmbedLinks)) {
+        return t(language, 'customEmbedChannelEmbedMissing', { channel });
     }
 
     if (roleToPing && !roleToPing.mentionable && !permissions.has(PermissionsBitField.Flags.MentionEveryone)) {
@@ -4413,10 +4508,19 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
         }
 
         const amount = clampNumber(payload.amount, 1, 100);
-        const deleted = await channel.bulkDelete(amount, true).catch(() => null);
+        let deleted;
 
-        if (!deleted) {
-            throw new Error(t(language, 'moderationFailed'));
+        try {
+            deleted = await channel.bulkDelete(amount, true);
+        } catch (error) {
+            console.error('Erreur purge confirmee :', error);
+            throw new Error(getModerationActionFailureMessage(
+                error,
+                guild,
+                PermissionsBitField.Flags.ManageMessages,
+                null,
+                language
+            ));
         }
 
         const caseData = addModerationCase(
@@ -4446,7 +4550,13 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
             deleteMessageSeconds: clampNumber(payload.deleteDays || 0, 0, 7) * 24 * 60 * 60
         }).catch(error => {
             console.error('Erreur bannissement confirme :', error);
-            throw new Error(t(language, 'moderationFailed'));
+            throw new Error(getModerationActionFailureMessage(
+                error,
+                guild,
+                PermissionsBitField.Flags.BanMembers,
+                member,
+                language
+            ));
         });
 
         const caseData = addModerationCase(guild.id, userId, interaction.user.id, 'ban', payload.reason, null);
@@ -4468,7 +4578,13 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
 
         await member.kick(payload.reason).catch(error => {
             console.error('Erreur expulsion confirmee :', error);
-            throw new Error(t(language, 'moderationFailed'));
+            throw new Error(getModerationActionFailureMessage(
+                error,
+                guild,
+                PermissionsBitField.Flags.KickMembers,
+                member,
+                language
+            ));
         });
 
         const caseData = addModerationCase(guild.id, member.id, interaction.user.id, 'kick', payload.reason, null);
@@ -8242,7 +8358,7 @@ async function handleModerationInteraction(interaction, commandName, language) {
 
     if (!hasModerationAccess(moderator, requiredPermission)) {
         await interaction.reply({
-            content: t(language, 'moderationAccessDenied'),
+            content: getModerationAccessDeniedMessage(requiredPermission, language),
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -8251,7 +8367,7 @@ async function handleModerationInteraction(interaction, commandName, language) {
     if (['timeout', 'fin-timeout', 'expulser', 'bannir', 'purge', 'tempban', 'unban', 'lock', 'unlock', 'slowmode'].includes(commandName)
         && !botHasPermission(interaction.guild, requiredPermission)) {
         await interaction.reply({
-            content: t(language, 'moderationBotPermissionMissing'),
+            content: getModerationBotPermissionMissingMessage(requiredPermission, language),
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -8532,7 +8648,13 @@ async function handleModerationInteraction(interaction, commandName, language) {
         } catch (error) {
             console.error('Erreur moderation premium :', error);
             await interaction.reply({
-                content: t(language, 'moderationFailed'),
+                content: getModerationActionFailureMessage(
+                    error,
+                    interaction.guild,
+                    PermissionsBitField.Flags.ManageChannels,
+                    null,
+                    language
+                ),
                 flags: MessageFlags.Ephemeral
             });
             return true;
@@ -8628,7 +8750,13 @@ async function handleModerationInteraction(interaction, commandName, language) {
         } catch (error) {
             console.error('Erreur tempban :', error);
             await interaction.reply({
-                content: t(language, 'moderationFailed'),
+                content: getModerationActionFailureMessage(
+                    error,
+                    interaction.guild,
+                    PermissionsBitField.Flags.BanMembers,
+                    target.member,
+                    language
+                ),
                 flags: MessageFlags.Ephemeral
             });
             return true;
@@ -8678,7 +8806,13 @@ async function handleModerationInteraction(interaction, commandName, language) {
         } catch (error) {
             console.error('Erreur unban :', error);
             await interaction.reply({
-                content: t(language, 'moderationFailed'),
+                content: getModerationActionFailureMessage(
+                    error,
+                    interaction.guild,
+                    PermissionsBitField.Flags.BanMembers,
+                    null,
+                    language
+                ),
                 flags: MessageFlags.Ephemeral
             });
             return true;
@@ -8785,7 +8919,13 @@ async function handleModerationInteraction(interaction, commandName, language) {
         } catch (error) {
             console.error('Erreur timeout :', error);
             await interaction.reply({
-                content: t(language, 'moderationFailed'),
+                content: getModerationActionFailureMessage(
+                    error,
+                    interaction.guild,
+                    PermissionsBitField.Flags.ModerateMembers,
+                    member,
+                    language
+                ),
                 flags: MessageFlags.Ephemeral
             });
             return true;
@@ -8811,7 +8951,13 @@ async function handleModerationInteraction(interaction, commandName, language) {
         } catch (error) {
             console.error('Erreur fin timeout :', error);
             await interaction.reply({
-                content: t(language, 'moderationFailed'),
+                content: getModerationActionFailureMessage(
+                    error,
+                    interaction.guild,
+                    PermissionsBitField.Flags.ModerateMembers,
+                    member,
+                    language
+                ),
                 flags: MessageFlags.Ephemeral
             });
             return true;
@@ -8959,11 +9105,14 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
             return true;
         }
 
-        const sentMessage = await channel.send(buildCustomEmbedPayload(data, roleToPing, language)).catch(() => null);
+        let sentMessage;
 
-        if (!sentMessage) {
+        try {
+            sentMessage = await channel.send(buildCustomEmbedPayload(data, roleToPing, language));
+        } catch (error) {
+            console.error('Erreur creation embed Sentinel :', error);
             await interaction.reply({
-                content: t(language, 'customEmbedBotPermissionMissing', { channel }),
+                content: t(language, 'customEmbedChannelSendMissing', { channel }),
                 flags: MessageFlags.Ephemeral
             });
             return true;
@@ -9107,13 +9256,13 @@ async function handleModerationMessage(message, language) {
     const requiredPermission = permissionByCommand[commandName];
 
     if (!hasModerationAccess(message.member, requiredPermission)) {
-        await message.reply(t(language, 'moderationAccessDenied'));
+        await message.reply(getModerationAccessDeniedMessage(requiredPermission, language));
         return true;
     }
 
     if (['timeout', 'fin-timeout', 'expulser', 'bannir', 'purge'].includes(commandName)
         && !botHasPermission(message.guild, requiredPermission)) {
-        await message.reply(t(language, 'moderationBotPermissionMissing'));
+        await message.reply(getModerationBotPermissionMissingMessage(requiredPermission, language));
         return true;
     }
 
@@ -9126,10 +9275,19 @@ async function handleModerationMessage(message, language) {
         }
 
         const amount = clampNumber(args[1], 1, 100);
-        const deleted = await message.channel.bulkDelete(amount, true).catch(() => null);
+        let deleted;
 
-        if (!deleted) {
-            await message.reply(t(language, 'moderationFailed'));
+        try {
+            deleted = await message.channel.bulkDelete(amount, true);
+        } catch (error) {
+            console.error('Erreur purge texte :', error);
+            await message.reply(getModerationActionFailureMessage(
+                error,
+                message.guild,
+                PermissionsBitField.Flags.ManageMessages,
+                null,
+                language
+            ));
             return true;
         }
 
@@ -9193,7 +9351,13 @@ async function handleModerationMessage(message, language) {
             });
         } catch (error) {
             console.error('Erreur bannissement texte :', error);
-            await message.reply(t(language, 'moderationFailed'));
+            await message.reply(getModerationActionFailureMessage(
+                error,
+                message.guild,
+                PermissionsBitField.Flags.BanMembers,
+                member,
+                language
+            ));
             return true;
         }
 
@@ -9239,7 +9403,13 @@ async function handleModerationMessage(message, language) {
             await member.timeout(duration, reason);
         } catch (error) {
             console.error('Erreur timeout texte :', error);
-            await message.reply(t(language, 'moderationFailed'));
+            await message.reply(getModerationActionFailureMessage(
+                error,
+                message.guild,
+                PermissionsBitField.Flags.ModerateMembers,
+                member,
+                language
+            ));
             return true;
         }
 
@@ -9260,7 +9430,13 @@ async function handleModerationMessage(message, language) {
             await member.timeout(null, reason);
         } catch (error) {
             console.error('Erreur fin timeout texte :', error);
-            await message.reply(t(language, 'moderationFailed'));
+            await message.reply(getModerationActionFailureMessage(
+                error,
+                message.guild,
+                PermissionsBitField.Flags.ModerateMembers,
+                member,
+                language
+            ));
             return true;
         }
 
@@ -9277,7 +9453,13 @@ async function handleModerationMessage(message, language) {
             await member.kick(reason);
         } catch (error) {
             console.error('Erreur expulsion texte :', error);
-            await message.reply(t(language, 'moderationFailed'));
+            await message.reply(getModerationActionFailureMessage(
+                error,
+                message.guild,
+                PermissionsBitField.Flags.KickMembers,
+                member,
+                language
+            ));
             return true;
         }
 

@@ -78,6 +78,166 @@ function createHttpError(status, message, details = {}) {
     return error;
 }
 
+const DASHBOARD_PERMISSION_LABELS = {
+    fr: new Map([
+        [PermissionsBitField.Flags.ViewChannel, 'Voir le salon'],
+        [PermissionsBitField.Flags.SendMessages, 'Envoyer des messages'],
+        [PermissionsBitField.Flags.EmbedLinks, 'Intégrer des liens'],
+        [PermissionsBitField.Flags.ReadMessageHistory, 'Voir les anciens messages'],
+        [PermissionsBitField.Flags.AttachFiles, 'Joindre des fichiers'],
+        [PermissionsBitField.Flags.ManageMessages, 'Gérer les messages'],
+        [PermissionsBitField.Flags.ManageChannels, 'Gérer les salons'],
+        [PermissionsBitField.Flags.ManageRoles, 'Gérer les rôles'],
+        [PermissionsBitField.Flags.ModerateMembers, 'Exclure temporairement des membres'],
+        [PermissionsBitField.Flags.KickMembers, 'Expulser des membres'],
+        [PermissionsBitField.Flags.BanMembers, 'Bannir des membres'],
+        [PermissionsBitField.Flags.MentionEveryone, 'Mentionner @everyone et les rôles']
+    ]),
+    en: new Map([
+        [PermissionsBitField.Flags.ViewChannel, 'View Channel'],
+        [PermissionsBitField.Flags.SendMessages, 'Send Messages'],
+        [PermissionsBitField.Flags.EmbedLinks, 'Embed Links'],
+        [PermissionsBitField.Flags.ReadMessageHistory, 'Read Message History'],
+        [PermissionsBitField.Flags.AttachFiles, 'Attach Files'],
+        [PermissionsBitField.Flags.ManageMessages, 'Manage Messages'],
+        [PermissionsBitField.Flags.ManageChannels, 'Manage Channels'],
+        [PermissionsBitField.Flags.ManageRoles, 'Manage Roles'],
+        [PermissionsBitField.Flags.ModerateMembers, 'Moderate Members'],
+        [PermissionsBitField.Flags.KickMembers, 'Kick Members'],
+        [PermissionsBitField.Flags.BanMembers, 'Ban Members'],
+        [PermissionsBitField.Flags.MentionEveryone, 'Mention @everyone and roles']
+    ])
+};
+
+function getErrorLanguage(language = 'fr') {
+    return language === 'en' ? 'en' : 'fr';
+}
+
+function getDashboardPermissionLabel(permissionFlag, language = 'fr') {
+    const lang = getErrorLanguage(language);
+    return DASHBOARD_PERMISSION_LABELS[lang].get(permissionFlag)
+        || (lang === 'en' ? 'the required permission' : 'la permission nécessaire');
+}
+
+function getBotRoleName(guild) {
+    return guild?.members?.me?.roles?.highest?.name || 'Sentinel';
+}
+
+function getDashboardBotPermissionFix(guild, permissionFlag, language = 'fr') {
+    const lang = getErrorLanguage(language);
+    const permission = getDashboardPermissionLabel(permissionFlag, lang);
+    const botRoleName = getBotRoleName(guild);
+
+    if (lang === 'en') {
+        return `Add the “${permission}” permission to the Sentinel role (${botRoleName}), then try again.`;
+    }
+
+    return `Ajoute la permission “${permission}” au rôle Sentinel (${botRoleName}), puis réessaie.`;
+}
+
+function getDashboardUserPermissionFix(permissionFlag, language = 'fr') {
+    const lang = getErrorLanguage(language);
+    const permission = getDashboardPermissionLabel(permissionFlag, lang);
+
+    if (lang === 'en') {
+        return `Give your Discord role the “${permission}” permission, or add your role to Sentinel allowed roles.`;
+    }
+
+    return `Donne la permission “${permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Sentinel.`;
+}
+
+function getDashboardTextChannelFix(language = 'fr') {
+    return getErrorLanguage(language) === 'en'
+        ? 'Choose a text channel that still exists and is visible to Sentinel.'
+        : 'Choisis un salon texte encore présent et visible par Sentinel.';
+}
+
+function getDashboardChannelPermissionFix(channel, permissionFlag, language = 'fr') {
+    const lang = getErrorLanguage(language);
+    const channelLabel = channel?.name
+        ? `#${channel.name}`
+        : (lang === 'en' ? 'the selected channel' : 'le salon choisi');
+
+    if (permissionFlag === PermissionsBitField.Flags.ViewChannel) {
+        return lang === 'en'
+            ? `Allow Sentinel to view ${channelLabel}.`
+            : `Autorise Sentinel à voir ${channelLabel}.`;
+    }
+
+    if (permissionFlag === PermissionsBitField.Flags.SendMessages) {
+        return lang === 'en'
+            ? `Allow Sentinel to send messages in ${channelLabel}.`
+            : `Autorise Sentinel à envoyer des messages dans ${channelLabel}.`;
+    }
+
+    if (permissionFlag === PermissionsBitField.Flags.EmbedLinks) {
+        return lang === 'en'
+            ? `Allow Sentinel to embed links in ${channelLabel}.`
+            : `Ajoute la permission “Intégrer des liens” à Sentinel dans ${channelLabel}.`;
+    }
+
+    if (permissionFlag === PermissionsBitField.Flags.ReadMessageHistory) {
+        return lang === 'en'
+            ? `Allow Sentinel to read message history in ${channelLabel}.`
+            : `Autorise Sentinel à voir les anciens messages dans ${channelLabel}.`;
+    }
+
+    return getDashboardBotPermissionFix(channel?.guild, permissionFlag, lang);
+}
+
+function requireBotChannelPermissions(guild, channel, permissionFlags, language = 'fr') {
+    const permissions = channel?.permissionsFor(guild.members.me);
+    const missingPermission = permissionFlags.find(permissionFlag => !permissions?.has(permissionFlag));
+
+    if (missingPermission) {
+        throw createHttpError(403, 'Sentinel cannot use the selected channel.', {
+            missingPermission: getDashboardPermissionLabel(missingPermission, language),
+            fix: getDashboardChannelPermissionFix(channel, missingPermission, language)
+        });
+    }
+}
+
+function createDiscordActionError(error, guild, permissionFlag, language = 'fr', targetMember = null) {
+    const lang = getErrorLanguage(language);
+    const discordCode = Number(error?.code || error?.rawError?.code || 0) || null;
+    const message = String(error?.message || '');
+    const botMember = guild?.members?.me;
+
+    if (discordCode === 10026) {
+        return createHttpError(404, 'Discord ban not found.', {
+            discordCode,
+            fix: lang === 'en'
+                ? 'Check the full Discord ID, then try again only if this user is still banned.'
+                : 'Vérifie l’ID Discord complet, puis réessaie seulement si cette personne est encore bannie.'
+        });
+    }
+
+    if (discordCode === 50013 || /Missing Permissions/i.test(message)) {
+        const targetRole = targetMember?.roles?.highest;
+
+        if (botMember && targetRole && targetRole.comparePositionTo(botMember.roles.highest) >= 0) {
+            return createHttpError(403, 'Discord refused the action.', {
+                discordCode,
+                fix: lang === 'en'
+                    ? `Move my role above “${targetRole.name}”, then try again.`
+                    : `Place mon rôle au-dessus de “${targetRole.name}”, puis réessaie.`
+            });
+        }
+
+        return createHttpError(403, 'Discord refused the action.', {
+            discordCode,
+            fix: getDashboardBotPermissionFix(guild, permissionFlag, lang)
+        });
+    }
+
+    return createHttpError(400, 'Discord refused the action.', {
+        discordCode,
+        fix: lang === 'en'
+            ? 'Open Dashboard > Security > Diagnostic, fix the red item, then try again.'
+            : 'Ouvre le dashboard > Sécurité > Diagnostic, corrige le point rouge, puis réessaie.'
+    });
+}
+
 function nowIso() {
     return new Date().toISOString();
 }
@@ -835,15 +995,21 @@ function requireDossierAccess(ctx, member) {
     }
 }
 
-function requireModerationAccess(ctx, member, permissionFlag) {
+function requireModerationAccess(ctx, member, permissionFlag, language = 'fr') {
     if (!member || !ctx.helpers.hasModerationAccess(member, permissionFlag)) {
-        throw createHttpError(403, 'You do not have permission for this moderation action.');
+        throw createHttpError(403, 'You do not have permission for this moderation action.', {
+            missingPermission: getDashboardPermissionLabel(permissionFlag, language),
+            fix: getDashboardUserPermissionFix(permissionFlag, language)
+        });
     }
 }
 
-function requireBotPermission(guild, permissionFlag) {
+function requireBotPermission(guild, permissionFlag, language = 'fr') {
     if (!guild.members.me?.permissions.has(permissionFlag)) {
-        throw createHttpError(403, 'Sentinel does not have the required Discord permission.');
+        throw createHttpError(403, 'Sentinel does not have the required Discord permission.', {
+            missingPermission: getDashboardPermissionLabel(permissionFlag, language),
+            fix: getDashboardBotPermissionFix(guild, permissionFlag, language)
+        });
     }
 }
 
@@ -871,11 +1037,15 @@ function getDossierStatusLabel(status, language = 'fr') {
     return copy[language === 'en' ? 'en' : 'fr'];
 }
 
-function normalizeUserId(ctx, value) {
+function normalizeUserId(ctx, value, language = 'fr') {
     const userId = ctx.helpers.normalizeUserId(value);
 
     if (!userId) {
-        throw createHttpError(400, 'Invalid Discord user ID.');
+        throw createHttpError(400, 'Invalid Discord user ID.', {
+            fix: getErrorLanguage(language) === 'en'
+                ? 'Copy the full numeric Discord ID, not the username.'
+                : 'Copie l’ID Discord numérique complet de la personne, pas son pseudo.'
+        });
     }
 
     return userId;
@@ -901,11 +1071,13 @@ function getChannel(guild, channelId) {
     return guild.channels.cache.get(channelId) || null;
 }
 
-function getTextChannel(guild, channelId) {
+function getTextChannel(guild, channelId, language = 'fr') {
     const channel = getChannel(guild, channelId);
 
     if (!channel || !channel.isTextBased()) {
-        throw createHttpError(400, 'Text channel not found.');
+        throw createHttpError(400, 'Text channel not found.', {
+            fix: getDashboardTextChannelFix(language)
+        });
     }
 
     return channel;
@@ -1469,8 +1641,8 @@ async function moderationAction(ctx, guild, actor, body) {
     const reason = getReason(ctx, body.reason, language);
 
     if (action === 'warn') {
-        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ModerateMembers);
-        const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId));
+        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ModerateMembers, language);
+        const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId, language));
         const caseData = ctx.helpers.addModerationCase(guild.id, target.userId, actor.id, 'warn', reason, null);
         await ctx.helpers.sendModerationLog(guild, actor.user, caseData, target.label, language);
         return `Avertissement ajoute. Cas #${caseData.id}.`;
@@ -1480,10 +1652,10 @@ async function moderationAction(ctx, guild, actor, body) {
         const flag = action === 'kick'
             ? PermissionsBitField.Flags.KickMembers
             : PermissionsBitField.Flags.ModerateMembers;
-        requireModerationAccess(ctx, actor, flag);
-        requireBotPermission(guild, flag);
+        requireModerationAccess(ctx, actor, flag, language);
+        requireBotPermission(guild, flag, language);
 
-        const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId));
+        const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId, language));
         const targetError = ctx.helpers.getModerationTargetError(actor, target.member, language);
 
         if (targetError) {
@@ -1497,20 +1669,35 @@ async function moderationAction(ctx, guild, actor, body) {
                 throw createHttpError(400, 'Invalid timeout duration.');
             }
 
-            await target.member.timeout(duration, reason);
+            try {
+                await target.member.timeout(duration, reason);
+            } catch (error) {
+                throw createDiscordActionError(error, guild, flag, language, target.member);
+            }
+
             const caseData = ctx.helpers.addModerationCase(guild.id, target.userId, actor.id, 'timeout', reason, duration);
             await ctx.helpers.sendModerationLog(guild, actor.user, caseData, target.label, language);
             return `Timeout applique. Cas #${caseData.id}.`;
         }
 
         if (action === 'untimeout') {
-            await target.member.timeout(null, reason);
+            try {
+                await target.member.timeout(null, reason);
+            } catch (error) {
+                throw createDiscordActionError(error, guild, flag, language, target.member);
+            }
+
             const caseData = ctx.helpers.addModerationCase(guild.id, target.userId, actor.id, 'untimeout', reason, null);
             await ctx.helpers.sendModerationLog(guild, actor.user, caseData, target.label, language);
             return `Timeout retire. Cas #${caseData.id}.`;
         }
 
-        await target.member.kick(reason);
+        try {
+            await target.member.kick(reason);
+        } catch (error) {
+            throw createDiscordActionError(error, guild, flag, language, target.member);
+        }
+
         const caseData = ctx.helpers.addModerationCase(guild.id, target.userId, actor.id, 'kick', reason, null);
         await ctx.helpers.sendModerationLog(guild, actor.user, caseData, target.label, language);
         return `Membre expulse. Cas #${caseData.id}.`;
@@ -1521,10 +1708,10 @@ async function moderationAction(ctx, guild, actor, body) {
             requireAdvanced(ctx, guild.id, actor);
         }
 
-        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.BanMembers);
-        requireBotPermission(guild, PermissionsBitField.Flags.BanMembers);
+        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.BanMembers, language);
+        requireBotPermission(guild, PermissionsBitField.Flags.BanMembers, language);
 
-        const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId));
+        const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId, language));
         const targetError = ctx.helpers.getUserTargetErrorById(guild, actor, target.userId, target.member, language);
 
         if (targetError) {
@@ -1542,10 +1729,14 @@ async function moderationAction(ctx, guild, actor, body) {
             }
         }
 
-        await guild.members.ban(target.userId, {
-            reason,
-            deleteMessageSeconds: deleteDays * 24 * 60 * 60
-        });
+        try {
+            await guild.members.ban(target.userId, {
+                reason,
+                deleteMessageSeconds: deleteDays * 24 * 60 * 60
+            });
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.BanMembers, language, target.member);
+        }
 
         const caseData = ctx.helpers.addModerationCase(guild.id, target.userId, actor.id, action, reason, duration);
 
@@ -1561,11 +1752,17 @@ async function moderationAction(ctx, guild, actor, body) {
 
     if (action === 'unban') {
         requireAdvanced(ctx, guild.id, actor);
-        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.BanMembers);
-        requireBotPermission(guild, PermissionsBitField.Flags.BanMembers);
+        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.BanMembers, language);
+        requireBotPermission(guild, PermissionsBitField.Flags.BanMembers, language);
 
-        const userId = normalizeUserId(ctx, body.userId);
-        await guild.bans.remove(userId, reason);
+        const userId = normalizeUserId(ctx, body.userId, language);
+
+        try {
+            await guild.bans.remove(userId, reason);
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.BanMembers, language);
+        }
+
         ctx.helpers.deleteTemporaryBan(guild.id, userId);
 
         const caseData = ctx.helpers.addModerationCase(guild.id, userId, actor.id, 'unban', reason, null);
@@ -1574,12 +1771,24 @@ async function moderationAction(ctx, guild, actor, body) {
     }
 
     if (action === 'purge') {
-        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ManageMessages);
-        requireBotPermission(guild, PermissionsBitField.Flags.ManageMessages);
+        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ManageMessages, language);
+        requireBotPermission(guild, PermissionsBitField.Flags.ManageMessages, language);
 
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.ReadMessageHistory,
+            PermissionsBitField.Flags.ManageMessages
+        ], language);
         const count = Math.min(Math.max(Number(body.count) || 1, 1), 100);
-        const deleted = await channel.bulkDelete(count, true);
+        let deleted;
+
+        try {
+            deleted = await channel.bulkDelete(count, true);
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageMessages, language);
+        }
+
         const caseData = ctx.helpers.addModerationCase(guild.id, null, actor.id, 'clear', `${count} messages demandes dans #${channel.name}`, null);
         await ctx.helpers.sendModerationLog(guild, actor.user, caseData, `${channel}`, language);
         return `${deleted.size} message(s) supprime(s).`;
@@ -1587,27 +1796,35 @@ async function moderationAction(ctx, guild, actor, body) {
 
     if (['lock', 'unlock', 'slowmode'].includes(action)) {
         requireAdvanced(ctx, guild.id, actor);
-        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ManageChannels);
-        requireBotPermission(guild, PermissionsBitField.Flags.ManageChannels);
+        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ManageChannels, language);
+        requireBotPermission(guild, PermissionsBitField.Flags.ManageChannels, language);
 
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
 
         if (action === 'lock') {
-            await channel.permissionOverwrites.edit(guild.roles.everyone, {
-                SendMessages: false,
-                SendMessagesInThreads: false,
-                CreatePublicThreads: false,
-                CreatePrivateThreads: false
-            }, { reason });
+            try {
+                await channel.permissionOverwrites.edit(guild.roles.everyone, {
+                    SendMessages: false,
+                    SendMessagesInThreads: false,
+                    CreatePublicThreads: false,
+                    CreatePrivateThreads: false
+                }, { reason });
+            } catch (error) {
+                throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageChannels, language);
+            }
         }
 
         if (action === 'unlock') {
-            await channel.permissionOverwrites.edit(guild.roles.everyone, {
-                SendMessages: null,
-                SendMessagesInThreads: null,
-                CreatePublicThreads: null,
-                CreatePrivateThreads: null
-            }, { reason });
+            try {
+                await channel.permissionOverwrites.edit(guild.roles.everyone, {
+                    SendMessages: null,
+                    SendMessagesInThreads: null,
+                    CreatePublicThreads: null,
+                    CreatePrivateThreads: null
+                }, { reason });
+            } catch (error) {
+                throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageChannels, language);
+            }
         }
 
         if (action === 'slowmode') {
@@ -1617,7 +1834,11 @@ async function moderationAction(ctx, guild, actor, body) {
                 throw createHttpError(400, 'Invalid slowmode duration.');
             }
 
-            await channel.setRateLimitPerUser(seconds, reason);
+            try {
+                await channel.setRateLimitPerUser(seconds, reason);
+            } catch (error) {
+                throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageChannels, language);
+            }
         }
 
         const duration = action === 'slowmode'
@@ -1630,7 +1851,7 @@ async function moderationAction(ctx, guild, actor, body) {
 
     if (['edit-case', 'delete-case', 'unwarn'].includes(action)) {
         requireAdvanced(ctx, guild.id, actor);
-        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ModerateMembers);
+        requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ModerateMembers, language);
 
         const caseId = Number(body.caseId);
         const caseRow = ctx.helpers.getModerationCase(guild.id, caseId);
@@ -1670,7 +1891,7 @@ async function customEmbedAction(ctx, guild, actor, body) {
     }
 
     if (action === 'custom-embed-create') {
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
         const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language);
 
         if (channelError) {
@@ -1698,12 +1919,18 @@ async function customEmbedAction(ctx, guild, actor, body) {
             throw createHttpError(400, error.message);
         }
 
-        const sentMessage = await channel
-            .send(ctx.helpers.buildCustomEmbedPayload(data, roleToPing, language))
-            .catch(() => null);
+        let sentMessage;
+
+        try {
+            sentMessage = await channel.send(ctx.helpers.buildCustomEmbedPayload(data, roleToPing, language));
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
 
         if (!sentMessage) {
-            throw createHttpError(403, 'Sentinel cannot send this embed in the selected channel.');
+            throw createHttpError(403, 'Sentinel cannot send this embed in the selected channel.', {
+                fix: getDashboardChannelPermissionFix(channel, PermissionsBitField.Flags.SendMessages, language)
+            });
         }
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, sentMessage.id, actor.id, data);
@@ -1718,7 +1945,7 @@ async function customEmbedAction(ctx, guild, actor, body) {
     }
 
     let record = ctx.helpers.getCustomEmbedRecord(guild.id, messageId);
-    const fallbackChannel = body.channelId ? getTextChannel(guild, body.channelId) : null;
+    const fallbackChannel = body.channelId ? getTextChannel(guild, body.channelId, language) : null;
     const channelId = record?.channel_id || fallbackChannel?.id || null;
     const channel = channelId
         ? guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null)
@@ -1753,7 +1980,12 @@ async function customEmbedAction(ctx, guild, actor, body) {
     }
 
     if (action === 'custom-embed-delete') {
-        await message.delete().catch(() => {});
+        try {
+            await message.delete();
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
+
         ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
         return `Embed Sentinel ${messageId} supprime.`;
     }
@@ -1786,11 +2018,16 @@ async function customEmbedAction(ctx, guild, actor, body) {
             throw createHttpError(400, 'No embed field provided.');
         }
 
-        await message.edit({
-            content: message.content || null,
-            embeds: [ctx.helpers.buildCustomAnnouncementEmbed(data, language)],
-            allowedMentions: { parse: [] }
-        });
+        try {
+            await message.edit({
+                content: message.content || null,
+                embeds: [ctx.helpers.buildCustomAnnouncementEmbed(data, language)],
+                allowedMentions: { parse: [] }
+            });
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
+
         ctx.helpers.updateCustomEmbedRecord(guild.id, messageId, data);
         return `Embed Sentinel ${messageId} modifie.`;
     }
@@ -1805,7 +2042,12 @@ async function dossierAction(ctx, guild, actor, body) {
     if (action === 'publish-dossier-panel') {
         requireCommandAccess(ctx, actor);
 
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.EmbedLinks
+        ], language);
         const quota = ctx.helpers.getDossierPanelQuota
             ? ctx.helpers.getDossierPanelQuota(guild.id, actor)
             : { unlimited: false, used: 0, limit: 1 };
@@ -1814,10 +2056,17 @@ async function dossierAction(ctx, guild, actor, body) {
             throw createHttpError(402, `Le gratuit permet ${quota.limit} panneau de dossiers par serveur.`);
         }
 
-        const message = await channel.send({
-            embeds: [ctx.helpers.buildDossierPanelEmbed(guild, actor.user, language)],
-            components: ctx.helpers.buildDossierPanelComponents(language)
-        });
+        let message;
+
+        try {
+            message = await channel.send({
+                embeds: [ctx.helpers.buildDossierPanelEmbed(guild, actor.user, language)],
+                components: ctx.helpers.buildDossierPanelComponents(language)
+            });
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
+
         ctx.helpers.recordDossierPanel?.(guild.id, channel.id, message.id, actor.id);
 
         return `Bureau d'accueil Sentinel publie dans #${channel.name}.`;
@@ -1844,7 +2093,7 @@ async function dossierAction(ctx, guild, actor, body) {
     if (action === 'dossier-close') {
         requireDossierAccess(ctx, actor);
 
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
@@ -1864,7 +2113,12 @@ async function dossierAction(ctx, guild, actor, body) {
         };
 
         await ctx.helpers.sendDossierTranscript(channel, closedDossier, actor.user, language);
-        await channel.delete('Cloture dossier Sentinel depuis le dashboard').catch(() => {});
+
+        try {
+            await channel.delete('Cloture dossier Sentinel depuis le dashboard');
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageChannels, language);
+        }
 
         return `Dossier Sentinel cloture : #${channel.name}.`;
     }
@@ -1872,7 +2126,7 @@ async function dossierAction(ctx, guild, actor, body) {
     if (action === 'dossier-status') {
         requireDossierAccess(ctx, actor);
 
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
@@ -1881,14 +2135,19 @@ async function dossierAction(ctx, guild, actor, body) {
         const nextStatus = dossier?.status || body.dossierStatus || body.status || 'open';
         const nextStatusLabel = getDossierStatusLabel(nextStatus, language);
 
-        await channel.send(`📌 ${actor.user} a mis à jour le statut du dossier : **${nextStatusLabel}**.`).catch(() => {});
+        try {
+            await channel.send(`📌 ${actor.user} a mis à jour le statut du dossier : **${nextStatusLabel}**.`);
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
+
         return `Statut du dossier mis a jour : ${nextStatusLabel}.`;
     }
 
     if (action === 'dossier-claim') {
         requireDossierAccess(ctx, actor);
 
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
@@ -1897,7 +2156,12 @@ async function dossierAction(ctx, guild, actor, body) {
             ? ctx.helpers.setDossierReferent(guild.id, channel.id, actor.id)
             : null;
 
-        await channel.send(`✅ ${actor.user} prend ce dossier en charge.`).catch(() => {});
+        try {
+            await channel.send(`✅ ${actor.user} prend ce dossier en charge.`);
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
+
         return `Dossier Sentinel pris en charge${dossier?.id ? ` : #${dossier.id}` : ''}.`;
     }
 
@@ -1993,7 +2257,11 @@ async function runDashboardAction(ctx, guild, member, body) {
 
     if (action === 'set-log-channel') {
         requireCommandAccess(ctx, member);
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages
+        ], language);
         ctx.helpers.updateGuildConfig(guild.id, { logChannelId: channel.id });
         return `Salon de logs configuré : #${channel.name}.`;
     }
@@ -2017,7 +2285,11 @@ async function runDashboardAction(ctx, guild, member, body) {
 
     if (action === 'publish-service-panel') {
         requireCommandAccess(ctx, member);
-        const channel = getTextChannel(guild, body.channelId);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages
+        ], language);
         const role = ctx.helpers.getServiceRole(guild);
         const roleError = ctx.helpers.getServiceRoleManageError
             ? ctx.helpers.getServiceRoleManageError(guild, role, language)
@@ -2027,10 +2299,15 @@ async function runDashboardAction(ctx, guild, member, body) {
             throw createHttpError(400, roleError);
         }
 
-        await channel.send({
-            content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
-            components: ctx.helpers.buildServicePanelComponents(language)
-        });
+        try {
+            await channel.send({
+                content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
+                components: ctx.helpers.buildServicePanelComponents(language)
+            });
+        } catch (error) {
+            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
+        }
+
         return `Panneau de service publié dans #${channel.name}.`;
     }
 

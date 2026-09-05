@@ -321,8 +321,13 @@ async function api(path, options = {}) {
   return payload;
 }
 
-function dashboardErrorMessage(message) {
+function dashboardErrorMessage(input) {
   const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
+  const payload = input && typeof input === 'object' ? input.payload || null : null;
+  const message = typeof input === 'string' ? input : input?.message;
+  const payloadFix = typeof payload?.fix === 'string' && payload.fix.trim()
+    ? payload.fix.trim()
+    : null;
 
   if (language === 'en') {
     const firstFix = currentState?.diagnostics?.fixes?.[0] || null;
@@ -362,6 +367,9 @@ function dashboardErrorMessage(message) {
       'Missing dossier type.': 'Ticket type is missing.',
       'Category not found.': 'Discord category not found.',
       'Sentinel cannot send this embed in the selected channel.': 'Sentinel cannot send this embed in the selected channel.',
+      'Sentinel cannot use the selected channel.': 'Sentinel cannot use the selected channel.',
+      'Discord refused the action.': 'Discord refused the action.',
+      'Discord ban not found.': 'No Discord ban was found for this ID.',
       'No embed field provided.': 'Choose at least one embed field to update.',
       'Sentinel embed not found.': 'No Sentinel embed was found with this ID in the selected channel.',
       'Unknown moderation action.': 'Unknown moderation action.',
@@ -385,13 +393,16 @@ function dashboardErrorMessage(message) {
       'Case not found.': 'Check the case ID in the latest cases table.',
       'Category not found.': 'Choose a Discord category that still exists.',
       'Sentinel cannot send this embed in the selected channel.': firstFix || 'Allow Sentinel to view the channel and send messages there.',
+      'Sentinel cannot use the selected channel.': 'Fix the permissions of the selected channel, then try again.',
+      'Discord refused the action.': 'Open the permissions diagnostic, fix the red item, then try again.',
+      'Discord ban not found.': 'Check the full Discord ID and make sure this user is still banned.',
       'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
       'Sentinel embed not found.': 'Choose the channel where the embed is posted, then paste the message ID. If the Discord message was deleted, its slot will be freed.',
       'This channel is not a Sentinel dossier.': 'Choose an open Sentinel ticket channel.',
       'This action is reserved for Sentinel Premium.': 'This option is shown to prepare Premium, but it stays locked on free servers.'
     };
     const base = translated[message] || message || 'Action failed.';
-    const resolution = resolutionByMessage[message];
+    const resolution = payloadFix || resolutionByMessage[message];
 
     return resolution ? `${base}\nFix: ${resolution}` : base;
   }
@@ -431,6 +442,9 @@ function dashboardErrorMessage(message) {
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
     'Sentinel cannot send this embed in the selected channel.': 'Sentinel ne peut pas envoyer cet embed dans le salon choisi.',
+    'Sentinel cannot use the selected channel.': 'Sentinel ne peut pas utiliser le salon choisi.',
+    'Discord refused the action.': 'Discord a refusé l’action.',
+    'Discord ban not found.': 'Aucun bannissement Discord n’a été trouvé pour cet ID.',
     'No embed field provided.': 'Indique au moins un champ à modifier.',
     'Sentinel embed not found.': 'Aucun embed Sentinel n’a été trouvé avec cet ID dans le salon choisi.',
     'Unknown moderation action.': 'Action de modération inconnue.',
@@ -457,12 +471,15 @@ function dashboardErrorMessage(message) {
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
     'Sentinel cannot send this embed in the selected channel.': firstFix || 'Autorise Sentinel à voir le salon et à y envoyer des messages.',
+    'Sentinel cannot use the selected channel.': 'Corrige les permissions du salon choisi, puis réessaie.',
+    'Discord refused the action.': 'Ouvre le diagnostic permissions, corrige le point rouge, puis réessaie.',
+    'Discord ban not found.': 'Vérifie l’ID Discord complet et assure-toi que cette personne est encore bannie.',
     'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
     'Sentinel embed not found.': 'Choisis le salon où se trouve l’embed, puis colle l’ID du message. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This channel is not a Sentinel dossier.': 'Choisis un salon de ticket Sentinel ouvert.',
     'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
   };
-  const resolution = resolutionByMessage[message];
+  const resolution = payloadFix || resolutionByMessage[message];
 
   return resolution ? `${base}\nÀ faire : ${resolution}` : base;
 }
@@ -3534,7 +3551,7 @@ async function runAction(action, data, button = null) {
     renderGuilds();
     toast(payload.message || 'Action terminée.');
   } catch (error) {
-    toast(dashboardErrorMessage(error.message), 'error');
+    toast(dashboardErrorMessage(error), 'error');
   } finally {
     setLoading(button, false);
   }
@@ -3564,7 +3581,7 @@ async function loadAuditLogs(filters = auditFilters, scope = auditScope, button 
     rememberCurrentGuildPreview();
     renderDashboard();
   } catch (error) {
-    toast(dashboardErrorMessage(error.message), 'error');
+    toast(dashboardErrorMessage(error), 'error');
   } finally {
     setLoading(button, false);
   }
@@ -3591,7 +3608,7 @@ async function loadModerationCases(filters = moderationFilters, button = null) {
     rememberCurrentGuildPreview();
     renderDashboard();
   } catch (error) {
-    toast(dashboardErrorMessage(error.message), 'error');
+    toast(dashboardErrorMessage(error), 'error');
   } finally {
     setLoading(button, false);
   }
@@ -3607,7 +3624,7 @@ async function loadUserProfile(userId, button = null) {
     selectedUserProfile = payload.profile;
     renderDashboard();
   } catch (error) {
-    toast(dashboardErrorMessage(error.message), 'error');
+    toast(dashboardErrorMessage(error), 'error');
   } finally {
     setLoading(button, false);
   }
