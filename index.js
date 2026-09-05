@@ -4641,7 +4641,28 @@ function getSentinelGeneralChannel(guild, language) {
 }
 
 function getSentinelStatusChannel(guild) {
-    return findGuildTextChannel(guild, SENTINEL_STATUS_CHANNELS);
+    return getSentinelStatusChannels(guild)[0]?.channel || null;
+}
+
+function getSentinelStatusChannels(guild) {
+    const channels = [];
+    const seenChannelIds = new Set();
+
+    for (const target of SENTINEL_STATUS_CHANNELS) {
+        const channel = findGuildTextChannel(guild, target.name);
+
+        if (!channel || seenChannelIds.has(channel.id)) {
+            continue;
+        }
+
+        seenChannelIds.add(channel.id);
+        channels.push({
+            channel,
+            language: target.language
+        });
+    }
+
+    return channels;
 }
 
 function getServiceRole(guild) {
@@ -5399,7 +5420,8 @@ async function runSentinelServerSync(guild, requester = client.user) {
     return buildSyncSentinelEmbed(guild, requester, result);
 }
 
-function buildSentinelStatusEmbed(guild, requester = client.user) {
+function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr') {
+    const isEnglish = language === 'en';
     let databaseOk = true;
 
     try {
@@ -5410,31 +5432,42 @@ function buildSentinelStatusEmbed(guild, requester = client.user) {
 
     const syncText = lastSentinelServerSync
         ? `<t:${Math.floor(lastSentinelServerSync / 1000)}:R>`
-        : 'Pas encore synchronise';
+        : (isEnglish ? 'Not synchronized yet' : 'Pas encore synchronisé');
     const syncDetail = lastSentinelServerSyncResult?.skipped
-        ? `Ignoree : ${lastSentinelServerSyncResult.reason}`
+        ? (isEnglish
+            ? `Skipped: ${lastSentinelServerSyncResult.reason}`
+            : `Ignorée : ${lastSentinelServerSyncResult.reason}`)
         : lastSentinelServerSyncResult
-            ? `${lastSentinelServerSyncResult.created} creation(s), ${lastSentinelServerSyncResult.updated} mise(s) a jour`
-            : 'En attente';
+            ? (isEnglish
+                ? `${lastSentinelServerSyncResult.created} creation(s), ${lastSentinelServerSyncResult.updated} update(s)`
+                : `${lastSentinelServerSyncResult.created} création(s), ${lastSentinelServerSyncResult.updated} mise(s) à jour`)
+            : (isEnglish ? 'Waiting' : 'En attente');
 
     return createSentinelEmbed({
         color: databaseOk ? SENTINEL_COLORS.success : SENTINEL_COLORS.warning,
-        title: 'Sentinel | Statut',
-        description: `Etat technique de **${guild.name}**.`,
-        requester
+        title: isEnglish ? 'Sentinel | Status' : 'Sentinel | Statut',
+        description: isEnglish
+            ? `Technical status for **${guild.name}**.`
+            : `État technique de **${guild.name}**.`,
+        requester,
+        language
     }).addFields(
         {
             name: 'Bot',
-            value: `En ligne\nLatence Discord : **${client.ws.ping}ms**\nBuild : \`${SENTINEL_BUILD}\``,
+            value: isEnglish
+                ? `Online\nDiscord latency: **${client.ws.ping}ms**\nBuild: \`${SENTINEL_BUILD}\``
+                : `En ligne\nLatence Discord : **${client.ws.ping}ms**\nBuild : \`${SENTINEL_BUILD}\``,
             inline: false
         },
         {
-            name: 'Données internes',
-            value: databaseOk ? 'OK - données accessibles' : 'À vérifier - données indisponibles',
+            name: isEnglish ? 'Internal data' : 'Données internes',
+            value: databaseOk
+                ? (isEnglish ? 'OK - data accessible' : 'OK - données accessibles')
+                : (isEnglish ? 'Needs checking - data unavailable' : 'À vérifier - données indisponibles'),
             inline: true
         },
         {
-            name: 'Derniere synchronisation',
+            name: isEnglish ? 'Latest synchronization' : 'Dernière synchronisation',
             value: `${syncText}\n${syncDetail}`,
             inline: true
         }
@@ -5442,22 +5475,24 @@ function buildSentinelStatusEmbed(guild, requester = client.user) {
 }
 
 async function updateSentinelStatusPanel(guild) {
-    const channel = getSentinelStatusChannel(guild);
+    const targets = getSentinelStatusChannels(guild);
 
-    if (!channel) {
+    if (targets.length === 0) {
         return;
     }
 
-    const payload = { embeds: [buildSentinelStatusEmbed(guild)] };
-    const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
-    const botMessage = messages?.find(message => message.author.id === client.user.id);
+    for (const { channel, language } of targets) {
+        const payload = { embeds: [buildSentinelStatusEmbed(guild, client.user, language)] };
+        const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+        const botMessage = messages?.find(message => message.author.id === client.user.id);
 
-    if (botMessage) {
-        await botMessage.edit(payload).catch(() => {});
-        return;
+        if (botMessage) {
+            await botMessage.edit(payload).catch(() => {});
+            continue;
+        }
+
+        await channel.send(payload).catch(() => {});
     }
-
-    await channel.send(payload).catch(() => {});
 }
 
 async function updateAllSentinelStatusPanels() {
@@ -7123,7 +7158,10 @@ const SENTINEL_GENERAL_CHANNELS = {
     en: ['💬｜general-en']
 };
 
-const SENTINEL_STATUS_CHANNELS = ['📌｜statut-sentinel', '📌｜sentinel-status'];
+const SENTINEL_STATUS_CHANNELS = [
+    { name: '📌｜statut-sentinel', language: 'fr' },
+    { name: '📌｜sentinel-status', language: 'en' }
+];
 const SENTINEL_STAFF_LOG_CHANNELS = ['📂｜logs'];
 
 const SENTINEL_VOTE_LABELS = {
