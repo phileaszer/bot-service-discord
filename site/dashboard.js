@@ -761,6 +761,7 @@ function dashboardConfigStatus(state) {
   const serviceRole = resolveRole(state, state.config.serviceRoleId);
   const autoRole = resolveRole(state, state.config.autoRoleId);
   const logChannel = resolveChannel(state, state.config.logChannelId);
+  const statusChannel = resolveChannel(state, state.config.statusChannelId);
   const allowedRoles = commandRoles(state);
   const alerts = [];
 
@@ -780,6 +781,14 @@ function dashboardConfigStatus(state) {
     alerts.push('Le salon de logs configuré n’existe plus ou n’est plus textuel.');
   }
 
+  if (state.config.statusChannelId && !statusChannel) {
+    alerts.push('Le salon statut configuré n’existe plus ou n’est plus textuel.');
+  }
+
+  if (state.config.statusUpdatesEnabled && !state.config.statusChannelId) {
+    alerts.push('Choisis un salon statut avant d’activer les nouveautés officielles.');
+  }
+
   if (allowedRoles.length === 0) {
     alerts.push('Ajoute au moins un rôle autorisé pour déléguer la gestion de Sentinel au staff.');
   }
@@ -788,6 +797,7 @@ function dashboardConfigStatus(state) {
     serviceRole,
     autoRole,
     logChannel,
+    statusChannel,
     allowedRoles,
     alerts,
     ready: alerts.length === 0,
@@ -1531,6 +1541,16 @@ function configSummaryList(state) {
       ready: Boolean(status.logChannel)
     },
     {
+      label: 'Salon statut',
+      value: status.statusChannel ? `#${status.statusChannel.name}` : 'Optionnel',
+      ready: !state.config.statusChannelId || Boolean(status.statusChannel)
+    },
+    {
+      label: 'Nouveautés',
+      value: state.config.statusUpdatesEnabled ? 'Activées' : 'Désactivées',
+      ready: !state.config.statusUpdatesEnabled || Boolean(status.statusChannel)
+    },
+    {
       label: 'Rôles staff',
       value: status.allowedRoles.length > 0
         ? status.allowedRoles.map((role) => `@${role.name}`).join(', ')
@@ -1551,8 +1571,11 @@ function configSummaryList(state) {
   `;
 }
 
-function renderConfigurationHub(state, channelOptions) {
+function renderConfigurationHub(state, channelOptions, statusChannelOptions) {
   const status = dashboardConfigStatus(state);
+  const statusChannelLabel = status.statusChannel ? `#${status.statusChannel.name}` : 'Aucun salon statut choisi';
+  const statusUpdatesLabel = state.config.statusUpdatesEnabled ? 'activées' : 'désactivées';
+  const statusUpdatesNextEnabled = state.config.statusUpdatesEnabled ? 'false' : 'true';
 
   return `
     <section class="dashboard-panel config-hub" id="configuration">
@@ -1576,6 +1599,27 @@ function renderConfigurationHub(state, channelOptions) {
             <select name="channelId">${channelOptions}</select>
             <button class="button" type="submit">Publier le panneau</button>
           </form>
+        </article>
+        <article class="config-hub-card">
+          <h3>Salon statut</h3>
+          <p>Ce salon affiche l’état automatique de Sentinel. Les nouveautés officielles ne sont envoyées que si tu les actives.</p>
+          <p class="muted">Actuel : ${escapeHtml(statusChannelLabel)}. Mises à jour officielles : ${escapeHtml(statusUpdatesLabel)}.</p>
+          <form data-action-form="set-status-channel">
+            ${labelHelp('Salon statut', 'Sentinel y maintient un panneau d’état : bot en ligne, latence, données internes et dernière synchronisation.')}
+            <select name="channelId">${statusChannelOptions}</select>
+            <button class="button" type="submit">Publier le statut</button>
+          </form>
+          <div class="split-actions">
+            <form data-action-form="set-status-updates">
+              <input type="hidden" name="enabled" value="${statusUpdatesNextEnabled}">
+              <button class="button button-ghost" type="submit" ${state.config.statusChannelId ? '' : 'disabled'}>
+                ${state.config.statusUpdatesEnabled ? 'Couper les nouveautés' : 'Recevoir les nouveautés'}
+              </button>
+            </form>
+            <form data-action-form="disable-status-channel">
+              <button class="button button-ghost" type="submit" ${state.config.statusChannelId ? '' : 'disabled'}>Désactiver</button>
+            </form>
+          </div>
         </article>
       </div>
       <div class="command-roles">
@@ -2532,6 +2576,11 @@ const AUDIT_ACTION_LABELS = {
   'set-auto-role': 'Rôle automatique',
   'disable-auto-role': 'Rôle automatique',
   'set-log-channel': 'Salon de logs',
+  'set-status-channel': 'Salon statut',
+  'disable-status-channel': 'Salon statut',
+  'set-status-updates': 'Nouveautés statut',
+  'enable-status-updates': 'Nouveautés statut',
+  'disable-status-updates': 'Nouveautés statut',
   'publish-service-panel': 'Panneau de service',
   'set-payroll-settings': 'Réglage paie RP',
   'set-payroll-role-rate': 'Taux paie par rôle',
@@ -3267,6 +3316,7 @@ function renderDashboard() {
   const dossierRoleOptions = optionList(state.roles, null, 'Choisir un rôle responsable');
   const pingRoleOptions = optionList(state.roles, null, 'Aucun ping de rôle');
   const channelOptions = optionList(state.channels, state.config.logChannelId, 'Choisir un salon');
+  const statusChannelOptions = optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut');
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
   const premiumTag = '<span class="premium-tag">Option Premium</span>';
 
@@ -3277,7 +3327,7 @@ function renderDashboard() {
 
       ${tabPanel('setup', renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions))}
 
-      ${tabPanel('configuration', renderConfigurationHub(state, channelOptions))}
+      ${tabPanel('configuration', renderConfigurationHub(state, channelOptions, statusChannelOptions))}
 
       ${tabPanel('service', renderServicePanel(state, premiumBadge, premiumTag))}
 

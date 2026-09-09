@@ -110,6 +110,31 @@ const publicCommands = [
                 .setRequired(true)
         ),
 
+    command('config-statut', 'status-channel', 'Configure le salon qui affiche l etat de Sentinel.', 'Configures the channel that displays Sentinel status.')
+        .addStringOption(option =>
+            option
+                .setName('action')
+                .setDescription('Action a effectuer')
+                .setDescriptionLocalizations(en('Action to perform'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Definir le salon', name_localizations: en('Set channel'), value: 'definir' },
+                    { name: 'Voir le reglage', name_localizations: en('View setting'), value: 'voir' },
+                    { name: 'Desactiver le statut', name_localizations: en('Disable status'), value: 'desactiver' },
+                    { name: 'Recevoir les mises a jour', name_localizations: en('Enable updates'), value: 'maj-on' },
+                    { name: 'Ne plus recevoir les mises a jour', name_localizations: en('Disable updates'), value: 'maj-off' }
+                )
+        )
+        .addChannelOption(option =>
+            option
+                .setName('salon')
+                .setNameLocalizations(en('channel'))
+                .setDescription('Salon ou Sentinel affiche son statut')
+                .setDescriptionLocalizations(en('Channel where Sentinel displays its status'))
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(false)
+        ),
+
     command('config-paie', 'payroll-config', 'Configure le montant horaire de la paie RP.', 'Configures the hourly amount for RP payroll.')
         .addNumberOption(option =>
             option
@@ -688,6 +713,50 @@ const advancedCommands = [
     command('sync-service', 'sync-service', 'Repare les incoherences entre la base et le role de service.', 'Repairs inconsistencies between the database and service role.'),
 
     command('sync-sentinel', 'sync-sentinel', 'Synchronise les salons, roles et panneaux Sentinel.', 'Synchronizes Sentinel channels, roles and panels.'),
+
+    command('maj-sentinel', 'sentinel-update', 'Publie une mise a jour officielle Sentinel.', 'Publishes an official Sentinel update.')
+        .addStringOption(option =>
+            option
+                .setName('titre')
+                .setNameLocalizations(en('title'))
+                .setDescription('Titre en francais')
+                .setDescriptionLocalizations(en('French title'))
+                .setMaxLength(256)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName('message')
+                .setDescription('Message en francais')
+                .setDescriptionLocalizations(en('French message'))
+                .setMaxLength(4000)
+                .setRequired(true)
+        )
+        .addBooleanOption(option =>
+            option
+                .setName('diffuser')
+                .setNameLocalizations(en('broadcast'))
+                .setDescription('Envoyer aussi aux serveurs qui ont active les mises a jour statut')
+                .setDescriptionLocalizations(en('Also send to servers that enabled status updates'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('titre_en')
+                .setNameLocalizations(en('title_en'))
+                .setDescription('Titre anglais optionnel')
+                .setDescriptionLocalizations(en('Optional English title'))
+                .setMaxLength(256)
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('message_en')
+                .setDescription('Message anglais optionnel')
+                .setDescriptionLocalizations(en('Optional English message'))
+                .setMaxLength(4000)
+                .setRequired(false)
+        ),
 
     command('reset-heures-all', 'reset-hours-all', 'Reinitialise toutes les heures de service.', 'Resets all service hours.'),
 

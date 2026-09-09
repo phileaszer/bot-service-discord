@@ -5,6 +5,7 @@ const {
     EmbedBuilder,
     GatewayIntentBits
 } = require('discord.js');
+const db = require('../database/database');
 
 const COLORS = {
     announcement: 0xff2d9a,
@@ -141,6 +142,69 @@ function buildPayload({ type, title, body, source, pingRole }) {
     return payload;
 }
 
+function shouldBroadcastToStatusSubscribers(args) {
+    return Boolean(
+        args['status-subscribers']
+        || args['broadcast-status']
+        || args['publish-status-updates']
+    );
+}
+
+function getStatusSubscriberRows(referenceGuildId) {
+    return db.prepare(`
+        SELECT guild_id, status_channel_id, language
+        FROM guild_configs
+        WHERE status_updates_enabled = 1
+          AND status_channel_id IS NOT NULL
+          AND status_channel_id != ''
+          AND guild_id != ?
+    `).all(referenceGuildId);
+}
+
+async function postStatusSubscriberUpdates(client, rows, payloadData, usedChannelIds) {
+    const posted = [];
+
+    for (const row of rows) {
+        const guild = await client.guilds.fetch(row.guild_id).catch(() => null);
+
+        if (!guild) {
+            continue;
+        }
+
+        await guild.channels.fetch().catch(() => null);
+        const channel = guild.channels.cache.get(row.status_channel_id);
+
+        if (!channel || !channel.isTextBased?.() || usedChannelIds.has(channel.id)) {
+            continue;
+        }
+
+        const language = row.language === 'en' ? 'en' : 'fr';
+        const title = language === 'en' && payloadData.titleEn ? payloadData.titleEn : payloadData.titleFr;
+        const body = language === 'en' && payloadData.bodyEn ? payloadData.bodyEn : payloadData.bodyFr;
+        const message = await channel.send(buildPayload({
+            type: 'status',
+            title,
+            body,
+            source: payloadData.source,
+            pingRole: null
+        })).catch(() => null);
+
+        if (message) {
+            usedChannelIds.add(channel.id);
+            posted.push({
+                language,
+                guildId: guild.id,
+                channel: channel.name,
+                id: channel.id,
+                messageId: message.id,
+                statusSubscriber: true
+            });
+        }
+    }
+
+    return posted;
+}
+
 async function main() {
     const args = readArgs(process.argv.slice(2));
     const type = String(args.type || 'announcement').trim();
@@ -179,6 +243,7 @@ async function main() {
                 : (args['ping-role-id'] || args['ping-role'] || process.env.ANNOUNCE_ROLE_ID || process.env.ANNOUNCE_ROLE_NAME || DEFAULT_PING_ROLE_NAME),
             fr: { title: titleFr, body: bodyFr },
             en: titleEn && bodyEn ? { title: titleEn, body: bodyEn } : null,
+            statusSubscribers: shouldBroadcastToStatusSubscribers(args),
             source
         }, null, 2));
         return;
@@ -198,6 +263,7 @@ async function main() {
             const pingRole = await resolvePingRole(guild, args);
 
             const posted = [];
+            const usedChannelIds = new Set();
             const frChannel = guild.channels.cache.find(channel => channel.name === target.fr);
 
             if (!frChannel) {
@@ -211,6 +277,7 @@ async function main() {
                     source,
                     pingRole
             }));
+            usedChannelIds.add(frChannel.id);
             posted.push({ language: 'fr', channel: target.fr, id: frChannel.id, pingedRole: pingRole?.id || null });
 
             if (titleEn && bodyEn && !args['fr-only']) {
@@ -224,8 +291,26 @@ async function main() {
                             source,
                             pingRole
                     }));
+                    usedChannelIds.add(enChannel.id);
                     posted.push({ language: 'en', channel: target.en, id: enChannel.id, pingedRole: pingRole?.id || null });
                 }
+            }
+
+            if (shouldBroadcastToStatusSubscribers(args)) {
+                const subscribersPosted = await postStatusSubscriberUpdates(
+                    client,
+                    getStatusSubscriberRows(guildId),
+                    {
+                        titleFr,
+                        bodyFr,
+                        titleEn,
+                        bodyEn,
+                        source
+                    },
+                    usedChannelIds
+                );
+
+                posted.push(...subscribersPosted);
             }
 
             console.log(JSON.stringify({ ok: true, type, posted }, null, 2));

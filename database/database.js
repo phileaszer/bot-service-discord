@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS guild_configs (
     guild_id TEXT PRIMARY KEY,
     role_id TEXT,
     log_channel_id TEXT,
+    status_channel_id TEXT,
+    status_updates_enabled INTEGER NOT NULL DEFAULT 0,
     auto_role_id TEXT,
     language TEXT NOT NULL DEFAULT 'fr',
     server_preset TEXT NOT NULL DEFAULT 'standard'
@@ -323,6 +325,14 @@ if (!guildConfigColumns.includes('language')) {
 
 if (!guildConfigColumns.includes('auto_role_id')) {
     db.prepare('ALTER TABLE guild_configs ADD COLUMN auto_role_id TEXT').run();
+}
+
+if (!guildConfigColumns.includes('status_channel_id')) {
+    db.prepare('ALTER TABLE guild_configs ADD COLUMN status_channel_id TEXT').run();
+}
+
+if (!guildConfigColumns.includes('status_updates_enabled')) {
+    db.prepare('ALTER TABLE guild_configs ADD COLUMN status_updates_enabled INTEGER NOT NULL DEFAULT 0').run();
 }
 
 if (!guildConfigColumns.includes('server_preset')) {

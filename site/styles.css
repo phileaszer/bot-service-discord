@@ -3077,6 +3077,20 @@ code {
   gap: 12px;
 }
 
+.split-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.split-actions form {
+  min-width: 0;
+}
+
+.split-actions .button {
+  width: 100%;
+}
+
 .config-summary-list {
   display: grid;
   gap: 8px;
@@ -4725,6 +4739,10 @@ code {
   }
 
   .global-lookup-form {
+    grid-template-columns: 1fr;
+  }
+
+  .split-actions {
     grid-template-columns: 1fr;
   }
 
