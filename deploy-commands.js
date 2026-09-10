@@ -758,6 +758,56 @@ const advancedCommands = [
                 .setRequired(false)
         ),
 
+    command('premium-acces', 'premium-access', 'Gere les acces Premium Sentinel.', 'Manages Sentinel Premium access.')
+        .addStringOption(option =>
+            option
+                .setName('action')
+                .setDescription('Action a effectuer')
+                .setDescriptionLocalizations(en('Action to run'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Ajouter', name_localizations: en('Add'), value: 'ajouter' },
+                    { name: 'Retirer', name_localizations: en('Remove'), value: 'retirer' },
+                    { name: 'Voir', name_localizations: en('View'), value: 'voir' }
+                )
+        )
+        .addStringOption(option =>
+            option
+                .setName('cible')
+                .setNameLocalizations(en('target'))
+                .setDescription('Type d acces Premium')
+                .setDescriptionLocalizations(en('Premium access type'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Serveur entier', name_localizations: en('Whole server'), value: 'serveur' },
+                    { name: 'Role', name_localizations: en('Role'), value: 'role' },
+                    { name: 'Utilisateur', name_localizations: en('User'), value: 'utilisateur' }
+                )
+        )
+        .addRoleOption(option =>
+            option
+                .setName('role')
+                .setDescription('Role a rendre Premium ou a retirer')
+                .setDescriptionLocalizations(en('Role to grant or remove Premium from'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord de la personne')
+                .setDescriptionLocalizations(en('Discord user ID'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('serveur_id')
+                .setNameLocalizations(en('server_id'))
+                .setDescription('ID du serveur si different du serveur actuel')
+                .setDescriptionLocalizations(en('Server ID if different from the current server'))
+                .setRequired(false)
+        ),
+
     command('reset-heures-all', 'reset-hours-all', 'Reinitialise toutes les heures de service.', 'Resets all service hours.'),
 
     command('resume-service', 'summary', 'Affiche un resume du service sur ce serveur.', 'Shows a service summary for this server.'),

@@ -98,6 +98,28 @@ CREATE TABLE IF NOT EXISTS guild_command_roles (
     PRIMARY KEY (guild_id, role_id)
 );
 
+CREATE TABLE IF NOT EXISTS sentinel_premium_guilds (
+    guild_id TEXT PRIMARY KEY,
+    granted_by_user_id TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sentinel_premium_roles (
+    guild_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    granted_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+);
+
+CREATE TABLE IF NOT EXISTS sentinel_premium_users (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    granted_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS sentinel_dossier_roles (
     guild_id TEXT,
     role_id TEXT,
@@ -263,6 +285,12 @@ ON weekly_payroll_archives (guild_id, week_start);
 
 CREATE INDEX IF NOT EXISTS idx_guild_command_roles_guild
 ON guild_command_roles (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_sentinel_premium_roles_guild
+ON sentinel_premium_roles (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_sentinel_premium_users_guild
+ON sentinel_premium_users (guild_id);
 
 CREATE INDEX IF NOT EXISTS idx_sentinel_dossier_roles_guild
 ON sentinel_dossier_roles (guild_id);

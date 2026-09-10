@@ -92,7 +92,9 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'paie-ajustement',
     'payroll-adjustment',
     'maj-sentinel',
-    'sentinel-update'
+    'sentinel-update',
+    'premium-acces',
+    'premium-access'
 ]);
 const ADVANCED_TEXT_COMMANDS = [
     /^!(heures|hours)(?:\s|$)/i,
@@ -229,6 +231,16 @@ const I18N = {
         officialUpdateDenied: '❌ Cette commande est réservée à la créatrice de Sentinel.',
         officialUpdateSent: '✅ Mise à jour officielle publiée. Serveur Sentinel : **{referenceCount}** salon(s). Serveurs abonnés : **{subscriberCount}** salon(s).',
         officialUpdateNoTarget: '❌ Aucun salon statut disponible pour publier cette mise à jour.',
+        premiumAccessDenied: '❌ Cette commande est réservée à la créatrice de Sentinel.',
+        premiumAccessRoleRequired: '❌ Choisis un rôle pour gérer l’accès Premium par rôle.',
+        premiumAccessUserRequired: '❌ Indique l’ID Discord complet de la personne.',
+        premiumAccessGuildRequired: '❌ Indique un ID de serveur Discord valide, ou utilise la commande sur le serveur concerné.',
+        premiumAccessTargetInvalid: '❌ Choisis une cible valide : serveur, rôle ou utilisateur.',
+        premiumAccessAdded: '✅ Accès Premium ajouté pour {target}.',
+        premiumAccessRemoved: '✅ Accès Premium retiré pour {target}.',
+        premiumAccessListTitle: 'Accès Premium Sentinel',
+        premiumAccessListEmpty: 'Aucun accès Premium manuel enregistré sur ce serveur.',
+        premiumAccessList: '**Serveur Premium :** {server}\n**Rôles Premium :** {roles}\n**Utilisateurs Premium :** {users}\n**Auto serveur Sentinel :** les rôles staff/modération du serveur de référence sont reconnus automatiquement.',
         payRateInvalid: '❌ Montant horaire invalide. Exemple : `/config-paie montant:500 devise:$`.',
         paySettingsUpdated: '✅ Paie RP configurée : **{rate}** par heure.',
         payRoleSettingsUpdated: '✅ Taux Premium configuré pour {role} : **{rate}** par heure.',
@@ -268,10 +280,14 @@ const I18N = {
         serviceLeft: '🔴 Tu as quitté ton service.\n⏱️ Durée de cette session : **{duration}**',
         serviceStartedLog: '🟢 {member} a pris son service.',
         serviceStarted: '🟢 Tu as pris ton service.',
+        serviceAlreadyStarted: '🟢 Tu es déjà en service.',
+        serviceNotStarted: '🔴 Tu n’es pas en service pour le moment.',
         serviceError: '❌ Sentinel n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
         showMyHoursLabel: 'Mes heures',
         activeLabel: 'En service',
-        toggleLabel: 'Prendre / Quitter',
+        toggleLabel: 'Service',
+        startServiceLabel: 'Prendre service',
+        endServiceLabel: 'Fin service',
         confirm: 'Confirmer',
         cancel: 'Annuler',
         buttonCooldown: '⏳ Action déjà en cours. Réessaie dans **{time}**.',
@@ -443,6 +459,16 @@ const I18N = {
         officialUpdateDenied: '❌ This command is reserved for the Sentinel creator.',
         officialUpdateSent: '✅ Official update published. Sentinel server: **{referenceCount}** channel(s). Subscribed servers: **{subscriberCount}** channel(s).',
         officialUpdateNoTarget: '❌ No status channel is available for this update.',
+        premiumAccessDenied: '❌ This command is reserved for the Sentinel creator.',
+        premiumAccessRoleRequired: '❌ Choose a role to manage Premium access by role.',
+        premiumAccessUserRequired: '❌ Provide the full numeric Discord user ID.',
+        premiumAccessGuildRequired: '❌ Provide a valid Discord server ID, or run the command on the target server.',
+        premiumAccessTargetInvalid: '❌ Choose a valid target: server, role, or user.',
+        premiumAccessAdded: '✅ Premium access added for {target}.',
+        premiumAccessRemoved: '✅ Premium access removed for {target}.',
+        premiumAccessListTitle: 'Sentinel Premium access',
+        premiumAccessListEmpty: 'No manual Premium access is saved on this server.',
+        premiumAccessList: '**Premium server:** {server}\n**Premium roles:** {roles}\n**Premium users:** {users}\n**Auto Sentinel server:** reference server staff/moderation roles are detected automatically.',
         payRateInvalid: '❌ Invalid hourly amount. Example: `/payroll-config hourly_rate:500 currency:$`.',
         paySettingsUpdated: '✅ RP payroll configured: **{rate}** per hour.',
         payRoleSettingsUpdated: '✅ Premium rate configured for {role}: **{rate}** per hour.',
@@ -482,10 +508,14 @@ const I18N = {
         serviceLeft: '🔴 You ended your service.\n⏱️ Session duration: **{duration}**',
         serviceStartedLog: '🟢 {member} started their service.',
         serviceStarted: '🟢 You started your service.',
+        serviceAlreadyStarted: '🟢 You are already on duty.',
+        serviceNotStarted: '🔴 You are not on duty right now.',
         serviceError: '❌ Sentinel could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
         showMyHoursLabel: 'My hours',
         activeLabel: 'On duty',
-        toggleLabel: 'Start / End',
+        toggleLabel: 'Duty',
+        startServiceLabel: 'Start duty',
+        endServiceLabel: 'End duty',
         confirm: 'Confirm',
         cancel: 'Cancel',
         buttonCooldown: '⏳ Action already running. Try again in **{time}**.',
@@ -664,6 +694,8 @@ function resolveCommandName(commandName) {
         help: 'aide',
         dashboard: 'dashboard',
         premium: 'premium',
+        'premium-acces': 'premium-acces',
+        'premium-access': 'premium-acces',
         support: 'support',
         'config-langue': 'config-langue',
         language: 'config-langue',
@@ -966,7 +998,7 @@ function buildPremiumComponents(language = 'fr') {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel(language === 'en' ? 'Premium page' : 'Page Premium')
+                .setLabel(language === 'en' ? 'Free Premium' : 'Premium gratuit')
                 .setStyle(ButtonStyle.Link)
                 .setURL(getPublicSiteUrl('premium.html')),
             new ButtonBuilder()
@@ -975,6 +1007,117 @@ function buildPremiumComponents(language = 'fr') {
                 .setURL(getPublicSiteUrl('statut.html'))
         )
     ];
+}
+
+async function handlePremiumAccessCommand(interaction, language = 'fr') {
+    if (!canPublishOfficialSentinelUpdate(interaction)) {
+        return interaction.reply({
+            content: t(language, 'premiumAccessDenied'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const action = String(interaction.options.getString('action') || 'voir');
+    const target = String(interaction.options.getString('cible') || 'serveur');
+    const providedGuildId = normalizeUserId(
+        interaction.options.getString('serveur_id')
+        || interaction.options.getString('server_id')
+    );
+    const guildId = providedGuildId || interaction.guildId;
+    const role = interaction.options.getRole('role');
+    const userId = normalizeUserId(
+        interaction.options.getString('utilisateur_id')
+        || interaction.options.getString('user_id')
+    );
+
+    if (!guildId) {
+        return interaction.reply({
+            content: t(language, 'premiumAccessGuildRequired'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    if (action === 'voir') {
+        return interaction.reply({
+            embeds: [
+                createSentinelEmbed({
+                    color: SENTINEL_COLORS.advanced,
+                    title: t(language, 'premiumAccessListTitle'),
+                    description: formatPremiumAccessList(guildId, language),
+                    requester: interaction.user,
+                    thumbnail: interaction.guild?.iconURL?.() || null,
+                    language
+                })
+            ],
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const add = action === 'ajouter';
+    const remove = action === 'retirer';
+
+    if (!add && !remove) {
+        return interaction.reply({
+            content: t(language, 'premiumAccessTargetInvalid'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    let targetLabel = null;
+
+    if (target === 'serveur') {
+        if (add) {
+            grantPremiumGuild(guildId, interaction.user.id);
+        } else {
+            revokePremiumGuild(guildId);
+        }
+
+        targetLabel = `serveur \`${guildId}\``;
+    } else if (target === 'role') {
+        if (!role || role.id === interaction.guildId) {
+            return interaction.reply({
+                content: t(language, 'premiumAccessRoleRequired'),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        const roleGuildId = role.guild?.id || interaction.guildId;
+
+        if (add) {
+            grantPremiumRole(roleGuildId, role.id, interaction.user.id);
+        } else {
+            revokePremiumRole(roleGuildId, role.id);
+        }
+
+        targetLabel = `${role}`;
+    } else if (target === 'utilisateur') {
+        if (!userId) {
+            return interaction.reply({
+                content: t(language, 'premiumAccessUserRequired'),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (add) {
+            grantPremiumUser(guildId, userId, interaction.user.id);
+        } else {
+            revokePremiumUser(guildId, userId);
+        }
+
+        targetLabel = `<@${userId}>`;
+    } else {
+        return interaction.reply({
+            content: t(language, 'premiumAccessTargetInvalid'),
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    return interaction.reply({
+        content: t(language, add ? 'premiumAccessAdded' : 'premiumAccessRemoved', {
+            target: targetLabel
+        }),
+        flags: MessageFlags.Ephemeral
+    });
 }
 
 function buildSupportEmbed(guild, requester) {
@@ -1436,7 +1579,10 @@ function getAdvancedGuildIds() {
 }
 
 function isAdvancedGuild(guildId) {
-    return Boolean(guildId && getAdvancedGuildIds().includes(String(guildId)));
+    return Boolean(guildId && (
+        getAdvancedGuildIds().includes(String(guildId))
+        || isManualPremiumGuild(guildId)
+    ));
 }
 
 function isCreatorUser(userId) {
@@ -1484,12 +1630,42 @@ function getPremiumRoleNames() {
         .filter(Boolean);
 }
 
+function hasReferenceStaffPremiumAccess(member) {
+    if (!member?.guild?.id || String(member.guild.id) !== SENTINEL_REFERENCE_GUILD_ID) {
+        return false;
+    }
+
+    if (member.id === member.guild.ownerId || isCreatorUser(member.id)) {
+        return true;
+    }
+
+    if (hasSentinelStaffRole(member)) {
+        return true;
+    }
+
+    const commandRoleIds = getCommandRoleIds(member.guild.id);
+
+    if (commandRoleIds.some(roleId => member.roles.cache.has(roleId))) {
+        return true;
+    }
+
+    return member.permissions.has(PermissionsBitField.Flags.Administrator)
+        || member.permissions.has(PermissionsBitField.Flags.ManageGuild)
+        || member.permissions.has(PermissionsBitField.Flags.ManageRoles)
+        || member.permissions.has(PermissionsBitField.Flags.ManageChannels)
+        || member.permissions.has(PermissionsBitField.Flags.ModerateMembers)
+        || member.permissions.has(PermissionsBitField.Flags.KickMembers)
+        || member.permissions.has(PermissionsBitField.Flags.BanMembers);
+}
+
 function hasAdvancedAccess(member, guildId = null) {
     const resolvedGuildId = guildId || member?.guild?.id;
 
     return Boolean(resolvedGuildId && (
         isAdvancedGuild(resolvedGuildId)
-        || hasSentinelStaffRole(member)
+        || hasReferenceStaffPremiumAccess(member)
+        || hasManualPremiumUserAccess(resolvedGuildId, member?.id)
+        || hasManualPremiumRoleAccess(member, resolvedGuildId)
     ));
 }
 
@@ -1667,6 +1843,124 @@ function removeCommandRole(guildId, roleId) {
         DELETE FROM guild_command_roles
         WHERE guild_id = ? AND role_id = ?
     `).run(guildId, roleId);
+}
+
+function isManualPremiumGuild(guildId) {
+    if (!guildId) {
+        return false;
+    }
+
+    const row = db.prepare(`
+        SELECT 1 AS found
+        FROM sentinel_premium_guilds
+        WHERE guild_id = ?
+        LIMIT 1
+    `).get(String(guildId));
+
+    return Boolean(row);
+}
+
+function grantPremiumGuild(guildId, grantedByUserId = null) {
+    db.prepare(`
+        INSERT OR REPLACE INTO sentinel_premium_guilds (guild_id, granted_by_user_id, created_at)
+        VALUES (?, ?, ?)
+    `).run(String(guildId), grantedByUserId || null, new Date().toISOString());
+}
+
+function revokePremiumGuild(guildId) {
+    db.prepare(`
+        DELETE FROM sentinel_premium_guilds
+        WHERE guild_id = ?
+    `).run(String(guildId));
+}
+
+function grantPremiumRole(guildId, roleId, grantedByUserId = null) {
+    db.prepare(`
+        INSERT OR REPLACE INTO sentinel_premium_roles (guild_id, role_id, granted_by_user_id, created_at)
+        VALUES (?, ?, ?, ?)
+    `).run(String(guildId), String(roleId), grantedByUserId || null, new Date().toISOString());
+}
+
+function revokePremiumRole(guildId, roleId) {
+    db.prepare(`
+        DELETE FROM sentinel_premium_roles
+        WHERE guild_id = ? AND role_id = ?
+    `).run(String(guildId), String(roleId));
+}
+
+function grantPremiumUser(guildId, userId, grantedByUserId = null) {
+    db.prepare(`
+        INSERT OR REPLACE INTO sentinel_premium_users (guild_id, user_id, granted_by_user_id, created_at)
+        VALUES (?, ?, ?, ?)
+    `).run(String(guildId), String(userId), grantedByUserId || null, new Date().toISOString());
+}
+
+function revokePremiumUser(guildId, userId) {
+    db.prepare(`
+        DELETE FROM sentinel_premium_users
+        WHERE guild_id = ? AND user_id = ?
+    `).run(String(guildId), String(userId));
+}
+
+function getPremiumRoleIds(guildId) {
+    return db.prepare(`
+        SELECT role_id
+        FROM sentinel_premium_roles
+        WHERE guild_id = ?
+        ORDER BY role_id ASC
+    `).all(String(guildId)).map(row => row.role_id);
+}
+
+function getPremiumUserIds(guildId) {
+    return db.prepare(`
+        SELECT user_id
+        FROM sentinel_premium_users
+        WHERE guild_id = ?
+        ORDER BY user_id ASC
+    `).all(String(guildId)).map(row => row.user_id);
+}
+
+function hasManualPremiumUserAccess(guildId, userId) {
+    if (!guildId || !userId) {
+        return false;
+    }
+
+    const row = db.prepare(`
+        SELECT 1 AS found
+        FROM sentinel_premium_users
+        WHERE guild_id = ? AND user_id = ?
+        LIMIT 1
+    `).get(String(guildId), String(userId));
+
+    return Boolean(row);
+}
+
+function hasManualPremiumRoleAccess(member, guildId = null) {
+    const resolvedGuildId = guildId || member?.guild?.id;
+
+    if (!member || !resolvedGuildId) {
+        return false;
+    }
+
+    const roleIds = getPremiumRoleIds(resolvedGuildId);
+
+    return roleIds.some(roleId => member.roles.cache.has(roleId));
+}
+
+function formatPremiumAccessList(guildId, language = 'fr') {
+    const isServerPremium = isManualPremiumGuild(guildId);
+    const premiumRoleIds = getPremiumRoleIds(guildId);
+    const premiumUserIds = getPremiumUserIds(guildId);
+
+    if (!isServerPremium && premiumRoleIds.length === 0 && premiumUserIds.length === 0) {
+        return t(language, 'premiumAccessListEmpty');
+    }
+
+    return t(language, 'premiumAccessList', {
+        server: isServerPremium ? (language === 'en' ? 'yes' : 'oui') : (language === 'en' ? 'no' : 'non'),
+        roles: premiumRoleIds.length ? premiumRoleIds.map(roleId => `<@&${roleId}>`).join(', ') : (language === 'en' ? 'none' : 'aucun'),
+        users: premiumUserIds.length ? premiumUserIds.map(userId => `<@${userId}>`).join(', ') : (language === 'en' ? 'none' : 'aucun')
+    });
 }
 
 function getDossierRoleIds(guildId) {
@@ -5983,15 +6277,15 @@ function buildLegacyHelpEmbed(guild, requester) {
         'Dans le salon ou les membres doivent pointer, envoie `!service-panel`.',
         '',
         '**Utiliser le panneau**',
-        '`Prendre / Quitter` commence ou termine le service. Sentinel calcule la duree, met a jour le total et envoie les logs.'
+        '`Prendre service` démarre le service, `Fin service` le termine. Sentinel calcule la durée, met à jour le total et envoie les logs.'
     ];
     const isReferenceServer = isAdvancedGuild(guild.id);
     const memberUsage = [
         '**Prendre son service**',
-        'Clique sur `Prendre / Quitter`. Sentinel ajoute le role de service.',
+        'Clique sur `Prendre service`. Sentinel ajoute le rôle de service.',
         '',
         '**Finir son service**',
-        'Clique sur le meme bouton. Sentinel retire le role et sauvegarde le temps.',
+        'Clique sur `Fin service`. Sentinel retire le rôle et sauvegarde le temps.',
         '',
         '**Consulter ses infos**',
         isReferenceServer
@@ -6255,7 +6549,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     {
                         name: 'Use the buttons',
                         value: [
-                            '`Start / End` starts or ends duty.',
+                            '`Start duty` starts duty, `End duty` ends it.',
                             '`My hours` shows personal hours.',
                             '`On duty` shows currently active agents.'
                         ].join('\n')
@@ -6571,7 +6865,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 {
                     name: 'Utiliser les boutons',
                     value: [
-                        '`Prendre / Quitter` commence ou termine le service.',
+                        '`Prendre service` démarre le service, `Fin service` le termine.',
                         '`Mes heures` affiche les heures personnelles.',
                         '`En service` affiche les agents actuellement actifs.'
                     ].join('\n')
@@ -6873,10 +7167,15 @@ function buildServicePanelComponents(language = 'fr') {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('toggle_service')
-                .setLabel(t(language, 'toggleLabel'))
+                .setCustomId('start_service')
+                .setLabel(t(language, 'startServiceLabel'))
                 .setStyle(ButtonStyle.Success)
                 .setEmoji('🟢'),
+            new ButtonBuilder()
+                .setCustomId('end_service')
+                .setLabel(t(language, 'endServiceLabel'))
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('🔴'),
             new ButtonBuilder()
                 .setCustomId('show_my_hours')
                 .setLabel(t(language, 'showMyHoursLabel'))
@@ -6961,7 +7260,7 @@ function getAuditOptionValue(interaction, names) {
 
 function mapDiscordAuditAction(interaction) {
     if (interaction.isButton()) {
-        if (interaction.customId === 'toggle_service') {
+        if (['toggle_service', 'start_service', 'end_service'].includes(interaction.customId)) {
             return 'toggle-service';
         }
 
@@ -7935,6 +8234,9 @@ async function handleSentinelButtonFailure(interaction, error) {
 
 function isProtectedButtonAction(customId) {
     return [
+        'toggle_service',
+        'start_service',
+        'end_service',
         'sentinel_dossier:claim',
         'sentinel_dossier:transcript',
         'sentinel_dossier:close',
@@ -10035,6 +10337,10 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
+        if (commandName === 'premium-acces') {
+            return handlePremiumAccessCommand(interaction, language);
+        }
+
         if (commandName === 'support') {
             return interaction.reply({
                 embeds: [buildSupportEmbed(interaction.guild, interaction.user)],
@@ -11033,7 +11339,13 @@ client.on(Events.InteractionCreate, async interaction => {
         return handleSentinelButton(interaction, handleSentinelVoteButton);
     }
 
-    if (interaction.customId !== 'toggle_service') return;
+    const serviceButtonActions = new Set(['toggle_service', 'start_service', 'end_service']);
+
+    if (!serviceButtonActions.has(interaction.customId)) return;
+
+    const requestedServiceAction = interaction.customId === 'start_service'
+        ? 'start'
+        : (interaction.customId === 'end_service' ? 'end' : 'toggle');
 
     if (await rejectDuplicateButtonAction(interaction, buttonLanguage)) {
         return;
@@ -11065,8 +11377,23 @@ client.on(Events.InteractionCreate, async interaction => {
         const guildId = interaction.guild.id;
         const userId = member.id;
         const userData = createUserIfMissing(guildId, userId);
+        const isOnDuty = member.roles.cache.has(role.id);
 
-        if (member.roles.cache.has(role.id)) {
+        if (requestedServiceAction === 'start' && isOnDuty) {
+            return interaction.reply({
+                content: t(buttonLanguage, 'serviceAlreadyStarted'),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (requestedServiceAction === 'end' && !isOnDuty) {
+            return interaction.reply({
+                content: t(buttonLanguage, 'serviceNotStarted'),
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (isOnDuty && requestedServiceAction !== 'start') {
             const startTime = userData.startTime;
             let duration = 0;
             let totalTime = userData.totalTime;

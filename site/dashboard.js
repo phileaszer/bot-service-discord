@@ -1593,9 +1593,9 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions) {
         </article>
         <article class="config-hub-card">
           <h3>Panneau de service</h3>
-          <p>Publie ou republie le bouton de service dans le salon de ton choix.</p>
+          <p>Publie ou republie les boutons de service dans le salon de ton choix.</p>
           <form data-action-form="publish-service-panel">
-            ${labelHelp('Salon de publication', 'Salon dans lequel Sentinel enverra le bouton utilisé pour prendre ou finir son service.')}
+            ${labelHelp('Salon de publication', 'Salon dans lequel Sentinel enverra les boutons utilisés pour prendre ou finir son service.')}
             <select name="channelId">${channelOptions}</select>
             <button class="button" type="submit">Publier le panneau</button>
           </form>
