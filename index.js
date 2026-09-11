@@ -116,7 +116,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-11-premium-role-site-access-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-11-premium-user-global-site-access-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -1719,7 +1719,8 @@ function hasReferencePremiumSubscription(member) {
 
     const premiumRoleNames = getPremiumSubscriberRoleNames();
 
-    return member.roles.cache.some(role => roleNameMatchesAny(role.name, premiumRoleNames));
+    return hasManualPremiumRoleAccess(member, SENTINEL_REFERENCE_GUILD_ID)
+        || member.roles.cache.some(role => roleNameMatchesAny(role.name, premiumRoleNames));
 }
 
 function hasAdvancedAccess(member, guildId = null) {
@@ -1728,6 +1729,7 @@ function hasAdvancedAccess(member, guildId = null) {
     return Boolean(resolvedGuildId && (
         isAdvancedGuild(resolvedGuildId)
         || hasReferencePremiumSubscription(member)
+        || hasManualPremiumUserSubscription(member?.id)
         || hasReferenceStaffPremiumAccess(member)
         || hasManualPremiumUserAccess(resolvedGuildId, member?.id)
         || hasManualPremiumRoleAccess(member, resolvedGuildId)
@@ -1996,6 +1998,21 @@ function hasManualPremiumUserAccess(guildId, userId) {
         WHERE guild_id = ? AND user_id = ?
         LIMIT 1
     `).get(String(guildId), String(userId));
+
+    return Boolean(row);
+}
+
+function hasManualPremiumUserSubscription(userId) {
+    if (!userId) {
+        return false;
+    }
+
+    const row = db.prepare(`
+        SELECT 1 AS found
+        FROM sentinel_premium_users
+        WHERE user_id = ?
+        LIMIT 1
+    `).get(String(userId));
 
     return Boolean(row);
 }
@@ -10217,6 +10234,7 @@ client.once(Events.ClientReady, async () => {
             getUserTargetErrorById,
             hasCommandRoleAccess,
             hasAdvancedAccess,
+            hasManualPremiumUserSubscription,
             hasReferencePremiumSubscription,
             memberCanManageDossier,
             mapCustomEmbedMessageData,

@@ -1052,6 +1052,10 @@ async function hasDashboardPremiumSubscription(ctx, session = null) {
         return true;
     }
 
+    if (ctx.helpers.hasManualPremiumUserSubscription?.(session?.user?.id)) {
+        return true;
+    }
+
     const referenceMember = await getReferenceMemberForSession(ctx, session);
 
     return Boolean(
