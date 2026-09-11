@@ -2982,6 +2982,40 @@ code {
   font-weight: 850;
 }
 
+.founder-premium-table {
+  min-width: 1040px;
+}
+
+.founder-premium-table td:first-child {
+  min-width: 210px;
+}
+
+.founder-premium-table .compact-list {
+  margin: 0;
+}
+
+.founder-premium-list li,
+.founder-reason-list li {
+  padding: 8px 0;
+  border-color: rgba(234, 242, 255, 0.06);
+}
+
+.founder-premium-list li.is-warning {
+  color: var(--warning);
+}
+
+.premium-row-server td:first-child strong {
+  color: var(--mint);
+}
+
+.premium-row-partial td:first-child strong {
+  color: var(--cyan);
+}
+
+.founder-premium-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .server-home-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);

@@ -17,6 +17,7 @@ const SESSION_COOKIE = 'sentinel_session';
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
+const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
 const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const SERVER_PRESET_LABELS = {
@@ -1032,6 +1033,210 @@ function requireAdvanced(ctx, guildId, member = null) {
     }
 }
 
+function getDashboardAdvancedGuildIds() {
+    return [
+        SENTINEL_REFERENCE_GUILD_ID,
+        process.env.SENTINEL_REFERENCE_GUILD_ID,
+        process.env.SENTINEL_PREMIUM_GUILD_ID,
+        process.env.SENTINEL_PREMIUM_GUILD_IDS,
+        process.env.PREMIUM_GUILD_IDS
+    ]
+        .flatMap(value => String(value || '').split(','))
+        .map(value => value.trim())
+        .filter(value => /^\d{17,20}$/.test(value));
+}
+
+function getManualPremiumGuildIds() {
+    return new Set(db.prepare(`
+        SELECT guild_id
+        FROM sentinel_premium_guilds
+        ORDER BY guild_id ASC
+    `).all().map(row => row.guild_id));
+}
+
+function getManualPremiumRolesByGuild() {
+    const byGuild = new Map();
+
+    for (const row of db.prepare(`
+        SELECT guild_id, role_id, granted_by_user_id, created_at
+        FROM sentinel_premium_roles
+        ORDER BY guild_id ASC, role_id ASC
+    `).all()) {
+        if (!byGuild.has(row.guild_id)) {
+            byGuild.set(row.guild_id, []);
+        }
+
+        byGuild.get(row.guild_id).push(row);
+    }
+
+    return byGuild;
+}
+
+function getManualPremiumUsersByGuild() {
+    const byGuild = new Map();
+
+    for (const row of db.prepare(`
+        SELECT guild_id, user_id, granted_by_user_id, created_at
+        FROM sentinel_premium_users
+        ORDER BY guild_id ASC, user_id ASC
+    `).all()) {
+        if (!byGuild.has(row.guild_id)) {
+            byGuild.set(row.guild_id, []);
+        }
+
+        byGuild.get(row.guild_id).push(row);
+    }
+
+    return byGuild;
+}
+
+async function buildCreatorPremiumOverview(ctx) {
+    const configuredAdvancedGuildIds = new Set(getDashboardAdvancedGuildIds());
+    const manualPremiumGuildIds = getManualPremiumGuildIds();
+    const premiumRolesByGuild = getManualPremiumRolesByGuild();
+    const premiumUsersByGuild = getManualPremiumUsersByGuild();
+    const guilds = Array.from(ctx.client.guilds.cache.values())
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+
+    const items = [];
+
+    for (const guild of guilds) {
+        await guild.roles.fetch().catch(() => null);
+
+        const isConfiguredPremium = configuredAdvancedGuildIds.has(guild.id);
+        const isManualPremium = manualPremiumGuildIds.has(guild.id);
+        const isReferenceGuild = guild.id === SENTINEL_REFERENCE_GUILD_ID;
+        const premiumRoleRows = premiumRolesByGuild.get(guild.id) || [];
+        const premiumUserRows = premiumUsersByGuild.get(guild.id) || [];
+        const premiumRoles = premiumRoleRows.map(row => {
+            const role = guild.roles.cache.get(row.role_id);
+
+            return {
+                id: row.role_id,
+                name: role?.name || null,
+                exists: Boolean(role),
+                grantedByUserId: row.granted_by_user_id || null,
+                createdAt: row.created_at
+            };
+        });
+        const premiumUsers = [];
+
+        for (const row of premiumUserRows) {
+            const member = await guild.members.fetch(row.user_id).catch(() => null);
+            const user = member?.user || await ctx.client.users.fetch(row.user_id).catch(() => null);
+
+            premiumUsers.push({
+                id: row.user_id,
+                tag: user?.tag || user?.username || null,
+                username: user?.username || null,
+                inGuild: Boolean(member),
+                grantedByUserId: row.granted_by_user_id || null,
+                createdAt: row.created_at
+            });
+        }
+
+        const referenceStaffRoleIds = isReferenceGuild && ctx.helpers.getCommandRoleIds
+            ? ctx.helpers.getCommandRoleIds(guild.id)
+            : [];
+        const referenceStaffRoles = referenceStaffRoleIds.map(roleId => {
+            const role = guild.roles.cache.get(roleId);
+
+            return {
+                id: roleId,
+                name: role?.name || null,
+                exists: Boolean(role)
+            };
+        });
+        const reasons = [];
+
+        if (isConfiguredPremium) {
+            reasons.push(isReferenceGuild ? 'Serveur de référence' : 'Serveur Premium configuré');
+        }
+
+        if (isManualPremium) {
+            reasons.push('Premium serveur manuel');
+        }
+
+        if (premiumRoles.length > 0) {
+            reasons.push(`${premiumRoles.length} rôle(s) Premium`);
+        }
+
+        if (premiumUsers.length > 0) {
+            reasons.push(`${premiumUsers.length} personne(s) Premium`);
+        }
+
+        if (isReferenceGuild && referenceStaffRoles.length > 0) {
+            reasons.push('Staff Sentinel reconnu automatiquement');
+        }
+
+        const fullPremium = isConfiguredPremium || isManualPremium;
+        const partialPremium = !fullPremium && (
+            premiumRoles.length > 0
+            || premiumUsers.length > 0
+            || (isReferenceGuild && referenceStaffRoles.length > 0)
+        );
+
+        items.push({
+            id: guild.id,
+            name: guild.name,
+            icon: guild.iconURL(),
+            memberCount: guild.memberCount || null,
+            premium: fullPremium || partialPremium,
+            premiumScope: fullPremium ? 'server' : (partialPremium ? 'partial' : 'none'),
+            fullPremium,
+            partialPremium,
+            configuredPremium: isConfiguredPremium,
+            manualPremium: isManualPremium,
+            referenceGuild: isReferenceGuild,
+            reasons,
+            premiumRoles,
+            premiumUsers,
+            referenceStaffRoles
+        });
+    }
+
+    const premiumOrder = { server: 0, partial: 1, none: 2 };
+    items.sort((a, b) => {
+        const scopeDiff = (premiumOrder[a.premiumScope] ?? 99) - (premiumOrder[b.premiumScope] ?? 99);
+
+        if (scopeDiff !== 0) {
+            return scopeDiff;
+        }
+
+        return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+    });
+
+    const summary = items.reduce((acc, item) => {
+        acc.guildCount += 1;
+
+        if (item.premiumScope === 'server') {
+            acc.serverPremiumCount += 1;
+        } else if (item.premiumScope === 'partial') {
+            acc.partialPremiumCount += 1;
+        } else {
+            acc.freeCount += 1;
+        }
+
+        acc.premiumRoleCount += item.premiumRoles.length;
+        acc.premiumUserCount += item.premiumUsers.length;
+        return acc;
+    }, {
+        guildCount: 0,
+        serverPremiumCount: 0,
+        partialPremiumCount: 0,
+        freeCount: 0,
+        premiumRoleCount: 0,
+        premiumUserCount: 0
+    });
+
+    return {
+        generatedAt: new Date().toISOString(),
+        canView: true,
+        summary,
+        guilds: items
+    };
+}
+
 function getDossierStatusLabel(status, language = 'fr') {
     const labels = {
         open: { fr: 'Ouvert', en: 'Open' },
@@ -1451,6 +1656,9 @@ async function buildGuildState(ctx, guild, session = null) {
             icon: guild.iconURL()
         },
         advanced,
+        creator: {
+            canViewPremiumOverview: canViewGlobalAudit
+        },
         inviteUrl: getInviteUrl(ctx, guild.id),
         config: {
             ...config,
@@ -2553,7 +2761,10 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             user: session.user,
-            settings: getUserSiteSettings(session.user.id)
+            settings: getUserSiteSettings(session.user.id),
+            creator: {
+                canViewPremiumOverview: isCreatorUser(session.user.id)
+            }
         });
         return;
     }
@@ -2617,6 +2828,18 @@ async function handleApi(req, res, ctx, url) {
         }
 
         json(res, 200, { ok: true, guilds });
+        return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/creator/premium-overview') {
+        if (!isCreatorUser(session.user.id)) {
+            throw createHttpError(403, 'Premium overview is reserved for the Sentinel creator.');
+        }
+
+        json(res, 200, {
+            ok: true,
+            overview: await buildCreatorPremiumOverview(ctx)
+        });
         return;
     }
 

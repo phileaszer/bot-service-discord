@@ -17,6 +17,9 @@ let expandedModerationCaseId = null;
 let selectedUserProfile = null;
 let dossierFilters = {};
 let expandedDossierId = null;
+let creatorOverview = null;
+let creatorOverviewLoading = false;
+let canViewPremiumOverview = false;
 let dashboardHydrating = false;
 let selectedGuildPreview = null;
 const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
@@ -3158,6 +3161,147 @@ function renderAuditPanel(state) {
   `;
 }
 
+function premiumScopeLabel(scope) {
+  if (scope === 'server') return 'Premium serveur';
+  if (scope === 'partial') return 'Premium partiel';
+  return 'Gratuit';
+}
+
+function premiumScopeReady(scope) {
+  return scope === 'server' || scope === 'partial';
+}
+
+function premiumNameList(items = [], emptyText = 'Aucun') {
+  if (!items.length) {
+    return `<span class="muted">${escapeHtml(emptyText)}</span>`;
+  }
+
+  return `
+    <ul class="compact-list founder-premium-list">
+      ${items.map((item) => `
+        <li class="${item.exists === false || item.inGuild === false ? 'is-warning' : ''}">
+          <span>
+            <strong>${escapeHtml(item.name || item.tag || item.username || item.id)}</strong>
+            <small><code>${escapeHtml(item.id)}</code>${item.inGuild === false ? ' - hors serveur' : ''}${item.exists === false ? ' - supprimé sur Discord' : ''}</small>
+          </span>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+function founderPremiumGuildRows(overview) {
+  const guildItems = overview?.guilds || [];
+
+  if (!guildItems.length) {
+    return '<p class="muted">Aucun serveur Sentinel trouvé pour le moment.</p>';
+  }
+
+  return `
+    <div class="table-shell founder-premium-table-shell">
+      <table class="dashboard-table founder-premium-table">
+        <thead>
+          <tr>
+            <th>Serveur</th>
+            <th>Statut</th>
+            <th>Pourquoi</th>
+            <th>Rôles Premium</th>
+            <th>Personnes Premium</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${guildItems.map((guild) => `
+            <tr class="premium-row-${escapeHtml(guild.premiumScope || 'none')}">
+              <td>
+                <strong>${escapeHtml(guild.name)}</strong>
+                <small><code>${escapeHtml(guild.id)}</code>${guild.memberCount ? ` - ${escapeHtml(guild.memberCount)} membres` : ''}</small>
+              </td>
+              <td>${statusBadge(premiumScopeLabel(guild.premiumScope), premiumScopeReady(guild.premiumScope), guild.premiumScope === 'server' ? 'is-site' : '')}</td>
+              <td>
+                ${guild.reasons?.length
+                  ? `<ul class="compact-list founder-reason-list">${guild.reasons.map((reason) => `<li><span>${escapeHtml(reason)}</span></li>`).join('')}</ul>`
+                  : '<span class="muted">Aucun accès Premium actif.</span>'}
+                ${guild.referenceStaffRoles?.length
+                  ? `<small>Rôles staff auto : ${guild.referenceStaffRoles.map((role) => escapeHtml(role.name || role.id)).join(', ')}</small>`
+                  : ''}
+              </td>
+              <td>${premiumNameList(guild.premiumRoles, 'Aucun rôle Premium')}</td>
+              <td>${premiumNameList(guild.premiumUsers, 'Aucune personne Premium')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderFounderPremiumPanel() {
+  if (!canShowFounderTab()) {
+    return '';
+  }
+
+  const overview = creatorOverview;
+  const summary = overview?.summary || {
+    guildCount: 0,
+    serverPremiumCount: 0,
+    partialPremiumCount: 0,
+    freeCount: 0,
+    premiumRoleCount: 0,
+    premiumUserCount: 0
+  };
+
+  return `
+    <section class="dashboard-panel module-panel founder-premium-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Fondatrice</p>
+          <h2>Accès Premium Sentinel</h2>
+          <p class="muted">Vue privée : serveurs Premium, serveurs gratuits, rôles Premium et personnes Premium.</p>
+        </div>
+        <button class="button button-small button-ghost" type="button" data-refresh-creator-premium ${creatorOverviewLoading ? 'disabled' : ''}>
+          ${creatorOverviewLoading ? 'Actualisation...' : 'Actualiser'}
+        </button>
+      </div>
+      <div class="dashboard-metrics dashboard-kpis founder-premium-kpis">
+        <article class="dashboard-kpi">
+          <span>Serveurs</span>
+          <strong>${escapeHtml(summary.guildCount)}</strong>
+          <small>où Sentinel est installé</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Premium serveur</span>
+          <strong>${escapeHtml(summary.serverPremiumCount)}</strong>
+          <small>accès complet</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Premium partiel</span>
+          <strong>${escapeHtml(summary.partialPremiumCount)}</strong>
+          <small>rôle ou personne</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Gratuits</span>
+          <strong>${escapeHtml(summary.freeCount)}</strong>
+          <small>aucun accès Premium</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Rôles</span>
+          <strong>${escapeHtml(summary.premiumRoleCount)}</strong>
+          <small>rôles Premium manuels</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Personnes</span>
+          <strong>${escapeHtml(summary.premiumUserCount)}</strong>
+          <small>accès Premium manuel</small>
+        </article>
+      </div>
+      ${creatorOverviewLoading && !overview
+        ? '<p class="muted">Chargement des accès Premium...</p>'
+        : founderPremiumGuildRows(overview)}
+      ${overview?.generatedAt ? `<p class="muted">Dernière lecture : ${escapeHtml(formatAuditDate(overview.generatedAt))}</p>` : ''}
+    </section>
+  `;
+}
+
 function helpTip(text) {
   const safeText = escapeHtml(text);
 
@@ -3224,6 +3368,13 @@ const DASHBOARD_TABS = [
     eyebrow: 'Traces',
     title: 'Journal des actions',
     description: 'Retrouver qui a fait quoi'
+  },
+  {
+    id: 'founder',
+    label: 'Fondatrice',
+    eyebrow: 'Premium',
+    title: 'Vue Premium',
+    description: 'Voir qui a accès au Premium'
   }
 ];
 
@@ -3239,11 +3390,24 @@ const DASHBOARD_TAB_GROUPS = [
   {
     label: 'Contrôler',
     tabs: ['audit']
+  },
+  {
+    label: 'Fondatrice',
+    tabs: ['founder']
   }
 ];
 
+function canShowFounderTab(state = currentState) {
+  return Boolean(canViewPremiumOverview || state?.creator?.canViewPremiumOverview || creatorOverview?.canView);
+}
+
+function availableDashboardTabs(state = currentState) {
+  return DASHBOARD_TABS.filter((tab) => tab.id !== 'founder' || canShowFounderTab(state));
+}
+
 function renderDashboardTabs(state, premiumBadge) {
-  const activeTab = DASHBOARD_TABS.find((tab) => tab.id === activeDashboardTab) || DASHBOARD_TABS[0];
+  const tabs = availableDashboardTabs(state);
+  const activeTab = tabs.find((tab) => tab.id === activeDashboardTab) || tabs[0] || DASHBOARD_TABS[0];
   const syncBadge = dashboardHydrating
     ? '<span class="status-badge is-syncing">Actualisation</span>'
     : '';
@@ -3265,7 +3429,7 @@ function renderDashboardTabs(state, premiumBadge) {
           <section class="dashboard-tab-group">
             <span class="dashboard-tab-group-label">${escapeHtml(group.label)}</span>
             <div class="dashboard-tabs">
-              ${group.tabs.map((tabId) => DASHBOARD_TABS.find((tab) => tab.id === tabId)).filter(Boolean).map((tab) => `
+              ${group.tabs.map((tabId) => tabs.find((tab) => tab.id === tabId)).filter(Boolean).map((tab) => `
                 <button
                   type="button"
                   class="dashboard-tab${tab.id === activeDashboardTab ? ' is-active' : ''}"
@@ -3279,7 +3443,7 @@ function renderDashboardTabs(state, premiumBadge) {
               `).join('')}
             </div>
           </section>
-        `).join('')}
+        `).filter((markup) => markup.includes('data-dashboard-tab')).join('')}
       </nav>
     </section>
   `;
@@ -3310,6 +3474,12 @@ function renderDashboard() {
   }
 
   const state = currentState;
+  const tabs = availableDashboardTabs(state);
+
+  if (!tabs.some((tab) => tab.id === activeDashboardTab)) {
+    activeDashboardTab = tabs[0]?.id || 'overview';
+  }
+
   const roleOptions = optionList(state.roles, state.config.serviceRoleId, 'Choisir un rôle');
   const autoRoleOptions = optionList(state.roles, state.config.autoRoleId, 'Choisir un rôle automatique');
   const commandRoleOptions = optionList(state.roles, null, 'Choisir un rôle autorisé');
@@ -3428,6 +3598,8 @@ function renderDashboard() {
       `)}
 
       ${tabPanel('audit', renderAuditPanel(state))}
+
+      ${canShowFounderTab(state) ? tabPanel('founder', renderFounderPremiumPanel()) : ''}
 
       ${tabPanel('moderation', `
     <section class="dashboard-panel module-panel moderation-panel" id="moderation">
@@ -3580,9 +3752,41 @@ async function refreshGuildState() {
   if (!selectedGuildId) return;
   const payload = await api(`/api/guilds/${selectedGuildId}/state`);
   currentState = payload.state;
+  canViewPremiumOverview = Boolean(canViewPremiumOverview || currentState.creator?.canViewPremiumOverview);
   dashboardHydrating = false;
   rememberCurrentGuildPreview();
   renderDashboard();
+}
+
+async function loadCreatorPremiumOverview(button = null, { silent = false } = {}) {
+  if (!canViewPremiumOverview) return;
+
+  setLoading(button, true);
+  creatorOverviewLoading = true;
+  renderDashboard();
+
+  try {
+    const payload = await api('/api/creator/premium-overview');
+    creatorOverview = payload.overview || null;
+    canViewPremiumOverview = Boolean(creatorOverview?.canView);
+
+    if (!silent) {
+      toast('Vue Premium actualisée.');
+    }
+  } catch (error) {
+    if (error.status === 403) {
+      canViewPremiumOverview = false;
+      creatorOverview = null;
+    }
+
+    if (!silent) {
+      toast(dashboardErrorMessage(error), 'error');
+    }
+  } finally {
+    creatorOverviewLoading = false;
+    setLoading(button, false);
+    renderDashboard();
+  }
 }
 
 async function runAction(action, data, button = null) {
@@ -3685,12 +3889,22 @@ function attachDashboardHandlers() {
     button.addEventListener('click', () => {
       const nextTab = button.dataset.dashboardTab;
 
-      if (!DASHBOARD_TABS.some((tab) => tab.id === nextTab)) {
+      if (!availableDashboardTabs().some((tab) => tab.id === nextTab)) {
         return;
       }
 
       activeDashboardTab = nextTab;
       renderDashboard();
+
+      if (nextTab === 'founder' && canViewPremiumOverview && !creatorOverview && !creatorOverviewLoading) {
+        loadCreatorPremiumOverview(null, { silent: true });
+      }
+    });
+  });
+
+  $$('[data-refresh-creator-premium]').forEach((button) => {
+    button.addEventListener('click', () => {
+      loadCreatorPremiumOverview(button);
     });
   });
 
@@ -3882,7 +4096,11 @@ async function bootstrap() {
     const session = await api('/api/session');
     currentUser = session.user;
     currentSettings = session.settings || null;
+    canViewPremiumOverview = Boolean(session.creator?.canViewPremiumOverview);
     renderUser();
+    if (canViewPremiumOverview) {
+      loadCreatorPremiumOverview(null, { silent: true });
+    }
     await loadGuilds();
 
     let restoredGuild = false;
@@ -3909,6 +4127,9 @@ async function bootstrap() {
     currentState = null;
     selectedUserProfile = null;
     selectedGuildPreview = null;
+    creatorOverview = null;
+    creatorOverviewLoading = false;
+    canViewPremiumOverview = false;
     dashboardHydrating = false;
     renderUser();
     renderGuilds();
@@ -4015,6 +4236,9 @@ $('[data-logout]')?.addEventListener('click', async () => {
   currentState = null;
   currentSettings = null;
   selectedGuildPreview = null;
+  creatorOverview = null;
+  creatorOverviewLoading = false;
+  canViewPremiumOverview = false;
   dashboardHydrating = false;
   dossierFilters = {};
   expandedDossierId = null;
