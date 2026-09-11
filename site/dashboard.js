@@ -3183,10 +3183,13 @@ function premiumScopeReady(scope) {
   return scope === 'server' || scope === 'partial';
 }
 
-function premiumNameList(items = [], emptyText = 'Aucun') {
+function premiumNameList(items = [], emptyText = 'Aucun', options = {}) {
   if (!items.length) {
     return `<span class="muted">${escapeHtml(emptyText)}</span>`;
   }
+
+  const target = options.target || null;
+  const guildId = options.guildId || null;
 
   return `
     <ul class="compact-list founder-premium-list">
@@ -3196,9 +3199,75 @@ function premiumNameList(items = [], emptyText = 'Aucun') {
             <strong>${escapeHtml(item.name || item.tag || item.username || item.id)}</strong>
             <small><code>${escapeHtml(item.id)}</code>${item.inGuild === false ? ' - hors serveur' : ''}${item.exists === false ? ' - supprimé sur Discord' : ''}</small>
           </span>
+          ${target ? `
+            <button
+              class="button button-small button-ghost"
+              type="button"
+              data-creator-premium-click
+              data-action="remove"
+              data-target="${escapeHtml(target)}"
+              ${target === 'role' ? `data-guild-id="${escapeHtml(guildId)}" data-role-id="${escapeHtml(item.id)}"` : `data-user-id="${escapeHtml(item.id)}"`}
+            >Retirer</button>
+          ` : ''}
         </li>
       `).join('')}
     </ul>
+  `;
+}
+
+function creatorPremiumGuildOptions(overview) {
+  return (overview?.guilds || [])
+    .map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`)
+    .join('');
+}
+
+function creatorPremiumManagePanel(overview) {
+  const guildOptions = creatorPremiumGuildOptions(overview);
+
+  return `
+    <datalist id="creator-premium-guilds">
+      ${guildOptions}
+    </datalist>
+    <div class="creator-premium-actions">
+      <form class="creator-premium-form" data-creator-premium-form>
+        <input type="hidden" name="target" value="server">
+        ${labelHelp('Serveur Premium', 'Ajoute ou retire le Premium complet sur un serveur Sentinel avec son ID Discord.')}
+        <div class="creator-premium-row">
+          <select name="action">
+            <option value="add">Ajouter</option>
+            <option value="remove">Retirer</option>
+          </select>
+          <input name="guildId" list="creator-premium-guilds" placeholder="ID serveur" required>
+          <button class="button button-small" type="submit">Appliquer</button>
+        </div>
+      </form>
+      <form class="creator-premium-form" data-creator-premium-form>
+        <input type="hidden" name="target" value="role">
+        ${labelHelp('Rôle Premium', 'Ajoute ou retire un rôle Premium sur un serveur où Sentinel est installé.')}
+        <div class="creator-premium-row">
+          <select name="action">
+            <option value="add">Ajouter</option>
+            <option value="remove">Retirer</option>
+          </select>
+          <input name="guildId" list="creator-premium-guilds" placeholder="ID serveur" required>
+          <input name="roleId" placeholder="ID rôle" required>
+          <button class="button button-small" type="submit">Appliquer</button>
+        </div>
+      </form>
+      <form class="creator-premium-form" data-creator-premium-form>
+        <input type="hidden" name="target" value="user">
+        ${labelHelp('Utilisateur Premium', 'Ajoute un abonnement Premium global à un ID Discord, ou retire son Premium partout.')}
+        <div class="creator-premium-row">
+          <select name="action">
+            <option value="add">Ajouter</option>
+            <option value="remove">Retirer partout</option>
+          </select>
+          <input name="userId" placeholder="ID utilisateur" required>
+          <input name="guildId" list="creator-premium-guilds" placeholder="Serveur rattachement optionnel">
+          <button class="button button-small" type="submit">Appliquer</button>
+        </div>
+      </form>
+    </div>
   `;
 }
 
@@ -3219,6 +3288,7 @@ function founderPremiumGuildRows(overview) {
             <th>Pourquoi</th>
             <th>Rôles Premium</th>
             <th>Personnes Premium</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -3237,8 +3307,20 @@ function founderPremiumGuildRows(overview) {
                   ? `<small>Rôles staff auto : ${guild.referenceStaffRoles.map((role) => escapeHtml(role.name || role.id)).join(', ')}</small>`
                   : ''}
               </td>
-              <td>${premiumNameList(guild.premiumRoles, 'Aucun rôle Premium')}</td>
-              <td>${premiumNameList(guild.premiumUsers, 'Aucune personne Premium')}</td>
+              <td>${premiumNameList(guild.premiumRoles, 'Aucun rôle Premium', { target: 'role', guildId: guild.id })}</td>
+              <td>${premiumNameList(guild.premiumUsers, 'Aucune personne Premium', { target: 'user' })}</td>
+              <td>
+                ${guild.configuredPremium && !guild.manualPremium
+                  ? '<span class="muted">Config env</span>'
+                  : `<button
+                      class="button button-small ${guild.manualPremium ? 'button-ghost' : ''}"
+                      type="button"
+                      data-creator-premium-click
+                      data-action="${guild.manualPremium ? 'remove' : 'add'}"
+                      data-target="server"
+                      data-guild-id="${escapeHtml(guild.id)}"
+                    >${guild.manualPremium ? 'Retirer serveur' : 'Ajouter serveur'}</button>`}
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -3306,6 +3388,7 @@ function renderFounderPremiumPanel() {
           <small>accès Premium manuel</small>
         </article>
       </div>
+      ${creatorPremiumManagePanel(overview)}
       ${creatorOverviewLoading && !overview
         ? '<p class="muted">Chargement des accès Premium...</p>'
         : founderPremiumGuildRows(overview)}
@@ -3897,6 +3980,38 @@ async function loadCreatorPremiumOverview(button = null, { silent = false } = {}
   }
 }
 
+async function manageCreatorPremiumAccess(data, button = null) {
+  if (!canViewPremiumOverview) return;
+
+  setLoading(button, true);
+
+  try {
+    const payload = await api('/api/creator/premium-access', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+
+    creatorOverview = payload.overview || creatorOverview;
+    canViewPremiumOverview = Boolean(creatorOverview?.canView);
+
+    await loadGuilds().catch(() => {});
+
+    if (selectedGuildId) {
+      await refreshGuildState().catch(() => {
+        renderDashboard();
+      });
+    } else {
+      renderDashboard();
+    }
+
+    toast(payload.message || 'Accès Premium mis à jour.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 async function runAction(action, data, button = null) {
   if (!selectedGuildId) return;
   setLoading(button, true);
@@ -4013,6 +4128,26 @@ function attachDashboardHandlers() {
   $$('[data-refresh-creator-premium]').forEach((button) => {
     button.addEventListener('click', () => {
       loadCreatorPremiumOverview(button);
+    });
+  });
+
+  $$('[data-creator-premium-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = $('button[type="submit"]', form);
+      manageCreatorPremiumAccess(formData(form), button);
+    });
+  });
+
+  $$('[data-creator-premium-click]').forEach((button) => {
+    button.addEventListener('click', () => {
+      manageCreatorPremiumAccess({
+        action: button.dataset.action,
+        target: button.dataset.target,
+        guildId: button.dataset.guildId || '',
+        roleId: button.dataset.roleId || '',
+        userId: button.dataset.userId || ''
+      }, button);
     });
   });
 

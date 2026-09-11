@@ -3035,7 +3035,7 @@ code {
 }
 
 .founder-premium-table {
-  min-width: 1040px;
+  min-width: 1180px;
 }
 
 .founder-premium-table td:first-child {
@@ -3046,8 +3046,39 @@ code {
   margin: 0;
 }
 
+.creator-premium-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.creator-premium-form {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(234, 242, 255, 0.1);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.06), transparent 50%, rgba(255, 45, 154, 0.05)),
+    rgba(5, 7, 12, 0.34);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+
+.creator-premium-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.creator-premium-row .button {
+  min-height: 42px;
+}
+
 .founder-premium-list li,
 .founder-reason-list li {
+  align-items: center;
   padding: 8px 0;
   border-color: rgba(234, 242, 255, 0.06);
 }

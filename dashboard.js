@@ -1116,6 +1116,11 @@ function getDashboardAdvancedGuildIds() {
         .filter(value => /^\d{17,20}$/.test(value));
 }
 
+function normalizeDiscordIdValue(value) {
+    const id = String(value || '').trim();
+    return /^\d{17,20}$/.test(id) ? id : null;
+}
+
 function getManualPremiumGuildIds() {
     return new Set(db.prepare(`
         SELECT guild_id
@@ -1158,6 +1163,133 @@ function getManualPremiumUsersByGuild() {
     }
 
     return byGuild;
+}
+
+function grantDashboardPremiumGuild(guildId, grantedByUserId = null) {
+    db.prepare(`
+        INSERT OR REPLACE INTO sentinel_premium_guilds (guild_id, granted_by_user_id, created_at)
+        VALUES (?, ?, ?)
+    `).run(String(guildId), grantedByUserId || null, new Date().toISOString());
+}
+
+function revokeDashboardPremiumGuild(guildId) {
+    db.prepare(`
+        DELETE FROM sentinel_premium_guilds
+        WHERE guild_id = ?
+    `).run(String(guildId));
+}
+
+function grantDashboardPremiumRole(guildId, roleId, grantedByUserId = null) {
+    db.prepare(`
+        INSERT OR REPLACE INTO sentinel_premium_roles (guild_id, role_id, granted_by_user_id, created_at)
+        VALUES (?, ?, ?, ?)
+    `).run(String(guildId), String(roleId), grantedByUserId || null, new Date().toISOString());
+}
+
+function revokeDashboardPremiumRole(guildId, roleId) {
+    db.prepare(`
+        DELETE FROM sentinel_premium_roles
+        WHERE guild_id = ? AND role_id = ?
+    `).run(String(guildId), String(roleId));
+}
+
+function grantDashboardPremiumUser(guildId, userId, grantedByUserId = null) {
+    db.prepare(`
+        INSERT OR REPLACE INTO sentinel_premium_users (guild_id, user_id, granted_by_user_id, created_at)
+        VALUES (?, ?, ?, ?)
+    `).run(String(guildId), String(userId), grantedByUserId || null, new Date().toISOString());
+}
+
+function revokeDashboardPremiumUser(userId, guildId = null) {
+    if (guildId) {
+        db.prepare(`
+            DELETE FROM sentinel_premium_users
+            WHERE guild_id = ? AND user_id = ?
+        `).run(String(guildId), String(userId));
+        return;
+    }
+
+    db.prepare(`
+        DELETE FROM sentinel_premium_users
+        WHERE user_id = ?
+    `).run(String(userId));
+}
+
+async function manageCreatorPremiumAccess(ctx, session, body) {
+    const action = String(body.action || '').trim().toLowerCase();
+    const target = String(body.target || '').trim().toLowerCase();
+    const add = action === 'add' || action === 'ajouter';
+    const remove = action === 'remove' || action === 'retirer';
+    const guildId = normalizeDiscordIdValue(body.guildId || body.serverId || body.serveurId);
+    const roleId = normalizeDiscordIdValue(body.roleId);
+    const userId = normalizeDiscordIdValue(body.userId || body.utilisateurId);
+
+    if (!add && !remove) {
+        throw createHttpError(400, 'Invalid Premium action.');
+    }
+
+    if (target === 'server' || target === 'serveur') {
+        if (!guildId) {
+            throw createHttpError(400, 'Invalid server ID.');
+        }
+
+        if (add) {
+            grantDashboardPremiumGuild(guildId, session.user.id);
+            return `Premium serveur ajouté pour ${guildId}.`;
+        }
+
+        revokeDashboardPremiumGuild(guildId);
+        return `Premium serveur retiré pour ${guildId}.`;
+    }
+
+    if (target === 'role') {
+        if (!guildId) {
+            throw createHttpError(400, 'Invalid server ID.');
+        }
+
+        if (!roleId) {
+            throw createHttpError(400, 'Invalid role ID.');
+        }
+
+        const guild = ctx.client.guilds.cache.get(guildId)
+            || await ctx.client.guilds.fetch(guildId).catch(() => null);
+
+        if (!guild) {
+            throw createHttpError(404, 'Sentinel is not installed on this server.');
+        }
+
+        await guild.roles.fetch().catch(() => null);
+
+        if (!guild.roles.cache.has(roleId)) {
+            throw createHttpError(404, 'Role not found.');
+        }
+
+        if (add) {
+            grantDashboardPremiumRole(guildId, roleId, session.user.id);
+            return `Premium rôle ajouté pour ${roleId}.`;
+        }
+
+        revokeDashboardPremiumRole(guildId, roleId);
+        return `Premium rôle retiré pour ${roleId}.`;
+    }
+
+    if (target === 'user' || target === 'utilisateur') {
+        if (!userId) {
+            throw createHttpError(400, 'Invalid Discord user ID.');
+        }
+
+        if (add) {
+            grantDashboardPremiumUser(guildId || SENTINEL_REFERENCE_GUILD_ID, userId, session.user.id);
+            return `Premium utilisateur ajouté pour ${userId}.`;
+        }
+
+        revokeDashboardPremiumUser(userId, guildId);
+        return guildId
+            ? `Premium utilisateur retiré pour ${userId} sur ${guildId}.`
+            : `Premium utilisateur retiré partout pour ${userId}.`;
+    }
+
+    throw createHttpError(400, 'Invalid Premium target.');
 }
 
 async function buildCreatorPremiumOverview(ctx) {
@@ -2916,6 +3048,22 @@ async function handleApi(req, res, ctx, url) {
 
         json(res, 200, {
             ok: true,
+            overview: await buildCreatorPremiumOverview(ctx)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/premium-access') {
+        if (!isCreatorUser(session.user.id)) {
+            throw createHttpError(403, 'Premium management is reserved for the Sentinel creator.');
+        }
+
+        const body = await parseBody(req);
+        const message = await manageCreatorPremiumAccess(ctx, session, body);
+
+        json(res, 200, {
+            ok: true,
+            message,
             overview: await buildCreatorPremiumOverview(ctx)
         });
         return;
