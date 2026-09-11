@@ -7,6 +7,7 @@ let selectedGuildId = null;
 let currentState = null;
 let currentSettings = null;
 let activeDashboardTab = 'overview';
+let dashboardPlanMode = 'free';
 let tooltipHost = null;
 let tooltipPinned = false;
 let tooltipElement = null;
@@ -2065,6 +2066,7 @@ function renderPayrollPanel(state) {
   const roleOptions = optionList(state.roles || [], null, copy.roleLabel);
   const premiumDisabled = state.advanced ? '' : ' disabled';
   const premiumHint = state.advanced ? '' : `<p class="premium-inline-note">${escapeHtml(copy.premiumOnly)}</p>`;
+  const premiumMode = isPremiumPlanVisible(state);
 
   return `
     <section class="dashboard-panel payroll-panel">
@@ -2089,7 +2091,9 @@ function renderPayrollPanel(state) {
           ${payrollSummaryCards(payroll, copy)}
         </article>
       </div>
-      <div class="payroll-grid payroll-premium-grid">
+      ${premiumRevealHint(state)}
+      ${premiumOnly(`
+      <div class="payroll-grid payroll-premium-grid premium-only-block">
         <article class="inline-form">
           ${labelHelp(copy.roleRates, copy.roleRatesHelp, `<span class="premium-tag">${escapeHtml(copy.premiumOnly)}</span>`)}
           <form data-action-form="set-payroll-role-rate">
@@ -2117,6 +2121,8 @@ function renderPayrollPanel(state) {
           ${payrollAdjustmentList(payroll, copy)}
         </article>
       </div>
+      `, state)}
+      ${!premiumMode ? premiumLockedHint(state) : ''}
       <form class="payroll-archive-form" data-action-form="archive-payroll">
         ${labelHelp(copy.archive, copy.archiveHelp)}
         <button class="button button-ghost" type="submit">${escapeHtml(copy.archiveButton)}</button>
@@ -2202,13 +2208,18 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
           <input name="userId" placeholder="ID Discord, même si la personne est partie" required>
           <button class="button" type="submit">Reset</button>
         </form>
+        ${premiumOnly(`
         <form data-action-form="sync-service">
           ${labelHelp('Synchronisation service', 'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et les données de service.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
         </form>
+        `, state)}
       </div>
+      ${premiumRevealHint(state)}
+      ${premiumLockedHint(state)}
     </section>
 
+    ${premiumOnly(`
     <section class="dashboard-panel inline-premium-panel">
       <div class="panel-heading row-heading">
         <div>
@@ -2220,6 +2231,7 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
       </div>
       ${premiumServiceRoadmap(state, premiumTag)}
     </section>
+    `, state)}
   `;
 }
 
@@ -3405,6 +3417,81 @@ function availableDashboardTabs(state = currentState) {
   return DASHBOARD_TABS.filter((tab) => tab.id !== 'founder' || canShowFounderTab(state));
 }
 
+function canUsePremiumPlan(state = currentState) {
+  return Boolean(state?.advanced);
+}
+
+function isPremiumPlanVisible(state = currentState) {
+  return canUsePremiumPlan(state) && dashboardPlanMode === 'premium';
+}
+
+function ensureDashboardPlanMode(state = currentState) {
+  if (!canUsePremiumPlan(state)) {
+    dashboardPlanMode = 'free';
+  }
+}
+
+function premiumVisibilityClass(state = currentState) {
+  return isPremiumPlanVisible(state) ? ' is-premium-visible' : ' is-premium-hidden';
+}
+
+function premiumLockedHint(state = currentState) {
+  if (canUsePremiumPlan(state)) {
+    return '';
+  }
+
+  return `
+    <div class="dashboard-alert is-warning premium-locked-hint">
+      <strong>Premium verrouillé</strong>
+      <p>Ce serveur ou ce compte n’a pas encore le Premium. Le bouton Premium se débloquera dès que l’accès sera actif.</p>
+    </div>
+  `;
+}
+
+function premiumRevealHint(state = currentState) {
+  if (!canUsePremiumPlan(state) || isPremiumPlanVisible(state)) {
+    return '';
+  }
+
+  return `
+    <div class="dashboard-alert is-ready premium-reveal-hint">
+      <strong>Vue gratuite</strong>
+      <p>Active le bouton Premium en haut du dashboard pour afficher les outils réservés au Premium dans cet onglet.</p>
+    </div>
+  `;
+}
+
+function premiumOnly(content, state = currentState) {
+  return isPremiumPlanVisible(state) ? content : '';
+}
+
+function renderDashboardPlanToggle(state) {
+  const premiumUnlocked = canUsePremiumPlan(state);
+  const premiumActive = isPremiumPlanVisible(state);
+  const premiumLabel = premiumUnlocked ? 'Premium' : 'Premium verrouillé';
+
+  return `
+    <div class="dashboard-plan-switch" aria-label="Mode du dashboard">
+      <span>Mode</span>
+      <div class="dashboard-plan-buttons">
+        <button
+          type="button"
+          class="dashboard-plan-button${dashboardPlanMode === 'free' ? ' is-active' : ''}"
+          data-dashboard-plan="free"
+          aria-pressed="${dashboardPlanMode === 'free' ? 'true' : 'false'}"
+        >Gratuit</button>
+        <button
+          type="button"
+          class="dashboard-plan-button${premiumActive ? ' is-active' : ''}${premiumUnlocked ? '' : ' is-locked'}"
+          data-dashboard-plan="premium"
+          aria-pressed="${premiumActive ? 'true' : 'false'}"
+          ${premiumUnlocked ? '' : 'disabled'}
+        >${escapeHtml(premiumLabel)}</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderDashboardTabs(state, premiumBadge) {
   const tabs = availableDashboardTabs(state);
   const activeTab = tabs.find((tab) => tab.id === activeDashboardTab) || tabs[0] || DASHBOARD_TABS[0];
@@ -3422,6 +3509,7 @@ function renderDashboardTabs(state, premiumBadge) {
       <div class="control-status">
         ${syncBadge}
         ${premiumBadge}
+        ${renderDashboardPlanToggle(state)}
         <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
       </div>
       <nav class="dashboard-tab-groups" aria-label="Sections du dashboard">
@@ -3474,6 +3562,7 @@ function renderDashboard() {
   }
 
   const state = currentState;
+  ensureDashboardPlanMode(state);
   const tabs = availableDashboardTabs(state);
 
   if (!tabs.some((tab) => tab.id === activeDashboardTab)) {
@@ -3489,10 +3578,11 @@ function renderDashboard() {
   const statusChannelOptions = optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut');
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
   const premiumTag = '<span class="premium-tag">Option Premium</span>';
+  const planClass = premiumVisibilityClass(state);
 
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
-    <div class="dashboard-tab-stage">
+    <div class="dashboard-tab-stage${planClass}">
       ${tabPanel('overview', renderServerHome(state, premiumBadge))}
 
       ${tabPanel('setup', renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions))}
@@ -3546,7 +3636,15 @@ function renderDashboard() {
           ${labelHelp('Embeds gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard. Copie leur ID pour les gérer.')}
           ${customEmbedList(state)}
         </article>
+        ${premiumOnly(`
+        <article class="inline-form premium-roadmap premium-only-block">
+          ${labelHelp('Premium annonces', 'Option Premium : les créations d’embeds Sentinel ne sont plus limitées par le quota gratuit.', ` ${premiumTag}`)}
+          <p>Le mode Premium garde les modifications et suppressions illimitées, et retire la limite d’embeds actifs pour les grosses communications.</p>
+        </article>
+        `, state)}
       </div>
+      ${premiumRevealHint(state)}
+      ${premiumLockedHint(state)}
     </section>
       `)}
 
@@ -3583,11 +3681,17 @@ function renderDashboard() {
           </form>
           ${dossierRoleList(state)}
         </article>
-        <article class="inline-form dossier-explain-card premium-roadmap">
+        ${premiumOnly(`
+        <article class="inline-form dossier-explain-card premium-roadmap premium-only-block">
           ${labelHelp('Premium dossiers', 'Le Premium ajoutera les panneaux illimités, catégories personnalisées, formulaires avancés, priorités, templates, historique complet, statistiques et automatisations.')}
           <p>Le gratuit reste simple : ouvrir, suivre, clôturer et retrouver les 10 derniers dossiers. Le Premium servira aux gros staffs qui ont besoin de trier et automatiser beaucoup de demandes.</p>
         </article>
+        `, state)}
+        ${premiumRevealHint(state)}
+        ${premiumLockedHint(state)}
+        ${premiumOnly(`
         ${dossierPremiumSettings(state, premiumTag)}
+        `, state)}
         <article class="inline-form dossier-list-card">
           ${labelHelp('Dossiers récents', 'Retrouve les dossiers ouverts ou clôturés sur ce serveur. Un dossier ouvert peut être clôturé depuis le dashboard.')}
           ${dossierFiltersPanel(state)}
@@ -3669,8 +3773,11 @@ function renderDashboard() {
           <p>Avertissements, timeout, fin de timeout, expulsion, ban par ID, purge et consultation simple des 10 derniers cas avec <code>/sanctions</code>.</p>
         </article>
       </div>
+      ${premiumRevealHint(state)}
+      ${premiumLockedHint(state)}
     </section>
 
+    ${premiumOnly(`
     <section class="dashboard-panel premium-panel inline-premium-panel module-panel">
       <div class="panel-heading row-heading">
         <div>
@@ -3741,6 +3848,7 @@ function renderDashboard() {
         </form>
       </div>
     </section>
+    `, state)}
       `)}
     </div>
   `;
@@ -3905,6 +4013,20 @@ function attachDashboardHandlers() {
   $$('[data-refresh-creator-premium]').forEach((button) => {
     button.addEventListener('click', () => {
       loadCreatorPremiumOverview(button);
+    });
+  });
+
+  $$('[data-dashboard-plan]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextPlan = button.dataset.dashboardPlan === 'premium' ? 'premium' : 'free';
+
+      if (nextPlan === 'premium' && !canUsePremiumPlan()) {
+        toast('Le mode Premium est réservé aux serveurs ou comptes Premium.', 'error');
+        return;
+      }
+
+      dashboardPlanMode = nextPlan;
+      renderDashboard();
     });
   });
 
