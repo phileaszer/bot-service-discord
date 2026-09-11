@@ -116,7 +116,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-11-founder-premium-dashboard-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-11-premium-role-site-access-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -129,6 +129,16 @@ const CREATOR_USER_IDS = new Set(
 const REFERENCE_SERVICE_ROLE_NAME = '🟢 Sentinel | En service';
 const REFERENCE_LOG_CHANNEL_NAMES = ['📂｜logs'];
 const REFERENCE_AUTO_ROLE_NAME = '◌ Sentinel | Nouveau';
+const DEFAULT_PREMIUM_SUBSCRIBER_ROLE_NAMES = [
+    'premium',
+    'sentinel premium',
+    'premium sentinel',
+    'abonne premium',
+    'abonnes premium',
+    'abonnement premium',
+    'client premium',
+    'premium subscriber'
+];
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const PREMIUM_SERVER_GOAL = Number.parseInt(process.env.PREMIUM_SERVER_GOAL || '50', 10);
 const DATABASE_FILE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db');
@@ -1619,6 +1629,12 @@ function normalizeRoleName(value) {
         .trim();
 }
 
+function normalizeComparableRoleName(value) {
+    return normalizeRoleName(value)
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
 function getPremiumRoleNames() {
     return [
         ...SENTINEL_STAFF_ROLES,
@@ -1628,6 +1644,40 @@ function getPremiumRoleNames() {
         .flatMap(value => String(value || '').split(','))
         .map(normalizeRoleName)
         .filter(Boolean);
+}
+
+function getPremiumSubscriberRoleNames() {
+    return [
+        ...DEFAULT_PREMIUM_SUBSCRIBER_ROLE_NAMES,
+        process.env.SENTINEL_PREMIUM_SUBSCRIBER_ROLE_NAMES,
+        process.env.SENTINEL_SUBSCRIBER_ROLE_NAMES,
+        process.env.PREMIUM_SUBSCRIBER_ROLE_NAMES,
+        process.env.SENTINEL_PREMIUM_ROLE_NAMES,
+        process.env.PREMIUM_ROLE_NAMES
+    ]
+        .flatMap(value => String(value || '').split(','))
+        .map(normalizeComparableRoleName)
+        .filter(Boolean);
+}
+
+function roleNameMatchesAny(roleName, expectedNames) {
+    const normalizedRoleName = normalizeComparableRoleName(roleName);
+
+    if (!normalizedRoleName) {
+        return false;
+    }
+
+    return expectedNames.some(expected => {
+        if (normalizedRoleName === expected) {
+            return true;
+        }
+
+        return expected.includes(' ')
+            && (
+                normalizedRoleName.endsWith(` ${expected}`)
+                || normalizedRoleName.startsWith(`${expected} `)
+            );
+    });
 }
 
 function hasReferenceStaffPremiumAccess(member) {
@@ -1658,11 +1708,26 @@ function hasReferenceStaffPremiumAccess(member) {
         || member.permissions.has(PermissionsBitField.Flags.BanMembers);
 }
 
+function hasReferencePremiumSubscription(member) {
+    if (!member?.guild?.id || String(member.guild.id) !== SENTINEL_REFERENCE_GUILD_ID) {
+        return false;
+    }
+
+    if (isCreatorUser(member.id)) {
+        return true;
+    }
+
+    const premiumRoleNames = getPremiumSubscriberRoleNames();
+
+    return member.roles.cache.some(role => roleNameMatchesAny(role.name, premiumRoleNames));
+}
+
 function hasAdvancedAccess(member, guildId = null) {
     const resolvedGuildId = guildId || member?.guild?.id;
 
     return Boolean(resolvedGuildId && (
         isAdvancedGuild(resolvedGuildId)
+        || hasReferencePremiumSubscription(member)
         || hasReferenceStaffPremiumAccess(member)
         || hasManualPremiumUserAccess(resolvedGuildId, member?.id)
         || hasManualPremiumRoleAccess(member, resolvedGuildId)
@@ -10152,6 +10217,7 @@ client.once(Events.ClientReady, async () => {
             getUserTargetErrorById,
             hasCommandRoleAccess,
             hasAdvancedAccess,
+            hasReferencePremiumSubscription,
             memberCanManageDossier,
             mapCustomEmbedMessageData,
             hasModerationAccess,
