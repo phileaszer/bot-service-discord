@@ -149,6 +149,59 @@ CREATE TABLE IF NOT EXISTS moderation_tempbans (
     PRIMARY KEY (guild_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS guild_automod_settings (
+    guild_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    forbidden_words_enabled INTEGER NOT NULL DEFAULT 1,
+    forbidden_words_action TEXT NOT NULL DEFAULT 'delete',
+    invite_filter_enabled INTEGER NOT NULL DEFAULT 0,
+    invite_action TEXT NOT NULL DEFAULT 'delete',
+    spam_filter_enabled INTEGER NOT NULL DEFAULT 0,
+    spam_action TEXT NOT NULL DEFAULT 'timeout',
+    spam_max_messages INTEGER NOT NULL DEFAULT 5,
+    spam_window_seconds INTEGER NOT NULL DEFAULT 8,
+    spam_timeout_seconds INTEGER NOT NULL DEFAULT 600,
+    premium_caps_enabled INTEGER NOT NULL DEFAULT 0,
+    premium_caps_action TEXT NOT NULL DEFAULT 'delete',
+    premium_mentions_enabled INTEGER NOT NULL DEFAULT 0,
+    premium_mentions_action TEXT NOT NULL DEFAULT 'timeout',
+    premium_mention_limit INTEGER NOT NULL DEFAULT 6,
+    premium_progressive_enabled INTEGER NOT NULL DEFAULT 0,
+    premium_progressive_window_minutes INTEGER NOT NULL DEFAULT 60,
+    premium_progressive_timeout_threshold INTEGER NOT NULL DEFAULT 3,
+    premium_progressive_kick_threshold INTEGER NOT NULL DEFAULT 5,
+    premium_progressive_ban_threshold INTEGER NOT NULL DEFAULT 7,
+    premium_raid_enabled INTEGER NOT NULL DEFAULT 0,
+    premium_raid_join_count INTEGER NOT NULL DEFAULT 6,
+    premium_raid_window_seconds INTEGER NOT NULL DEFAULT 30,
+    premium_ignored_role_ids_json TEXT NOT NULL DEFAULT '[]',
+    premium_ignored_channel_ids_json TEXT NOT NULL DEFAULT '[]',
+    premium_unlocked_by_user_id TEXT,
+    premium_unlocked_at TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS guild_automod_words (
+    guild_id TEXT NOT NULL,
+    word TEXT NOT NULL,
+    match_mode TEXT NOT NULL DEFAULT 'contains',
+    created_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, word)
+);
+
+CREATE TABLE IF NOT EXISTS guild_automod_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    action TEXT NOT NULL,
+    reason TEXT,
+    message_id TEXT,
+    channel_id TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS custom_embeds (
     message_id TEXT PRIMARY KEY,
     guild_id TEXT NOT NULL,
@@ -305,6 +358,15 @@ ON moderation_cases (guild_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_moderation_tempbans_expires
 ON moderation_tempbans (expires_at);
 
+CREATE INDEX IF NOT EXISTS idx_guild_automod_words_guild
+ON guild_automod_words (guild_id);
+
+CREATE INDEX IF NOT EXISTS idx_guild_automod_events_guild_created
+ON guild_automod_events (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_guild_automod_events_guild_user_created
+ON guild_automod_events (guild_id, user_id, created_at);
+
 CREATE INDEX IF NOT EXISTS idx_custom_embeds_guild
 ON custom_embeds (guild_id);
 
@@ -381,6 +443,17 @@ if (!dashboardSessionColumns.includes('user_agent')) {
 
 if (!dashboardSessionColumns.includes('csrf_token')) {
     db.prepare('ALTER TABLE dashboard_sessions ADD COLUMN csrf_token TEXT').run();
+}
+
+const automodSettingsColumns = db.prepare('PRAGMA table_info(guild_automod_settings)').all()
+    .map(column => column.name);
+
+if (!automodSettingsColumns.includes('premium_unlocked_by_user_id')) {
+    db.prepare('ALTER TABLE guild_automod_settings ADD COLUMN premium_unlocked_by_user_id TEXT').run();
+}
+
+if (!automodSettingsColumns.includes('premium_unlocked_at')) {
+    db.prepare('ALTER TABLE guild_automod_settings ADD COLUMN premium_unlocked_at TEXT').run();
 }
 
 const dossierColumns = db.prepare('PRAGMA table_info(sentinel_dossiers)').all()

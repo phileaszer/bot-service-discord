@@ -474,7 +474,32 @@ function sanitizeAuditDetails(body = {}) {
         'dossierId',
         'dossierStatus',
         'dossierType',
+        'word',
         'enabled',
+        'forbiddenWordsEnabled',
+        'forbiddenWordsAction',
+        'inviteFilterEnabled',
+        'inviteAction',
+        'spamFilterEnabled',
+        'spamAction',
+        'spamMaxMessages',
+        'spamWindowSeconds',
+        'spamTimeoutSeconds',
+        'premiumCapsEnabled',
+        'premiumCapsAction',
+        'premiumMentionsEnabled',
+        'premiumMentionsAction',
+        'premiumMentionLimit',
+        'premiumProgressiveEnabled',
+        'premiumProgressiveWindowMinutes',
+        'premiumProgressiveTimeoutThreshold',
+        'premiumProgressiveKickThreshold',
+        'premiumProgressiveBanThreshold',
+        'premiumRaidEnabled',
+        'premiumRaidJoinCount',
+        'premiumRaidWindowSeconds',
+        'premiumIgnoredRoleIds',
+        'premiumIgnoredChannelIds',
         'weekStart',
         'paid',
         'hourlyRate',
@@ -2392,6 +2417,15 @@ async function buildGuildState(ctx, guild, session = null) {
     const moderationCases = ctx.helpers.getRecentModerationCases
         ? ctx.helpers.getRecentModerationCases(guild.id, moderationCaseLimit)
         : [];
+    const automodSettings = ctx.helpers.getDashboardAutomodSettings
+        ? ctx.helpers.getDashboardAutomodSettings(guild.id)
+        : null;
+    const automodWords = ctx.helpers.getAutomodWords
+        ? ctx.helpers.getAutomodWords(guild.id)
+        : [];
+    const automodEvents = ctx.helpers.getRecentAutomodEvents
+        ? ctx.helpers.getRecentAutomodEvents(guild.id, advanced || canViewGlobalAudit ? 25 : 10)
+        : [];
     const roles = guild.roles.cache
         .filter(role => !role.managed && role.id !== guild.id)
         .sort((a, b) => b.position - a.position)
@@ -2507,6 +2541,11 @@ async function buildGuildState(ctx, guild, session = null) {
         moderationCases: {
             limit: moderationCaseLimit,
             items: moderationCases.map(item => mapModerationCase(ctx, item))
+        },
+        automod: {
+            settings: automodSettings,
+            words: automodWords,
+            events: automodEvents
         },
         recentActions: getDashboardAuditLogs({
             guildId: guild.id,
@@ -2640,6 +2679,94 @@ async function resetUserFromDashboard(ctx, guild, actor, body) {
     ctx.helpers.clearLongServiceAlert?.(guild.id, userId);
 
     return `Heures réinitialisées pour ${member?.user?.tag || userId}.`;
+}
+
+const AUTOMOD_PREMIUM_BODY_KEYS = new Set([
+    'premiumCapsEnabled',
+    'premiumCapsAction',
+    'premiumMentionsEnabled',
+    'premiumMentionsAction',
+    'premiumMentionLimit',
+    'premiumProgressiveEnabled',
+    'premiumProgressiveWindowMinutes',
+    'premiumProgressiveTimeoutThreshold',
+    'premiumProgressiveKickThreshold',
+    'premiumProgressiveBanThreshold',
+    'premiumRaidEnabled',
+    'premiumRaidJoinCount',
+    'premiumRaidWindowSeconds',
+    'premiumIgnoredRoleIds',
+    'premiumIgnoredChannelIds'
+]);
+
+function normalizeDashboardAutomodWord(value) {
+    return String(value || '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80);
+}
+
+async function automodAction(ctx, guild, actor, body, session = null) {
+    requireCommandAccess(ctx, actor);
+
+    const action = body.action;
+    const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, actor, session);
+    const hasPremiumPatch = Object.keys(body || {}).some(key => AUTOMOD_PREMIUM_BODY_KEYS.has(key));
+
+    if (hasPremiumPatch && !advanced) {
+        throw createHttpError(402, 'This action is reserved for Sentinel Premium.');
+    }
+
+    if (action === 'set-automod-settings') {
+        ctx.helpers.updateAutomodSettings(guild.id, body, {
+            premium: advanced,
+            premiumUserId: session?.user?.id || actor?.id || null
+        });
+
+        return 'Auto-modération mise à jour.';
+    }
+
+    if (action === 'add-automod-word') {
+        const word = normalizeDashboardAutomodWord(body.word);
+
+        if (word.length < 2) {
+            throw createHttpError(400, 'Automod word is invalid.');
+        }
+
+        const settings = ctx.helpers.getDashboardAutomodSettings?.(guild.id) || {};
+        const words = ctx.helpers.getAutomodWords?.(guild.id) || [];
+        const alreadyExists = words.some(item => item.word === word);
+        const limit = advanced
+            ? (settings.premiumWordLimit || 200)
+            : (settings.freeWordLimit || 25);
+
+        if (!alreadyExists && words.length >= limit) {
+            throw createHttpError(402, `Limite auto-mod atteinte : ${limit} mot(s) interdits.`);
+        }
+
+        const savedWord = ctx.helpers.addAutomodWord(guild.id, word, actor.id);
+
+        if (!savedWord) {
+            throw createHttpError(400, 'Automod word is invalid.');
+        }
+
+        return `Mot interdit ajoute : ${savedWord.word}.`;
+    }
+
+    if (action === 'remove-automod-word') {
+        const word = normalizeDashboardAutomodWord(body.word);
+
+        if (!word) {
+            throw createHttpError(400, 'Automod word is invalid.');
+        }
+
+        ctx.helpers.removeAutomodWord(guild.id, word);
+        return `Mot interdit retire : ${word}.`;
+    }
+
+    throw createHttpError(400, 'Unknown automod action.');
 }
 
 async function moderationAction(ctx, guild, actor, body, session = null) {
@@ -3499,6 +3626,10 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
 
     if (['publish-dossier-panel', 'add-dossier-role', 'remove-dossier-role', 'dossier-close', 'dossier-status', 'dossier-claim', 'set-dossier-category'].includes(action)) {
         return dossierAction(ctx, guild, member, body, session);
+    }
+
+    if (['set-automod-settings', 'add-automod-word', 'remove-automod-word'].includes(action)) {
+        return automodAction(ctx, guild, member, body, session);
     }
 
     return moderationAction(ctx, guild, member, body, session);

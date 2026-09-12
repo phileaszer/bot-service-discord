@@ -43,6 +43,16 @@ const FREE_CUSTOM_EMBED_LIMIT = 2;
 const FREE_DOSSIER_PANEL_LIMIT = 1;
 const FREE_OPEN_DOSSIER_LIMIT = 5;
 const FREE_DOSSIER_HISTORY_LIMIT = 10;
+const FREE_AUTOMOD_WORD_LIMIT = 25;
+const PREMIUM_AUTOMOD_WORD_LIMIT = 200;
+const AUTOMOD_FREE_ACTIONS = new Set(['log', 'delete', 'warn', 'timeout']);
+const AUTOMOD_PREMIUM_ACTIONS = new Set([...AUTOMOD_FREE_ACTIONS, 'kick', 'ban']);
+const AUTOMOD_DEFAULT_TIMEOUT_SECONDS = 10 * 60;
+const AUTOMOD_FREE_MAX_TIMEOUT_SECONDS = 60 * 60;
+const AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS = 28 * 24 * 60 * 60;
+const AUTOMOD_MODERATOR_USER_ID = 'sentinel-automod';
+const AUTOMOD_SPAM_BUCKET_MAX = 5000;
+const AUTOMOD_RAID_BUCKET_MAX = 1000;
 const DOSSIER_PANEL_CLICK_COOLDOWN_MS = 8 * 1000;
 const DOSSIER_CREATE_COOLDOWN_MS = 90 * 1000;
 const BUTTON_ACTION_COOLDOWN_MS = 3 * 1000;
@@ -116,7 +126,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-11-dashboard-security-hardening-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-12-automod-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -152,6 +162,8 @@ const DATABASE_BACKUP_DIR = process.env.DATABASE_BACKUP_DIR || path.join(path.di
 let lastSentinelServerSync = null;
 let lastSentinelServerSyncResult = null;
 let lastDatabaseBackup = null;
+const automodSpamBuckets = new Map();
+const automodRaidBuckets = new Map();
 let lastSlashCommandCheck = {
     status: 'pending',
     checkedAt: null,
@@ -1723,6 +1735,17 @@ function hasReferencePremiumSubscription(member) {
         || member.roles.cache.some(role => roleNameMatchesAny(role.name, premiumRoleNames));
 }
 
+function hasCachedReferencePremiumSubscription(userId) {
+    if (!userId) {
+        return false;
+    }
+
+    const referenceGuild = client.guilds.cache.get(SENTINEL_REFERENCE_GUILD_ID);
+    const referenceMember = referenceGuild?.members.cache.get(String(userId));
+
+    return Boolean(referenceMember && hasReferencePremiumSubscription(referenceMember));
+}
+
 function hasAdvancedAccess(member, guildId = null) {
     const resolvedGuildId = guildId || member?.guild?.id;
 
@@ -1887,6 +1910,427 @@ function updateGuildConfig(guildId, newConfig) {
     );
 
     return nextConfig;
+}
+
+function boolFromInput(value, fallback = false) {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    const normalized = String(value ?? '').trim().toLowerCase();
+
+    if (['true', '1', 'yes', 'oui', 'on', 'enabled', 'active'].includes(normalized)) {
+        return true;
+    }
+
+    if (['false', '0', 'no', 'non', 'off', 'disabled', 'inactive', ''].includes(normalized)) {
+        return false;
+    }
+
+    return fallback;
+}
+
+function normalizeInteger(value, fallback, min, max) {
+    const parsed = Number.parseInt(value, 10);
+    const safeValue = Number.isFinite(parsed) ? parsed : fallback;
+
+    return Math.min(Math.max(safeValue, min), max);
+}
+
+function parseStoredJsonArray(value) {
+    if (!value) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+
+        return Array.isArray(parsed)
+            ? parsed.map(item => String(item)).filter(Boolean)
+            : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function normalizeDiscordIdList(value, limit = 50) {
+    const rawValues = Array.isArray(value)
+        ? value.join(' ')
+        : String(value || '');
+    const ids = rawValues.match(/\d{17,20}/g) || [];
+
+    return Array.from(new Set(ids)).slice(0, limit);
+}
+
+function normalizeAutomodAction(value, premium = false, fallback = 'delete') {
+    const normalized = String(value || '').trim().toLowerCase();
+    const allowedActions = premium ? AUTOMOD_PREMIUM_ACTIONS : AUTOMOD_FREE_ACTIONS;
+
+    if (allowedActions.has(normalized)) {
+        return normalized;
+    }
+
+    return allowedActions.has(fallback) ? fallback : 'delete';
+}
+
+function normalizeAutomodWord(value) {
+    return String(value || '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80);
+}
+
+function mapAutomodSettings(row) {
+    return {
+        guildId: row.guild_id,
+        enabled: Boolean(row.enabled),
+        forbiddenWordsEnabled: Boolean(row.forbidden_words_enabled),
+        forbiddenWordsAction: row.forbidden_words_action || 'delete',
+        inviteFilterEnabled: Boolean(row.invite_filter_enabled),
+        inviteAction: row.invite_action || 'delete',
+        spamFilterEnabled: Boolean(row.spam_filter_enabled),
+        spamAction: row.spam_action || 'timeout',
+        spamMaxMessages: row.spam_max_messages || 5,
+        spamWindowSeconds: row.spam_window_seconds || 8,
+        spamTimeoutSeconds: row.spam_timeout_seconds || AUTOMOD_DEFAULT_TIMEOUT_SECONDS,
+        premiumCapsEnabled: Boolean(row.premium_caps_enabled),
+        premiumCapsAction: row.premium_caps_action || 'delete',
+        premiumMentionsEnabled: Boolean(row.premium_mentions_enabled),
+        premiumMentionsAction: row.premium_mentions_action || 'timeout',
+        premiumMentionLimit: row.premium_mention_limit || 6,
+        premiumProgressiveEnabled: Boolean(row.premium_progressive_enabled),
+        premiumProgressiveWindowMinutes: row.premium_progressive_window_minutes || 60,
+        premiumProgressiveTimeoutThreshold: row.premium_progressive_timeout_threshold || 3,
+        premiumProgressiveKickThreshold: row.premium_progressive_kick_threshold || 5,
+        premiumProgressiveBanThreshold: row.premium_progressive_ban_threshold || 7,
+        premiumRaidEnabled: Boolean(row.premium_raid_enabled),
+        premiumRaidJoinCount: row.premium_raid_join_count || 6,
+        premiumRaidWindowSeconds: row.premium_raid_window_seconds || 30,
+        premiumIgnoredRoleIds: parseStoredJsonArray(row.premium_ignored_role_ids_json),
+        premiumIgnoredChannelIds: parseStoredJsonArray(row.premium_ignored_channel_ids_json),
+        premiumUnlockedByUserId: row.premium_unlocked_by_user_id || null,
+        premiumUnlockedAt: row.premium_unlocked_at || null,
+        updatedAt: row.updated_at
+    };
+}
+
+function createDefaultAutomodSettings(guildId) {
+    const timestamp = new Date().toISOString();
+
+    db.prepare(`
+        INSERT OR IGNORE INTO guild_automod_settings (
+            guild_id,
+            enabled,
+            forbidden_words_enabled,
+            forbidden_words_action,
+            invite_filter_enabled,
+            invite_action,
+            spam_filter_enabled,
+            spam_action,
+            spam_max_messages,
+            spam_window_seconds,
+            spam_timeout_seconds,
+            premium_caps_enabled,
+            premium_caps_action,
+            premium_mentions_enabled,
+            premium_mentions_action,
+            premium_mention_limit,
+            premium_progressive_enabled,
+            premium_progressive_window_minutes,
+            premium_progressive_timeout_threshold,
+            premium_progressive_kick_threshold,
+            premium_progressive_ban_threshold,
+            premium_raid_enabled,
+            premium_raid_join_count,
+            premium_raid_window_seconds,
+            premium_ignored_role_ids_json,
+            premium_ignored_channel_ids_json,
+            premium_unlocked_by_user_id,
+            premium_unlocked_at,
+            updated_at
+        )
+        VALUES (?, 0, 1, 'delete', 0, 'delete', 0, 'timeout', 5, 8, ?, 0, 'delete', 0, 'timeout', 6, 0, 60, 3, 5, 7, 0, 6, 30, '[]', '[]', NULL, NULL, ?)
+    `).run(guildId, AUTOMOD_DEFAULT_TIMEOUT_SECONDS, timestamp);
+}
+
+function getAutomodSettings(guildId) {
+    createDefaultAutomodSettings(guildId);
+
+    const row = db.prepare(`
+        SELECT *
+        FROM guild_automod_settings
+        WHERE guild_id = ?
+    `).get(guildId);
+
+    return mapAutomodSettings(row);
+}
+
+function hasActivePremiumUnlockForAutomod(guildId, settings = null) {
+    if (isAdvancedGuild(guildId)) {
+        return true;
+    }
+
+    if (getPremiumRoleIds(guildId).length > 0 || getPremiumUserIds(guildId).length > 0) {
+        return true;
+    }
+
+    const unlockUserId = settings?.premiumUnlockedByUserId;
+
+    return Boolean(
+        unlockUserId
+        && (
+            hasManualPremiumUserSubscription(unlockUserId)
+            || hasManualPremiumUserAccess(guildId, unlockUserId)
+            || hasCachedReferencePremiumSubscription(unlockUserId)
+        )
+    );
+}
+
+function withAutomodPremiumFlag(settings) {
+    return {
+        ...settings,
+        premiumActive: hasActivePremiumUnlockForAutomod(settings.guildId, settings),
+        freeWordLimit: FREE_AUTOMOD_WORD_LIMIT,
+        premiumWordLimit: PREMIUM_AUTOMOD_WORD_LIMIT
+    };
+}
+
+function getDashboardAutomodSettings(guildId) {
+    return withAutomodPremiumFlag(getAutomodSettings(guildId));
+}
+
+function updateAutomodSettings(guildId, patch = {}, options = {}) {
+    const current = getAutomodSettings(guildId);
+    const premium = Boolean(options.premium);
+    const has = key => Object.prototype.hasOwnProperty.call(patch, key);
+    const next = { ...current };
+    let premiumFieldChanged = false;
+
+    if (has('enabled')) next.enabled = boolFromInput(patch.enabled, current.enabled);
+    if (has('forbiddenWordsEnabled')) next.forbiddenWordsEnabled = boolFromInput(patch.forbiddenWordsEnabled, current.forbiddenWordsEnabled);
+    if (has('forbiddenWordsAction')) next.forbiddenWordsAction = normalizeAutomodAction(patch.forbiddenWordsAction, false, current.forbiddenWordsAction);
+    if (has('inviteFilterEnabled')) next.inviteFilterEnabled = boolFromInput(patch.inviteFilterEnabled, current.inviteFilterEnabled);
+    if (has('inviteAction')) next.inviteAction = normalizeAutomodAction(patch.inviteAction, false, current.inviteAction);
+    if (has('spamFilterEnabled')) next.spamFilterEnabled = boolFromInput(patch.spamFilterEnabled, current.spamFilterEnabled);
+    if (has('spamAction')) next.spamAction = normalizeAutomodAction(patch.spamAction, false, current.spamAction);
+    if (has('spamMaxMessages')) next.spamMaxMessages = normalizeInteger(patch.spamMaxMessages, current.spamMaxMessages, 2, 12);
+    if (has('spamWindowSeconds')) next.spamWindowSeconds = normalizeInteger(patch.spamWindowSeconds, current.spamWindowSeconds, 3, 60);
+    if (has('spamTimeoutSeconds')) {
+        next.spamTimeoutSeconds = normalizeInteger(
+            patch.spamTimeoutSeconds,
+            current.spamTimeoutSeconds,
+            30,
+            premium ? AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS : AUTOMOD_FREE_MAX_TIMEOUT_SECONDS
+        );
+    }
+
+    if (premium) {
+        const setPremiumField = (key, value) => {
+            next[key] = value;
+            premiumFieldChanged = true;
+        };
+
+        if (has('premiumCapsEnabled')) setPremiumField('premiumCapsEnabled', boolFromInput(patch.premiumCapsEnabled, current.premiumCapsEnabled));
+        if (has('premiumCapsAction')) setPremiumField('premiumCapsAction', normalizeAutomodAction(patch.premiumCapsAction, true, current.premiumCapsAction));
+        if (has('premiumMentionsEnabled')) setPremiumField('premiumMentionsEnabled', boolFromInput(patch.premiumMentionsEnabled, current.premiumMentionsEnabled));
+        if (has('premiumMentionsAction')) setPremiumField('premiumMentionsAction', normalizeAutomodAction(patch.premiumMentionsAction, true, current.premiumMentionsAction));
+        if (has('premiumMentionLimit')) setPremiumField('premiumMentionLimit', normalizeInteger(patch.premiumMentionLimit, current.premiumMentionLimit, 3, 30));
+        if (has('premiumProgressiveEnabled')) setPremiumField('premiumProgressiveEnabled', boolFromInput(patch.premiumProgressiveEnabled, current.premiumProgressiveEnabled));
+        if (has('premiumProgressiveWindowMinutes')) setPremiumField('premiumProgressiveWindowMinutes', normalizeInteger(patch.premiumProgressiveWindowMinutes, current.premiumProgressiveWindowMinutes, 5, 10080));
+        if (has('premiumProgressiveTimeoutThreshold')) setPremiumField('premiumProgressiveTimeoutThreshold', normalizeInteger(patch.premiumProgressiveTimeoutThreshold, current.premiumProgressiveTimeoutThreshold, 2, 30));
+        if (has('premiumProgressiveKickThreshold')) setPremiumField('premiumProgressiveKickThreshold', normalizeInteger(patch.premiumProgressiveKickThreshold, current.premiumProgressiveKickThreshold, 3, 40));
+        if (has('premiumProgressiveBanThreshold')) setPremiumField('premiumProgressiveBanThreshold', normalizeInteger(patch.premiumProgressiveBanThreshold, current.premiumProgressiveBanThreshold, 4, 50));
+        if (has('premiumRaidEnabled')) setPremiumField('premiumRaidEnabled', boolFromInput(patch.premiumRaidEnabled, current.premiumRaidEnabled));
+        if (has('premiumRaidJoinCount')) setPremiumField('premiumRaidJoinCount', normalizeInteger(patch.premiumRaidJoinCount, current.premiumRaidJoinCount, 3, 30));
+        if (has('premiumRaidWindowSeconds')) setPremiumField('premiumRaidWindowSeconds', normalizeInteger(patch.premiumRaidWindowSeconds, current.premiumRaidWindowSeconds, 10, 300));
+        if (has('premiumIgnoredRoleIds')) setPremiumField('premiumIgnoredRoleIds', normalizeDiscordIdList(patch.premiumIgnoredRoleIds));
+        if (has('premiumIgnoredChannelIds')) setPremiumField('premiumIgnoredChannelIds', normalizeDiscordIdList(patch.premiumIgnoredChannelIds));
+
+        if (premiumFieldChanged && options.premiumUserId) {
+            next.premiumUnlockedByUserId = String(options.premiumUserId);
+            next.premiumUnlockedAt = new Date().toISOString();
+        }
+    }
+
+    const updatedAt = new Date().toISOString();
+
+    db.prepare(`
+        UPDATE guild_automod_settings
+        SET enabled = ?,
+            forbidden_words_enabled = ?,
+            forbidden_words_action = ?,
+            invite_filter_enabled = ?,
+            invite_action = ?,
+            spam_filter_enabled = ?,
+            spam_action = ?,
+            spam_max_messages = ?,
+            spam_window_seconds = ?,
+            spam_timeout_seconds = ?,
+            premium_caps_enabled = ?,
+            premium_caps_action = ?,
+            premium_mentions_enabled = ?,
+            premium_mentions_action = ?,
+            premium_mention_limit = ?,
+            premium_progressive_enabled = ?,
+            premium_progressive_window_minutes = ?,
+            premium_progressive_timeout_threshold = ?,
+            premium_progressive_kick_threshold = ?,
+            premium_progressive_ban_threshold = ?,
+            premium_raid_enabled = ?,
+            premium_raid_join_count = ?,
+            premium_raid_window_seconds = ?,
+            premium_ignored_role_ids_json = ?,
+            premium_ignored_channel_ids_json = ?,
+            premium_unlocked_by_user_id = ?,
+            premium_unlocked_at = ?,
+            updated_at = ?
+        WHERE guild_id = ?
+    `).run(
+        next.enabled ? 1 : 0,
+        next.forbiddenWordsEnabled ? 1 : 0,
+        next.forbiddenWordsAction,
+        next.inviteFilterEnabled ? 1 : 0,
+        next.inviteAction,
+        next.spamFilterEnabled ? 1 : 0,
+        next.spamAction,
+        next.spamMaxMessages,
+        next.spamWindowSeconds,
+        next.spamTimeoutSeconds,
+        next.premiumCapsEnabled ? 1 : 0,
+        next.premiumCapsAction,
+        next.premiumMentionsEnabled ? 1 : 0,
+        next.premiumMentionsAction,
+        next.premiumMentionLimit,
+        next.premiumProgressiveEnabled ? 1 : 0,
+        next.premiumProgressiveWindowMinutes,
+        next.premiumProgressiveTimeoutThreshold,
+        next.premiumProgressiveKickThreshold,
+        next.premiumProgressiveBanThreshold,
+        next.premiumRaidEnabled ? 1 : 0,
+        next.premiumRaidJoinCount,
+        next.premiumRaidWindowSeconds,
+        JSON.stringify(next.premiumIgnoredRoleIds),
+        JSON.stringify(next.premiumIgnoredChannelIds),
+        next.premiumUnlockedByUserId || null,
+        next.premiumUnlockedAt || null,
+        updatedAt,
+        guildId
+    );
+
+    return getDashboardAutomodSettings(guildId);
+}
+
+function getAutomodWords(guildId) {
+    return db.prepare(`
+        SELECT word, match_mode, created_by_user_id, created_at
+        FROM guild_automod_words
+        WHERE guild_id = ?
+        ORDER BY word ASC
+    `).all(guildId).map(row => ({
+        word: row.word,
+        matchMode: row.match_mode || 'contains',
+        createdByUserId: row.created_by_user_id || null,
+        createdAt: row.created_at
+    }));
+}
+
+function addAutomodWord(guildId, word, createdByUserId = null) {
+    const normalizedWord = normalizeAutomodWord(word);
+
+    if (normalizedWord.length < 2) {
+        return null;
+    }
+
+    const timestamp = new Date().toISOString();
+
+    db.prepare(`
+        INSERT OR REPLACE INTO guild_automod_words (guild_id, word, match_mode, created_by_user_id, created_at)
+        VALUES (?, ?, 'contains', ?, ?)
+    `).run(guildId, normalizedWord, createdByUserId || null, timestamp);
+
+    return {
+        word: normalizedWord,
+        matchMode: 'contains',
+        createdByUserId: createdByUserId || null,
+        createdAt: timestamp
+    };
+}
+
+function removeAutomodWord(guildId, word) {
+    const normalizedWord = normalizeAutomodWord(word);
+
+    if (!normalizedWord) {
+        return false;
+    }
+
+    return db.prepare(`
+        DELETE FROM guild_automod_words
+        WHERE guild_id = ? AND word = ?
+    `).run(guildId, normalizedWord).changes > 0;
+}
+
+function addAutomodEvent(guildId, userId, rule, action, reason, messageId = null, channelId = null) {
+    const timestamp = new Date().toISOString();
+    const result = db.prepare(`
+        INSERT INTO guild_automod_events (guild_id, user_id, rule, action, reason, message_id, channel_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        guildId,
+        userId,
+        rule,
+        action,
+        reason || null,
+        messageId || null,
+        channelId || null,
+        timestamp
+    );
+
+    return {
+        id: result.lastInsertRowid,
+        guildId,
+        userId,
+        rule,
+        action,
+        reason: reason || null,
+        messageId: messageId || null,
+        channelId: channelId || null,
+        createdAt: timestamp
+    };
+}
+
+function getRecentAutomodEvents(guildId, limit = 20) {
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+
+    return db.prepare(`
+        SELECT id, guild_id, user_id, rule, action, reason, message_id, channel_id, created_at
+        FROM guild_automod_events
+        WHERE guild_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+    `).all(guildId, safeLimit).map(row => ({
+        id: row.id,
+        guildId: row.guild_id,
+        userId: row.user_id,
+        rule: row.rule,
+        action: row.action,
+        reason: row.reason,
+        messageId: row.message_id,
+        channelId: row.channel_id,
+        createdAt: row.created_at
+    }));
+}
+
+function getAutomodEventCount(guildId, userId, windowMinutes = 60) {
+    const since = new Date(Date.now() - normalizeInteger(windowMinutes, 60, 1, 10080) * 60 * 1000).toISOString();
+    const row = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM guild_automod_events
+        WHERE guild_id = ? AND user_id = ? AND created_at >= ?
+    `).get(guildId, userId, since);
+
+    return row?.count || 0;
 }
 
 function getCommandRoleIds(guildId) {
@@ -4108,6 +4552,430 @@ function getReason(value, language = 'fr') {
     const reason = String(value || '').trim();
 
     return reason || t(language, 'moderationReasonDefault');
+}
+
+function pruneAutomodBucketMap(bucketMap, maxSize) {
+    while (bucketMap.size > maxSize) {
+        const firstKey = bucketMap.keys().next().value;
+
+        if (!firstKey) {
+            break;
+        }
+
+        bucketMap.delete(firstKey);
+    }
+}
+
+function automodMemberBypasses(member, settings, premiumActive = false) {
+    if (!member) {
+        return true;
+    }
+
+    if (member.user?.bot || member.id === member.guild.ownerId || member.id === client.user?.id) {
+        return true;
+    }
+
+    if (hasCommandRoleAccess(member)) {
+        return true;
+    }
+
+    if (member.permissions.has(PermissionsBitField.Flags.Administrator)
+        || member.permissions.has(PermissionsBitField.Flags.ManageGuild)
+        || member.permissions.has(PermissionsBitField.Flags.ManageMessages)
+        || member.permissions.has(PermissionsBitField.Flags.ModerateMembers)
+        || member.permissions.has(PermissionsBitField.Flags.KickMembers)
+        || member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
+        return true;
+    }
+
+    return Boolean(
+        premiumActive
+        && settings.premiumIgnoredRoleIds?.some(roleId => member.roles.cache.has(roleId))
+    );
+}
+
+function automodChannelBypasses(channel, settings, premiumActive = false) {
+    if (!premiumActive || !channel) {
+        return false;
+    }
+
+    const ignoredIds = new Set(settings.premiumIgnoredChannelIds || []);
+
+    return ignoredIds.has(channel.id) || (channel.parentId && ignoredIds.has(channel.parentId));
+}
+
+function findAutomodForbiddenWord(content, words) {
+    const normalizedContent = String(content || '')
+        .normalize('NFKC')
+        .toLowerCase();
+
+    return words.find(item => item.word && normalizedContent.includes(item.word)) || null;
+}
+
+function hasDiscordInvite(content) {
+    return /(?:discord\.gg|discord(?:app)?\.com\/invite)\/[a-z0-9-]+/i.test(String(content || ''));
+}
+
+function isCapsAbuse(content) {
+    const letters = String(content || '').replace(/[^a-zA-ZÀ-ÖØ-öø-ÿ]/g, '');
+
+    if (letters.length < 16) {
+        return false;
+    }
+
+    const uppercase = letters.replace(/[^A-ZÀ-Ö]/g, '').length;
+
+    return uppercase / letters.length >= 0.78;
+}
+
+function getMentionCount(message) {
+    const everyoneCount = message.mentions.everyone ? 1 : 0;
+    const userCount = message.mentions.users?.size || 0;
+    const roleCount = message.mentions.roles?.size || 0;
+
+    return everyoneCount + userCount + roleCount;
+}
+
+function isAutomodSpam(message, settings) {
+    const key = `${message.guild.id}:${message.author.id}`;
+    const now = Date.now();
+    const windowMs = settings.spamWindowSeconds * 1000;
+    const timestamps = (automodSpamBuckets.get(key) || [])
+        .filter(timestamp => now - timestamp <= windowMs);
+
+    timestamps.push(now);
+
+    if (timestamps.length > settings.spamMaxMessages) {
+        automodSpamBuckets.set(key, [now]);
+        pruneAutomodBucketMap(automodSpamBuckets, AUTOMOD_SPAM_BUCKET_MAX);
+        return true;
+    }
+
+    automodSpamBuckets.set(key, timestamps);
+    pruneAutomodBucketMap(automodSpamBuckets, AUTOMOD_SPAM_BUCKET_MAX);
+    return false;
+}
+
+function getAutomodTrigger(message, settings, words, premiumActive = false) {
+    const content = String(message.content || '');
+
+    if (settings.forbiddenWordsEnabled) {
+        const forbiddenWord = findAutomodForbiddenWord(content, words);
+
+        if (forbiddenWord) {
+            return {
+                rule: 'forbidden_words',
+                action: settings.forbiddenWordsAction,
+                reason: `Mot interdit detecte : ${forbiddenWord.word}`
+            };
+        }
+    }
+
+    if (settings.inviteFilterEnabled && hasDiscordInvite(content)) {
+        return {
+            rule: 'discord_invite',
+            action: settings.inviteAction,
+            reason: 'Invitation Discord detectee'
+        };
+    }
+
+    if (settings.spamFilterEnabled && isAutomodSpam(message, settings)) {
+        return {
+            rule: 'spam',
+            action: settings.spamAction,
+            reason: `${settings.spamMaxMessages + 1}+ messages en ${settings.spamWindowSeconds}s`
+        };
+    }
+
+    if (premiumActive && settings.premiumCapsEnabled && isCapsAbuse(content)) {
+        return {
+            rule: 'premium_caps',
+            action: settings.premiumCapsAction,
+            reason: 'Message majoritairement en majuscules'
+        };
+    }
+
+    const mentionCount = getMentionCount(message);
+
+    if (premiumActive && settings.premiumMentionsEnabled && mentionCount >= settings.premiumMentionLimit) {
+        return {
+            rule: 'premium_mentions',
+            action: settings.premiumMentionsAction,
+            reason: `${mentionCount} mention(s) dans un message`
+        };
+    }
+
+    return null;
+}
+
+function automodSeverity(action) {
+    return {
+        log: 0,
+        delete: 1,
+        warn: 2,
+        timeout: 3,
+        kick: 4,
+        ban: 5
+    }[action] ?? 0;
+}
+
+function automodTimeoutDurationMs(settings, premiumActive = false) {
+    const maxSeconds = premiumActive
+        ? AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS
+        : AUTOMOD_FREE_MAX_TIMEOUT_SECONDS;
+    const seconds = Math.min(Math.max(Number(settings.spamTimeoutSeconds) || AUTOMOD_DEFAULT_TIMEOUT_SECONDS, 30), maxSeconds);
+
+    return seconds * 1000;
+}
+
+function truncateAutomodText(value, maxLength = 650) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+async function applyAutomodSanction(guild, member, userId, action, reason, durationMs, language = 'fr') {
+    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const targetLabel = member ? `${member}` : `<@${userId}>`;
+
+    if (action === 'warn') {
+        const caseData = addModerationCase(guild.id, userId, AUTOMOD_MODERATOR_USER_ID, 'warn', reason, null);
+        await sendModerationLog(guild, client.user || getFallbackRequester(), caseData, targetLabel, language);
+        return { applied: true, caseData };
+    }
+
+    if (action === 'timeout') {
+        if (!member || !botMember || !botHasPermission(guild, PermissionsBitField.Flags.ModerateMembers)) {
+            return { applied: false, failure: 'permission_timeout' };
+        }
+
+        const targetError = getModerationTargetError(botMember, member, language);
+
+        if (targetError || !member.moderatable) {
+            return { applied: false, failure: 'target_timeout' };
+        }
+
+        const timeoutApplied = await member.timeout(durationMs, reason)
+            .then(() => true)
+            .catch(() => false);
+
+        if (!timeoutApplied) {
+            return { applied: false, failure: 'discord_timeout' };
+        }
+
+        const caseData = addModerationCase(guild.id, userId, AUTOMOD_MODERATOR_USER_ID, 'timeout', reason, durationMs);
+        await sendModerationLog(guild, client.user || getFallbackRequester(), caseData, targetLabel, language);
+        return { applied: true, caseData };
+    }
+
+    if (action === 'kick') {
+        if (!member || !botMember || !botHasPermission(guild, PermissionsBitField.Flags.KickMembers)) {
+            return { applied: false, failure: 'permission_kick' };
+        }
+
+        const targetError = getModerationTargetError(botMember, member, language);
+
+        if (targetError || !member.kickable) {
+            return { applied: false, failure: 'target_kick' };
+        }
+
+        await member.kick(reason);
+        const caseData = addModerationCase(guild.id, userId, AUTOMOD_MODERATOR_USER_ID, 'kick', reason, null);
+        await sendModerationLog(guild, client.user || getFallbackRequester(), caseData, targetLabel, language);
+        return { applied: true, caseData };
+    }
+
+    if (action === 'ban') {
+        if (!botMember || !botHasPermission(guild, PermissionsBitField.Flags.BanMembers)) {
+            return { applied: false, failure: 'permission_ban' };
+        }
+
+        const targetError = getUserTargetErrorById(guild, botMember, userId, member, language);
+
+        if (targetError) {
+            return { applied: false, failure: 'target_ban' };
+        }
+
+        await guild.members.ban(userId, {
+            reason,
+            deleteMessageSeconds: 0
+        });
+        const caseData = addModerationCase(guild.id, userId, AUTOMOD_MODERATOR_USER_ID, 'ban', reason, null);
+        await sendModerationLog(guild, client.user || getFallbackRequester(), caseData, targetLabel, language);
+        return { applied: true, caseData };
+    }
+
+    return { applied: true, caseData: null };
+}
+
+function getProgressiveAutomodAction(settings, eventCount) {
+    if (!settings.premiumProgressiveEnabled) {
+        return null;
+    }
+
+    if (eventCount >= settings.premiumProgressiveBanThreshold) {
+        return 'ban';
+    }
+
+    if (eventCount >= settings.premiumProgressiveKickThreshold) {
+        return 'kick';
+    }
+
+    if (eventCount >= settings.premiumProgressiveTimeoutThreshold) {
+        return 'timeout';
+    }
+
+    return null;
+}
+
+async function applyAutomodAction(message, trigger, settings, premiumActive = false) {
+    const language = getGuildLanguage(message.guild.id);
+    const userId = message.author.id;
+    const member = message.member || await message.guild.members.fetch(userId).catch(() => null);
+    const action = normalizeAutomodAction(trigger.action, premiumActive);
+    const reason = `Auto-moderation Sentinel - ${trigger.reason}`;
+    const durationMs = automodTimeoutDurationMs(settings, premiumActive);
+    let deleted = false;
+    let sanction = { applied: action === 'log' || action === 'delete', caseData: null };
+    let progressive = null;
+
+    if (action !== 'log' && message.deletable) {
+        deleted = await message.delete().then(() => true).catch(() => false);
+    }
+
+    if (['warn', 'timeout', 'kick', 'ban'].includes(action)) {
+        sanction = await applyAutomodSanction(message.guild, member, userId, action, reason, durationMs, language)
+            .catch(error => ({ applied: false, failure: error.message }));
+    }
+
+    const event = addAutomodEvent(
+        message.guild.id,
+        userId,
+        trigger.rule,
+        action,
+        reason,
+        message.id,
+        message.channelId
+    );
+    const eventCount = getAutomodEventCount(
+        message.guild.id,
+        userId,
+        settings.premiumProgressiveWindowMinutes
+    );
+    const progressiveAction = premiumActive
+        ? getProgressiveAutomodAction(settings, eventCount)
+        : null;
+
+    if (progressiveAction && automodSeverity(progressiveAction) > automodSeverity(action)) {
+        const progressiveReason = `Escalade auto-moderation Sentinel - ${eventCount} infraction(s) en ${settings.premiumProgressiveWindowMinutes} min`;
+        progressive = {
+            action: progressiveAction,
+            ...(await applyAutomodSanction(message.guild, member, userId, progressiveAction, progressiveReason, durationMs, language)
+                .catch(error => ({ applied: false, failure: error.message })))
+        };
+    }
+
+    const logLines = [
+        `Auto-moderation declenchee dans ${message.channel || 'un salon inconnu'}.`,
+        `Membre : ${message.author.tag} (${userId})`,
+        `Regle : ${trigger.rule}`,
+        `Action : ${action}${sanction.failure ? ` (${sanction.failure})` : ''}`,
+        `Message supprime : ${deleted ? 'oui' : 'non'}`,
+        `Evenement : #${event.id}`
+    ];
+
+    if (sanction.caseData?.id) {
+        logLines.push(`Cas moderation : #${sanction.caseData.id}`);
+    }
+
+    if (progressive?.action) {
+        logLines.push(`Escalade premium : ${progressive.action}${progressive.failure ? ` (${progressive.failure})` : ''}`);
+        if (progressive.caseData?.id) {
+            logLines.push(`Cas escalade : #${progressive.caseData.id}`);
+        }
+    }
+
+    if (message.content) {
+        logLines.push(`Contenu : ${truncateAutomodText(message.content)}`);
+    }
+
+    await sendSentinelStaffLog(message.guild, logLines.join('\n'), {
+        color: SENTINEL_COLORS.warning,
+        title: 'Sentinel | Auto-modération',
+        language
+    });
+
+    return true;
+}
+
+async function handleAutomodMessage(message) {
+    if (!message.guild || message.author.bot || String(message.content || '').trim().startsWith('!')) {
+        return false;
+    }
+
+    const settings = getAutomodSettings(message.guild.id);
+
+    if (!settings.enabled) {
+        return false;
+    }
+
+    const premiumActive = hasActivePremiumUnlockForAutomod(message.guild.id, settings);
+    const member = message.member || await message.guild.members.fetch(message.author.id).catch(() => null);
+
+    if (automodMemberBypasses(member, settings, premiumActive)
+        || automodChannelBypasses(message.channel, settings, premiumActive)) {
+        return false;
+    }
+
+    const words = settings.forbiddenWordsEnabled ? getAutomodWords(message.guild.id) : [];
+    const trigger = getAutomodTrigger(message, settings, words, premiumActive);
+
+    if (!trigger) {
+        return false;
+    }
+
+    return applyAutomodAction(message, trigger, settings, premiumActive);
+}
+
+async function handleAutomodRaid(member) {
+    if (!member?.guild || member.user?.bot) {
+        return;
+    }
+
+    const settings = getAutomodSettings(member.guild.id);
+    const premiumActive = hasActivePremiumUnlockForAutomod(member.guild.id, settings);
+
+    if (!settings.enabled || !premiumActive || !settings.premiumRaidEnabled) {
+        return;
+    }
+
+    const key = member.guild.id;
+    const now = Date.now();
+    const windowMs = settings.premiumRaidWindowSeconds * 1000;
+    const timestamps = (automodRaidBuckets.get(key) || [])
+        .filter(timestamp => now - timestamp <= windowMs);
+
+    timestamps.push(now);
+    automodRaidBuckets.set(key, timestamps);
+    pruneAutomodBucketMap(automodRaidBuckets, AUTOMOD_RAID_BUCKET_MAX);
+
+    if (timestamps.length < settings.premiumRaidJoinCount) {
+        return;
+    }
+
+    const reason = `${timestamps.length} arrivees en ${settings.premiumRaidWindowSeconds}s`;
+    automodRaidBuckets.set(key, [now]);
+    addAutomodEvent(member.guild.id, member.id, 'premium_raid', 'log', reason, null, null);
+    await sendSentinelStaffLog(member.guild, [
+        'Alerte anti-raid Premium.',
+        `Signal : ${reason}`,
+        `Derniere arrivee : ${member.user.tag} (${member.id})`,
+        'Action : alerte staff uniquement pour eviter un faux positif destructeur.'
+    ].join('\n'), {
+        color: SENTINEL_COLORS.danger,
+        title: 'Sentinel | Anti-raid',
+        language: getGuildLanguage(member.guild.id)
+    });
 }
 
 function buildModerationCasesEmbed(member, requester, cases, language = 'fr', userId = null) {
@@ -10194,6 +11062,7 @@ client.once(Events.ClientReady, async () => {
             formatDuration,
             formatCustomEmbedQuota,
             getActiveServices,
+            addAutomodWord,
             getCommandRoleIds,
             getCustomEmbeds,
             getCustomEmbedQuota,
@@ -10208,9 +11077,12 @@ client.once(Events.ClientReady, async () => {
             getDossierByChannel,
             getDossierPanelQuota,
             getDossierTypeSettings,
+            getDashboardAutomodSettings,
             getLogChannel,
             getOpenDossierCount,
             getFilteredModerationCases,
+            getAutomodWords,
+            getRecentAutomodEvents,
             getModerationCases,
             getModerationCase,
             getGuildPaySettings,
@@ -10243,6 +11115,7 @@ client.once(Events.ClientReady, async () => {
             normalizeUserId,
             parseDurationToMs,
             parseSlowmodeToSeconds,
+            removeAutomodWord,
             removeDossierRole,
             removeCommandRole,
             removeGuildPayRoleSettings,
@@ -10260,6 +11133,7 @@ client.once(Events.ClientReady, async () => {
             updateDossierTypeCategory,
             syncServiceState,
             updateGuildPaySettings,
+            updateAutomodSettings,
             updateGuildConfig,
             updateCustomEmbedRecord,
             updateSentinelStatusPanel,
@@ -10354,6 +11228,9 @@ client.on(Events.GuildCreate, async guild => {
 
 client.on(Events.GuildMemberAdd, async member => {
     await assignConfiguredAutoRole(member);
+    await handleAutomodRaid(member).catch(error => {
+        console.error('Erreur anti-raid auto-mod :', error);
+    });
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -11581,6 +12458,10 @@ client.on(Events.MessageCreate, async message => {
     let auditSummary = null;
 
     try {
+    if (await handleAutomodMessage(message)) {
+        return;
+    }
+
     if (/^!sentinel-build$/i.test(content)) {
         return message.reply(`Build Sentinel actif : \`${SENTINEL_BUILD}\``);
     }

@@ -3484,6 +3484,92 @@ code {
   line-height: 1.5;
 }
 
+.automod-card-wide {
+  grid-column: 1 / -1;
+}
+
+.automod-settings-form,
+.automod-add-word {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  clip-path: none;
+}
+
+.automod-toggle-grid,
+.automod-control-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.automod-toggle,
+.automod-control-grid > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(234, 242, 255, 0.08);
+  background: rgba(5, 7, 12, 0.28);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+
+.automod-toggle input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--cyan);
+}
+
+.automod-word-list,
+.automod-event-list {
+  display: grid;
+  gap: 8px;
+}
+
+.automod-word-chip,
+.form-grid .automod-word-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(234, 242, 255, 0.08);
+  background: rgba(5, 7, 12, 0.3);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+.automod-word-chip code {
+  overflow-wrap: anywhere;
+}
+
+.automod-event-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(234, 242, 255, 0.08);
+  background: rgba(5, 7, 12, 0.28);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+.automod-event-list div,
+.automod-event-list code,
+.automod-event-list small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automod-event-list span,
+.automod-event-list small {
+  color: var(--muted);
+}
+
 .diagnostics-panel,
 .dossier-list-card {
   grid-column: 1 / -1;
@@ -4733,6 +4819,11 @@ code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .automod-toggle-grid,
+  .automod-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .diagnostic-grid,
   .dossier-category-grid,
   .user-profile-stats {
@@ -4919,6 +5010,9 @@ code {
   .personal-service-head,
   .audit-filters,
   .audit-detail-grid,
+  .automod-toggle-grid,
+  .automod-control-grid,
+  .automod-event-list article,
   .diagnostic-grid,
   .dossier-category-grid,
   .case-detail-card,
@@ -5064,6 +5158,11 @@ code {
 
   .audit-actions .button {
     width: 100%;
+  }
+
+  .automod-word-chip {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .start-board .action-link {

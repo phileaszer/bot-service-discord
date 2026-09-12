@@ -386,6 +386,7 @@ function dashboardErrorMessage(input) {
       'No embed field provided.': 'Choose at least one embed field to update.',
       'Sentinel embed not found.': 'No Sentinel embed was found with this ID in the selected channel.',
       'Unknown moderation action.': 'Unknown moderation action.',
+      'Automod word is invalid.': 'Enter a forbidden word with at least 2 characters.',
       'This channel is not a Sentinel dossier.': 'This channel is not a Sentinel ticket.'
     };
 
@@ -461,6 +462,7 @@ function dashboardErrorMessage(input) {
     'No embed field provided.': 'Indique au moins un champ à modifier.',
     'Sentinel embed not found.': 'Aucun embed Sentinel n’a été trouvé avec cet ID dans le salon choisi.',
     'Unknown moderation action.': 'Action de modération inconnue.',
+    'Automod word is invalid.': 'Indique un mot interdit d’au moins 2 caractères.',
     'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
   };
 
@@ -2657,6 +2659,9 @@ const AUDIT_ACTION_LABELS = {
   'dossier-transcript': 'Compte rendu dossier',
   'add-command-role': 'Rôle autorisé ajouté',
   'remove-command-role': 'Rôle autorisé retiré',
+  'set-automod-settings': 'Auto-mod réglée',
+  'add-automod-word': 'Mot interdit ajouté',
+  'remove-automod-word': 'Mot interdit retiré',
   'toggle-service': 'Bouton service',
   'start-service': 'Prise de service',
   'end-service': 'Fin de service',
@@ -2963,6 +2968,271 @@ function moderationCaseList(state) {
       </table>
     </div>
     <p class="muted case-limit-note">Affichage limité aux ${escapeHtml(limit)} derniers dossiers sur ce serveur.</p>
+  `;
+}
+
+const AUTOMOD_ACTION_LABELS = {
+  log: 'Log seulement',
+  delete: 'Supprimer',
+  warn: 'Avertir',
+  timeout: 'Timeout',
+  kick: 'Expulser',
+  ban: 'Bannir'
+};
+
+const AUTOMOD_RULE_LABELS = {
+  forbidden_words: 'Mots interdits',
+  discord_invite: 'Invitations Discord',
+  spam: 'Spam',
+  premium_caps: 'Majuscules',
+  premium_mentions: 'Mentions',
+  premium_raid: 'Anti-raid'
+};
+
+function automodSettings(state) {
+  return {
+    enabled: false,
+    forbiddenWordsEnabled: true,
+    forbiddenWordsAction: 'delete',
+    inviteFilterEnabled: false,
+    inviteAction: 'delete',
+    spamFilterEnabled: false,
+    spamAction: 'timeout',
+    spamMaxMessages: 5,
+    spamWindowSeconds: 8,
+    spamTimeoutSeconds: 600,
+    premiumCapsEnabled: false,
+    premiumCapsAction: 'delete',
+    premiumMentionsEnabled: false,
+    premiumMentionsAction: 'timeout',
+    premiumMentionLimit: 6,
+    premiumProgressiveEnabled: false,
+    premiumProgressiveWindowMinutes: 60,
+    premiumProgressiveTimeoutThreshold: 3,
+    premiumProgressiveKickThreshold: 5,
+    premiumProgressiveBanThreshold: 7,
+    premiumRaidEnabled: false,
+    premiumRaidJoinCount: 6,
+    premiumRaidWindowSeconds: 30,
+    premiumIgnoredRoleIds: [],
+    premiumIgnoredChannelIds: [],
+    freeWordLimit: 25,
+    premiumWordLimit: 200,
+    ...(state.automod?.settings || {})
+  };
+}
+
+function automodActionOptions(selectedAction = 'delete', premium = false) {
+  const actions = premium
+    ? ['log', 'delete', 'warn', 'timeout', 'kick', 'ban']
+    : ['log', 'delete', 'warn', 'timeout'];
+
+  return actions.map((action) => `
+    <option value="${escapeHtml(action)}"${action === selectedAction ? ' selected' : ''}>${escapeHtml(AUTOMOD_ACTION_LABELS[action] || action)}</option>
+  `).join('');
+}
+
+function automodCheckbox(name, checked) {
+  return `
+    <input type="hidden" name="${escapeHtml(name)}" value="false">
+    <input type="checkbox" name="${escapeHtml(name)}" value="true" ${checked ? 'checked' : ''}>
+  `;
+}
+
+function automodToggle(name, checked, label, help) {
+  return `
+    <div class="automod-toggle">
+      ${labelHelp(label, help)}
+      ${automodCheckbox(name, checked)}
+    </div>
+  `;
+}
+
+function automodWordList(state) {
+  const words = state.automod?.words || [];
+
+  if (!words.length) {
+    return '<p class="muted">Aucun mot interdit configuré.</p>';
+  }
+
+  return `
+    <div class="automod-word-list">
+      ${words.map((item) => `
+        <form class="automod-word-chip" data-action-form="remove-automod-word">
+          <input type="hidden" name="word" value="${escapeHtml(item.word)}">
+          <code>${escapeHtml(item.word)}</code>
+          <button class="button button-small button-ghost" type="submit">Retirer</button>
+        </form>
+      `).join('')}
+    </div>
+  `;
+}
+
+function automodEventList(state) {
+  const events = state.automod?.events || [];
+
+  if (!events.length) {
+    return '<p class="muted">Aucun déclenchement auto-mod pour le moment.</p>';
+  }
+
+  return `
+    <div class="automod-event-list">
+      ${events.map((item) => {
+        const channel = resolveChannel(state, item.channelId);
+        return `
+          <article>
+            <div>
+              <strong>${escapeHtml(AUTOMOD_RULE_LABELS[item.rule] || item.rule)}</strong>
+              <span>${escapeHtml(AUTOMOD_ACTION_LABELS[item.action] || item.action)} - ${escapeHtml(formatAuditDate(item.createdAt))}</span>
+            </div>
+            <code>${escapeHtml(item.userId)}</code>
+            <small>${channel ? `#${escapeHtml(channel.name)}` : escapeHtml(item.channelId || 'sans salon')}</small>
+          </article>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function automodFreePanel(state) {
+  const settings = automodSettings(state);
+  const words = state.automod?.words || [];
+  const wordLimit = state.advanced ? settings.premiumWordLimit : settings.freeWordLimit;
+
+  return `
+    <article class="inline-form automod-card automod-card-wide">
+      <div class="panel-mini-heading">
+        <div>
+          <p class="eyebrow">Auto-modération</p>
+          <h3>Protection gratuite</h3>
+          <p class="muted">Mots interdits, invitations Discord et spam simple.</p>
+        </div>
+        ${statusBadge(settings.enabled ? 'Active' : 'Pause', settings.enabled)}
+      </div>
+      <form class="automod-settings-form" data-action-form="set-automod-settings">
+        <div class="automod-toggle-grid">
+          ${automodToggle('enabled', settings.enabled, 'Activer l’auto-modération', 'Allume ou met en pause toutes les règles automatiques du serveur.')}
+          ${automodToggle('forbiddenWordsEnabled', settings.forbiddenWordsEnabled, 'Mots interdits', 'Détecte les mots ajoutés dans la liste du serveur.')}
+          ${automodToggle('inviteFilterEnabled', settings.inviteFilterEnabled, 'Anti-invitations', 'Repère les liens discord.gg et les liens d’invitation Discord.')}
+          ${automodToggle('spamFilterEnabled', settings.spamFilterEnabled, 'Anti-spam', 'Détecte les messages envoyés trop vite par la même personne.')}
+        </div>
+        <div class="automod-control-grid">
+          <div>
+            ${labelHelp('Action mots interdits', 'Action appliquée quand un mot interdit est détecté.')}
+            <select name="forbiddenWordsAction">${automodActionOptions(settings.forbiddenWordsAction, false)}</select>
+          </div>
+          <div>
+            ${labelHelp('Action invitations', 'Action appliquée quand une invitation Discord est détectée.')}
+            <select name="inviteAction">${automodActionOptions(settings.inviteAction, false)}</select>
+          </div>
+          <div>
+            ${labelHelp('Action spam', 'Action appliquée quand le seuil anti-spam est dépassé.')}
+            <select name="spamAction">${automodActionOptions(settings.spamAction, false)}</select>
+          </div>
+          <div>
+            ${labelHelp('Seuil spam', 'Nombre de messages tolérés dans la fenêtre anti-spam.')}
+            <input name="spamMaxMessages" type="number" min="2" max="12" value="${escapeHtml(settings.spamMaxMessages)}">
+          </div>
+          <div>
+            ${labelHelp('Fenêtre spam', 'Durée en secondes utilisée pour compter les messages rapides.')}
+            <input name="spamWindowSeconds" type="number" min="3" max="60" value="${escapeHtml(settings.spamWindowSeconds)}">
+          </div>
+          <div>
+            ${labelHelp('Timeout auto', 'Durée du timeout automatique en secondes.')}
+            <input name="spamTimeoutSeconds" type="number" min="30" max="${state.advanced ? 2419200 : 3600}" value="${escapeHtml(settings.spamTimeoutSeconds)}">
+          </div>
+        </div>
+        <button class="button" type="submit">Enregistrer l’auto-mod</button>
+      </form>
+    </article>
+    <article class="inline-form automod-card">
+      <div class="panel-mini-heading">
+        <div>
+          <h3>Mots interdits</h3>
+          <p class="muted">${escapeHtml(words.length)}/${escapeHtml(wordLimit)} mot(s) configurés.</p>
+        </div>
+      </div>
+      <form class="automod-add-word" data-action-form="add-automod-word">
+        <input name="word" maxlength="80" placeholder="Mot ou expression" required>
+        <button class="button" type="submit">Ajouter</button>
+      </form>
+      ${automodWordList(state)}
+    </article>
+    <article class="inline-form automod-card">
+      <h3>Derniers déclenchements</h3>
+      ${automodEventList(state)}
+    </article>
+  `;
+}
+
+function automodPremiumPanel(state, premiumTag) {
+  const settings = automodSettings(state);
+
+  return `
+    <article class="inline-form automod-card automod-card-wide premium-roadmap">
+      <div class="panel-mini-heading">
+        <div>
+          <p class="eyebrow">Auto-modération Premium</p>
+          <h3>Détection avancée ${premiumTag}</h3>
+          <p class="muted">Majuscules abusives, mentions massives, escalade progressive et alerte anti-raid.</p>
+        </div>
+      </div>
+      <form class="automod-settings-form" data-action-form="set-automod-settings">
+        <div class="automod-toggle-grid">
+          ${automodToggle('premiumCapsEnabled', settings.premiumCapsEnabled, 'Anti-caps', 'Repère les messages presque entièrement en majuscules.')}
+          ${automodToggle('premiumMentionsEnabled', settings.premiumMentionsEnabled, 'Anti-mentions', 'Repère les messages avec trop de mentions.')}
+          ${automodToggle('premiumProgressiveEnabled', settings.premiumProgressiveEnabled, 'Escalade progressive', 'Augmente la sanction quand la même personne récidive dans la période choisie.')}
+          ${automodToggle('premiumRaidEnabled', settings.premiumRaidEnabled, 'Alerte anti-raid', 'Signale une arrivée massive de membres dans un court délai.')}
+        </div>
+        <div class="automod-control-grid">
+          <div>
+            ${labelHelp('Action caps', 'Action appliquée aux messages abusant des majuscules.', ` ${premiumTag}`)}
+            <select name="premiumCapsAction">${automodActionOptions(settings.premiumCapsAction, true)}</select>
+          </div>
+          <div>
+            ${labelHelp('Action mentions', 'Action appliquée quand le seuil de mentions est dépassé.', ` ${premiumTag}`)}
+            <select name="premiumMentionsAction">${automodActionOptions(settings.premiumMentionsAction, true)}</select>
+          </div>
+          <div>
+            ${labelHelp('Limite mentions', 'Nombre de mentions à partir duquel la règle se déclenche.', ` ${premiumTag}`)}
+            <input name="premiumMentionLimit" type="number" min="3" max="30" value="${escapeHtml(settings.premiumMentionLimit)}">
+          </div>
+          <div>
+            ${labelHelp('Fenêtre récidive', 'Durée en minutes utilisée pour compter les déclenchements répétés.', ` ${premiumTag}`)}
+            <input name="premiumProgressiveWindowMinutes" type="number" min="5" max="10080" value="${escapeHtml(settings.premiumProgressiveWindowMinutes)}">
+          </div>
+          <div>
+            ${labelHelp('Seuil timeout', 'Nombre de déclenchements avant timeout automatique.', ` ${premiumTag}`)}
+            <input name="premiumProgressiveTimeoutThreshold" type="number" min="2" max="30" value="${escapeHtml(settings.premiumProgressiveTimeoutThreshold)}">
+          </div>
+          <div>
+            ${labelHelp('Seuil kick', 'Nombre de déclenchements avant expulsion automatique.', ` ${premiumTag}`)}
+            <input name="premiumProgressiveKickThreshold" type="number" min="3" max="40" value="${escapeHtml(settings.premiumProgressiveKickThreshold)}">
+          </div>
+          <div>
+            ${labelHelp('Seuil ban', 'Nombre de déclenchements avant bannissement automatique.', ` ${premiumTag}`)}
+            <input name="premiumProgressiveBanThreshold" type="number" min="4" max="50" value="${escapeHtml(settings.premiumProgressiveBanThreshold)}">
+          </div>
+          <div>
+            ${labelHelp('Arrivées raid', 'Nombre d’arrivées à partir duquel Sentinel alerte le staff.', ` ${premiumTag}`)}
+            <input name="premiumRaidJoinCount" type="number" min="3" max="30" value="${escapeHtml(settings.premiumRaidJoinCount)}">
+          </div>
+          <div>
+            ${labelHelp('Fenêtre raid', 'Durée en secondes utilisée pour détecter une vague d’arrivées.', ` ${premiumTag}`)}
+            <input name="premiumRaidWindowSeconds" type="number" min="10" max="300" value="${escapeHtml(settings.premiumRaidWindowSeconds)}">
+          </div>
+          <div>
+            ${labelHelp('Rôles ignorés', 'IDs de rôles ignorés par l’auto-modération, séparés par des espaces.', ` ${premiumTag}`)}
+            <input name="premiumIgnoredRoleIds" value="${escapeHtml((settings.premiumIgnoredRoleIds || []).join(' '))}" placeholder="ID rôle ID rôle">
+          </div>
+          <div>
+            ${labelHelp('Salons ignorés', 'IDs de salons ou catégories ignorés par l’auto-modération, séparés par des espaces.', ` ${premiumTag}`)}
+            <input name="premiumIgnoredChannelIds" value="${escapeHtml((settings.premiumIgnoredChannelIds || []).join(' '))}" placeholder="ID salon ID catégorie">
+          </div>
+        </div>
+        <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Enregistrer le Premium</button>
+      </form>
+    </article>
   `;
 }
 
@@ -3849,6 +4119,7 @@ function renderDashboard() {
             <button class="button button-ghost" type="submit">Désactiver l’auto-rôle</button>
           </form>
         </article>
+        ${automodFreePanel(state)}
         <form data-action-form="warn">
           ${labelHelp('Avertir par ID', 'Ajoute un avertissement au dossier de modération d’un utilisateur et l’enregistre dans les logs.')}
           <input name="userId" placeholder="ID Discord" required>
@@ -3962,10 +4233,7 @@ function renderDashboard() {
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unwarn</button>
         </form>
-        <article class="inline-form moderation-note premium-roadmap">
-          <h3>Automatisation Premium ${premiumTag}</h3>
-          <p>Prévu plus tard : déclencher automatiquement une sanction après X avertissements, par exemple timeout, kick ou ban selon les règles du serveur.</p>
-        </article>
+        ${automodPremiumPanel(state, premiumTag)}
         <form data-action-form="reset-guild">
           ${labelHelp('Reset global serveur', 'Option Premium : remet à zéro toutes les heures de service du serveur avec une action globale réservée aux grands nettoyages.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Reset global</button>
