@@ -3,6 +3,7 @@
   const PROFILE_STORAGE_KEY = 'sentinel-discord-profile';
   const LANGUAGE_STORAGE_KEY = 'sentinel-site-language';
   const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
+  let csrfToken = null;
 
   function backendOrigin() {
     if (
@@ -67,18 +68,40 @@
     return user?.globalName || user?.username || 'Discord';
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function safeAvatarUrl(value) {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && url.hostname === 'cdn.discordapp.com'
+        ? url.toString()
+        : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function renderProfile(user) {
     document.querySelectorAll('[data-discord-login]').forEach((link) => {
       if (link.hasAttribute('data-login')) {
         return;
       }
 
+      const avatarUrl = safeAvatarUrl(user.avatar);
+      const safeName = escapeHtml(displayName(user));
       link.href = `${backendOrigin()}/dashboard`;
       link.classList.add('discord-profile-button');
       link.setAttribute('aria-label', `Profil Discord : ${displayName(user)}`);
       link.innerHTML = `
-        ${user.avatar ? `<img src="${user.avatar}" alt="">` : '<span class="discord-profile-fallback">D</span>'}
-        <span>${displayName(user)}</span>
+        ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="">` : '<span class="discord-profile-fallback">D</span>'}
+        <span>${safeName}</span>
       `;
 
       const host = link.closest('.header-actions');
@@ -120,7 +143,8 @@
         method: 'POST',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-Sentinel-CSRF': csrfToken } : {})
         },
         body: JSON.stringify(patch)
       });
@@ -163,6 +187,7 @@
       }
 
       const payload = await response.json();
+      csrfToken = payload.csrfToken || csrfToken;
 
       if (payload.user) {
         storeProfile(payload.user);

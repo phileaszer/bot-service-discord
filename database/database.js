@@ -234,6 +234,7 @@ CREATE TABLE IF NOT EXISTS dashboard_sessions (
     access_token TEXT NOT NULL,
     refresh_token TEXT,
     token_expires_at INTEGER,
+    csrf_token TEXT,
     ip_hash TEXT,
     user_agent TEXT,
     created_at INTEGER NOT NULL,
@@ -376,6 +377,10 @@ if (!dashboardSessionColumns.includes('ip_hash')) {
 
 if (!dashboardSessionColumns.includes('user_agent')) {
     db.prepare('ALTER TABLE dashboard_sessions ADD COLUMN user_agent TEXT').run();
+}
+
+if (!dashboardSessionColumns.includes('csrf_token')) {
+    db.prepare('ALTER TABLE dashboard_sessions ADD COLUMN csrf_token TEXT').run();
 }
 
 const dossierColumns = db.prepare('PRAGMA table_info(sentinel_dossiers)').all()

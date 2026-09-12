@@ -23,6 +23,7 @@ let creatorOverviewLoading = false;
 let canViewPremiumOverview = false;
 let dashboardHydrating = false;
 let selectedGuildPreview = null;
+let csrfToken = null;
 const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
 const GUILD_PREVIEW_CACHE_PREFIX = 'sentinel-dashboard-guild-preview';
 const PROFILE_STORAGE_KEY = 'sentinel-discord-profile';
@@ -286,8 +287,9 @@ function getRestorableGuildId() {
 
 function renderDashboardLoadingState(preview = selectedGuildPreview) {
   const serverName = preview?.name || 'ton dernier serveur';
-  const serverIcon = preview?.icon
-    ? `<img src="${escapeHtml(preview.icon)}" alt="">`
+  const previewIcon = safeDiscordImageUrl(preview?.icon);
+  const serverIcon = previewIcon
+    ? `<img src="${escapeHtml(previewIcon)}" alt="">`
     : '<span class="guild-fallback">S</span>';
 
   return `
@@ -304,15 +306,22 @@ function renderDashboardLoadingState(preview = selectedGuildPreview) {
 }
 
 async function api(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
   const response = await fetch(path, {
     credentials: 'include',
     headers: {
+      Accept: 'application/json',
       'Content-Type': 'application/json',
+      ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'X-Sentinel-CSRF': csrfToken } : {}),
       ...(options.headers || {})
     },
     ...options
   });
   const payload = await response.json().catch(() => ({}));
+
+  if (payload.csrfToken) {
+    csrfToken = payload.csrfToken;
+  }
 
   if (!response.ok || payload.ok === false) {
     const message = payload.error || `Erreur ${response.status}`;
@@ -502,7 +511,30 @@ function escapeHtml(value) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function safeDiscordImageUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && ['cdn.discordapp.com', 'media.discordapp.net'].includes(url.hostname)
+      ? url.toString()
+      : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function safeExternalUrl(value, allowedHosts = []) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && allowedHosts.includes(url.hostname)
+      ? url.toString()
+      : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function optionList(items, selectedId = null, placeholder = 'Choisir') {
@@ -681,8 +713,9 @@ function renderUser() {
     return;
   }
 
+  const avatarUrl = safeDiscordImageUrl(currentUser.avatar);
   card.innerHTML = `
-    ${currentUser.avatar ? `<img src="${currentUser.avatar}" alt="">` : ''}
+    ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="">` : ''}
     <span>${escapeHtml(currentUser.globalName || currentUser.username)}</span>
   `;
   login.hidden = true;
@@ -704,14 +737,14 @@ function renderGuilds() {
 
   list.innerHTML = guilds.map((guild) => `
     <article class="guild-card ${guild.id === selectedGuildId ? 'is-active' : ''}">
-      <button type="button" data-select-guild="${guild.id}">
-        ${guild.icon ? `<img src="${guild.icon}" alt="">` : '<span class="guild-fallback">S</span>'}
+      <button type="button" data-select-guild="${escapeHtml(guild.id)}">
+        ${safeDiscordImageUrl(guild.icon) ? `<img src="${escapeHtml(safeDiscordImageUrl(guild.icon))}" alt="">` : '<span class="guild-fallback">S</span>'}
         <span>
           <strong>${escapeHtml(guild.name)}</strong>
           <small>${guild.installed ? (guild.advanced ? 'Premium / référence' : 'Bot installé') : 'Autorisation requise'}</small>
         </span>
       </button>
-      ${guild.installed ? '' : `<a class="button button-small" href="${guild.inviteUrl}" target="_blank" rel="noopener">Autoriser</a>`}
+      ${guild.installed ? '' : `<a class="button button-small" href="${escapeHtml(safeExternalUrl(guild.inviteUrl, ['discord.com']) || '#')}" target="_blank" rel="noopener">Autoriser</a>`}
     </article>
   `).join('');
 }
@@ -1691,6 +1724,13 @@ function ratioPercent(value, max) {
   return Math.max(4, Math.min(100, Math.round((value / max) * 100)));
 }
 
+function applyDeferredStyles(root = document) {
+  root.querySelectorAll('[data-chart-width]').forEach((bar) => {
+    const width = Math.max(0, Math.min(100, Number(bar.dataset.chartWidth) || 0));
+    bar.style.width = `${width}%`;
+  });
+}
+
 function leaderboardChart(items = [], emptyText = 'Aucune donnée à afficher.') {
   const rows = items.slice(0, 6);
 
@@ -1706,7 +1746,7 @@ function leaderboardChart(items = [], emptyText = 'Aucune donnée à afficher.')
         <div class="service-chart-row">
           <span class="chart-rank">#${index + 1}</span>
           <span class="chart-user">${escapeHtml(item.userId)}</span>
-          <span class="chart-bar"><i style="width: ${ratioPercent(Number(item.totalTime) || 0, max)}%"></i></span>
+          <span class="chart-bar"><i data-chart-width="${escapeHtml(ratioPercent(Number(item.totalTime) || 0, max))}"></i></span>
           <strong>${escapeHtml(item.totalTimeLabel || '0h 0min')}</strong>
         </div>
       `).join('')}
@@ -2982,11 +3022,12 @@ function userProfilePanel(profile) {
   const actions = profile.actions || [];
   const payrollLine = profile.payroll?.line || null;
   const tag = profile.user.tag || profile.user.username || profile.user.id;
+  const avatarUrl = safeDiscordImageUrl(profile.user.avatar);
 
   return `
     <div class="user-profile-card">
       <div class="user-profile-head">
-        ${profile.user.avatar ? `<img src="${escapeHtml(profile.user.avatar)}" alt="">` : '<span class="user-avatar-placeholder"></span>'}
+        ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="">` : '<span class="user-avatar-placeholder"></span>'}
         <div>
           <h3>${escapeHtml(tag)}</h3>
           <code>${escapeHtml(profile.user.id)}</code>
@@ -3937,6 +3978,7 @@ function renderDashboard() {
   `;
 
   attachDashboardHandlers();
+  applyDeferredStyles(main);
 }
 
 async function refreshGuildState() {
@@ -4326,8 +4368,11 @@ async function selectGuild(guildId, { restored = false } = {}) {
     dashboardHydrating = false;
 
     if (error.payload?.inviteUrl) {
+      const inviteUrl = safeExternalUrl(error.payload.inviteUrl, ['discord.com']);
       toast('Sentinel doit être autorisé sur ce serveur.', 'error');
-      window.open(error.payload.inviteUrl, '_blank', 'noopener');
+      if (inviteUrl) {
+        window.open(inviteUrl, '_blank', 'noopener');
+      }
       renderDashboard();
       return false;
     }
@@ -4352,6 +4397,7 @@ async function bootstrap() {
   try {
     const session = await api('/api/session');
     currentUser = session.user;
+    csrfToken = session.csrfToken || csrfToken;
     currentSettings = session.settings || null;
     canViewPremiumOverview = Boolean(session.creator?.canViewPremiumOverview);
     renderUser();
@@ -4378,6 +4424,7 @@ async function bootstrap() {
     }
   } catch (error) {
     currentUser = null;
+    csrfToken = null;
     guilds = [];
     currentSettings = null;
     selectedGuildId = null;
@@ -4496,6 +4543,7 @@ $('[data-logout]')?.addEventListener('click', async () => {
   creatorOverview = null;
   creatorOverviewLoading = false;
   canViewPremiumOverview = false;
+  csrfToken = null;
   dashboardHydrating = false;
   dossierFilters = {};
   expandedDossierId = null;

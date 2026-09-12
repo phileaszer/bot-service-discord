@@ -53,6 +53,46 @@ const ALLOWED_RETURN_PATHS = new Set([
     '/statut',
     '/statut.html'
 ]);
+const DEFAULT_DASHBOARD_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
+const PUBLIC_SITE_ORIGIN = 'https://phileaszer.github.io';
+const TRUSTED_INLINE_THEME_SCRIPT_HASH = "'sha256-Uu777sEy6oOiMQiWxnehxOXPt2q3s3srNqyZMOTy+Mg='";
+const CSRF_HEADER = 'x-sentinel-csrf';
+const STORED_SECRET_PREFIX = 'enc:v1:';
+const STORED_SESSION_ID_PREFIX = 'sha256:';
+const MAX_JSON_BODY_BYTES = Math.min(
+    Math.max(Number.parseInt(process.env.DASHBOARD_MAX_JSON_BYTES || `${128 * 1024}`, 10), 16 * 1024),
+    1024 * 1024
+);
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const RATE_LIMIT_BUCKETS_MAX = 5000;
+const rateLimitBuckets = new Map();
+const RATE_LIMITS = {
+    global: {
+        windowMs: 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_GLOBAL || '360', 10), 60)
+    },
+    api: {
+        windowMs: 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_API || '180', 10), 30)
+    },
+    mutate: {
+        windowMs: 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_MUTATE || '60', 10), 10)
+    },
+    auth: {
+        windowMs: 10 * 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_AUTH || '30', 10), 5)
+    },
+    creator: {
+        windowMs: 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_CREATOR || '20', 10), 5)
+    },
+    status: {
+        windowMs: 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_STATUS || '120', 10), 20)
+    }
+};
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -257,6 +297,111 @@ function truncateText(value, maxLength = 600) {
 
 function isCreatorUser(userId) {
     return Boolean(userId && CREATOR_USER_IDS.has(String(userId)));
+}
+
+function firstHeaderValue(value) {
+    return Array.isArray(value) ? value[0] : value;
+}
+
+function splitConfiguredList(value) {
+    return String(value || '')
+        .split(/[,\s]+/)
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+function safeUrl(value) {
+    try {
+        return value ? new URL(value) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function normalizeHostname(value) {
+    const raw = firstHeaderValue(value);
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return new URL(`http://${String(raw).trim()}`).hostname.toLowerCase();
+    } catch (error) {
+        return null;
+    }
+}
+
+function isLocalHostname(hostname) {
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+function getConfiguredDashboardOrigin() {
+    const configured = safeUrl(process.env.DASHBOARD_URL || DEFAULT_DASHBOARD_ORIGIN);
+    return configured?.origin || DEFAULT_DASHBOARD_ORIGIN;
+}
+
+function getTrustedDashboardHostnames() {
+    const hostnames = new Set(['localhost', '127.0.0.1', '::1']);
+    const defaultOrigin = safeUrl(DEFAULT_DASHBOARD_ORIGIN);
+    const configuredOrigin = safeUrl(getConfiguredDashboardOrigin());
+
+    if (defaultOrigin?.hostname) {
+        hostnames.add(defaultOrigin.hostname.toLowerCase());
+    }
+
+    if (configuredOrigin?.hostname) {
+        hostnames.add(configuredOrigin.hostname.toLowerCase());
+    }
+
+    for (const entry of splitConfiguredList(process.env.DASHBOARD_ALLOWED_HOSTS)) {
+        const hostname = normalizeHostname(entry);
+
+        if (hostname) {
+            hostnames.add(hostname);
+        }
+    }
+
+    return hostnames;
+}
+
+function getRequestHostname(req) {
+    return normalizeHostname(req.headers.host);
+}
+
+function requireTrustedHost(req) {
+    const hostname = getRequestHostname(req);
+
+    if (!hostname || !getTrustedDashboardHostnames().has(hostname)) {
+        throw createHttpError(400, 'Invalid request host.');
+    }
+}
+
+function isRequestSecure(req) {
+    const forwardedProto = firstHeaderValue(req.headers['x-forwarded-proto']);
+
+    if (String(forwardedProto || '').split(',')[0].trim().toLowerCase() === 'https') {
+        return true;
+    }
+
+    return Boolean(req.socket?.encrypted);
+}
+
+function shouldUseSecureCookies(req) {
+    const hostname = getRequestHostname(req);
+
+    return isRequestSecure(req)
+        || (!isLocalHostname(hostname) && getConfiguredDashboardOrigin().startsWith('https://'));
+}
+
+function getAllowedPublicOrigins() {
+    return new Set([
+        PUBLIC_SITE_ORIGIN,
+        getConfiguredDashboardOrigin(),
+        ...splitConfiguredList(process.env.DASHBOARD_ALLOWED_CORS_ORIGINS)
+            .map(value => safeUrl(value)?.origin)
+            .filter(Boolean)
+    ]);
 }
 
 function getClientIp(req) {
@@ -616,11 +761,11 @@ function getRequestBaseUrl(req) {
         return process.env.DASHBOARD_URL.replace(/\/$/, '');
     }
 
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+    const host = firstHeaderValue(req.headers.host);
+    const hostname = getRequestHostname(req);
+    const proto = isRequestSecure(req) || !isLocalHostname(hostname) ? 'https' : 'http';
 
-    return `${proto || 'http'}://${host}`;
+    return `${proto}://${host}`;
 }
 
 function getRedirectUri(req) {
@@ -651,7 +796,7 @@ function getSafeReturnTo(req, value) {
     }
 
     try {
-        const parsed = new URL(value, baseUrl);
+        const parsed = new URL(truncateText(String(value), 1000), baseUrl);
         const base = new URL(baseUrl);
         const isSameOrigin = parsed.origin === base.origin;
         const isGithubPages = parsed.hostname.toLowerCase() === 'phileaszer.github.io';
@@ -661,7 +806,7 @@ function getSafeReturnTo(req, value) {
         }
 
         const path = normalizeReturnPath(parsed.pathname);
-        return `${baseUrl}${path}${parsed.search}${parsed.hash}`;
+        return `${baseUrl}${path}${truncateText(parsed.search || '', 300)}${truncateText(parsed.hash || '', 200)}`;
     } catch (error) {
         return `${baseUrl}/dashboard`;
     }
@@ -691,23 +836,123 @@ function parseCookies(req) {
         const [name, ...valueParts] = entry.trim().split('=');
 
         if (name) {
-            cookies[name] = decodeURIComponent(valueParts.join('='));
+            try {
+                cookies[name] = decodeURIComponent(valueParts.join('='));
+            } catch (error) {
+                cookies[name] = '';
+            }
         }
 
         return cookies;
     }, {});
 }
 
-function setSessionCookie(res, sessionId) {
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL / 1000)}`);
+function sessionCookieAttributes(req, maxAge) {
+    const secure = shouldUseSecureCookies(req) ? '; Secure' : '';
+    return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}; Priority=High${secure}`;
 }
 
-function clearSessionCookie(res) {
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+function setSessionCookie(res, req, sessionId) {
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; ${sessionCookieAttributes(req, Math.floor(SESSION_TTL / 1000))}`);
+}
+
+function clearSessionCookie(res, req) {
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; ${sessionCookieAttributes(req, 0)}`);
+}
+
+function isValidSessionId(sessionId) {
+    return /^[a-f0-9]{64}$/i.test(String(sessionId || ''));
+}
+
+function hashSessionId(sessionId) {
+    return `${STORED_SESSION_ID_PREFIX}${hashSessionValue(sessionId)}`;
+}
+
+function getSessionStorageIds(sessionId) {
+    if (!isValidSessionId(sessionId)) {
+        return [];
+    }
+
+    return [hashSessionId(sessionId), String(sessionId)];
+}
+
+function getSessionEncryptionKey() {
+    const secret = process.env.DASHBOARD_SESSION_SECRET
+        || process.env.CLIENT_SECRET
+        || process.env.TOKEN
+        || null;
+
+    if (!secret || String(secret).length < 24) {
+        return null;
+    }
+
+    return crypto.createHash('sha256').update(String(secret)).digest();
+}
+
+function encodeStoredSecret(value) {
+    if (!value) {
+        return value || null;
+    }
+
+    const key = getSessionEncryptionKey();
+
+    if (!key) {
+        return String(value);
+    }
+
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(String(value), 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+
+    return `${STORED_SECRET_PREFIX}${iv.toString('base64')}.${tag.toString('base64')}.${encrypted.toString('base64')}`;
+}
+
+function decodeStoredSecret(value) {
+    if (!value || !String(value).startsWith(STORED_SECRET_PREFIX)) {
+        return value || null;
+    }
+
+    const key = getSessionEncryptionKey();
+
+    if (!key) {
+        throw createHttpError(401, 'Session encryption key unavailable.');
+    }
+
+    const encoded = String(value).slice(STORED_SECRET_PREFIX.length);
+    const [ivBase64, tagBase64, encryptedBase64] = encoded.split('.');
+
+    if (!ivBase64 || !tagBase64 || !encryptedBase64) {
+        throw createHttpError(401, 'Invalid stored session secret.');
+    }
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivBase64, 'base64'));
+    decipher.setAuthTag(Buffer.from(tagBase64, 'base64'));
+
+    return Buffer.concat([
+        decipher.update(Buffer.from(encryptedBase64, 'base64')),
+        decipher.final()
+    ]).toString('utf8');
+}
+
+function createCsrfToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+function constantTimeEqual(a, b) {
+    const left = Buffer.from(String(a || ''), 'utf8');
+    const right = Buffer.from(String(b || ''), 'utf8');
+
+    if (left.length !== right.length || left.length === 0) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(left, right);
 }
 
 function saveDashboardSession(sessionId, session, req = null) {
     const fingerprint = req ? getSessionFingerprint(req) : {};
+    const storedSessionId = hashSessionId(sessionId);
 
     db.prepare(`
         INSERT OR REPLACE INTO dashboard_sessions (
@@ -716,18 +961,20 @@ function saveDashboardSession(sessionId, session, req = null) {
             access_token,
             refresh_token,
             token_expires_at,
+            csrf_token,
             ip_hash,
             user_agent,
             created_at,
             expires_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-        sessionId,
+        storedSessionId,
         session.user.id,
-        session.accessToken,
-        session.refreshToken || null,
+        encodeStoredSecret(session.accessToken),
+        encodeStoredSecret(session.refreshToken),
         session.tokenExpiresAt || null,
+        session.csrfToken,
         fingerprint.ipHash || session.ipHash || null,
         fingerprint.userAgent || session.userAgent || null,
         session.createdAt,
@@ -736,11 +983,17 @@ function saveDashboardSession(sessionId, session, req = null) {
 }
 
 function loadDashboardSession(sessionId) {
+    const sessionIds = getSessionStorageIds(sessionId);
+
+    if (sessionIds.length === 0) {
+        return null;
+    }
+
     const row = db.prepare(`
-        SELECT session_id, user_id, access_token, refresh_token, token_expires_at, ip_hash, user_agent, created_at, expires_at
+        SELECT session_id, user_id, access_token, refresh_token, token_expires_at, csrf_token, ip_hash, user_agent, created_at, expires_at
         FROM dashboard_sessions
-        WHERE session_id = ?
-    `).get(sessionId);
+        WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})
+    `).get(...sessionIds);
 
     if (!row) {
         return null;
@@ -749,46 +1002,100 @@ function loadDashboardSession(sessionId) {
     const profile = getUserProfile(row.user_id);
 
     if (!profile) {
-        db.prepare('DELETE FROM dashboard_sessions WHERE session_id = ?').run(sessionId);
+        db.prepare(`DELETE FROM dashboard_sessions WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})`).run(...sessionIds);
         return null;
     }
 
-    return {
-        accessToken: row.access_token,
-        refreshToken: row.refresh_token,
-        tokenExpiresAt: row.token_expires_at,
-        ipHash: row.ip_hash,
-        userAgent: row.user_agent,
-        user: profile,
-        createdAt: row.created_at,
-        expiresAt: row.expires_at
-    };
+    try {
+        const session = {
+            accessToken: decodeStoredSecret(row.access_token),
+            refreshToken: decodeStoredSecret(row.refresh_token),
+            tokenExpiresAt: row.token_expires_at,
+            csrfToken: row.csrf_token || createCsrfToken(),
+            ipHash: row.ip_hash,
+            userAgent: row.user_agent,
+            user: profile,
+            createdAt: row.created_at,
+            expiresAt: row.expires_at
+        };
+        const storedSessionId = hashSessionId(sessionId);
+        const encryptionAvailable = Boolean(getSessionEncryptionKey());
+        const shouldMigrate = row.session_id !== storedSessionId
+            || (
+                encryptionAvailable
+                && (
+                    !String(row.access_token || '').startsWith(STORED_SECRET_PREFIX)
+                    || (row.refresh_token && !String(row.refresh_token).startsWith(STORED_SECRET_PREFIX))
+                )
+            );
+
+        if (shouldMigrate) {
+            saveDashboardSession(sessionId, session);
+
+            if (row.session_id !== storedSessionId) {
+                db.prepare('DELETE FROM dashboard_sessions WHERE session_id = ?').run(row.session_id);
+            }
+        }
+
+        return session;
+    } catch (error) {
+        db.prepare(`DELETE FROM dashboard_sessions WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})`).run(...sessionIds);
+        return null;
+    }
 }
 
 function extendDashboardSession(sessionId, session, req = null) {
     const fingerprint = req ? getSessionFingerprint(req) : {};
     const ipHash = fingerprint.ipHash || session.ipHash || null;
     const userAgent = fingerprint.userAgent || session.userAgent || null;
+    const sessionIds = getSessionStorageIds(sessionId);
+
+    if (sessionIds.length === 0) {
+        return;
+    }
 
     session.ipHash = ipHash;
     session.userAgent = userAgent;
 
     db.prepare(`
         UPDATE dashboard_sessions
-        SET expires_at = ?, ip_hash = ?, user_agent = ?
-        WHERE session_id = ?
-    `).run(session.expiresAt, ipHash, userAgent, sessionId);
+        SET expires_at = ?, csrf_token = ?, ip_hash = ?, user_agent = ?
+        WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})
+    `).run(session.expiresAt, session.csrfToken, ipHash, userAgent, ...sessionIds);
 }
 
 function deleteDashboardSession(sessionId) {
     sessions.delete(sessionId);
-    db.prepare('DELETE FROM dashboard_sessions WHERE session_id = ?').run(sessionId);
+    const sessionIds = getSessionStorageIds(sessionId);
+
+    if (sessionIds.length > 0) {
+        db.prepare(`DELETE FROM dashboard_sessions WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})`).run(...sessionIds);
+    }
+}
+
+function sessionFingerprintMatches(req, session) {
+    const fingerprint = getSessionFingerprint(req);
+
+    if (session.userAgent && fingerprint.userAgent && session.userAgent !== fingerprint.userAgent) {
+        return false;
+    }
+
+    if (
+        String(process.env.DASHBOARD_STRICT_SESSION_IP || '').toLowerCase() === 'true'
+        && session.ipHash
+        && fingerprint.ipHash
+        && session.ipHash !== fingerprint.ipHash
+    ) {
+        return false;
+    }
+
+    return true;
 }
 
 function getSession(req) {
     const sessionId = parseCookies(req)[SESSION_COOKIE];
 
-    if (!sessionId) {
+    if (!isValidSessionId(sessionId)) {
         return null;
     }
 
@@ -807,6 +1114,15 @@ function getSession(req) {
         return null;
     }
 
+    if (!sessionFingerprintMatches(req, session)) {
+        deleteDashboardSession(sessionId);
+        return null;
+    }
+
+    if (!session.csrfToken) {
+        session.csrfToken = createCsrfToken();
+    }
+
     const profile = getUserProfile(session.user.id);
     if (profile) {
         session.user = profile;
@@ -822,6 +1138,7 @@ function createSession(payload, req = null) {
     const fingerprint = req ? getSessionFingerprint(req) : {};
     const session = {
         ...payload,
+        csrfToken: createCsrfToken(),
         ipHash: fingerprint.ipHash || null,
         userAgent: fingerprint.userAgent || null,
         createdAt: Date.now(),
@@ -833,45 +1150,297 @@ function createSession(payload, req = null) {
     return { sessionId, session };
 }
 
-function json(res, status, payload) {
-    res.writeHead(status, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'Access-Control-Allow-Origin': '*'
+function appendVary(headers, value) {
+    const current = headers.Vary || headers.vary;
+
+    if (!current) {
+        headers.Vary = value;
+        return;
+    }
+
+    const values = new Set(String(current).split(',').map(item => item.trim()).filter(Boolean));
+    values.add(value);
+    headers.Vary = Array.from(values).join(', ');
+}
+
+function buildContentSecurityPolicy(req) {
+    const directives = [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        `script-src 'self' ${TRUSTED_INLINE_THEME_SCRIPT_HASH}`,
+        "style-src 'self'",
+        "img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://phileaszer.github.io",
+        "font-src 'self' data:",
+        `connect-src 'self' ${DEFAULT_DASHBOARD_ORIGIN} ${getConfiguredDashboardOrigin()}`,
+        "form-action 'self' https://discord.com",
+        "manifest-src 'self'",
+        "worker-src 'none'"
+    ];
+
+    if (isRequestSecure(req)) {
+        directives.push('upgrade-insecure-requests');
+    }
+
+    return directives.join('; ');
+}
+
+function securityHeaders(req, headers = {}) {
+    const next = {
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'accelerometer=(), autoplay=(), camera=(), clipboard-read=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), browsing-topics=()',
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+        'Origin-Agent-Cluster': '?1',
+        'X-Permitted-Cross-Domain-Policies': 'none',
+        'Content-Security-Policy': buildContentSecurityPolicy(req),
+        ...headers
+    };
+
+    if (isRequestSecure(req)) {
+        next['Strict-Transport-Security'] = 'max-age=15552000; includeSubDomains';
+    }
+
+    return next;
+}
+
+function corsHeaders(req, url) {
+    const origin = firstHeaderValue(req.headers.origin);
+
+    if (!origin || url?.pathname !== '/api/status') {
+        return {};
+    }
+
+    const parsed = safeUrl(origin);
+
+    if (!parsed || !getAllowedPublicOrigins().has(parsed.origin)) {
+        return {};
+    }
+
+    return {
+        'Access-Control-Allow-Origin': parsed.origin,
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers': 'Accept, Content-Type',
+        'Access-Control-Max-Age': '600'
+    };
+}
+
+function responseHeaders(res, headers = {}) {
+    const req = res.sentinelRequest;
+    const url = res.sentinelUrl;
+    const next = securityHeaders(req, {
+        ...headers,
+        ...corsHeaders(req, url)
     });
-    res.end(JSON.stringify(payload));
+
+    if (next['Access-Control-Allow-Origin']) {
+        appendVary(next, 'Origin');
+    }
+
+    return next;
+}
+
+function writeResponse(res, status, headers = {}, body = undefined) {
+    res.writeHead(status, responseHeaders(res, headers));
+    res.end(body);
+}
+
+function json(res, status, payload) {
+    writeResponse(res, status, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store'
+    }, JSON.stringify(payload));
 }
 
 function redirect(res, location) {
-    res.writeHead(302, { Location: location });
-    res.end();
+    writeResponse(res, 302, {
+        Location: location,
+        'Cache-Control': 'no-store'
+    });
 }
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
-        let body = '';
+        const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+
+        if (contentType && contentType !== 'application/json') {
+            reject(createHttpError(415, 'Content-Type must be application/json.'));
+            return;
+        }
+
+        const chunks = [];
+        let size = 0;
+        let rejected = false;
 
         req.on('data', chunk => {
-            body += chunk;
-
-            if (body.length > 1024 * 1024) {
-                reject(createHttpError(413, 'Payload too large.'));
+            if (rejected) {
+                return;
             }
+
+            size += chunk.length;
+
+            if (size > MAX_JSON_BODY_BYTES) {
+                rejected = true;
+                reject(createHttpError(413, 'Payload too large.'));
+                req.destroy();
+                return;
+            }
+
+            chunks.push(chunk);
         });
 
         req.on('end', () => {
+            if (rejected) {
+                return;
+            }
+
+            const body = Buffer.concat(chunks).toString('utf8');
+
             if (!body.trim()) {
                 resolve({});
                 return;
             }
 
             try {
-                resolve(JSON.parse(body));
+                const parsed = JSON.parse(body);
+
+                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                    reject(createHttpError(400, 'JSON body must be an object.'));
+                    return;
+                }
+
+                resolve(parsed);
             } catch (error) {
                 reject(createHttpError(400, 'Invalid JSON body.'));
             }
         });
+
+        req.on('error', () => {
+            if (!rejected) {
+                reject(createHttpError(400, 'Request body read failed.'));
+            }
+        });
     });
+}
+
+function sameOriginFromHeader(req, value) {
+    if (!value) {
+        return false;
+    }
+
+    const parsed = safeUrl(value);
+
+    if (!parsed) {
+        return false;
+    }
+
+    return parsed.origin === new URL(getRequestBaseUrl(req)).origin;
+}
+
+function requireTrustedMutationOrigin(req) {
+    if (!MUTATING_METHODS.has(req.method)) {
+        return;
+    }
+
+    const origin = firstHeaderValue(req.headers.origin);
+    const referer = firstHeaderValue(req.headers.referer);
+    const fetchSite = String(firstHeaderValue(req.headers['sec-fetch-site']) || '').toLowerCase();
+
+    if (origin) {
+        if (sameOriginFromHeader(req, origin)) {
+            return;
+        }
+
+        throw createHttpError(403, 'Cross-origin request blocked.');
+    }
+
+    if (referer) {
+        if (sameOriginFromHeader(req, referer)) {
+            return;
+        }
+
+        throw createHttpError(403, 'Cross-origin request blocked.');
+    }
+
+    if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) {
+        throw createHttpError(403, 'Cross-origin request blocked.');
+    }
+
+    if (!fetchSite && !isLocalHostname(getRequestHostname(req))) {
+        throw createHttpError(403, 'Missing request origin.');
+    }
+}
+
+function requireCsrfToken(req, session) {
+    if (!MUTATING_METHODS.has(req.method) || !session) {
+        return;
+    }
+
+    const headerValue = firstHeaderValue(req.headers[CSRF_HEADER]);
+
+    if (!constantTimeEqual(headerValue, session.csrfToken)) {
+        throw createHttpError(403, 'Invalid security token.');
+    }
+}
+
+function rateLimitKey(req, scope, userId = null) {
+    return `${scope}:${userId || hashSessionValue(getClientIp(req) || 'unknown')}`;
+}
+
+function checkRateLimit(key, limit) {
+    const now = Date.now();
+    let bucket = rateLimitBuckets.get(key);
+
+    if (!bucket || bucket.resetAt <= now) {
+        bucket = {
+            count: 0,
+            resetAt: now + limit.windowMs
+        };
+        rateLimitBuckets.set(key, bucket);
+    }
+
+    bucket.count += 1;
+
+    if (bucket.count > limit.max) {
+        const retryAfter = Math.max(Math.ceil((bucket.resetAt - now) / 1000), 1);
+        throw createHttpError(429, 'Too many requests.', { retryAfter });
+    }
+}
+
+function pruneRateLimitBuckets() {
+    const now = Date.now();
+
+    for (const [key, bucket] of rateLimitBuckets.entries()) {
+        if (bucket.resetAt <= now || rateLimitBuckets.size > RATE_LIMIT_BUCKETS_MAX) {
+            rateLimitBuckets.delete(key);
+        }
+    }
+}
+
+function applyRequestRateLimits(req, url) {
+    checkRateLimit(rateLimitKey(req, 'global'), RATE_LIMITS.global);
+
+    if (url.pathname === '/auth/login' || url.pathname === '/auth/callback') {
+        checkRateLimit(rateLimitKey(req, 'auth'), RATE_LIMITS.auth);
+        return;
+    }
+
+    if (!url.pathname.startsWith('/api/')) {
+        return;
+    }
+
+    if (url.pathname === '/api/status') {
+        checkRateLimit(rateLimitKey(req, 'status'), RATE_LIMITS.status);
+        return;
+    }
+
+    checkRateLimit(rateLimitKey(req, 'api'), RATE_LIMITS.api);
+
+    if (MUTATING_METHODS.has(req.method)) {
+        checkRateLimit(rateLimitKey(req, 'mutate'), RATE_LIMITS.mutate);
+    }
 }
 
 async function discordFetch(pathname, accessToken) {
@@ -2936,6 +3505,21 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
 }
 
 async function handleApi(req, res, ctx, url) {
+    if (req.method === 'OPTIONS') {
+        if (url.pathname === '/api/status' && corsHeaders(req, url)['Access-Control-Allow-Origin']) {
+            writeResponse(res, 204, {
+                'Cache-Control': 'no-store'
+            });
+            return;
+        }
+
+        throw createHttpError(405, 'Method not allowed.');
+    }
+
+    if (!SAFE_METHODS.has(req.method)) {
+        requireTrustedMutationOrigin(req);
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/status') {
         const incidents = getStatusListFromEnv('SENTINEL_STATUS_INCIDENTS');
         const maintenance = String(process.env.SENTINEL_STATUS_MAINTENANCE || '').trim() || null;
@@ -2955,22 +3539,32 @@ async function handleApi(req, res, ctx, url) {
 
     if (req.method === 'POST' && url.pathname === '/api/logout') {
         const sessionId = parseCookies(req)[SESSION_COOKIE];
+        const session = getSession(req);
+
+        if (session) {
+            requireCsrfToken(req, session);
+        }
 
         if (sessionId) {
             deleteDashboardSession(sessionId);
         }
 
-        clearSessionCookie(res);
+        clearSessionCookie(res, req);
         json(res, 200, { ok: true });
         return;
     }
 
     const session = requireSession(req);
 
+    if (!SAFE_METHODS.has(req.method)) {
+        requireCsrfToken(req, session);
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/session') {
         json(res, 200, {
             ok: true,
             user: session.user,
+            csrfToken: session.csrfToken,
             settings: getUserSiteSettings(session.user.id),
             creator: {
                 canViewPremiumOverview: isCreatorUser(session.user.id)
@@ -3058,6 +3652,7 @@ async function handleApi(req, res, ctx, url) {
             throw createHttpError(403, 'Premium management is reserved for the Sentinel creator.');
         }
 
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
         const body = await parseBody(req);
         const message = await manageCreatorPremiumAccess(ctx, session, body);
 
@@ -3278,7 +3873,14 @@ function isFreshStaticRequest(req, entry) {
 
 function serveStatic(req, res, url) {
     const siteDir = path.resolve(__dirname, 'site');
-    const cleanPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    let cleanPath;
+
+    try {
+        cleanPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    } catch (error) {
+        throw createHttpError(400, 'Invalid URL path.');
+    }
+
     const routeMap = {
         '': 'index.html',
         dashboard: 'dashboard.html',
@@ -3302,6 +3904,11 @@ function serveStatic(req, res, url) {
         : path.join(siteDir, '404.html');
     const statusCode = finalPath.endsWith('404.html') ? 404 : 200;
     const ext = path.extname(finalPath).toLowerCase();
+
+    if (!MIME_TYPES[ext]) {
+        throw createHttpError(404, 'Not found.');
+    }
+
     const stats = fs.statSync(finalPath);
     const entry = getCachedStaticFile(finalPath, ext, stats);
     const cacheControl = statusCode === 404
@@ -3318,8 +3925,7 @@ function serveStatic(req, res, url) {
     };
 
     if (statusCode === 200 && isFreshStaticRequest(req, entry)) {
-        res.writeHead(304, headers);
-        res.end();
+        writeResponse(res, 304, headers);
         return;
     }
 
@@ -3334,14 +3940,19 @@ function serveStatic(req, res, url) {
     }
 
     headers['Content-Length'] = content.length;
-    res.writeHead(statusCode, headers);
-    res.end(req.method === 'HEAD' ? undefined : content);
+    writeResponse(res, statusCode, headers, req.method === 'HEAD' ? undefined : content);
 }
 
 async function handleRequest(req, res, ctx) {
-    const url = new URL(req.url, getRequestBaseUrl(req));
+    let url = null;
+    res.sentinelRequest = req;
 
     try {
+        requireTrustedHost(req);
+        url = new URL(req.url, getRequestBaseUrl(req));
+        res.sentinelUrl = url;
+        applyRequestRateLimits(req, url);
+
         if (req.method === 'GET' && url.pathname === '/auth/login') {
             if (!process.env.CLIENT_SECRET) {
                 throw createHttpError(503, 'Discord OAuth is not configured. Add CLIENT_SECRET on Railway.');
@@ -3371,7 +3982,7 @@ async function handleRequest(req, res, ctx) {
                 deleteDashboardSession(sessionId);
             }
 
-            clearSessionCookie(res);
+            clearSessionCookie(res, req);
             redirect(res, getSafeReturnTo(req, url.searchParams.get('return_to')));
             return;
         }
@@ -3415,7 +4026,7 @@ async function handleRequest(req, res, ctx) {
                 user: profile
             }, req);
 
-            setSessionCookie(res, sessionId);
+            setSessionCookie(res, req, sessionId);
             redirect(res, returnTo);
             return;
         }
@@ -3431,17 +4042,30 @@ async function handleRequest(req, res, ctx) {
 
         serveStatic(req, res, url);
     } catch (error) {
+        if (!url) {
+            url = { pathname: '' };
+            res.sentinelUrl = url;
+        }
+
+        const status = error.status || 500;
+
+        if (status >= 500) {
+            console.error('Erreur dashboard :', error);
+        }
+
         if (url.pathname.startsWith('/api/')) {
             json(res, error.status || 500, {
                 ok: false,
-                error: error.message || 'Internal server error.',
-                ...(error.details || {})
+                error: status >= 500 ? 'Internal server error.' : (error.message || 'Internal server error.'),
+                ...(status < 500 ? (error.details || {}) : {})
             });
             return;
         }
 
-        res.writeHead(error.status || 500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(error.message || 'Internal server error.');
+        writeResponse(res, status, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-store'
+        }, status >= 500 ? 'Internal server error.' : (error.message || 'Internal server error.'));
     }
 }
 
@@ -3463,6 +4087,7 @@ function cleanupSessions() {
     }
 
     db.prepare('DELETE FROM dashboard_sessions WHERE expires_at <= ?').run(now);
+    pruneRateLimitBuckets();
 }
 
 function startDashboardServer(ctx) {
