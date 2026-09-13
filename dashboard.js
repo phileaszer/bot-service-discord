@@ -3480,20 +3480,24 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         }
 
         try {
-            await channel.send(ctx.helpers.buildServicePanelPayload
-                ? ctx.helpers.buildServicePanelPayload(language)
-                : {
-                    content: language === 'en'
-                        ? '**Sentinel | Duty desk**\nSecured operations channel. Use the controls below to clock in, clock out, or consult the service registry.'
-                        : '**Sentinel | Bureau de service**\nCanal opérationnel sécurisé. Utilise les contrôles ci-dessous pour prendre ton service, le clôturer ou consulter le registre.',
-                    embeds: [],
-                    components: ctx.helpers.buildServicePanelComponents(language)
-                });
+            if (ctx.helpers.publishOrUpdateServicePanel) {
+                await ctx.helpers.publishOrUpdateServicePanel(channel, language);
+            } else {
+                await channel.send(ctx.helpers.buildServicePanelPayload
+                    ? ctx.helpers.buildServicePanelPayload(language)
+                    : {
+                        content: language === 'en'
+                            ? '**Sentinel | Duty desk**\nSecured operations channel. Use the controls below to clock in, clock out, or consult the service registry.'
+                            : '**Sentinel | Bureau de service**\nCanal opérationnel sécurisé. Utilise les contrôles ci-dessous pour prendre ton service, le clôturer ou consulter le registre.',
+                        embeds: [],
+                        components: ctx.helpers.buildServicePanelComponents(language)
+                    });
+            }
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
 
-        return `Panneau de service publié dans #${channel.name}.`;
+        return `Panneau de service publié ou mis à jour dans #${channel.name}.`;
     }
 
     if (action === 'set-payroll-settings') {

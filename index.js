@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-service-panel-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-service-panel-v2';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -8874,6 +8874,22 @@ function buildServicePanelPayload(language = 'fr') {
     };
 }
 
+async function publishOrUpdateServicePanel(channel, language = 'fr') {
+    const payload = buildServicePanelPayload(language);
+    const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+    const existingPanel = messages?.find(message => isServicePanelMessage(message));
+
+    if (existingPanel) {
+        const editedPanel = await existingPanel.edit(payload).catch(() => null);
+
+        if (editedPanel) {
+            return editedPanel;
+        }
+    }
+
+    return channel.send(payload);
+}
+
 function buildSentinelStatusPayload(guild, language = 'fr') {
     return {
         content: '',
@@ -11181,6 +11197,7 @@ client.once(Events.ClientReady, async () => {
             buildDossierPanelEmbed,
             buildServicePanelComponents,
             buildServicePanelPayload,
+            publishOrUpdateServicePanel,
             clearLongServiceAlert,
             clearLongServiceAlertsForGuild,
             closeDossierRecord,
@@ -12667,7 +12684,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     if (content === '!service-panel') {
-        return message.channel.send(buildServicePanelPayload(language));
+        return publishOrUpdateServicePanel(message.channel, language);
     }
 
     if (/^!(dossier-panel|ticket-panel)$/i.test(content)) {
