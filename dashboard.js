@@ -3186,32 +3186,36 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
             PermissionsBitField.Flags.SendMessages,
             PermissionsBitField.Flags.EmbedLinks
         ], language);
-        const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, actor, session);
-        const quota = applyDashboardPremiumQuota(
-            ctx.helpers.getDossierPanelQuota
-                ? ctx.helpers.getDossierPanelQuota(guild.id, actor)
-                : { unlimited: false, used: 0, limit: 1 },
-            advanced
-        );
-
-        if (!quota.unlimited && quota.used >= quota.limit) {
-            throw createHttpError(402, `Le gratuit permet ${quota.limit} panneau de dossiers par serveur.`);
-        }
 
         let message;
 
         try {
-            message = await channel.send({
-                embeds: [ctx.helpers.buildDossierPanelEmbed(guild, actor.user, language)],
-                components: ctx.helpers.buildDossierPanelComponents(language)
-            });
+            if (ctx.helpers.publishOrUpdateDossierPanel) {
+                message = await ctx.helpers.publishOrUpdateDossierPanel(channel, actor.user, language, actor);
+            } else {
+                const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, actor, session);
+                const quota = applyDashboardPremiumQuota(
+                    ctx.helpers.getDossierPanelQuota
+                        ? ctx.helpers.getDossierPanelQuota(guild.id, actor)
+                        : { unlimited: false, used: 0, limit: 1 },
+                    advanced
+                );
+
+                if (!quota.unlimited && quota.used >= quota.limit) {
+                    throw createHttpError(402, `Le gratuit permet ${quota.limit} panneau de dossiers par serveur.`);
+                }
+
+                message = await channel.send({
+                    embeds: [ctx.helpers.buildDossierPanelEmbed(guild, actor.user, language)],
+                    components: ctx.helpers.buildDossierPanelComponents(language)
+                });
+                ctx.helpers.recordDossierPanel?.(guild.id, channel.id, message.id, actor.id);
+            }
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
 
-        ctx.helpers.recordDossierPanel?.(guild.id, channel.id, message.id, actor.id);
-
-        return `Bureau d'accueil Sentinel publie dans #${channel.name}.`;
+        return `Bureau d'accueil Sentinel publie ou mis a jour dans #${channel.name}.`;
     }
 
     if (action === 'add-dossier-role' || action === 'remove-dossier-role') {

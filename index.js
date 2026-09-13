@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-panels-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-panels-v2';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -8898,6 +8898,57 @@ function buildDossierPanelComponents(language = 'fr') {
     ];
 }
 
+function buildDossierPanelPayload(guild, requester, language = 'fr') {
+    return {
+        embeds: [buildDossierPanelEmbed(guild, requester, language)],
+        components: buildDossierPanelComponents(language)
+    };
+}
+
+function hasDossierPanelButtons(message) {
+    return Boolean(message?.components?.some(row => (
+        row.components?.some(component => String(component.customId || '').startsWith('sentinel_dossier:'))
+    )));
+}
+
+function hasDossierPanelEmbed(message) {
+    return Boolean(message?.embeds?.some(embed => (
+        embed?.title === 'Sentinel | Bureau d’accueil'
+        || embed?.title === 'Sentinel | Reception desk'
+    )));
+}
+
+function isDossierPanelMessage(message) {
+    return Boolean(
+        message?.author?.id === client.user?.id
+        && (
+            hasDossierPanelButtons(message)
+            || hasDossierPanelEmbed(message)
+        )
+    );
+}
+
+async function publishOrUpdateDossierPanel(channel, requester, language = 'fr', member = null) {
+    const payload = buildDossierPanelPayload(channel.guild, requester, language);
+    const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+    const existingPanel = messages?.find(message => isDossierPanelMessage(message));
+
+    if (existingPanel) {
+        const editedPanel = await existingPanel.edit(payload).catch(() => null);
+
+        if (editedPanel) {
+            recordDossierPanel(channel.guild.id, channel.id, editedPanel.id, requester?.id || null);
+            return editedPanel;
+        }
+    }
+
+    assertDossierPanelQuota(channel.guild.id, language, member);
+
+    const message = await channel.send(payload);
+    recordDossierPanel(channel.guild.id, channel.id, message.id, requester?.id || null);
+    return message;
+}
+
 function buildServicePanelPayload(language = 'fr') {
     return {
         content: '',
@@ -8983,15 +9034,7 @@ function isSentinelStatusPanelMessage(message) {
 }
 
 async function publishDossierPanel(channel, requester, language = 'fr', member = null) {
-    assertDossierPanelQuota(channel.guild.id, language, member);
-
-    const message = await channel.send({
-        embeds: [buildDossierPanelEmbed(channel.guild, requester, language)],
-        components: buildDossierPanelComponents(language)
-    });
-
-    recordDossierPanel(channel.guild.id, channel.id, message.id, requester?.id || null);
-    return message;
+    return publishOrUpdateDossierPanel(channel, requester, language, member);
 }
 
 function buildDossierOpenModal(dossierType, language = 'fr') {
@@ -11229,6 +11272,7 @@ client.once(Events.ClientReady, async () => {
             buildCustomEmbedPayload,
             buildDossierPanelComponents,
             buildDossierPanelEmbed,
+            publishOrUpdateDossierPanel,
             buildServicePanelComponents,
             buildServicePanelPayload,
             publishOrUpdateServicePanel,
