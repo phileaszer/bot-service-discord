@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-service-panel-v2';
+const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-panels-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -307,14 +307,14 @@ const I18N = {
         serviceNotStarted: '🔴 Tu n’es pas en service pour le moment.',
         serviceError: '❌ Sentinel n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
         servicePanelTitle: 'Sentinel | Bureau de service',
-        servicePanelDescription: '`Canal opérationnel sécurisé`\nDéclare ton état avant de partir en intervention. Sentinel synchronise le rôle de service et ton registre horaire.',
+        servicePanelDescription: '`Canal opérationnel sécurisé`\nDéclare ton état avant de partir en intervention. Sentinel ajuste ton badge de service et tient le registre horaire.',
         servicePanelStartName: 'Prise de poste',
-        servicePanelStartValue: '🟢 Active ton rôle et démarre le chronomètre de service.',
+        servicePanelStartValue: '🟢 Active ton badge et démarre le chronomètre de service.',
         servicePanelEndName: 'Fin de poste',
         servicePanelEndValue: '🔴 Coupe le suivi et archive la session dans le registre.',
         servicePanelRegistryName: 'Registre',
         servicePanelRegistryValue: '📊 Consulte tes heures ou affiche les agents actuellement déployés.',
-        servicePanelFooter: 'Sentinel - registre de service RP',
+        servicePanelFooter: 'Sentinel - registre de service',
         showMyHoursLabel: 'Mes heures',
         activeLabel: 'En service',
         toggleLabel: 'Service',
@@ -413,15 +413,22 @@ const I18N = {
         customEmbedQuotaFree: 'Quota gratuit : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
         customEmbedQuotaUnlimited: 'Quota Premium : accès illimité aux embeds.',
         dossierPanelTitle: 'Sentinel | Bureau d’accueil',
-        dossierPanelDescription: 'Dans Sentinel, un dossier est un ticket privé : chaque demande ouvre un salon dédié avec le membre et l’équipe autorisée.\n\nChoisis le type de dossier à ouvrir. Sentinel demandera le sujet avant de créer le salon.',
-        dossierSupportLabel: 'Support',
+        dossierPanelDescription: '`Accueil confidentiel`\nChoisis la nature de ta demande. Sentinel préparera un espace réservé avec les personnes habilitées et gardera le suivi dans un dossier clair.',
+        dossierPanelAccessName: 'Accueil',
+        dossierPanelAccessValue: 'Chaque demande ouvre un espace confidentiel pour échanger avec l’équipe concernée.',
+        dossierPanelFollowName: 'Suivi',
+        dossierPanelFollowValue: 'Le statut, le référent et le compte rendu restent rattachés au même dossier.',
+        dossierPanelBeforeName: 'Avant d’ouvrir',
+        dossierPanelBeforeValue: 'Prépare un sujet court et les éléments utiles : faits, personnes concernées, moment, preuves ou contexte.',
+        dossierPanelFooter: 'Sentinel - bureau d’accueil',
+        dossierSupportLabel: 'Assistance',
         dossierReportLabel: 'Signalement',
-        dossierRecruitmentLabel: 'Recrutement',
-        dossierPartnershipLabel: 'Partenariat',
-        dossierOtherLabel: 'Autre',
+        dossierRecruitmentLabel: 'Candidature',
+        dossierPartnershipLabel: 'Alliance',
+        dossierOtherLabel: 'Requête',
         dossierModalTitle: 'Ouvrir un dossier',
         dossierModalSubject: 'Sujet',
-        dossierModalSubjectPlaceholder: 'Exemple : Besoin d’aide pour configurer Sentinel',
+        dossierModalSubjectPlaceholder: 'Exemple : demande d’assistance administrative',
         dossierModalDescription: 'Description',
         dossierModalDescriptionPlaceholder: 'Explique ta demande avec les détails utiles.',
         dossierOpenedTitle: 'Sentinel | Dossier ouvert',
@@ -433,7 +440,7 @@ const I18N = {
         dossierCreated: 'Dossier créé : {channel}',
         dossierNotInDossier: 'Ce bouton doit être utilisé dans un dossier Sentinel.',
         dossierCloseDenied: 'Seul le demandeur ou un membre autorisé peut clôturer ce dossier.',
-        dossierClosed: 'Dossier clôturé. Le compte rendu a été envoyé, puis le salon va être fermé.',
+        dossierClosed: 'Dossier clôturé. Le compte rendu a été transmis, puis l’espace va être fermé.',
         dossierClaimed: 'Dossier pris en charge par {member}.',
         dossierClaimDenied: 'Tu dois avoir un rôle autorisé pour prendre en charge ce dossier.',
         dossierClaimPremiumOnly: '⭐ Les options Premium des dossiers concernent surtout les volumes, les formulaires, les priorités et les automatisations.',
@@ -447,7 +454,7 @@ const I18N = {
         dossierAddDone: '✅ {member} a été ajouté comme intervenant du dossier.',
         dossierRemoveDone: '✅ {member} a été retiré du dossier.',
         dossierCommandOutside: '❌ Cette commande doit être utilisée dans un salon de dossier Sentinel.',
-        dossierTranscriptDone: '✅ Compte rendu généré.',
+        dossierTranscriptDone: '✅ Compte rendu préparé.',
         dossierPanelPublished: '✅ Bureau d’accueil Sentinel publié dans {channel}.'
     },
     en: {
@@ -544,14 +551,14 @@ const I18N = {
         serviceNotStarted: '🔴 You are not on duty right now.',
         serviceError: '❌ Sentinel could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
         servicePanelTitle: 'Sentinel | Duty desk',
-        servicePanelDescription: '`Secured operations channel`\nDeclare your status before deployment. Sentinel syncs your duty role and your service log.',
+        servicePanelDescription: '`Secured operations channel`\nDeclare your status before deployment. Sentinel adjusts your duty badge and keeps the service ledger.',
         servicePanelStartName: 'Clock in',
-        servicePanelStartValue: '🟢 Enables your role and starts the duty timer.',
+        servicePanelStartValue: '🟢 Enables your badge and starts the duty timer.',
         servicePanelEndName: 'Clock out',
         servicePanelEndValue: '🔴 Stops tracking and archives the session in the log.',
         servicePanelRegistryName: 'Registry',
         servicePanelRegistryValue: '📊 Check your hours or display agents currently deployed.',
-        servicePanelFooter: 'Sentinel - RP duty registry',
+        servicePanelFooter: 'Sentinel - duty registry',
         showMyHoursLabel: 'My hours',
         activeLabel: 'On duty',
         toggleLabel: 'Duty',
@@ -650,15 +657,22 @@ const I18N = {
         customEmbedQuotaFree: 'Free quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
         customEmbedQuotaUnlimited: 'Premium quota: unlimited embed access.',
         dossierPanelTitle: 'Sentinel | Reception desk',
-        dossierPanelDescription: 'In Sentinel, a dossier is a private ticket: each request opens a dedicated channel with the member and the authorized team.\n\nChoose the dossier type to open. Sentinel will ask for the subject before creating the channel.',
-        dossierSupportLabel: 'Support',
+        dossierPanelDescription: '`Confidential reception`\nChoose the nature of your request. Sentinel will prepare a reserved space with authorized personnel and keep the follow-up inside one clear dossier.',
+        dossierPanelAccessName: 'Reception',
+        dossierPanelAccessValue: 'Each request opens a confidential space for discussion with the assigned team.',
+        dossierPanelFollowName: 'Follow-up',
+        dossierPanelFollowValue: 'Status, referent, and written record stay attached to the same dossier.',
+        dossierPanelBeforeName: 'Before opening',
+        dossierPanelBeforeValue: 'Prepare a short subject and the useful elements: facts, people involved, moment, proof, or context.',
+        dossierPanelFooter: 'Sentinel - reception desk',
+        dossierSupportLabel: 'Assistance',
         dossierReportLabel: 'Report',
-        dossierRecruitmentLabel: 'Recruitment',
-        dossierPartnershipLabel: 'Partnership',
-        dossierOtherLabel: 'Other',
+        dossierRecruitmentLabel: 'Application',
+        dossierPartnershipLabel: 'Alliance',
+        dossierOtherLabel: 'Request',
         dossierModalTitle: 'Open a dossier',
         dossierModalSubject: 'Subject',
-        dossierModalSubjectPlaceholder: 'Example: Need help configuring Sentinel',
+        dossierModalSubjectPlaceholder: 'Example: administrative assistance request',
         dossierModalDescription: 'Description',
         dossierModalDescriptionPlaceholder: 'Explain your request with useful details.',
         dossierOpenedTitle: 'Sentinel | Dossier opened',
@@ -670,7 +684,7 @@ const I18N = {
         dossierCreated: 'Dossier created: {channel}',
         dossierNotInDossier: 'This button must be used inside a Sentinel dossier.',
         dossierCloseDenied: 'Only the requester or an authorized member can close this dossier.',
-        dossierClosed: 'Dossier closed. The transcript has been sent, then the channel will be closed.',
+        dossierClosed: 'Dossier closed. The written record has been sent, then the space will be sealed.',
         dossierClaimed: 'Dossier taken over by {member}.',
         dossierClaimDenied: 'You need an authorized role to take over this dossier.',
         dossierClaimPremiumOnly: '⭐ Premium dossier options mainly cover volume, forms, priorities, and automations.',
@@ -684,7 +698,7 @@ const I18N = {
         dossierAddDone: '✅ {member} has been added as a dossier participant.',
         dossierRemoveDone: '✅ {member} has been removed from this dossier.',
         dossierCommandOutside: '❌ This command must be used inside a Sentinel dossier channel.',
-        dossierTranscriptDone: '✅ Transcript generated.',
+        dossierTranscriptDone: '✅ Written record prepared.',
         dossierPanelPublished: '✅ Sentinel reception desk published in {channel}.'
     }
 };
@@ -986,7 +1000,7 @@ function buildPremiumEmbed(guild, requester, member = null) {
                 '',
                 hasReferenceAccess
                     ? 'This server already has reference access to the advanced tools.'
-                    : 'Until then, the free version keeps the essential service, moderation, embeds and ticket features.'
+                    : 'Until then, the free version keeps the essential service, moderation, embeds and dossier features.'
             ].join('\n')
             : [
                 'Sentinel Premium n’est pas encore ouvert publiquement.',
@@ -994,7 +1008,7 @@ function buildPremiumEmbed(guild, requester, member = null) {
                 '',
                 hasReferenceAccess
                     ? 'Ce serveur dispose déjà de l’accès de référence aux outils avancés.'
-                    : 'En attendant, le gratuit garde les bases utiles : service, modération, embeds et dossiers/tickets.'
+                    : 'En attendant, le gratuit garde les bases utiles : service, modération, embeds et dossiers.'
             ].join('\n'),
         requester,
         thumbnail: guild.iconURL(),
@@ -1170,11 +1184,11 @@ function buildSupportEmbed(guild, requester) {
         title: language === 'en' ? 'Sentinel | Support' : 'Sentinel | Support',
         description: language === 'en'
             ? [
-                'Need help with setup, permissions, service tracking, moderation, embeds, or tickets?',
+                'Need help with setup, permissions, service tracking, moderation, embeds, or dossiers?',
                 'Use the support server for questions, bug reports and follow-up.'
             ].join('\n')
             : [
-                'Besoin d’aide pour l’installation, les permissions, les services, la modération, les embeds ou les dossiers/tickets ?',
+                'Besoin d’aide pour l’installation, les permissions, les services, la modération, les embeds ou les dossiers ?',
                 'Le serveur support est là pour les questions, les bugs et les demandes qui doivent être suivies.'
             ].join('\n'),
         requester,
@@ -2663,27 +2677,27 @@ const DOSSIER_TYPES = {
         emoji: '📁',
         color: SENTINEL_COLORS.primary,
         fr: {
-            label: 'Support',
+            label: 'Assistance',
             channelPrefix: 'dossier-support',
             intro: [
-                'Explique ta demande clairement.',
+                'Explique ta demande clairement pour que l’équipe puisse agir vite.',
                 '',
-                '- problème ou question',
-                '- commande/fonction concernée',
-                '- capture ou message d’erreur si disponible',
+                '- situation rencontrée',
+                '- élément concerné',
+                '- pièce jointe ou preuve si disponible',
                 '',
                 'Un référent prendra le dossier dès que possible.'
             ]
         },
         en: {
-            label: 'Support',
+            label: 'Assistance',
             channelPrefix: 'support-dossier',
             intro: [
-                'Explain your request clearly.',
+                'Explain your request clearly so the team can act quickly.',
                 '',
-                '- issue or question',
-                '- related command or feature',
-                '- screenshot or error message if available',
+                '- situation encountered',
+                '- element concerned',
+                '- attachment or proof if available',
                 '',
                 'A referent will take over the dossier as soon as possible.'
             ]
@@ -2700,7 +2714,7 @@ const DOSSIER_TYPES = {
                 '',
                 '**Personne concernée :**',
                 '**Ce qui s’est passé :**',
-                '**Salon / moment :**',
+                '**Lieu / moment :**',
                 '**Preuve ou capture :**',
                 '',
                 'L’équipe autorisée traitera le dossier.'
@@ -2714,7 +2728,7 @@ const DOSSIER_TYPES = {
                 '',
                 '**Concerned person:**',
                 '**What happened:**',
-                '**Channel / moment:**',
+                '**Place / moment:**',
                 '**Proof or screenshot:**',
                 '',
                 'The authorized team will handle the dossier.'
@@ -2725,7 +2739,7 @@ const DOSSIER_TYPES = {
         emoji: '🧭',
         color: SENTINEL_COLORS.accent,
         fr: {
-            label: 'Recrutement',
+            label: 'Candidature',
             channelPrefix: 'dossier-recrutement',
             intro: [
                 'Présente ta candidature avec les informations utiles.',
@@ -2737,7 +2751,7 @@ const DOSSIER_TYPES = {
             ]
         },
         en: {
-            label: 'Recruitment',
+            label: 'Application',
             channelPrefix: 'recruitment-dossier',
             intro: [
                 'Present your application with useful information.',
@@ -2753,25 +2767,25 @@ const DOSSIER_TYPES = {
         emoji: '🤝',
         color: SENTINEL_COLORS.success,
         fr: {
-            label: 'Partenariat',
+            label: 'Alliance',
             channelPrefix: 'dossier-partenariat',
             intro: [
-                'Présente la demande de partenariat clairement.',
+                'Présente la demande d’alliance clairement.',
                 '',
-                '**Serveur / projet :**',
-                '**Objectif du partenariat :**',
+                '**Structure / projet :**',
+                '**Objectif de l’alliance :**',
                 '**Contact :**',
                 '**Lien ou éléments utiles :**'
             ]
         },
         en: {
-            label: 'Partnership',
+            label: 'Alliance',
             channelPrefix: 'partnership-dossier',
             intro: [
-                'Present the partnership request clearly.',
+                'Present the alliance request clearly.',
                 '',
-                '**Server / project:**',
-                '**Partnership goal:**',
+                '**Structure / project:**',
+                '**Alliance goal:**',
                 '**Contact:**',
                 '**Useful link or details:**'
             ]
@@ -2781,7 +2795,7 @@ const DOSSIER_TYPES = {
         emoji: '🧾',
         color: SENTINEL_COLORS.neutral,
         fr: {
-            label: 'Autre',
+            label: 'Requête',
             channelPrefix: 'dossier-autre',
             intro: [
                 'Explique ta demande en quelques lignes.',
@@ -2792,7 +2806,7 @@ const DOSSIER_TYPES = {
             ]
         },
         en: {
-            label: 'Other',
+            label: 'Request',
             channelPrefix: 'other-dossier',
             intro: [
                 'Explain your request in a few lines.',
@@ -6771,54 +6785,54 @@ function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr
 
     const syncText = lastSentinelServerSync
         ? `<t:${Math.floor(lastSentinelServerSync / 1000)}:R>`
-        : (isEnglish ? 'Not synchronized yet' : 'Pas encore synchronisé');
+        : (isEnglish ? 'No relay yet' : 'Aucun relais pour le moment');
     const syncDetail = lastSentinelServerSyncResult?.skipped
         ? (isEnglish
-            ? `Skipped: ${lastSentinelServerSyncResult.reason}`
-            : `Ignorée : ${lastSentinelServerSyncResult.reason}`)
+            ? `Relay held: ${lastSentinelServerSyncResult.reason}`
+            : `Relais retenu : ${lastSentinelServerSyncResult.reason}`)
         : lastSentinelServerSyncResult
             ? (isEnglish
-                ? `${lastSentinelServerSyncResult.created} creation(s), ${lastSentinelServerSyncResult.updated} update(s)`
-                : `${lastSentinelServerSyncResult.created} création(s), ${lastSentinelServerSyncResult.updated} mise(s) à jour`)
-            : (isEnglish ? 'Waiting' : 'En attente');
+                ? `${lastSentinelServerSyncResult.created} opening(s), ${lastSentinelServerSyncResult.updated} refresh(es)`
+                : `${lastSentinelServerSyncResult.created} ouverture(s), ${lastSentinelServerSyncResult.updated} rafraîchissement(s)`)
+            : (isEnglish ? 'Standing by' : 'En veille');
 
     return createSentinelEmbed({
         color: databaseOk ? SENTINEL_COLORS.success : SENTINEL_COLORS.warning,
-        title: isEnglish ? 'Sentinel | Status' : 'Sentinel | Statut',
+        title: isEnglish ? 'Sentinel | Operations' : 'Sentinel | État opérationnel',
         description: isEnglish
-            ? `Technical status for **${guild.name}**.`
-            : `État technique de **${guild.name}**.`,
+            ? `Operations channel for **${guild.name}**.`
+            : `Canal de contrôle opérationnel pour **${guild.name}**.`,
         requester,
         language
     }).addFields(
         {
-            name: 'Bot',
+            name: isEnglish ? 'Sentinel core' : 'Noyau Sentinel',
             value: isEnglish
-                ? `Online\nDiscord latency: **${client.ws.ping}ms**\nBuild: \`${SENTINEL_BUILD}\``
-                : `En ligne\nLatence Discord : **${client.ws.ping}ms**\nBuild : \`${SENTINEL_BUILD}\``,
+                ? `Awake\nSignal: **${client.ws.ping}ms**\nProtocol: \`${SENTINEL_BUILD}\``
+                : `Éveillé\nSignal : **${client.ws.ping}ms**\nProtocole : \`${SENTINEL_BUILD}\``,
             inline: false
         },
         {
-            name: isEnglish ? 'Internal data' : 'Données internes',
+            name: isEnglish ? 'Internal ledger' : 'Registre interne',
             value: databaseOk
-                ? (isEnglish ? 'OK - data accessible' : 'OK - données accessibles')
-                : (isEnglish ? 'Needs checking - data unavailable' : 'À vérifier - données indisponibles'),
+                ? (isEnglish ? 'Stable - ledger accessible' : 'Stable - registre accessible')
+                : (isEnglish ? 'Needs inspection - ledger unreachable' : 'À inspecter - registre injoignable'),
             inline: true
         },
         {
-            name: isEnglish ? 'Latest synchronization' : 'Dernière synchronisation',
+            name: isEnglish ? 'Latest relay' : 'Dernier relais',
             value: `${syncText}\n${syncDetail}`,
             inline: true
         },
         {
-            name: isEnglish ? 'Official updates' : 'Mises à jour officielles',
+            name: isEnglish ? 'Sentinel bulletins' : 'Bulletins Sentinel',
             value: guildConfig.statusUpdatesEnabled
                 ? (isEnglish
-                    ? 'Enabled. Public updates selected by the Sentinel creator can be posted here.'
-                    : 'Activées. Les nouveautés publiques choisies par la créatrice peuvent être publiées ici.')
+                    ? 'Open. Validated bulletins can be posted here.'
+                    : 'Ouverts. Les bulletins validés peuvent être publiés ici.')
                 : (isEnglish
-                    ? 'Disabled on this server.'
-                    : 'Désactivées sur ce serveur.'),
+                    ? 'Closed for this outpost.'
+                    : 'Fermés pour ce poste.'),
             inline: false
         }
     );
@@ -7071,14 +7085,14 @@ function buildServerOnboardingEmbed(guild, requester) {
         color: SENTINEL_COLORS.accent,
         title: 'Sentinel | Premiers pas',
         description: [
-            'Merci d’avoir invité Sentinel. Le bot est prêt, il reste juste à le configurer pour ton serveur.',
+            'Merci d’avoir invité Sentinel. Le noyau est prêt, il reste juste à configurer ton poste.',
             '',
             '`1.` Choisis la langue du serveur avec les boutons ci-dessous.',
             '`2.` Configure le rôle de service avec `/config-role role:@role`.',
             '`3.` Configure le salon de logs avec `/config-logs salon_id:ID`.',
             '`4.` Ajoute les rôles autorisés avec `/config-permissions action:ajouter role:@role`.',
             '`5.` Publie le panneau de service dans le bon salon avec `!service-panel`.',
-            '`6.` Si tu veux les tickets privés, publie le bureau avec `/dossier-panel`.',
+            '`6.` Si tu veux les dossiers privés, publie le bureau avec `/dossier-panel`.',
             '`7.` Optionnel : ajoute un salon statut avec `/config-statut`.',
             '',
             'Besoin d’un guide plus simple ? Utilise `/aide` ou ouvre le dashboard.'
@@ -7562,27 +7576,27 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 menuDescription: 'Sentinel dossier system with a RP vocabulary.',
                 emoji: '📁',
                 title: 'Sentinel | Dossiers',
-                description: 'In Sentinel, a dossier is a private ticket: each request opens a dedicated channel with the authorized team.',
+                description: 'In Sentinel, a dossier is a reserved request space handled by authorized personnel.',
                 fields: [
                     {
                         name: 'How it works',
                         value: [
                             '`/ticket-panel` publishes the Sentinel reception desk.',
-                            'Members choose a type: support, report, recruitment, partnership, or other.',
-                            'Sentinel asks for a subject and description, then creates the private channel.'
+                            'Members choose a type: assistance, report, application, alliance, or request.',
+                            'Sentinel asks for a subject and description, then prepares the reserved space.'
                         ].join('\n')
                     },
                     {
                         name: 'Inside a dossier',
                         value: [
-                            'Free servers can reply, add participants, generate a transcript, and close the dossier.',
+                            'Free servers can reply, add participants, prepare a written record, and close the dossier.',
                             '`/ticket-roles action:add role:@role` gives a role access to dossier handling.',
                             '`/ticket-claim` marks you as the dossier referent.',
                             '`/ticket-status status:...` updates the visible status if the requester made a mistake or the situation changes.',
                             '`/close-ticket` closes the current dossier.',
                             '`/ticket-add member:@member` adds a participant.',
                             '`/ticket-remove member:@member` removes a participant.',
-                            '`/ticket-transcript` sends the transcript to the log channel when possible.'
+                            '`/ticket-transcript` sends the written record to the log channel when possible.'
                         ].join('\n')
                     },
                     {
@@ -7878,14 +7892,14 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 menuDescription: 'Le système de dossiers Sentinel avec un vocabulaire RP.',
                 emoji: '📁',
                 title: 'Sentinel | Dossiers',
-                description: 'Dans Sentinel, un dossier est un ticket privé : chaque demande ouvre un salon dédié avec l’équipe autorisée.',
+                description: 'Dans Sentinel, un dossier est un espace réservé confié à l’équipe autorisée.',
                 fields: [
                     {
                         name: 'Fonctionnement',
                         value: [
                             '`/dossier-panel` publie le bureau d’accueil Sentinel.',
-                            'Les membres choisissent un type : support, signalement, recrutement, partenariat ou autre.',
-                            'Sentinel demande un sujet et une description, puis crée le salon privé.'
+                            'Les membres choisissent un type : assistance, signalement, candidature, alliance ou requête.',
+                            'Sentinel demande un sujet et une description, puis prépare l’espace réservé.'
                         ].join('\n')
                     },
                     {
@@ -8829,7 +8843,25 @@ function buildDossierPanelEmbed(guild, requester, language = 'fr') {
         requester,
         thumbnail: guild.iconURL(),
         language
-    });
+    })
+        .addFields(
+            {
+                name: t(language, 'dossierPanelAccessName'),
+                value: t(language, 'dossierPanelAccessValue'),
+                inline: false
+            },
+            {
+                name: t(language, 'dossierPanelFollowName'),
+                value: t(language, 'dossierPanelFollowValue'),
+                inline: false
+            },
+            {
+                name: t(language, 'dossierPanelBeforeName'),
+                value: t(language, 'dossierPanelBeforeValue'),
+                inline: false
+            }
+        )
+        .setFooter({ text: t(language, 'dossierPanelFooter') });
 }
 
 function buildDossierPanelComponents(language = 'fr') {
@@ -8902,6 +8934,8 @@ function hasSentinelStatusEmbed(message) {
     return Boolean(message?.embeds?.some(embed => (
         embed?.title === 'Sentinel | Statut'
         || embed?.title === 'Sentinel | Status'
+        || embed?.title === 'Sentinel | État opérationnel'
+        || embed?.title === 'Sentinel | Operations'
     )));
 }
 
@@ -9005,7 +9039,7 @@ function buildDossierControlComponents(language = 'fr', options = {}) {
                 .setEmoji('✅'),
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:transcript')
-                .setLabel(language === 'en' ? 'Transcript' : 'Compte rendu')
+                .setLabel(language === 'en' ? 'Written record' : 'Compte rendu')
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('🧾'),
             new ButtonBuilder()
@@ -9115,10 +9149,10 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     const status = getDossierStatusLabel(dossier?.status || 'open', language);
     const archiveEmbed = new EmbedBuilder()
         .setColor(SENTINEL_COLORS.neutral)
-        .setTitle(language === 'en' ? 'Sentinel | Ticket archive' : 'Sentinel | Archive de dossier')
+        .setTitle(language === 'en' ? 'Sentinel | Dossier archive' : 'Sentinel | Archive de dossier')
         .setDescription(language === 'en'
-            ? `Transcript generated for ${channel}.`
-            : `Compte rendu généré pour ${channel}.`
+            ? `Written record prepared for ${channel}.`
+            : `Compte rendu préparé pour ${channel}.`
         )
         .addFields(
             {
@@ -9486,8 +9520,8 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
 
     const description = [
         language === 'en'
-            ? `${interaction.user}, this private channel is your Sentinel dossier.`
-            : `${interaction.user}, ce salon privé est ton dossier Sentinel.`,
+            ? `${interaction.user}, this reserved space is your Sentinel dossier.`
+            : `${interaction.user}, cet espace réservé est ton dossier Sentinel.`,
         subject
             ? (language === 'en' ? `**Subject:** ${subject}` : `**Sujet :** ${subject}`)
             : null,
@@ -9827,8 +9861,8 @@ async function handleDossierInteraction(interaction, commandName, language) {
             targetLabel: `#${channel.name}`,
             details: [
                 language === 'en'
-                    ? 'Sentinel will send the transcript, then close the channel.'
-                    : 'Sentinel enverra le compte rendu, puis fermera le salon.'
+                    ? 'Sentinel will send the written record, then seal this space.'
+                    : 'Sentinel transmettra le compte rendu, puis scellera cet espace.'
             ],
             payload: {
                 channelId: channel.id
@@ -9923,8 +9957,8 @@ async function handleSentinelTicketCloseButton(interaction) {
         targetLabel: `#${channel.name}`,
         details: [
             language === 'en'
-                ? 'Sentinel will send the transcript, then close the channel.'
-                : 'Sentinel enverra le compte rendu, puis fermera le salon.'
+                ? 'Sentinel will send the written record, then seal this space.'
+                : 'Sentinel transmettra le compte rendu, puis scellera cet espace.'
         ],
         payload: {
             channelId: channel.id

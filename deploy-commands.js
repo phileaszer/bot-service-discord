@@ -600,7 +600,7 @@ const publicCommands = [
                 )
         ),
 
-    command('dossier-panel', 'ticket-panel', 'Publie le bureau d accueil des dossiers Sentinel.', 'Publishes the Sentinel ticket reception panel.')
+    command('dossier-panel', 'ticket-panel', 'Publie le bureau d accueil des dossiers Sentinel.', 'Publishes the Sentinel dossier reception panel.')
         .addChannelOption(option =>
             option
                 .setName('salon')
@@ -611,7 +611,7 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('dossier-roles', 'ticket-roles', 'Configure les roles responsables des dossiers Sentinel.', 'Configures Sentinel ticket manager roles.')
+    command('dossier-roles', 'ticket-roles', 'Configure les roles responsables des dossiers Sentinel.', 'Configures Sentinel dossier manager roles.')
         .addStringOption(option =>
             option
                 .setName('action')
@@ -632,15 +632,15 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('dossier-prendre', 'ticket-claim', 'Prend en charge le dossier Sentinel du salon actuel.', 'Takes over the Sentinel ticket in the current channel.'),
+    command('dossier-prendre', 'ticket-claim', 'Prend en charge le dossier Sentinel du salon actuel.', 'Takes over the current Sentinel dossier.'),
 
-    command('dossier-statut', 'ticket-status', 'Modifie le statut du dossier Sentinel du salon actuel.', 'Updates the current Sentinel ticket status.')
+    command('dossier-statut', 'ticket-status', 'Modifie le statut du dossier Sentinel du salon actuel.', 'Updates the current Sentinel dossier status.')
         .addStringOption(option =>
             option
                 .setName('statut')
                 .setNameLocalizations(en('status'))
                 .setDescription('Nouveau statut du dossier')
-                .setDescriptionLocalizations(en('New ticket status'))
+                .setDescriptionLocalizations(en('New dossier status'))
                 .setRequired(true)
                 .addChoices(
                     { name: 'Ouvert', name_localizations: en('Open'), value: 'open' },
@@ -650,29 +650,29 @@ const publicCommands = [
                 )
         ),
 
-    command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the Sentinel ticket in the current channel.'),
+    command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the current Sentinel dossier.'),
 
-    command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel ticket.')
+    command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel dossier.')
         .addUserOption(option =>
             option
                 .setName('membre')
                 .setNameLocalizations(en('member'))
                 .setDescription('Membre a ajouter au dossier')
-                .setDescriptionLocalizations(en('Member to add to the ticket'))
+                .setDescriptionLocalizations(en('Member to add to the dossier'))
                 .setRequired(true)
         ),
 
-    command('dossier-retirer', 'ticket-remove', 'Retire un intervenant du dossier Sentinel actuel.', 'Removes a participant from the current Sentinel ticket.')
+    command('dossier-retirer', 'ticket-remove', 'Retire un intervenant du dossier Sentinel actuel.', 'Removes a participant from the current Sentinel dossier.')
         .addUserOption(option =>
             option
                 .setName('membre')
                 .setNameLocalizations(en('member'))
                 .setDescription('Membre a retirer du dossier')
-                .setDescriptionLocalizations(en('Member to remove from the ticket'))
+                .setDescriptionLocalizations(en('Member to remove from the dossier'))
                 .setRequired(true)
         ),
 
-    command('dossier-compte-rendu', 'ticket-transcript', 'Genere le compte rendu du dossier Sentinel actuel.', 'Generates the current Sentinel ticket transcript.'),
+    command('dossier-compte-rendu', 'ticket-transcript', 'Genere le compte rendu du dossier Sentinel actuel.', 'Generates the current Sentinel dossier written record.'),
 
     command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d un membre.', 'Resets a member service hours.')
         .addUserOption(option =>
