@@ -124,9 +124,10 @@ const SENTINEL_COLORS = {
     warning: 0xff4fb8,
     danger: 0xff235a,
     neutral: 0x8b8fa3,
-    advanced: 0xb76cff
+    advanced: 0xb76cff,
+    service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-13-status-panel-fix-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-service-panel-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -305,6 +306,15 @@ const I18N = {
         serviceAlreadyStarted: '🟢 Tu es déjà en service.',
         serviceNotStarted: '🔴 Tu n’es pas en service pour le moment.',
         serviceError: '❌ Sentinel n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
+        servicePanelTitle: 'Sentinel | Bureau de service',
+        servicePanelDescription: '`Canal opérationnel sécurisé`\nDéclare ton état avant de partir en intervention. Sentinel synchronise le rôle de service et ton registre horaire.',
+        servicePanelStartName: 'Prise de poste',
+        servicePanelStartValue: '🟢 Active ton rôle et démarre le chronomètre de service.',
+        servicePanelEndName: 'Fin de poste',
+        servicePanelEndValue: '🔴 Coupe le suivi et archive la session dans le registre.',
+        servicePanelRegistryName: 'Registre',
+        servicePanelRegistryValue: '📊 Consulte tes heures ou affiche les agents actuellement déployés.',
+        servicePanelFooter: 'Sentinel - registre de service RP',
         showMyHoursLabel: 'Mes heures',
         activeLabel: 'En service',
         toggleLabel: 'Service',
@@ -533,6 +543,15 @@ const I18N = {
         serviceAlreadyStarted: '🟢 You are already on duty.',
         serviceNotStarted: '🔴 You are not on duty right now.',
         serviceError: '❌ Sentinel could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
+        servicePanelTitle: 'Sentinel | Duty desk',
+        servicePanelDescription: '`Secured operations channel`\nDeclare your status before deployment. Sentinel syncs your duty role and your service log.',
+        servicePanelStartName: 'Clock in',
+        servicePanelStartValue: '🟢 Enables your role and starts the duty timer.',
+        servicePanelEndName: 'Clock out',
+        servicePanelEndValue: '🔴 Stops tracking and archives the session in the log.',
+        servicePanelRegistryName: 'Registry',
+        servicePanelRegistryValue: '📊 Check your hours or display agents currently deployed.',
+        servicePanelFooter: 'Sentinel - RP duty registry',
         showMyHoursLabel: 'My hours',
         activeLabel: 'On duty',
         toggleLabel: 'Duty',
@@ -8146,6 +8165,43 @@ function buildServicePanelComponents(language = 'fr') {
     ];
 }
 
+function buildServicePanelEmbed(language = 'fr') {
+    const brandIcon = client.user?.displayAvatarURL();
+    const embed = new EmbedBuilder()
+        .setColor(SENTINEL_COLORS.service)
+        .setTitle(t(language, 'servicePanelTitle'))
+        .setDescription(t(language, 'servicePanelDescription'))
+        .addFields(
+            {
+                name: t(language, 'servicePanelStartName'),
+                value: t(language, 'servicePanelStartValue'),
+                inline: true
+            },
+            {
+                name: t(language, 'servicePanelEndName'),
+                value: t(language, 'servicePanelEndValue'),
+                inline: true
+            },
+            {
+                name: t(language, 'servicePanelRegistryName'),
+                value: t(language, 'servicePanelRegistryValue'),
+                inline: false
+            }
+        )
+        .setFooter({ text: t(language, 'servicePanelFooter') })
+        .setTimestamp();
+
+    if (brandIcon) {
+        embed.setAuthor({
+            name: t(language, 'brand'),
+            iconURL: brandIcon
+        });
+        embed.setThumbnail(brandIcon);
+    }
+
+    return embed;
+}
+
 function buildResetGuildConfirmationComponents(requesterId, language = 'fr') {
     const createdAt = Date.now();
 
@@ -8812,8 +8868,8 @@ function buildDossierPanelComponents(language = 'fr') {
 
 function buildServicePanelPayload(language = 'fr') {
     return {
-        content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
-        embeds: [],
+        content: '',
+        embeds: [buildServicePanelEmbed(language)],
         components: buildServicePanelComponents(language)
     };
 }
@@ -8851,9 +8907,17 @@ function isServicePanelMessage(message) {
         message?.author?.id === client.user?.id
         && (
             hasServicePanelButtons(message)
-            || /^\*\*Sentinel \| Panneau de service\*\*/.test(String(message.content || ''))
+            || hasServicePanelEmbed(message)
+            || /^\*\*Sentinel \| (Panneau de service|Bureau de service|Duty desk)\*\*/.test(String(message.content || ''))
         )
     );
+}
+
+function hasServicePanelEmbed(message) {
+    return Boolean(message?.embeds?.some(embed => (
+        embed?.title === 'Sentinel | Bureau de service'
+        || embed?.title === 'Sentinel | Duty desk'
+    )));
 }
 
 function isMixedServiceStatusPanelMessage(message) {

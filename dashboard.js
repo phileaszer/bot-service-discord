@@ -3483,7 +3483,9 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             await channel.send(ctx.helpers.buildServicePanelPayload
                 ? ctx.helpers.buildServicePanelPayload(language)
                 : {
-                    content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
+                    content: language === 'en'
+                        ? '**Sentinel | Duty desk**\nSecured operations channel. Use the controls below to clock in, clock out, or consult the service registry.'
+                        : '**Sentinel | Bureau de service**\nCanal opérationnel sécurisé. Utilise les contrôles ci-dessous pour prendre ton service, le clôturer ou consulter le registre.',
                     embeds: [],
                     components: ctx.helpers.buildServicePanelComponents(language)
                 });
