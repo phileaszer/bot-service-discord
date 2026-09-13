@@ -126,7 +126,7 @@ const SENTINEL_COLORS = {
     neutral: 0x8b8fa3,
     advanced: 0xb76cff
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-12-automod-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-13-status-panel-fix-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -6815,9 +6815,15 @@ async function updateSentinelStatusPanel(guild) {
     }
 
     for (const { channel, language } of targets) {
-        const payload = { embeds: [buildSentinelStatusEmbed(guild, client.user, language)] };
+        const payload = buildSentinelStatusPayload(guild, language);
         const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
-        const botMessage = messages?.find(message => message.author.id === client.user.id);
+        const botMessages = messages?.filter(message => message.author.id === client.user.id);
+        const mixedServicePanel = botMessages?.find(isMixedServiceStatusPanelMessage);
+        const botMessage = botMessages?.find(isSentinelStatusPanelMessage);
+
+        if (mixedServicePanel) {
+            await mixedServicePanel.edit(buildServicePanelPayload(language)).catch(() => {});
+        }
 
         if (botMessage) {
             await botMessage.edit(payload).catch(() => {});
@@ -8802,6 +8808,64 @@ function buildDossierPanelComponents(language = 'fr') {
                 .setEmoji('🧾')
         )
     ];
+}
+
+function buildServicePanelPayload(language = 'fr') {
+    return {
+        content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
+        embeds: [],
+        components: buildServicePanelComponents(language)
+    };
+}
+
+function buildSentinelStatusPayload(guild, language = 'fr') {
+    return {
+        content: '',
+        embeds: [buildSentinelStatusEmbed(guild, client.user, language)],
+        components: []
+    };
+}
+
+function hasSentinelStatusEmbed(message) {
+    return Boolean(message?.embeds?.some(embed => (
+        embed?.title === 'Sentinel | Statut'
+        || embed?.title === 'Sentinel | Status'
+    )));
+}
+
+function hasServicePanelButtons(message) {
+    const serviceButtonIds = new Set([
+        'start_service',
+        'end_service',
+        'show_my_hours',
+        'show_active_services'
+    ]);
+
+    return Boolean(message?.components?.some(row => (
+        row.components?.some(component => serviceButtonIds.has(component.customId))
+    )));
+}
+
+function isServicePanelMessage(message) {
+    return Boolean(
+        message?.author?.id === client.user?.id
+        && (
+            hasServicePanelButtons(message)
+            || /^\*\*Sentinel \| Panneau de service\*\*/.test(String(message.content || ''))
+        )
+    );
+}
+
+function isMixedServiceStatusPanelMessage(message) {
+    return isServicePanelMessage(message) && hasSentinelStatusEmbed(message);
+}
+
+function isSentinelStatusPanelMessage(message) {
+    return Boolean(
+        message?.author?.id === client.user?.id
+        && hasSentinelStatusEmbed(message)
+        && !isServicePanelMessage(message)
+    );
 }
 
 async function publishDossierPanel(channel, requester, language = 'fr', member = null) {
@@ -11052,6 +11116,7 @@ client.once(Events.ClientReady, async () => {
             buildDossierPanelComponents,
             buildDossierPanelEmbed,
             buildServicePanelComponents,
+            buildServicePanelPayload,
             clearLongServiceAlert,
             clearLongServiceAlertsForGuild,
             closeDossierRecord,
@@ -12538,10 +12603,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     if (content === '!service-panel') {
-        return message.channel.send({
-            content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
-            components: buildServicePanelComponents(language)
-        });
+        return message.channel.send(buildServicePanelPayload(language));
     }
 
     if (/^!(dossier-panel|ticket-panel)$/i.test(content)) {

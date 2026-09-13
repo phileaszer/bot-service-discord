@@ -3480,10 +3480,13 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         }
 
         try {
-            await channel.send({
-                content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
-                components: ctx.helpers.buildServicePanelComponents(language)
-            });
+            await channel.send(ctx.helpers.buildServicePanelPayload
+                ? ctx.helpers.buildServicePanelPayload(language)
+                : {
+                    content: '**Sentinel | Panneau de service**\nPrends ton service, consulte tes heures ou vois les agents actifs avec les boutons ci-dessous.',
+                    embeds: [],
+                    components: ctx.helpers.buildServicePanelComponents(language)
+                });
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
