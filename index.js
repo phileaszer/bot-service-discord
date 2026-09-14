@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-14-rp-suite-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-14-rp-service-panel-v2';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -307,19 +307,19 @@ const I18N = {
         serviceNotStarted: '🔴 Tu n’es pas en service pour le moment.',
         serviceError: '❌ Sentinel n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
         servicePanelTitle: 'Sentinel | Bureau de service',
-        servicePanelDescription: '`Canal opérationnel sécurisé`\nDéclare ton état avant de partir en intervention. Sentinel ajuste ton badge de service et tient le registre horaire.',
-        servicePanelStartName: 'Prise de poste',
-        servicePanelStartValue: '🟢 Active ton badge et démarre le chronomètre de service.',
-        servicePanelEndName: 'Fin de poste',
-        servicePanelEndValue: '🔴 Coupe le suivi et archive la session dans le registre.',
-        servicePanelRegistryName: 'Registre',
-        servicePanelRegistryValue: '📊 Consulte tes heures ou affiche les agents actuellement déployés.',
-        servicePanelFooter: 'Sentinel - registre de service',
+        servicePanelDescription: '`Registre opérationnel`\nDéclare ta prise de poste, clôture ton service ou consulte les agents déjà déployés.\nChaque action ajuste ton badge de service et archive la présence dans le registre.',
+        servicePanelStartName: 'Ouverture de service',
+        servicePanelStartValue: '🟢 Active ton badge et inscrit ton départ dans le registre.',
+        servicePanelEndName: 'Clôture de service',
+        servicePanelEndValue: '🔴 Ferme ton service, retire le badge et consigne la durée.',
+        servicePanelRegistryName: 'Registre vivant',
+        servicePanelRegistryValue: '📊 `Ma fiche` affiche ton relevé. `Déploiement` montre les agents actuellement sur le terrain.',
+        servicePanelFooter: 'Bureau Sentinel - registre de présence',
         showMyHoursLabel: 'Ma fiche',
         activeLabel: 'Déploiement',
         toggleLabel: 'Service',
-        startServiceLabel: 'Prendre service',
-        endServiceLabel: 'Fin service',
+        startServiceLabel: 'Prendre poste',
+        endServiceLabel: 'Fin de poste',
         confirm: 'Confirmer',
         cancel: 'Annuler',
         buttonCooldown: '⏳ Action déjà en cours. Réessaie dans **{time}**.',
@@ -551,19 +551,19 @@ const I18N = {
         serviceNotStarted: '🔴 You are not on duty right now.',
         serviceError: '❌ Sentinel could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
         servicePanelTitle: 'Sentinel | Duty desk',
-        servicePanelDescription: '`Secured operations channel`\nDeclare your status before deployment. Sentinel adjusts your duty badge and keeps the service ledger.',
-        servicePanelStartName: 'Clock in',
-        servicePanelStartValue: '🟢 Enables your badge and starts the duty timer.',
-        servicePanelEndName: 'Clock out',
-        servicePanelEndValue: '🔴 Stops tracking and archives the session in the log.',
-        servicePanelRegistryName: 'Registry',
-        servicePanelRegistryValue: '📊 Check your hours or display agents currently deployed.',
-        servicePanelFooter: 'Sentinel - duty registry',
-        showMyHoursLabel: 'My hours',
-        activeLabel: 'On duty',
+        servicePanelDescription: '`Operations ledger`\nOpen your duty post, close your service, or inspect agents already deployed.\nEach action updates your duty badge and records presence in the ledger.',
+        servicePanelStartName: 'Duty opening',
+        servicePanelStartValue: '🟢 Enables your badge and records your departure in the ledger.',
+        servicePanelEndName: 'Duty closure',
+        servicePanelEndValue: '🔴 Closes duty, removes the badge, and records the duration.',
+        servicePanelRegistryName: 'Live ledger',
+        servicePanelRegistryValue: '📊 `My file` shows your record. `Deployment` shows agents currently in the field.',
+        servicePanelFooter: 'Sentinel desk - presence ledger',
+        showMyHoursLabel: 'My file',
+        activeLabel: 'Deployment',
         toggleLabel: 'Duty',
-        startServiceLabel: 'Start duty',
-        endServiceLabel: 'End duty',
+        startServiceLabel: 'Open post',
+        endServiceLabel: 'Close post',
         confirm: 'Confirm',
         cancel: 'Cancel',
         buttonCooldown: '⏳ Action already running. Try again in **{time}**.',
@@ -7262,19 +7262,19 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/config-voir` affiche le rôle, les salons configurés et les rôles autorisés.'
     ];
     const panelSteps = [
-        '**Publier le panneau**',
+        '**Publier le bureau**',
         'Dans le salon ou les membres doivent pointer, envoie `!service-panel`.',
         '',
-        '**Utiliser le panneau**',
-        '`Prendre service` démarre le service, `Fin service` le termine. Sentinel calcule la durée, met à jour le total et envoie les logs.'
+        '**Utiliser le bureau**',
+        '`Prendre poste` ouvre le service, `Fin de poste` le clôture. Sentinel consigne la durée et met le registre à jour.'
     ];
     const isReferenceServer = isAdvancedGuild(guild.id);
     const memberUsage = [
-        '**Prendre son service**',
-        'Clique sur `Prendre service`. Sentinel ajoute le rôle de service.',
+        '**Ouvrir son poste**',
+        'Clique sur `Prendre poste`. Sentinel ajoute le grade de service.',
         '',
-        '**Finir son service**',
-        'Clique sur `Fin service`. Sentinel retire le rôle et sauvegarde le temps.',
+        '**Clôturer son poste**',
+        'Clique sur `Fin de poste`. Sentinel retire le grade et consigne le temps.',
         '',
         '**Consulter ses infos**',
         isReferenceServer
@@ -7361,7 +7361,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             inline: false
         },
         {
-            name: 'Panneau de service',
+            name: 'Bureau de service',
             value: panelSteps.join('\n'),
             inline: false
         },
@@ -7854,10 +7854,10 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 {
                     name: 'Pointage des agents',
                     value: [
-                        '`Prendre service` ouvre la fiche de présence.',
-                        '`Fin service` ferme le service et consigne la durée.',
+                        '`Prendre poste` ouvre la fiche de présence.',
+                        '`Fin de poste` ferme le service et consigne la durée.',
                         '`Ma fiche` affiche la fiche personnelle.',
-                        '`En service` affiche le déploiement actif.'
+                        '`Déploiement` affiche les agents actifs.'
                     ].join('\n')
                 }
             ]

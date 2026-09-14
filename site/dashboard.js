@@ -477,7 +477,7 @@ function dashboardErrorMessage(input) {
     'Role not found.': 'Choisis un rôle Discord toujours présent sur le serveur.',
     'No service role is configured.': 'Va dans l’assistant et choisis le rôle donné aux membres en service.',
     'This user must be in the server to start duty.': 'Vérifie l’ID Discord et assure-toi que la personne est encore sur ce serveur.',
-    'This user is already on duty.': 'Utilise plutôt “Fin service” si tu veux arrêter sa session actuelle.',
+    'This user is already on duty.': 'Utilise plutôt “Fin de poste” si tu veux arrêter sa session actuelle.',
     'This user is not on duty.': 'Aucune session active n’est trouvée pour cet ID sur ce serveur.',
     'Invalid server profile.': 'Choisis un profil proposé dans l’assistant.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
@@ -1631,12 +1631,12 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions) {
           <button class="button button-ghost" type="button" data-dashboard-tab="setup">Ouvrir l’assistant de configuration</button>
         </article>
         <article class="config-hub-card">
-          <h3>Panneau de service</h3>
-          <p>Publie ou republie les boutons de service dans le salon de ton choix.</p>
+          <h3>Bureau de service</h3>
+          <p>Publie ou republie le bureau où les agents ouvrent leur poste, le clôturent et consultent le déploiement.</p>
           <form data-action-form="publish-service-panel">
-            ${labelHelp('Salon de publication', 'Salon dans lequel Sentinel enverra les boutons utilisés pour prendre ou finir son service.')}
+            ${labelHelp('Salon de publication', 'Salon dans lequel Sentinel déposera le Bureau de service et ses boutons de présence.')}
             <select name="channelId">${channelOptions}</select>
-            <button class="button" type="submit">Publier le panneau</button>
+            <button class="button" type="submit">Publier le bureau</button>
           </form>
         </article>
         <article class="config-hub-card">
@@ -2238,12 +2238,12 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         <form data-action-form="start-service">
           ${labelHelp('Ouvrir le service d’un agent', 'Démarre manuellement le service d’un membre avec son ID et applique le grade de service si possible.')}
           <input name="userId" placeholder="ID du membre" required>
-          <button class="button" type="submit">Prendre service</button>
+          <button class="button" type="submit">Prendre poste</button>
         </form>
         <form data-action-form="end-service">
           ${labelHelp('Fermer le service d’un agent', 'Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son registre.')}
           <input name="userId" placeholder="ID du membre" required>
-          <button class="button" type="submit">Fin service</button>
+          <button class="button" type="submit">Fin de poste</button>
         </form>
         <form data-action-form="reset-user">
           ${labelHelp('Remise à zéro individuelle', 'Remet à zéro les heures d’une seule personne avec son ID, même si elle a quitté le serveur.')}
@@ -2638,7 +2638,7 @@ const AUDIT_ACTION_LABELS = {
   'set-status-updates': 'Nouveautés statut',
   'enable-status-updates': 'Nouveautés statut',
   'disable-status-updates': 'Nouveautés statut',
-  'publish-service-panel': 'Panneau de service',
+  'publish-service-panel': 'Bureau de service',
   'set-payroll-settings': 'Réglage paie RP',
   'set-payroll-role-rate': 'Taux paie par rôle',
   'remove-payroll-role-rate': 'Taux paie retiré',
