@@ -2179,9 +2179,9 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
     <section class="dashboard-panel service-overview-panel" id="service">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Service</p>
-          <h2>Statistiques de service</h2>
-          <p class="muted">Vue rapide des agents en service, du top global, des heures de la semaine et de ton historique personnel.</p>
+          <p class="eyebrow">Registre</p>
+          <h2>Registre de service</h2>
+          <p class="muted">Suivi des fiches agent, déploiements actifs, cycles hebdomadaires et paie.</p>
         </div>
         ${premiumBadge}
       </div>
@@ -2190,8 +2190,8 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         <article class="service-insight service-insight-wide">
           <div class="service-card-heading">
             <div>
-              <p class="eyebrow">Direct</p>
-              <h3>Agents actuellement en service</h3>
+              <p class="eyebrow">Déploiement</p>
+              <h3>Agents en service</h3>
             </div>
             <strong>${escapeHtml(state.summary.activeCount)}</strong>
           </div>
@@ -2200,8 +2200,8 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         <article class="service-insight">
           <div class="service-card-heading">
             <div>
-              <p class="eyebrow">Classement</p>
-              <h3>Top service</h3>
+              <p class="eyebrow">Registre général</p>
+              <h3>Présence cumulée</h3>
             </div>
           </div>
           ${leaderboardChart(state.topService || [], 'Aucun temps total enregistré.')}
@@ -2209,8 +2209,8 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         <article class="service-insight">
           <div class="service-card-heading">
             <div>
-              <p class="eyebrow">Semaine</p>
-              <h3>Heures des 7 derniers jours</h3>
+              <p class="eyebrow">Cycle courant</p>
+              <h3>Sept derniers jours</h3>
             </div>
           </div>
           ${leaderboardChart(state.topWeek || [], 'Aucune session cette semaine.')}
@@ -2218,8 +2218,8 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         <article class="service-insight service-insight-wide">
           <div class="service-card-heading">
             <div>
-              <p class="eyebrow">Personnel</p>
-              <h3>Ton historique</h3>
+              <p class="eyebrow">Fiche personnelle</p>
+              <h3>Ton registre</h3>
             </div>
           </div>
           ${personalHistory(state)}
@@ -2231,28 +2231,28 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
 
     <section class="dashboard-panel">
       <div class="panel-heading">
-        <p class="eyebrow">Actions</p>
-        <h2>Gestion rapide</h2>
+        <p class="eyebrow">Régie</p>
+        <h2>Actions de service</h2>
       </div>
       <div class="form-grid">
         <form data-action-form="start-service">
-          ${labelHelp('Prendre le service pour un membre', 'Démarre manuellement le service d’un membre avec son ID Discord et applique le rôle de service si possible.')}
-          <input name="userId" placeholder="ID Discord du membre" required>
+          ${labelHelp('Ouvrir le service d’un agent', 'Démarre manuellement le service d’un membre avec son ID et applique le grade de service si possible.')}
+          <input name="userId" placeholder="ID du membre" required>
           <button class="button" type="submit">Prendre service</button>
         </form>
         <form data-action-form="end-service">
-          ${labelHelp('Finir le service pour un membre', 'Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son total.')}
-          <input name="userId" placeholder="ID Discord du membre" required>
+          ${labelHelp('Fermer le service d’un agent', 'Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son registre.')}
+          <input name="userId" placeholder="ID du membre" required>
           <button class="button" type="submit">Fin service</button>
         </form>
         <form data-action-form="reset-user">
-          ${labelHelp('Réinitialisation individuelle des heures', 'Remet à zéro les heures d’une seule personne avec son ID Discord, même si elle a quitté le serveur.')}
-          <input name="userId" placeholder="ID Discord, même si la personne est partie" required>
-          <button class="button" type="submit">Reset</button>
+          ${labelHelp('Remise à zéro individuelle', 'Remet à zéro les heures d’une seule personne avec son ID, même si elle a quitté le serveur.')}
+          <input name="userId" placeholder="ID, même si la personne est partie" required>
+          <button class="button" type="submit">Réinitialiser</button>
         </form>
         ${premiumOnly(`
         <form data-action-form="sync-service">
-          ${labelHelp('Synchronisation service', 'Option Premium : répare les incohérences entre les membres en service, les rôles Discord et les données de service.', ` ${premiumTag}`)}
+          ${labelHelp('Synchronisation du registre', 'Option Premium : répare les écarts entre agents en service, grades et registre de service.', ` ${premiumTag}`)}
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
         </form>
         `, state)}
@@ -2265,9 +2265,9 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
     <section class="dashboard-panel inline-premium-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Premium service</p>
-          <h2>Statistiques avancées</h2>
-          <p class="muted">Ces options restent prévues pour les serveurs qui auront besoin de bilans complets et d’exports.</p>
+          <p class="eyebrow">Registre Premium</p>
+          <h2>Registres avancés</h2>
+          <p class="muted">Ces options servent aux équipes qui ont besoin de bilans complets et d’exports.</p>
         </div>
         ${premiumBadge}
       </div>
@@ -2659,34 +2659,34 @@ const AUDIT_ACTION_LABELS = {
   'dossier-transcript': 'Compte rendu dossier',
   'add-command-role': 'Rôle autorisé ajouté',
   'remove-command-role': 'Rôle autorisé retiré',
-  'set-automod-settings': 'Auto-mod réglée',
-  'add-automod-word': 'Mot interdit ajouté',
-  'remove-automod-word': 'Mot interdit retiré',
+  'set-automod-settings': 'Garde réglée',
+  'add-automod-word': 'Mot surveillé ajouté',
+  'remove-automod-word': 'Mot surveillé retiré',
   'toggle-service': 'Bouton service',
   'start-service': 'Prise de service',
   'end-service': 'Fin de service',
-  'reset-user': 'Reset utilisateur',
-  'reset-guild': 'Reset global',
+  'reset-user': 'Fiche réinitialisée',
+  'reset-guild': 'Registre réinitialisé',
   'sync-service': 'Synchronisation',
   'custom-embed-create': 'Embed créé',
   'custom-embed-edit': 'Embed modifié',
   'custom-embed-delete': 'Embed supprimé',
   warn: 'Avertissement',
-  timeout: 'Timeout',
-  untimeout: 'Fin timeout',
+  timeout: 'Mise au silence',
+  untimeout: 'Silence levé',
   kick: 'Expulsion',
-  ban: 'Ban',
-  tempban: 'Ban temporaire',
-  unban: 'Déban',
+  ban: 'Bannissement',
+  tempban: 'Bannissement temporaire',
+  unban: 'Bannissement levé',
   clear: 'Purge',
   purge: 'Purge',
-  lock: 'Lock',
-  unlock: 'Unlock',
-  slowmode: 'Mode lent',
-  case_edit: 'Cas modifié',
-  case_delete: 'Cas supprimé',
-  'edit-case': 'Cas modifié',
-  'delete-case': 'Cas supprimé',
+  lock: 'Salon verrouillé',
+  unlock: 'Salon rouvert',
+  slowmode: 'Salon ralenti',
+  case_edit: 'Dossier corrigé',
+  case_delete: 'Dossier retiré',
+  'edit-case': 'Dossier corrigé',
+  'delete-case': 'Dossier retiré',
   unwarn: 'Avertissement retiré'
 };
 
@@ -3072,7 +3072,7 @@ function automodEventList(state) {
   const events = state.automod?.events || [];
 
   if (!events.length) {
-    return '<p class="muted">Aucun déclenchement auto-mod pour le moment.</p>';
+    return '<p class="muted">Aucun signal de sécurité pour le moment.</p>';
   }
 
   return `
@@ -3094,6 +3094,46 @@ function automodEventList(state) {
   `;
 }
 
+function automodSecurityOverview(state, settings, words) {
+  const events = state.automod?.events || [];
+  const activeSignals = [
+    settings.forbiddenWordsEnabled,
+    settings.inviteFilterEnabled,
+    settings.spamFilterEnabled
+  ].filter(Boolean).length;
+  const latestEvent = events[0]?.createdAt ? formatAuditDate(events[0].createdAt) : 'Aucun signal';
+
+  return `
+    <div class="automod-security-grid">
+      <article class="automod-security-card">
+        <span>Garde</span>
+        <strong>${settings.enabled ? 'En service' : 'En pause'}</strong>
+        <small>${settings.enabled ? 'Les règles actives surveillent les salons autorisés.' : 'Aucune règle automatique ne se déclenche.'}</small>
+      </article>
+      <article class="automod-security-card">
+        <span>Signaux actifs</span>
+        <strong>${activeSignals}/3</strong>
+        <small>Mots surveillés, invitations et rafales de messages.</small>
+      </article>
+      <article class="automod-security-card">
+        <span>Lexique</span>
+        <strong>${escapeHtml(words.length)}</strong>
+        <small>mot(s) ou expression(s) consignés.</small>
+      </article>
+      <article class="automod-security-card">
+        <span>Dernière alerte</span>
+        <strong>${escapeHtml(latestEvent)}</strong>
+        <small>${escapeHtml(events.length)} signalement(s) dans le registre récent.</small>
+      </article>
+      <article class="automod-security-card">
+        <span>Accès</span>
+        <strong>${state.advanced ? 'Premium' : 'Gratuit'}</strong>
+        <small>${state.advanced ? 'Veille renforcée disponible.' : 'Garde essentielle disponible.'}</small>
+      </article>
+    </div>
+  `;
+}
+
 function automodFreePanel(state) {
   const settings = automodSettings(state);
   const words = state.automod?.words || [];
@@ -3103,63 +3143,64 @@ function automodFreePanel(state) {
     <article class="inline-form automod-card automod-card-wide">
       <div class="panel-mini-heading">
         <div>
-          <p class="eyebrow">Auto-modération</p>
-          <h3>Protection gratuite</h3>
-          <p class="muted">Mots interdits, invitations Discord et spam simple.</p>
+          <p class="eyebrow">Centre de sécurité</p>
+          <h3>Garde gratuite</h3>
+          <p class="muted">Lexique surveillé, invitations et rythme de messages.</p>
         </div>
-        ${statusBadge(settings.enabled ? 'Active' : 'Pause', settings.enabled)}
+        ${statusBadge(settings.enabled ? 'En service' : 'Pause', settings.enabled)}
       </div>
+      ${automodSecurityOverview(state, settings, words)}
       <form class="automod-settings-form" data-action-form="set-automod-settings">
         <div class="automod-toggle-grid">
-          ${automodToggle('enabled', settings.enabled, 'Activer l’auto-modération', 'Allume ou met en pause toutes les règles automatiques du serveur.')}
-          ${automodToggle('forbiddenWordsEnabled', settings.forbiddenWordsEnabled, 'Mots interdits', 'Détecte les mots ajoutés dans la liste du serveur.')}
-          ${automodToggle('inviteFilterEnabled', settings.inviteFilterEnabled, 'Anti-invitations', 'Repère les liens discord.gg et les liens d’invitation Discord.')}
-          ${automodToggle('spamFilterEnabled', settings.spamFilterEnabled, 'Anti-spam', 'Détecte les messages envoyés trop vite par la même personne.')}
+          ${automodToggle('enabled', settings.enabled, 'Mettre la garde en service', 'Allume ou met en pause toutes les règles automatiques du serveur.')}
+          ${automodToggle('forbiddenWordsEnabled', settings.forbiddenWordsEnabled, 'Lexique interdit', 'Détecte les mots ajoutés dans le registre du serveur.')}
+          ${automodToggle('inviteFilterEnabled', settings.inviteFilterEnabled, 'Invitations externes', 'Repère les liens discord.gg et les liens d’invitation.')}
+          ${automodToggle('spamFilterEnabled', settings.spamFilterEnabled, 'Rafales de messages', 'Détecte les messages envoyés trop vite par la même personne.')}
         </div>
         <div class="automod-control-grid">
           <div>
-            ${labelHelp('Action mots interdits', 'Action appliquée quand un mot interdit est détecté.')}
+            ${labelHelp('Réponse lexique', 'Mesure appliquée quand un mot surveillé est détecté.')}
             <select name="forbiddenWordsAction">${automodActionOptions(settings.forbiddenWordsAction, false)}</select>
           </div>
           <div>
-            ${labelHelp('Action invitations', 'Action appliquée quand une invitation Discord est détectée.')}
+            ${labelHelp('Réponse invitations', 'Mesure appliquée quand une invitation est détectée.')}
             <select name="inviteAction">${automodActionOptions(settings.inviteAction, false)}</select>
           </div>
           <div>
-            ${labelHelp('Action spam', 'Action appliquée quand le seuil anti-spam est dépassé.')}
+            ${labelHelp('Réponse rafale', 'Mesure appliquée quand le seuil de rafale est dépassé.')}
             <select name="spamAction">${automodActionOptions(settings.spamAction, false)}</select>
           </div>
           <div>
-            ${labelHelp('Seuil spam', 'Nombre de messages tolérés dans la fenêtre anti-spam.')}
+            ${labelHelp('Seuil de rafale', 'Nombre de messages tolérés dans la fenêtre de surveillance.')}
             <input name="spamMaxMessages" type="number" min="2" max="12" value="${escapeHtml(settings.spamMaxMessages)}">
           </div>
           <div>
-            ${labelHelp('Fenêtre spam', 'Durée en secondes utilisée pour compter les messages rapides.')}
+            ${labelHelp('Fenêtre de surveillance', 'Durée en secondes utilisée pour compter les messages rapides.')}
             <input name="spamWindowSeconds" type="number" min="3" max="60" value="${escapeHtml(settings.spamWindowSeconds)}">
           </div>
           <div>
-            ${labelHelp('Timeout auto', 'Durée du timeout automatique en secondes.')}
+            ${labelHelp('Durée de silence', 'Durée du silence automatique en secondes.')}
             <input name="spamTimeoutSeconds" type="number" min="30" max="${state.advanced ? 2419200 : 3600}" value="${escapeHtml(settings.spamTimeoutSeconds)}">
           </div>
         </div>
-        <button class="button" type="submit">Enregistrer l’auto-mod</button>
+        <button class="button" type="submit">Enregistrer la garde</button>
       </form>
     </article>
     <article class="inline-form automod-card">
       <div class="panel-mini-heading">
         <div>
-          <h3>Mots interdits</h3>
+          <h3>Lexique surveillé</h3>
           <p class="muted">${escapeHtml(words.length)}/${escapeHtml(wordLimit)} mot(s) configurés.</p>
         </div>
       </div>
       <form class="automod-add-word" data-action-form="add-automod-word">
-        <input name="word" maxlength="80" placeholder="Mot ou expression" required>
-        <button class="button" type="submit">Ajouter</button>
+        <input name="word" maxlength="80" placeholder="Mot ou expression à surveiller" required>
+        <button class="button" type="submit">Consigner</button>
       </form>
       ${automodWordList(state)}
     </article>
     <article class="inline-form automod-card">
-      <h3>Derniers déclenchements</h3>
+      <h3>Registre des alertes</h3>
       ${automodEventList(state)}
     </article>
   `;
@@ -3172,29 +3213,29 @@ function automodPremiumPanel(state, premiumTag) {
     <article class="inline-form automod-card automod-card-wide premium-roadmap">
       <div class="panel-mini-heading">
         <div>
-          <p class="eyebrow">Auto-modération Premium</p>
-          <h3>Détection avancée ${premiumTag}</h3>
-          <p class="muted">Majuscules abusives, mentions massives, escalade progressive et alerte anti-raid.</p>
+          <p class="eyebrow">Garde Premium</p>
+          <h3>Veille renforcée ${premiumTag}</h3>
+          <p class="muted">Majuscules abusives, mentions massives, récidives et arrivée groupée.</p>
         </div>
       </div>
       <form class="automod-settings-form" data-action-form="set-automod-settings">
         <div class="automod-toggle-grid">
-          ${automodToggle('premiumCapsEnabled', settings.premiumCapsEnabled, 'Anti-caps', 'Repère les messages presque entièrement en majuscules.')}
-          ${automodToggle('premiumMentionsEnabled', settings.premiumMentionsEnabled, 'Anti-mentions', 'Repère les messages avec trop de mentions.')}
-          ${automodToggle('premiumProgressiveEnabled', settings.premiumProgressiveEnabled, 'Escalade progressive', 'Augmente la sanction quand la même personne récidive dans la période choisie.')}
-          ${automodToggle('premiumRaidEnabled', settings.premiumRaidEnabled, 'Alerte anti-raid', 'Signale une arrivée massive de membres dans un court délai.')}
+          ${automodToggle('premiumCapsEnabled', settings.premiumCapsEnabled, 'Surveillance majuscules', 'Repère les messages presque entièrement en majuscules.')}
+          ${automodToggle('premiumMentionsEnabled', settings.premiumMentionsEnabled, 'Mentions massives', 'Repère les messages avec trop de mentions.')}
+          ${automodToggle('premiumProgressiveEnabled', settings.premiumProgressiveEnabled, 'Escalade récidive', 'Renforce la mesure quand la même personne récidive dans la période choisie.')}
+          ${automodToggle('premiumRaidEnabled', settings.premiumRaidEnabled, 'Veille anti-raid', 'Signale une arrivée massive de membres dans un court délai.')}
         </div>
         <div class="automod-control-grid">
           <div>
-            ${labelHelp('Action caps', 'Action appliquée aux messages abusant des majuscules.', ` ${premiumTag}`)}
+            ${labelHelp('Réponse majuscules', 'Mesure appliquée aux messages abusant des majuscules.', ` ${premiumTag}`)}
             <select name="premiumCapsAction">${automodActionOptions(settings.premiumCapsAction, true)}</select>
           </div>
           <div>
-            ${labelHelp('Action mentions', 'Action appliquée quand le seuil de mentions est dépassé.', ` ${premiumTag}`)}
+            ${labelHelp('Réponse mentions', 'Mesure appliquée quand le seuil de mentions est dépassé.', ` ${premiumTag}`)}
             <select name="premiumMentionsAction">${automodActionOptions(settings.premiumMentionsAction, true)}</select>
           </div>
           <div>
-            ${labelHelp('Limite mentions', 'Nombre de mentions à partir duquel la règle se déclenche.', ` ${premiumTag}`)}
+            ${labelHelp('Limite de mentions', 'Nombre de mentions à partir duquel la règle se déclenche.', ` ${premiumTag}`)}
             <input name="premiumMentionLimit" type="number" min="3" max="30" value="${escapeHtml(settings.premiumMentionLimit)}">
           </div>
           <div>
@@ -3202,35 +3243,35 @@ function automodPremiumPanel(state, premiumTag) {
             <input name="premiumProgressiveWindowMinutes" type="number" min="5" max="10080" value="${escapeHtml(settings.premiumProgressiveWindowMinutes)}">
           </div>
           <div>
-            ${labelHelp('Seuil timeout', 'Nombre de déclenchements avant timeout automatique.', ` ${premiumTag}`)}
+            ${labelHelp('Palier silence', 'Nombre de signaux avant silence automatique.', ` ${premiumTag}`)}
             <input name="premiumProgressiveTimeoutThreshold" type="number" min="2" max="30" value="${escapeHtml(settings.premiumProgressiveTimeoutThreshold)}">
           </div>
           <div>
-            ${labelHelp('Seuil kick', 'Nombre de déclenchements avant expulsion automatique.', ` ${premiumTag}`)}
+            ${labelHelp('Palier expulsion', 'Nombre de signaux avant expulsion automatique.', ` ${premiumTag}`)}
             <input name="premiumProgressiveKickThreshold" type="number" min="3" max="40" value="${escapeHtml(settings.premiumProgressiveKickThreshold)}">
           </div>
           <div>
-            ${labelHelp('Seuil ban', 'Nombre de déclenchements avant bannissement automatique.', ` ${premiumTag}`)}
+            ${labelHelp('Palier bannissement', 'Nombre de signaux avant bannissement automatique.', ` ${premiumTag}`)}
             <input name="premiumProgressiveBanThreshold" type="number" min="4" max="50" value="${escapeHtml(settings.premiumProgressiveBanThreshold)}">
           </div>
           <div>
-            ${labelHelp('Arrivées raid', 'Nombre d’arrivées à partir duquel Sentinel alerte le staff.', ` ${premiumTag}`)}
+            ${labelHelp('Arrivées groupées', 'Nombre d’arrivées à partir duquel Sentinel alerte l’équipe.', ` ${premiumTag}`)}
             <input name="premiumRaidJoinCount" type="number" min="3" max="30" value="${escapeHtml(settings.premiumRaidJoinCount)}">
           </div>
           <div>
-            ${labelHelp('Fenêtre raid', 'Durée en secondes utilisée pour détecter une vague d’arrivées.', ` ${premiumTag}`)}
+            ${labelHelp('Fenêtre d’arrivée', 'Durée en secondes utilisée pour détecter une vague d’arrivées.', ` ${premiumTag}`)}
             <input name="premiumRaidWindowSeconds" type="number" min="10" max="300" value="${escapeHtml(settings.premiumRaidWindowSeconds)}">
           </div>
           <div>
-            ${labelHelp('Rôles ignorés', 'IDs de rôles ignorés par l’auto-modération, séparés par des espaces.', ` ${premiumTag}`)}
+            ${labelHelp('Grades ignorés', 'IDs de grades ignorés par la garde automatique, séparés par des espaces.', ` ${premiumTag}`)}
             <input name="premiumIgnoredRoleIds" value="${escapeHtml((settings.premiumIgnoredRoleIds || []).join(' '))}" placeholder="ID rôle ID rôle">
           </div>
           <div>
-            ${labelHelp('Salons ignorés', 'IDs de salons ou catégories ignorés par l’auto-modération, séparés par des espaces.', ` ${premiumTag}`)}
+            ${labelHelp('Salons ignorés', 'IDs de salons ou catégories ignorés par la garde automatique, séparés par des espaces.', ` ${premiumTag}`)}
             <input name="premiumIgnoredChannelIds" value="${escapeHtml((settings.premiumIgnoredChannelIds || []).join(' '))}" placeholder="ID salon ID catégorie">
           </div>
         </div>
-        <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Enregistrer le Premium</button>
+        <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Enregistrer la veille</button>
       </form>
     </article>
   `;
@@ -3539,10 +3580,14 @@ function creatorPremiumManagePanel(overview) {
     <datalist id="creator-premium-guilds">
       ${guildOptions}
     </datalist>
+    <div class="founder-console-note">
+      <strong>Attribution rapide</strong>
+      <span>Accorde ou retire un accès Premium à un serveur entier, à un grade d’un serveur, ou à une personne précise.</span>
+    </div>
     <div class="creator-premium-actions">
       <form class="creator-premium-form" data-creator-premium-form>
         <input type="hidden" name="target" value="server">
-        ${labelHelp('Serveur Premium', 'Ajoute ou retire le Premium complet sur un serveur Sentinel avec son ID Discord.')}
+        ${labelHelp('Accès serveur', 'Accorde ou retire le Premium complet sur un serveur Sentinel avec son ID.')}
         <div class="creator-premium-row">
           <select name="action">
             <option value="add">Ajouter</option>
@@ -3554,7 +3599,7 @@ function creatorPremiumManagePanel(overview) {
       </form>
       <form class="creator-premium-form" data-creator-premium-form>
         <input type="hidden" name="target" value="role">
-        ${labelHelp('Rôle Premium', 'Ajoute ou retire un rôle Premium sur un serveur où Sentinel est installé.')}
+        ${labelHelp('Accès par grade', 'Accorde ou retire un grade Premium sur un serveur où Sentinel est installé.')}
         <div class="creator-premium-row">
           <select name="action">
             <option value="add">Ajouter</option>
@@ -3567,7 +3612,7 @@ function creatorPremiumManagePanel(overview) {
       </form>
       <form class="creator-premium-form" data-creator-premium-form>
         <input type="hidden" name="target" value="user">
-        ${labelHelp('Utilisateur Premium', 'Ajoute un abonnement Premium global à un ID Discord, ou retire son Premium partout.')}
+        ${labelHelp('Accès personnel', 'Accorde un accès Premium global à un ID, ou retire son Premium partout.')}
         <div class="creator-premium-row">
           <select name="action">
             <option value="add">Ajouter</option>
@@ -3594,12 +3639,12 @@ function founderPremiumGuildRows(overview) {
       <table class="dashboard-table founder-premium-table">
         <thead>
           <tr>
-            <th>Serveur</th>
-            <th>Statut</th>
-            <th>Pourquoi</th>
-            <th>Rôles Premium</th>
+            <th>Poste</th>
+            <th>Accès</th>
+            <th>Motif</th>
+            <th>Grades Premium</th>
             <th>Personnes Premium</th>
-            <th>Actions</th>
+            <th>Contrôle</th>
           </tr>
         </thead>
         <tbody>
@@ -3615,14 +3660,14 @@ function founderPremiumGuildRows(overview) {
                   ? `<ul class="compact-list founder-reason-list">${guild.reasons.map((reason) => `<li><span>${escapeHtml(reason)}</span></li>`).join('')}</ul>`
                   : '<span class="muted">Aucun accès Premium actif.</span>'}
                 ${guild.referenceStaffRoles?.length
-                  ? `<small>Rôles staff auto : ${guild.referenceStaffRoles.map((role) => escapeHtml(role.name || role.id)).join(', ')}</small>`
+                  ? `<small>Grades de régie auto : ${guild.referenceStaffRoles.map((role) => escapeHtml(role.name || role.id)).join(', ')}</small>`
                   : ''}
               </td>
-              <td>${premiumNameList(guild.premiumRoles, 'Aucun rôle Premium', { target: 'role', guildId: guild.id })}</td>
+              <td>${premiumNameList(guild.premiumRoles, 'Aucun grade Premium', { target: 'role', guildId: guild.id })}</td>
               <td>${premiumNameList(guild.premiumUsers, 'Aucune personne Premium', { target: 'user' })}</td>
               <td>
                 ${guild.configuredPremium && !guild.manualPremium
-                  ? '<span class="muted">Config env</span>'
+                  ? '<span class="muted">Accès fixe</span>'
                   : `<button
                       class="button button-small ${guild.manualPremium ? 'button-ghost' : ''}"
                       type="button"
@@ -3630,7 +3675,7 @@ function founderPremiumGuildRows(overview) {
                       data-action="${guild.manualPremium ? 'remove' : 'add'}"
                       data-target="server"
                       data-guild-id="${escapeHtml(guild.id)}"
-                    >${guild.manualPremium ? 'Retirer serveur' : 'Ajouter serveur'}</button>`}
+                    >${guild.manualPremium ? 'Retirer accès' : 'Accorder accès'}</button>`}
               </td>
             </tr>
           `).join('')}
@@ -3659,39 +3704,39 @@ function renderFounderPremiumPanel() {
     <section class="dashboard-panel module-panel founder-premium-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Fondatrice</p>
-          <h2>Accès Premium Sentinel</h2>
-          <p class="muted">Vue privée : serveurs Premium, serveurs gratuits, rôles Premium et personnes Premium.</p>
+          <p class="eyebrow">Console</p>
+          <h2>Console fondatrice</h2>
+          <p class="muted">Vue privée des accès Premium : serveurs, grades et personnes.</p>
         </div>
         <button class="button button-small button-ghost" type="button" data-refresh-creator-premium ${creatorOverviewLoading ? 'disabled' : ''}>
-          ${creatorOverviewLoading ? 'Actualisation...' : 'Actualiser'}
+          ${creatorOverviewLoading ? 'Lecture...' : 'Relire'}
         </button>
       </div>
       <div class="dashboard-metrics dashboard-kpis founder-premium-kpis">
         <article class="dashboard-kpi">
-          <span>Serveurs</span>
+          <span>Postes suivis</span>
           <strong>${escapeHtml(summary.guildCount)}</strong>
           <small>où Sentinel est installé</small>
         </article>
         <article class="dashboard-kpi">
-          <span>Premium serveur</span>
+          <span>Accès complet</span>
           <strong>${escapeHtml(summary.serverPremiumCount)}</strong>
-          <small>accès complet</small>
+          <small>serveur entier</small>
         </article>
         <article class="dashboard-kpi">
-          <span>Premium partiel</span>
+          <span>Accès ciblés</span>
           <strong>${escapeHtml(summary.partialPremiumCount)}</strong>
-          <small>rôle ou personne</small>
+          <small>grade ou personne</small>
         </article>
         <article class="dashboard-kpi">
-          <span>Gratuits</span>
+          <span>Sans accès</span>
           <strong>${escapeHtml(summary.freeCount)}</strong>
           <small>aucun accès Premium</small>
         </article>
         <article class="dashboard-kpi">
-          <span>Rôles</span>
+          <span>Grades</span>
           <strong>${escapeHtml(summary.premiumRoleCount)}</strong>
-          <small>rôles Premium manuels</small>
+          <small>accès Premium manuels</small>
         </article>
         <article class="dashboard-kpi">
           <span>Personnes</span>
@@ -3701,7 +3746,7 @@ function renderFounderPremiumPanel() {
       </div>
       ${creatorPremiumManagePanel(overview)}
       ${creatorOverviewLoading && !overview
-        ? '<p class="muted">Chargement des accès Premium...</p>'
+        ? '<p class="muted">Lecture des accès Premium...</p>'
         : founderPremiumGuildRows(overview)}
       ${overview?.generatedAt ? `<p class="muted">Dernière lecture : ${escapeHtml(formatAuditDate(overview.generatedAt))}</p>` : ''}
     </section>
@@ -4102,70 +4147,70 @@ function renderDashboard() {
       ${tabPanel('moderation', `
     <section class="dashboard-panel module-panel moderation-panel" id="moderation">
       <div class="panel-heading">
-        <p class="eyebrow">Modération</p>
-        <h2>Commandes de modération</h2>
-        <p class="muted">Le gratuit garde les actions essentielles : avertissements, timeout, kick, ban par ID et purge. Le Premium ajoutera des outils plus poussés pour les gros staffs.</p>
+        <p class="eyebrow">Sécurité</p>
+        <h2>Centre de sécurité</h2>
+        <p class="muted">Actions disciplinaires, garde automatique, registres récents et veille Premium pour les équipes qui tiennent plusieurs salons.</p>
       </div>
       ${permissionDiagnosticsPanel(state)}
       <div class="form-grid module-form-grid">
         <article class="inline-form moderation-note">
-          ${labelHelp('Rôle automatique d’arrivée', 'Donne automatiquement un rôle aux nouveaux membres qui rejoignent le serveur. Sentinel doit avoir Gérer les rôles et être placé au-dessus du rôle choisi.')}
+          ${labelHelp('Grade automatique d’arrivée', 'Donne automatiquement un grade aux nouveaux membres qui rejoignent le serveur. Sentinel doit avoir Gérer les rôles et être placé au-dessus du grade choisi.')}
           <p class="muted">Actuel : ${state.config.autoRoleId ? escapeHtml(resolveRole(state, state.config.autoRoleId)?.name || 'rôle supprimé sur Discord') : 'désactivé'}</p>
           <form data-action-form="set-auto-role">
             <select name="roleId">${autoRoleOptions}</select>
-            <button class="button" type="submit">Configurer l’auto-rôle</button>
+            <button class="button" type="submit">Configurer le grade</button>
           </form>
           <form data-action-form="disable-auto-role">
-            <button class="button button-ghost" type="submit">Désactiver l’auto-rôle</button>
+            <button class="button button-ghost" type="submit">Désactiver le grade</button>
           </form>
         </article>
         ${automodFreePanel(state)}
         <form data-action-form="warn">
-          ${labelHelp('Avertir par ID', 'Ajoute un avertissement au dossier de modération d’un utilisateur et l’enregistre dans les logs.')}
-          <input name="userId" placeholder="ID Discord" required>
+          ${labelHelp('Consigner un avertissement', 'Ajoute un avertissement au dossier disciplinaire d’un utilisateur et l’enregistre dans le registre.')}
+          <input name="userId" placeholder="ID utilisateur" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Avertir</button>
         </form>
         <form data-action-form="timeout">
-          ${labelHelp('Timeout', 'Rend temporairement muet un membre présent sur le serveur pendant la durée indiquée.')}
-          <input name="userId" placeholder="ID Discord du membre présent" required>
+          ${labelHelp('Mise au silence', 'Rend temporairement muet un membre présent sur le serveur pendant la durée indiquée.')}
+          <input name="userId" placeholder="ID du membre présent" required>
           <input name="duration" placeholder="10m, 2h, 7d" required>
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit">Timeout</button>
+          <button class="button" type="submit">Mettre au silence</button>
         </form>
         <form data-action-form="untimeout">
-          ${labelHelp('Fin timeout', 'Retire un timeout actif sur un membre présent et garde une trace de l’action.')}
-          <input name="userId" placeholder="ID Discord du membre présent" required>
+          ${labelHelp('Lever le silence', 'Retire un timeout actif sur un membre présent et garde une trace de l’action.')}
+          <input name="userId" placeholder="ID du membre présent" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Retirer</button>
         </form>
         <form data-action-form="kick">
           ${labelHelp('Expulser', 'Retire un membre du serveur sans le bannir. Il pourra revenir avec une nouvelle invitation.')}
-          <input name="userId" placeholder="ID Discord du membre présent" required>
+          <input name="userId" placeholder="ID du membre présent" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit">Expulser</button>
         </form>
         <form data-action-form="ban">
-          ${labelHelp('Bannir par ID', 'Bannit un utilisateur avec son ID Discord, même s’il n’est plus présent sur le serveur.')}
-          <input name="userId" placeholder="ID Discord, même hors serveur" required>
+          ${labelHelp('Bannir par ID', 'Bannit un utilisateur avec son ID, même s’il n’est plus présent sur le serveur.')}
+          <input name="userId" placeholder="ID, même hors serveur" required>
           <input name="reason" placeholder="Raison">
           <input name="deleteDays" type="number" min="0" max="7" placeholder="Jours messages">
           <button class="button" type="submit">Bannir</button>
         </form>
         <form data-action-form="purge">
-          ${labelHelp('Purge messages', 'Supprime rapidement un nombre defini de messages recents dans le salon choisi.')}
+          ${labelHelp('Nettoyer un salon', 'Supprime rapidement un nombre défini de messages récents dans le salon choisi.')}
           <select name="channelId">${channelOptions}</select>
           <input name="count" type="number" min="1" max="100" value="10">
           <button class="button" type="submit">Purger</button>
         </form>
         <article class="inline-form moderation-cases-note">
-          ${labelHelp('Derniers dossiers', 'Affiche les dernières sanctions enregistrées sur ce serveur. Les ID restent visibles même si la personne a quitté le Discord.')}
+          ${labelHelp('Registre disciplinaire', 'Affiche les dernières mesures enregistrées sur ce serveur. Les ID restent visibles même si la personne a quitté.')}
           ${moderationCaseFilters(state)}
           ${moderationCaseList(state)}
         </article>
         <article class="inline-form moderation-note">
-          <h3>Inclus en gratuit</h3>
-          <p>Avertissements, timeout, fin de timeout, expulsion, ban par ID, purge et consultation simple des 10 derniers cas avec <code>/sanctions</code>.</p>
+          <h3>Garde gratuite</h3>
+          <p>Avertissements, silence temporaire, expulsion, bannissement par ID, purge et consultation simple des 10 derniers dossiers avec <code>/sanctions</code>.</p>
         </article>
       </div>
       ${premiumRevealHint(state)}
@@ -4176,53 +4221,53 @@ function renderDashboard() {
     <section class="dashboard-panel premium-panel inline-premium-panel module-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Options premium</p>
-          <h2>Modération avancée</h2>
-          <p class="muted">Ces actions sont pensées pour les staffs qui gèrent beaucoup de salons, de sanctions et de cas de modération. Les sanctions automatiques après X avertissements seront ajoutées plus tard.</p>
+          <p class="eyebrow">Veille Premium</p>
+          <h2>Sécurité avancée</h2>
+          <p class="muted">Ces actions sont pensées pour les équipes qui gèrent beaucoup de salons, de mesures et de dossiers disciplinaires.</p>
         </div>
         ${premiumBadge}
       </div>
       <div class="form-grid module-form-grid">
         <form data-action-form="tempban">
-          ${labelHelp('Ban temporaire par ID', 'Option Premium : bannit un utilisateur pour une durée précise, puis Sentinel le débannit automatiquement.', ` ${premiumTag}`)}
-          <input name="userId" placeholder="ID Discord" required>
+          ${labelHelp('Bannissement temporaire', 'Option Premium : bannit un utilisateur pour une durée précise, puis Sentinel lève automatiquement le bannissement.', ` ${premiumTag}`)}
+          <input name="userId" placeholder="ID utilisateur" required>
           <input name="duration" placeholder="1h, 7d, 30d" required>
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Tempban</button>
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Bannir temporairement</button>
         </form>
         <form data-action-form="unban">
-          ${labelHelp('Débannir par ID', 'Option Premium : retire le bannissement d’un utilisateur avec son ID Discord, même s’il n’est plus dans le serveur.', ` ${premiumTag}`)}
-          <input name="userId" placeholder="ID Discord" required>
+          ${labelHelp('Lever un bannissement', 'Option Premium : retire le bannissement d’un utilisateur avec son ID, même s’il n’est plus dans le serveur.', ` ${premiumTag}`)}
+          <input name="userId" placeholder="ID utilisateur" required>
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unban</button>
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Débannir</button>
         </form>
         <form data-action-form="lock">
           ${labelHelp('Verrouiller salon', 'Option Premium : bloque l’envoi de messages dans un salon pour calmer une situation ou préparer une annonce.', ` ${premiumTag}`)}
           <select name="channelId">${channelOptions}</select>
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Lock</button>
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Verrouiller</button>
         </form>
         <form data-action-form="unlock">
-          ${labelHelp('Déverrouiller salon', 'Option Premium : remet un salon verrouillé en mode normal pour permettre aux membres de reparler.', ` ${premiumTag}`)}
+          ${labelHelp('Rouvrir un salon', 'Option Premium : remet un salon verrouillé en mode normal pour permettre aux membres de reparler.', ` ${premiumTag}`)}
           <select name="channelId">${channelOptions}</select>
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unlock</button>
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Rouvrir</button>
         </form>
         <form data-action-form="slowmode">
-          ${labelHelp('Mode lent', 'Option Premium : impose un délai entre deux messages pour ralentir un salon trop actif.', ` ${premiumTag}`)}
+          ${labelHelp('Ralentir un salon', 'Option Premium : impose un délai entre deux messages pour calmer un salon trop actif.', ` ${premiumTag}`)}
           <select name="channelId">${channelOptions}</select>
           <input name="duration" placeholder="10s, 5m, 0">
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Slowmode</button>
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Ralentir</button>
         </form>
         <form data-action-form="edit-case">
-          ${labelHelp('Modifier un cas', 'Option Premium : corrige ou précise la raison d’un dossier de modération déjà enregistré.', ` ${premiumTag}`)}
+          ${labelHelp('Corriger un dossier', 'Option Premium : corrige ou précise la raison d’un dossier disciplinaire déjà enregistré.', ` ${premiumTag}`)}
           <input name="caseId" placeholder="ID du cas" required>
           <input name="reason" placeholder="Nouvelle raison" required>
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Modifier</button>
         </form>
         <form data-action-form="delete-case">
-          ${labelHelp('Supprimer un cas', 'Option Premium : retire un dossier de modération créé par erreur ou devenu invalide.', ` ${premiumTag}`)}
+          ${labelHelp('Retirer un dossier', 'Option Premium : retire un dossier disciplinaire créé par erreur ou devenu invalide.', ` ${premiumTag}`)}
           <input name="caseId" placeholder="ID du cas" required>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Supprimer</button>
@@ -4231,12 +4276,12 @@ function renderDashboard() {
           ${labelHelp('Retirer un avertissement', 'Option Premium : annule un avertissement précis sans effacer toute l’histoire de modération du membre.', ` ${premiumTag}`)}
           <input name="caseId" placeholder="ID du cas avertissement" required>
           <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Unwarn</button>
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Annuler</button>
         </form>
         ${automodPremiumPanel(state, premiumTag)}
         <form data-action-form="reset-guild">
-          ${labelHelp('Reset global serveur', 'Option Premium : remet à zéro toutes les heures de service du serveur avec une action globale réservée aux grands nettoyages.', ` ${premiumTag}`)}
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Reset global</button>
+          ${labelHelp('Remise à zéro générale', 'Option Premium : remet à zéro toutes les heures de service du serveur avec une action globale réservée aux grands nettoyages.', ` ${premiumTag}`)}
+          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Réinitialiser</button>
         </form>
       </div>
     </section>

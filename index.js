@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-13-rp-panels-v2';
+const SENTINEL_BUILD = 'community-suite-2026-09-14-rp-suite-v1';
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -315,8 +315,8 @@ const I18N = {
         servicePanelRegistryName: 'Registre',
         servicePanelRegistryValue: '📊 Consulte tes heures ou affiche les agents actuellement déployés.',
         servicePanelFooter: 'Sentinel - registre de service',
-        showMyHoursLabel: 'Mes heures',
-        activeLabel: 'En service',
+        showMyHoursLabel: 'Ma fiche',
+        activeLabel: 'Déploiement',
         toggleLabel: 'Service',
         startServiceLabel: 'Prendre service',
         endServiceLabel: 'Fin service',
@@ -344,13 +344,13 @@ const I18N = {
         serviceLogTotal: 'Total',
         serviceLogStartedAt: 'Début',
         serviceLogSourceDiscord: 'Discord',
-        serviceLogSourceDashboard: 'Dashboard',
+        serviceLogSourceDashboard: 'Console',
         staffLogTitle: 'Sentinel | Journal',
-        helpTitle: 'Sentinel | Guide de démarrage',
-        helpDescription: 'Commence ici. Ce guide explique comment installer Sentinel, choisir la langue du serveur, le configurer, puis l utiliser sans connaitre les bots Discord.',
+        helpTitle: 'Sentinel | Briefing',
+        helpDescription: 'Commence ici. Ce briefing explique comment ouvrir le poste Sentinel, préparer les grades et tenir le registre.',
         moderationAccessDenied: '❌ Tu n’as pas accès à cette commande de modération.',
         moderationAccessDeniedSpecific: '❌ Tu ne peux pas lancer cette sanction.\nÀ faire : donne la permission “{permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Sentinel.',
-        moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.\nOuvre le dashboard > Sécurité > Diagnostic, ou ajoute la permission manquante au rôle Sentinel.',
+        moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.\nOuvre la console > Sécurité > Diagnostic, ou ajoute la permission manquante au rôle Sentinel.',
         moderationBotPermissionMissingSpecific: '❌ Sentinel ne peut pas faire cette action.\nÀ faire : ajoute la permission “{permission}” au rôle Sentinel, puis réessaie.',
         moderationDiscordRefused: '❌ Discord a refusé l’action.\nÀ faire : {fix}',
         moderationBotPermissionFix: 'ajoute la permission “{permission}” au rôle Sentinel, puis réessaie.',
@@ -944,7 +944,7 @@ function buildDashboardEmbed(guild, requester) {
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Dashboard' : 'Sentinel | Dashboard',
+        title: isEnglish ? 'Sentinel | Dashboard' : 'Sentinel | Console',
         description: isEnglish
             ? [
                 'Open the web dashboard to manage Sentinel from your browser.',
@@ -956,11 +956,11 @@ function buildDashboardEmbed(guild, requester) {
                 dashboardUrl
             ].join('\n')
             : [
-                'Ouvre le dashboard web pour gérer Sentinel depuis ton navigateur.',
+                'Ouvre la console Sentinel pour gérer ton poste depuis le site.',
                 '',
-                '`1.` Connecte-toi avec Discord.',
+                '`1.` Connecte-toi avec ton compte.',
                 '`2.` Choisis le serveur.',
-                '`3.` Configure le service, les logs, les embeds, la modération et l’historique au même endroit.',
+                '`3.` Prépare le service, le registre, les annonces, la sécurité et l’historique au même endroit.',
                 '',
                 dashboardUrl
             ].join('\n'),
@@ -974,7 +974,7 @@ function buildDashboardComponents(language = 'fr') {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel(language === 'en' ? 'Open dashboard' : 'Ouvrir le dashboard')
+                .setLabel(language === 'en' ? 'Open dashboard' : 'Ouvrir la console')
                 .setStyle(ButtonStyle.Link)
                 .setURL(getDashboardUrl('/dashboard'))
         )
@@ -5496,12 +5496,12 @@ function buildServiceHistoryEmbed(member, requester, userData, sessions, options
     ));
     const fields = [
         {
-            name: 'Statut actuel',
+            name: 'État de mission',
             value: `**${status}**`,
             inline: true
         },
         {
-            name: 'Temps total',
+            name: 'Temps consigné',
             value: `**${formatDuration(totalTime)}**`,
             inline: true
         }
@@ -5513,18 +5513,18 @@ function buildServiceHistoryEmbed(member, requester, userData, sessions, options
         const remainingSlots = Math.max(FREE_HISTORY_LIMIT - totalSessionCount, 0);
         const hiddenSessions = Math.max(totalSessionCount - FREE_HISTORY_LIMIT, 0);
         const limitLines = [
-            `Utilisation gratuite : **${visibleUsage}/${FREE_HISTORY_LIMIT}** sessions visibles.`,
+            `Registre gratuit : **${visibleUsage}/${FREE_HISTORY_LIMIT}** services visibles.`,
             remainingSlots > 0
-                ? `Il te reste **${remainingSlots}** emplacement(s) visible(s) avant la limite gratuite.`
-                : 'Tu as atteint la limite visible gratuite.'
+                ? `Il reste **${remainingSlots}** emplacement(s) dans le registre visible.`
+                : 'Le registre visible gratuit est complet.'
         ];
 
         if (hiddenSessions > 0) {
-            limitLines.push(`Sessions plus anciennes masquées : **${hiddenSessions}**.`);
+            limitLines.push(`Services plus anciens placés hors aperçu : **${hiddenSessions}**.`);
         }
 
         fields.push({
-            name: 'Limite gratuite',
+            name: 'Registre gratuit',
             value: limitLines.join('\n'),
             inline: false
         });
@@ -5532,8 +5532,8 @@ function buildServiceHistoryEmbed(member, requester, userData, sessions, options
 
     return createSentinelEmbed({
         color: userData?.startTime ? SENTINEL_COLORS.success : SENTINEL_COLORS.accent,
-        title: 'Sentinel | Historique',
-        description: `Agent : ${member}\n${sessionLines.length > 0 ? sessionLines.join('\n') : 'Aucune session enregistrée.'}`,
+        title: 'Sentinel | Registre agent',
+        description: `Fiche : ${member}\n${sessionLines.length > 0 ? sessionLines.join('\n') : 'Aucun service consigné.'}`,
         requester,
         thumbnail: member.user.displayAvatarURL()
     })
@@ -6132,8 +6132,8 @@ function buildMyHoursEmbed(user, userData) {
     if (!userData) {
         return createSentinelEmbed({
             color: SENTINEL_COLORS.neutral,
-            title: 'Sentinel | Mes heures',
-            description: 'Aucune heure enregistrée pour le moment.\nPrends ton service avec le bouton Sentinel pour commencer le suivi.',
+            title: 'Sentinel | Fiche agent',
+            description: 'Aucun service consigné pour le moment.\nPrends ton service depuis le Bureau Sentinel pour ouvrir ta fiche.',
             requester: user,
             thumbnail: user.displayAvatarURL()
         });
@@ -6147,12 +6147,12 @@ function buildMyHoursEmbed(user, userData) {
 
     const fields = [
         {
-            name: 'Statut',
+            name: 'État',
             value: `**${getServiceStatusText(userData.startTime)}**`,
             inline: true
         },
         {
-            name: 'Temps total',
+            name: 'Temps consigné',
             value: `**${formatDuration(totalTime)}**`,
             inline: true
         }
@@ -6160,16 +6160,16 @@ function buildMyHoursEmbed(user, userData) {
 
     if (userData.startTime) {
         fields.push({
-            name: 'Session en cours',
-            value: `Démarrée <t:${Math.floor(userData.startTime / 1000)}:R>\nDurée actuelle : **${formatDuration(Date.now() - userData.startTime)}**`,
+            name: 'Service en cours',
+            value: `Ouvert <t:${Math.floor(userData.startTime / 1000)}:R>\nDurée actuelle : **${formatDuration(Date.now() - userData.startTime)}**`,
             inline: false
         });
     }
 
     return createSentinelEmbed({
         color: userData.startTime ? SENTINEL_COLORS.success : SENTINEL_COLORS.danger,
-        title: 'Sentinel | Mes heures',
-        description: `Agent : ${user}`,
+        title: 'Sentinel | Fiche agent',
+        description: `Fiche : ${user}`,
         requester: user,
         thumbnail: user.displayAvatarURL()
     }).addFields(fields);
@@ -6188,18 +6188,18 @@ function buildMemberHoursEmbed(member, requester, userData) {
 
     return createSentinelEmbed({
         color: userData.startTime ? SENTINEL_COLORS.success : SENTINEL_COLORS.primary,
-        title: 'Sentinel | Heures membre',
-        description: `Agent : ${member}`,
+        title: 'Sentinel | Fiche agent',
+        description: `Fiche : ${member}`,
         requester,
         thumbnail: member.user.displayAvatarURL()
     }).addFields(
         {
-            name: 'Statut',
+            name: 'État',
             value: `**${getServiceStatusText(userData.startTime)}**`,
             inline: true
         },
         {
-            name: 'Temps total',
+            name: 'Temps consigné',
             value: `**${formatDuration(totalTime)}**`,
             inline: true
         }
@@ -6220,31 +6220,31 @@ function buildTopServiceEmbed(requester, classement, options = {}) {
         `**${getRankLabel(index)}.** <@${user.userId}> - **${formatDuration(user.totalTime)}**`
     ));
     const suffix = classement.length > displayedClassement.length
-        ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) classe(s).`
+        ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) consigné(s).`
         : '';
     const description = options.isReferenceServer
         ? `${lines.join('\n')}${suffix}`
-        : `${lines.join('\n')}\n\nTop ${FREE_TOP_LIMIT} affiche en version gratuite.`;
+        : `${lines.join('\n')}\n\nAperçu gratuit : top ${FREE_TOP_LIMIT} du registre.`;
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.warning,
-        title: 'Sentinel | Classement global',
+        title: 'Sentinel | Registre général',
         description,
         requester
     })
         .addFields(
             {
-                name: 'Agents classés',
+                name: 'Agents consignés',
                 value: `**${classement.length}**`,
                 inline: true
             },
             {
-                name: 'Temps cumulé',
+                name: 'Temps total',
                 value: `**${formatDuration(totalServerTime)}**`,
                 inline: true
             },
             {
-                name: 'Leader',
+                name: 'Tête de registre',
                 value: `<@${bestUser.userId}>`,
                 inline: false
             }
@@ -6335,23 +6335,23 @@ function buildActiveServicesEmbed(requester, activeServices) {
     ));
 
     if (hiddenCount > 0) {
-        lines.push(`... et **${hiddenCount}** autre(s) agent(s) en service.`);
+        lines.push(`... et **${hiddenCount}** autre(s) agent(s) en déploiement.`);
     }
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.success,
-        title: 'Sentinel | Services actifs',
+        title: 'Sentinel | Déploiement actif',
         description: lines.join('\n'),
         requester
     })
         .addFields(
             {
-                name: 'Agents en service',
+                name: 'Agents déployés',
                 value: `**${activeServices.length}**`,
                 inline: true
             },
             {
-                name: 'Temps actif cumulé',
+                name: 'Temps de présence cumulé',
                 value: `**${formatDuration(totalActiveTime)}**`,
                 inline: true
             }
@@ -6372,44 +6372,44 @@ function buildServiceSummaryEmbed(guild, requester) {
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.advanced,
-        title: 'Sentinel | Résumé du service',
-        description: `Vue d’ensemble de **${guild.name}**.`,
+        title: 'Sentinel | Rapport de service',
+        description: `État du registre de **${guild.name}**.`,
         requester
     })
         .addFields(
             {
-                name: 'En service',
+                name: 'Déployés',
                 value: `**${summary.activeServices.length}**`,
                 inline: true
             },
             {
-                name: 'Agents suivis',
+                name: 'Agents enregistrés',
                 value: `**${summary.registeredUsers}**`,
                 inline: true
             },
             {
-                name: 'Total serveur',
+                name: 'Temps consigné',
                 value: `**${formatDuration(summary.totalServiceTime)}**`,
                 inline: true
             },
             {
-                name: 'Cette semaine',
+                name: 'Cycle courant',
                 value: `**${formatDuration(summary.weeklyServiceTime)}**`,
                 inline: true
             },
             {
-                name: 'Leader global',
+                name: 'Premier registre',
                 value: bestUserValue,
                 inline: false
             },
             {
-                name: 'Leader semaine',
+                name: 'Premier cycle',
                 value: bestWeekUserValue,
                 inline: false
             },
             {
-                name: 'Configuration',
-                value: `Rôle : ${roleValue}\nLogs : ${logChannelValue}`,
+                name: 'Poste de service',
+                value: `Grade : ${roleValue}\nRegistre : ${logChannelValue}`,
                 inline: false
             }
         );
@@ -6449,7 +6449,7 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Weekly RP payroll' : 'Sentinel | Paie RP hebdomadaire',
+        title: isEnglish ? 'Sentinel | Weekly RP payroll' : 'Sentinel | Registre de paie',
         description,
         requester,
         thumbnail: guild.iconURL(),
@@ -6457,7 +6457,7 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
     })
         .addFields(
             {
-                name: isEnglish ? 'Current week' : 'Semaine en cours',
+                name: isEnglish ? 'Current week' : 'Cycle en cours',
                 value: `**${payroll.weekStart} → ${payroll.weekEnd}**`,
                 inline: true
             },
@@ -6467,7 +6467,7 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
                 inline: true
             },
             {
-                name: isEnglish ? 'Total time' : 'Temps total',
+                name: isEnglish ? 'Total time' : 'Temps consigné',
                 value: `**${payroll.totals.totalTimeLabel}**`,
                 inline: true
             },
@@ -6615,7 +6615,7 @@ async function buildDiagnosticEmbed(guild, requester) {
                 value: [
                     diagnosticLine(databaseOk, 'Données internes disponibles'),
                     `Agents suivis : **${getRegisteredUserCount(guild.id)}**`,
-                    `Services actifs : **${getActiveServices(guild.id).length}**`
+                    `Déploiement actif : **${getActiveServices(guild.id).length}**`
                 ].join('\n'),
                 inline: false
             },
@@ -7027,28 +7027,28 @@ function buildTopWeekEmbed(requester, classement) {
         `**${getRankLabel(index)}.** <@${user.userId}> - **${formatDuration(user.totalTime)}**`
     ));
     const suffix = classement.length > displayedClassement.length
-        ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) classe(s).`
+        ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) consigné(s).`
         : '';
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.advanced,
-        title: 'Sentinel | Classement hebdomadaire',
+        title: 'Sentinel | Registre hebdomadaire',
         description: `${lines.join('\n')}${suffix}`,
         requester
     })
         .addFields(
             {
-                name: 'Agents classés',
+                name: 'Agents consignés',
                 value: `**${classement.length}**`,
                 inline: true
             },
             {
-                name: 'Temps cumulé',
+                name: 'Temps du cycle',
                 value: `**${formatDuration(totalWeekTime)}**`,
                 inline: true
             },
             {
-                name: 'Leader semaine',
+                name: 'Premier cycle',
                 value: `<@${bestUser.userId}>`,
                 inline: false
             }
@@ -7085,17 +7085,17 @@ function buildServerOnboardingEmbed(guild, requester) {
         color: SENTINEL_COLORS.accent,
         title: 'Sentinel | Premiers pas',
         description: [
-            'Merci d’avoir invité Sentinel. Le noyau est prêt, il reste juste à configurer ton poste.',
+            'Merci d’avoir ouvert l’accès Sentinel. Le noyau est prêt, il reste juste à configurer ton poste.',
             '',
             '`1.` Choisis la langue du serveur avec les boutons ci-dessous.',
-            '`2.` Configure le rôle de service avec `/config-role role:@role`.',
-            '`3.` Configure le salon de logs avec `/config-logs salon_id:ID`.',
-            '`4.` Ajoute les rôles autorisés avec `/config-permissions action:ajouter role:@role`.',
-            '`5.` Publie le panneau de service dans le bon salon avec `!service-panel`.',
+            '`2.` Configure le grade de service avec `/config-role role:@role`.',
+            '`3.` Configure le salon de registre avec `/config-logs salon_id:ID`.',
+            '`4.` Ajoute les grades autorisés avec `/config-permissions action:ajouter role:@role`.',
+            '`5.` Publie le Bureau de service dans le bon salon avec `!service-panel`.',
             '`6.` Si tu veux les dossiers privés, publie le bureau avec `/dossier-panel`.',
             '`7.` Optionnel : ajoute un salon statut avec `/config-statut`.',
             '',
-            'Besoin d’un guide plus simple ? Utilise `/aide` ou ouvre le dashboard.'
+            'Besoin d’un guide plus simple ? Utilise `/aide` ou ouvre la console.'
         ].join('\n'),
         requester,
         thumbnail: guild.iconURL(),
@@ -7104,9 +7104,9 @@ function buildServerOnboardingEmbed(guild, requester) {
         {
             name: 'À vérifier',
             value: [
-                'Le rôle Sentinel doit être au-dessus du rôle de service.',
+                'Le grade Sentinel doit être au-dessus du grade de service.',
                 'Sentinel doit pouvoir voir/écrire dans les salons utiles et créer des salons pour les dossiers.',
-                'Le dashboard peut aussi guider toute la configuration.'
+                'La console peut aussi guider toute la configuration.'
             ].join('\n'),
             inline: false
         }
@@ -7118,7 +7118,7 @@ function buildServerOnboardingComponents(language = 'fr') {
         ...buildLanguageButtons(language),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel(language === 'en' ? 'Open dashboard' : 'Ouvrir le dashboard')
+                .setLabel(language === 'en' ? 'Open dashboard' : 'Ouvrir la console')
                 .setStyle(ButtonStyle.Link)
                 .setURL(getDashboardUrl('/dashboard')),
             new ButtonBuilder()
@@ -7755,133 +7755,134 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
     const pages = [
         {
             id: 'start',
-            label: 'Commencer',
-            menuDescription: 'Le chemin le plus simple pour démarrer.',
-            emoji: '👋',
-            title: 'Sentinel | Aide',
-            description: 'Choisis une rubrique dans le menu ci-dessous. Chaque page est courte pour rester lisible sur mobile.',
+            label: 'Briefing',
+            menuDescription: 'Le chemin court pour ouvrir le poste.',
+            emoji: '🗂️',
+            title: 'Sentinel | Briefing',
+            description: 'Choisis une rubrique dans le registre ci-dessous. Chaque page reste courte pour une lecture rapide.',
             fields: [
                 {
-                    name: 'Ordre conseillé',
+                    name: 'Ordre de mise en place',
                     value: [
-                        '`1.` Invite Sentinel comme vrai bot Discord.',
-                        '`2.` Choisis la langue du serveur avec `/config-langue`.',
-                        '`3.` Configure le rôle de service et le salon de logs.',
-                        '`4.` Publie le panneau avec `!service-panel`.'
+                        '`1.` Ouvre l’accès Sentinel avec le lien officiel.',
+                        '`2.` Choisis la langue du poste avec `/config-langue`.',
+                        '`3.` Déclare le grade de service et le salon de registre.',
+                        '`4.` Installe le Bureau de service avec `!service-panel`.'
                     ].join('\n')
                 },
                 {
-                    name: 'Vérifications utiles',
+                    name: 'Contrôles utiles',
                     value: [
-                        '`/config-voir` affiche les réglages actuels.',
-                        '`/dashboard` ouvre le dashboard web.',
-                        '`/support` affiche les liens officiels et le serveur support.',
+                        '`/config-voir` affiche les réglages du poste.',
+                        '`/dashboard` ouvre la console de gestion.',
+                        '`/support` affiche les accès officiels.',
                         '`/premium` affiche la progression avant l’ouverture Premium.',
-                        '`/diagnostic` vérifie les permissions et l’ordre des rôles.',
-                        '`/ping` vérifie que Sentinel et ses données internes répondent.'
+                        '`/diagnostic` vérifie les accès et l’ordre des grades.',
+                        '`/ping` vérifie que Sentinel et ses registres répondent.'
                     ].join('\n')
                 }
             ]
         },
         {
             id: 'install',
-            label: 'Installation',
-            menuDescription: 'Inviter Sentinel et vérifier les rôles.',
-            emoji: '🧩',
-            title: 'Sentinel | Installation',
-            description: 'Avant de configurer le bot, vérifie que Discord voit bien Sentinel comme un bot.',
+            label: 'Arrivée',
+            menuDescription: 'Installer Sentinel et préparer les grades.',
+            emoji: '🧭',
+            title: 'Sentinel | Mise en place',
+            description: 'Avant d’ouvrir le poste, vérifie que Sentinel est bien présent et placé correctement.',
             fields: [
                 {
-                    name: 'Intégration Discord',
+                    name: 'Présence Sentinel',
                     value: [
-                        'Dans `Paramètres du serveur > Intégrations`, Sentinel doit avoir le badge `Bot`.',
-                        'Si tu vois seulement `Commandes`, retire l’intégration et réinvite Sentinel avec le lien officiel.'
+                        'Dans les intégrations du serveur, Sentinel doit avoir le badge `Bot`.',
+                        'Si tu vois seulement `Commandes`, retire l’accès et réinvite Sentinel avec le lien officiel.'
                     ].join('\n')
                 },
                 {
-                    name: 'Ordre des rôles',
+                    name: 'Ordre des grades',
                     value: [
-                        'Crée un rôle de service, par exemple `En service`, `Patrouille` ou `Agent actif`.',
-                        'Place le rôle Sentinel au-dessus de ce rôle, sinon Discord refusera de l’ajouter ou de le retirer.'
+                        'Crée un grade de service, par exemple `En service`, `Patrouille` ou `Agent actif`.',
+                        'Place le grade Sentinel au-dessus de ce grade, sinon il ne pourra pas l’ajouter ou le retirer.'
                     ].join('\n')
                 }
             ]
         },
         {
             id: 'config',
-            label: 'Configuration',
-            menuDescription: 'Langue, rôle, logs et rôles staff.',
+            label: 'Régie',
+            menuDescription: 'Langue, grades, registre et accès de régie.',
             emoji: '⚙️',
-            title: 'Sentinel | Configuration serveur',
-            description: 'Ces commandes préparent Sentinel pour ce serveur uniquement.',
+            title: 'Sentinel | Poste serveur',
+            description: 'Ces commandes préparent le poste Sentinel de ce serveur uniquement.',
             fields: [
                 {
-                    name: 'Réglages de base',
+                    name: 'Réglages du poste',
                     value: [
                         '`/config-langue langue:Français` choisit la langue du serveur.',
-                        '`/config-role role:@role` choisit le rôle donné en service.',
-                        '`/config-autorole action:definir role:@role` donne un rôle aux nouveaux membres automatiquement.',
-                        '`/config-logs salon_id:ID` choisit le salon de logs par ID.',
-                        '`/config-statut` publie un panneau d’état automatique et peut recevoir les nouveautés officielles.',
+                        '`/config-role role:@role` choisit le grade donné pendant le service.',
+                        '`/config-autorole action:definir role:@role` remet un grade aux nouveaux arrivants.',
+                        '`/config-logs salon_id:ID` choisit le salon de registre.',
+                        '`/config-statut` publie le centre de contrôle et peut recevoir les bulletins officiels.',
                         '`/config-voir` affiche ce qui est configuré.'
                     ].join('\n')
                 },
                 {
-                    name: 'Qui peut gérer Sentinel ?',
+                    name: 'Accès de régie',
                     value: [
-                        'Au départ, propriétaire/admin/Gérer le serveur/Gérer les rôles peuvent configurer.',
-                        'Ensuite, utilise `/config-permissions action:ajouter role:@role` pour choisir les rôles staff autorisés.'
+                        'Au départ, propriétaire/admin/Gérer le serveur/Gérer les rôles peuvent ouvrir la régie.',
+                        'Ensuite, utilise `/config-permissions action:ajouter role:@role` pour déclarer les grades autorisés.'
                     ].join('\n')
                 }
             ]
         },
         {
             id: 'service',
-            label: 'Panneau service',
-            menuDescription: 'Publier et utiliser les boutons de service.',
+            label: 'Service',
+            menuDescription: 'Installer et utiliser le Bureau de service.',
             emoji: '🟢',
-            title: 'Sentinel | Panneau de service',
-            description: 'Le panneau est une commande texte normale, pas une commande slash.',
+            title: 'Sentinel | Bureau de service',
+            description: 'Le bureau se publie dans le salon de pointage choisi.',
             fields: [
                 {
-                    name: 'Publier le panneau',
+                    name: 'Installer le bureau',
                     value: [
-                        'Va dans le salon où les membres doivent pointer.',
+                        'Va dans le salon où les agents doivent pointer.',
                         'Envoie `!service-panel`.',
-                        'Sentinel publiera les boutons dans ce salon.'
+                        'Sentinel y déposera le Bureau de service.'
                     ].join('\n')
                 },
                 {
-                    name: 'Utiliser les boutons',
+                    name: 'Pointage des agents',
                     value: [
-                        '`Prendre service` démarre le service, `Fin service` le termine.',
-                        '`Mes heures` affiche les heures personnelles.',
-                        '`En service` affiche les agents actuellement actifs.'
+                        '`Prendre service` ouvre la fiche de présence.',
+                        '`Fin service` ferme le service et consigne la durée.',
+                        '`Ma fiche` affiche la fiche personnelle.',
+                        '`En service` affiche le déploiement actif.'
                     ].join('\n')
                 }
             ]
         },
             {
                 id: 'dashboard',
-                label: 'Dashboard',
-                menuDescription: 'Ouvrir le site et gérer un serveur.',
+                label: 'Console',
+                menuDescription: 'Ouvrir la console et gérer un serveur.',
             emoji: '🖥️',
-            title: 'Sentinel | Dashboard',
-            description: 'Le dashboard permet aux staffs autorisés de gérer Sentinel depuis un navigateur.',
+            title: 'Sentinel | Console',
+            description: 'La console permet aux responsables autorisés de gérer Sentinel depuis le site.',
             fields: [
                 {
-                    name: 'L’ouvrir',
+                    name: 'Ouvrir la console',
                     value: [
-                        'Utilise `/dashboard` dans Discord, puis clique sur le bouton.',
-                        'Tu peux aussi ouvrir le site public et choisir `Dashboard`.'
+                        'Utilise `/dashboard`, puis clique sur le bouton.',
+                        'Tu peux aussi ouvrir le site public et choisir la console.'
                     ].join('\n')
                 },
                 {
-                    name: 'Ce que tu peux faire dessus',
+                    name: 'Ce que la console donne',
                     value: [
-                        'Choisir un serveur lié à ton compte Discord.',
-                        'Configurer la langue, le rôle de service, l’auto-rôle, le salon de logs, le panneau de service, les embeds, les sanctions et l’historique.',
-                        'Si un serveur demande une autorisation, invite d’abord Sentinel comme vrai bot.'
+                        'Choisir un serveur lié à ton compte.',
+                        'Préparer la langue, le grade de service, le grade d’arrivée, le registre, le Bureau de service, les annonces, la sécurité et l’historique.',
+                        'Si un serveur demande une autorisation, ouvre d’abord l’accès Sentinel avec le lien officiel.'
                     ].join('\n')
                     }
                 ]
@@ -7889,13 +7890,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             {
                 id: 'dossiers',
                 label: 'Dossiers',
-                menuDescription: 'Le système de dossiers Sentinel avec un vocabulaire RP.',
+                menuDescription: 'Accueil, demandes, signalements et suivi réservé.',
                 emoji: '📁',
                 title: 'Sentinel | Dossiers',
-                description: 'Dans Sentinel, un dossier est un espace réservé confié à l’équipe autorisée.',
+                description: 'Le Bureau d’accueil reçoit les demandes et les confie aux équipes autorisées.',
                 fields: [
                     {
-                        name: 'Fonctionnement',
+                        name: 'Accueil Sentinel',
                         value: [
                             '`/dossier-panel` publie le bureau d’accueil Sentinel.',
                             'Les membres choisissent un type : assistance, signalement, candidature, alliance ou requête.',
@@ -7903,9 +7904,9 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         ].join('\n')
                     },
                     {
-                        name: 'Dans un dossier',
+                        name: 'Suivi du dossier',
                         value: [
-                            'En gratuit, le staff peut répondre, ajouter des intervenants, générer un compte rendu et clôturer le dossier.',
+                            'En gratuit, l’équipe peut répondre, ajouter des intervenants, préparer un compte rendu et clôturer le dossier.',
                             '`/dossier-roles action:ajouter role:@rôle` donne accès à la gestion des dossiers.',
                             '`/dossier-prendre` te marque comme référent du dossier.',
                             '`/dossier-statut statut:...` corrige le statut visible si le demandeur s’est trompé ou si la situation change.',
@@ -7926,26 +7927,26 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             },
             {
                 id: 'commands',
-                label: 'Commandes gratuites',
-            menuDescription: 'Les commandes service principales.',
+                label: 'Répertoire',
+            menuDescription: 'Les commandes ouvertes à tous les serveurs.',
             emoji: '📋',
-            title: 'Sentinel | Commandes gratuites',
-            description: 'Le gratuit garde les commandes essentielles, sans noyer les utilisateurs.',
+            title: 'Sentinel | Répertoire gratuit',
+            description: 'Le répertoire gratuit garde les actions essentielles, sans noyer les équipes.',
             fields: [
                 {
-                    name: 'Membres',
+                    name: 'Agents',
                     value: [
-                        '`/mes-heures` affiche tes heures.',
-                        '`/historique-service` affiche tes dernières sessions.',
-                        '`/en-service` affiche les agents actifs.',
-                        '`/top-service` affiche le top 10 du serveur.'
+                        '`/mes-heures` affiche ta fiche agent.',
+                        '`/historique-service` affiche tes derniers services.',
+                        '`/en-service` affiche le déploiement actif.',
+                        '`/top-service` affiche le registre général du serveur.'
                     ].join('\n')
                 },
                 {
-                    name: 'Staff',
+                    name: 'Régie',
                     value: [
-                        '`/dashboard` donne le lien du dashboard web.',
-                        '`/support` donne les liens officiels et le serveur support.',
+                        '`/dashboard` donne le lien de la console.',
+                        '`/support` donne les accès officiels.',
                         '`/premium` indique quand le Premium ouvrira.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/config-paie` règle le montant horaire RP.',
@@ -7960,42 +7961,42 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
         },
         {
             id: 'moderation',
-            label: 'Modération',
-            menuDescription: 'Warn, timeout, expulsion, ban par ID et purge.',
+            label: 'Sécurité',
+            menuDescription: 'Avertissement, silence, expulsion, bannissement et purge.',
             emoji: '🛡️',
-            title: 'Sentinel | Modération',
-            description: 'Sentinel vérifie les permissions Discord et la hiérarchie des rôles avant chaque sanction.',
+            title: 'Sentinel | Centre de sécurité',
+            description: 'Sentinel vérifie les accès et l’ordre des grades avant chaque mesure.',
             fields: [
                 {
-                    name: 'Modération gratuite',
+                    name: 'Mesures gratuites',
                     value: [
                         '`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`.',
-                        '`/config-autorole` peut donner un rôle automatiquement quand un membre rejoint.',
-                        '`/bannir` peut utiliser un ID Discord si la personne n’est plus sur le serveur.',
-                        '`/sanctions` affiche une vue simple des derniers cas.'
+                        '`/config-autorole` peut donner un grade automatiquement quand un membre rejoint.',
+                        '`/bannir` peut utiliser un ID si la personne n’est plus sur le serveur.',
+                        '`/sanctions` affiche une vue simple des derniers dossiers disciplinaires.'
                     ].join('\n')
                 },
                 {
-                    name: 'Important',
-                    value: 'Si une action est refusée, vérifie la position du rôle Sentinel et les permissions Discord.'
+                    name: 'À contrôler',
+                    value: 'Si une mesure est refusée, vérifie la position du grade Sentinel et les accès du salon.'
                 }
             ]
         },
         {
             id: 'limits',
-            label: isReferenceServer ? 'Serveur référence' : 'Limites gratuites',
-            menuDescription: isReferenceServer ? 'Ce qui est ouvert sur le serveur référence.' : 'Ce que les serveurs gratuits peuvent utiliser.',
+            label: isReferenceServer ? 'Accès complet' : 'Accès gratuit',
+            menuDescription: isReferenceServer ? 'Ce qui est ouvert ici.' : 'Ce que les serveurs gratuits peuvent utiliser.',
             emoji: '⭐',
-            title: isReferenceServer ? 'Sentinel | Serveur de référence' : 'Sentinel | Limites gratuites',
+            title: isReferenceServer ? 'Sentinel | Accès complet' : 'Sentinel | Accès gratuit',
             description: isReferenceServer
-                ? 'Ce serveur a accès à l’ensemble des commandes Sentinel.'
-                : 'Le gratuit reste utile, les outils plus lourds sont prévus pour le Premium.',
+                ? 'Ce serveur dispose de l’ensemble du registre Sentinel.'
+                : 'Le gratuit reste opérationnel, les outils de grande équipe passent par le Premium.',
             fields: isReferenceServer
                 ? [
                     {
                         name: 'Accès référence',
                         value: [
-                            `Historique jusqu’à ${REFERENCE_HISTORY_LIMIT} sessions par demande.`,
+                            `Historique jusqu’à ${REFERENCE_HISTORY_LIMIT} services par demande.`,
                             `Classements jusqu’à ${REFERENCE_TOP_LIMIT} agents.`,
                             '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel` sont disponibles.',
                             'Embeds Sentinel : création illimitée et modifications illimitées.'
@@ -8006,8 +8007,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     {
                         name: 'Accès gratuit',
                         value: [
-                            `Historique personnel : ${FREE_HISTORY_LIMIT} dernières sessions.`,
-                            `Classement public : top ${FREE_TOP_LIMIT}.`,
+                            `Historique personnel : ${FREE_HISTORY_LIMIT} derniers services.`,
+                            `Registre public : top ${FREE_TOP_LIMIT}.`,
                             `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs, modifications illimitées.`,
                             '`/reset-heures-all` sera réservé à Sentinel Premium.',
                             `Premium est prévu quand Sentinel aura atteint ${PREMIUM_SERVER_GOAL} serveurs.`
@@ -8017,19 +8018,19 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
         },
         {
             id: 'troubleshooting',
-            label: 'Dépannage',
-            menuDescription: 'Les corrections rapides quand ça bloque.',
-            emoji: '🛠️',
-            title: 'Sentinel | Dépannage rapide',
-            description: 'La plupart des soucis viennent du lien d’invitation, de l’ordre des rôles ou des permissions salon.',
+            label: 'Contrôle',
+            menuDescription: 'Les vérifications rapides quand ça bloque.',
+            emoji: '🧰',
+            title: 'Sentinel | Contrôle rapide',
+            description: 'La plupart des blocages viennent de l’accès initial, de l’ordre des grades ou des accès salon.',
             fields: [
                 {
-                    name: 'Corrections rapides',
+                    name: 'Points à vérifier',
                     value: [
-                        'Sentinel ne donne pas le rôle ? Remonte son rôle au-dessus du rôle de service.',
-                        'Les logs ne partent pas ? Vérifie que Sentinel peut voir et écrire dans le salon.',
+                        'Sentinel ne donne pas le grade ? Remonte son grade au-dessus du grade de service.',
+                        'Le registre ne reçoit rien ? Vérifie que Sentinel peut voir et écrire dans le salon.',
                         'Commande refusée ? Vérifie `/config-permissions action:voir`.',
-                        'Sentinel n’apparaît pas dans les membres ? Réinvite-le comme bot, pas seulement comme commandes.'
+                        'Sentinel n’apparaît pas dans les membres ? Rouvre l’accès avec le lien officiel.'
                     ].join('\n')
                 }
             ]
@@ -8039,25 +8040,25 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
     if (isReferenceServer) {
         pages.push({
             id: 'advanced',
-            label: 'Avancé',
-            menuDescription: 'Commandes référence/Premium.',
+            label: 'Premium',
+            menuDescription: 'Commandes ouvertes aux accès complets.',
             emoji: '💎',
-            title: 'Sentinel | Commandes avancées',
-            description: 'Ces outils sont réservés au serveur de référence et aux futurs serveurs Premium.',
+            title: 'Sentinel | Accès Premium',
+            description: 'Ces outils sont réservés aux accès complets et aux serveurs Premium.',
             fields: [
                 {
-                    name: 'Service',
+                    name: 'Registre de service',
                     value: [
                         '`/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-heures-all`.',
                         '`/embed creer` est illimité ici. `/embed modifier` reste illimité partout.'
                     ].join('\n')
                 },
                 {
-                    name: 'Modération Premium',
+                    name: 'Sécurité Premium',
                     value: [
                         '`/cas`, `/modifier-cas`, `/supprimer-cas`, `/unwarn`, `/profil-mod`.',
                         '`/tempban`, `/unban`, `/lock`, `/unlock`, `/slowmode`.',
-                        'Plus tard : sanctions automatiques après X avertissements.'
+                        'Les règles automatiques avancées peuvent être pilotées depuis la console.'
                     ].join('\n')
                 }
             ]
