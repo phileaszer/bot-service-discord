@@ -60,8 +60,8 @@ const CSRF_HEADER = 'x-sentinel-csrf';
 const STORED_SECRET_PREFIX = 'enc:v1:';
 const STORED_SESSION_ID_PREFIX = 'sha256:';
 const MAX_JSON_BODY_BYTES = Math.min(
-    Math.max(Number.parseInt(process.env.DASHBOARD_MAX_JSON_BYTES || `${128 * 1024}`, 10), 16 * 1024),
-    1024 * 1024
+    Math.max(Number.parseInt(process.env.DASHBOARD_MAX_JSON_BYTES || `${12 * 1024 * 1024}`, 10), 16 * 1024),
+    16 * 1024 * 1024
 );
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -1689,6 +1689,11 @@ function formatDashboardCustomEmbedQuota(ctx, guildId, language = 'fr', member =
     return ctx.helpers.formatCustomEmbedQuota(guildId, language, member);
 }
 
+function getEmbedAttachmentName(value) {
+    const match = /^attachment:\/\/([^?#]+)$/i.exec(String(value || '').trim());
+    return match ? match[1] : null;
+}
+
 async function requireAdvanced(ctx, guildId, member = null, session = null) {
     const hasAccess = await hasDashboardAdvancedAccess(ctx, guildId, member, session);
 
@@ -3026,7 +3031,8 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
 
     if (action === 'custom-embed-create') {
         const channel = getTextChannel(guild, body.channelId, language);
-        const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language);
+        const hasUploadedFiles = Boolean(ctx.helpers.hasCustomEmbedUpload?.(body));
+        const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language, hasUploadedFiles);
 
         if (channelError) {
             throw createHttpError(403, channelError);
@@ -3057,10 +3063,20 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
             throw createHttpError(400, error.message);
         }
 
+        let files = [];
+
+        try {
+            files = ctx.helpers.prepareCustomEmbedUploads
+                ? ctx.helpers.prepareCustomEmbedUploads(body, data, language)
+                : [];
+        } catch (error) {
+            throw createHttpError(400, error.message);
+        }
+
         let sentMessage;
 
         try {
-            sentMessage = await channel.send(ctx.helpers.buildCustomEmbedPayload(data, roleToPing, language));
+            sentMessage = await channel.send(ctx.helpers.buildCustomEmbedPayload(data, roleToPing, language, files));
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
@@ -3089,7 +3105,8 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         ? guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null)
         : null;
 
-    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, null, language);
+    const hasUploadedFiles = Boolean(ctx.helpers.hasCustomEmbedUpload?.(body));
+    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, null, language, hasUploadedFiles);
 
     if (channelError) {
         throw createHttpError(403, channelError);
@@ -3152,16 +3169,48 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
             throw createHttpError(400, error.message);
         }
 
+        let files = [];
+
+        try {
+            files = ctx.helpers.prepareCustomEmbedUploads
+                ? ctx.helpers.prepareCustomEmbedUploads(body, data, language)
+                : [];
+        } catch (error) {
+            throw createHttpError(400, error.message);
+        }
+
+        if (files.length > 0) {
+            changed = true;
+        }
+
         if (!changed) {
             throw createHttpError(400, 'No embed field provided.');
         }
 
         try {
-            await message.edit({
+            const editPayload = {
                 content: message.content || null,
                 embeds: [ctx.helpers.buildCustomAnnouncementEmbed(data, language)],
                 allowedMentions: { parse: [] }
-            });
+            };
+
+            if (files.length > 0) {
+                editPayload.files = files;
+            }
+
+            const attachmentNamesToKeep = new Set([
+                getEmbedAttachmentName(data.imageUrl),
+                getEmbedAttachmentName(data.thumbnailUrl)
+            ].filter(Boolean));
+            const keptAttachments = message.attachments
+                .filter(attachment => attachmentNamesToKeep.has(attachment.name))
+                .map(attachment => attachment);
+
+            if (files.length > 0 || keptAttachments.length !== message.attachments.size) {
+                editPayload.attachments = keptAttachments;
+            }
+
+            await message.edit(editPayload);
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }

@@ -127,7 +127,14 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-14-rp-service-panel-v2';
+const SENTINEL_BUILD = 'community-suite-2026-09-14-local-embed-images-v1';
+const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
+    ['image/png', 'png'],
+    ['image/jpeg', 'jpg'],
+    ['image/gif', 'gif'],
+    ['image/webp', 'webp']
+]);
 const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
 const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
@@ -400,9 +407,12 @@ const I18N = {
         customEmbedChannelViewMissing: '❌ Sentinel ne voit pas {channel}.\nÀ faire : autorise Sentinel à voir ce salon.',
         customEmbedChannelSendMissing: '❌ Sentinel ne peut pas écrire dans {channel}.\nÀ faire : autorise Sentinel à envoyer des messages dans ce salon.',
         customEmbedChannelEmbedMissing: '❌ Sentinel ne peut pas envoyer d’embed dans {channel}.\nÀ faire : ajoute la permission “Intégrer des liens” à Sentinel dans ce salon.',
+        customEmbedChannelAttachMissing: '❌ Sentinel ne peut pas joindre de fichier dans {channel}.\nÀ faire : ajoute la permission “Joindre des fichiers” à Sentinel dans ce salon.',
         customEmbedMentionPermissionMissing: '❌ Sentinel ne peut pas mentionner ce rôle.\nÀ faire : rends le rôle mentionnable, ou donne à Sentinel la permission de mentionner les rôles.',
         customEmbedInvalidColor: '❌ Couleur invalide. Utilise `rose`, `cyan`, `vert`, `rouge`, `violet` ou un code comme `#ff2d9a`.',
         customEmbedInvalidUrl: '❌ URL invalide pour {field}. Utilise une URL `https://` ou indique `retirer` pendant une modification.',
+        customEmbedInvalidUpload: '❌ Image locale invalide. Utilise une image PNG, JPG, WebP ou GIF.',
+        customEmbedUploadTooLarge: '❌ Image locale trop lourde. Garde un total maximum de 8 Mo par embed.',
         customEmbedTooLarge: '❌ Cet embed est trop long. Garde le titre sous 256 caractères, le message sous 4000 caractères et le total sous 6000 caractères.',
         customEmbedLimitReached: '⭐ Le gratuit permet **{limit}** embeds Sentinel actifs par serveur. Tu peux modifier tes embeds existants sans limite avec `/embed modifier`, supprimer un embed avec `/embed supprimer`, ou passer Premium pour créer en illimité.',
         customEmbedCreated: '✅ Embed Sentinel envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
@@ -644,9 +654,12 @@ const I18N = {
         customEmbedChannelViewMissing: '❌ Sentinel cannot see {channel}.\nFix: allow Sentinel to view this channel.',
         customEmbedChannelSendMissing: '❌ Sentinel cannot write in {channel}.\nFix: allow Sentinel to send messages in this channel.',
         customEmbedChannelEmbedMissing: '❌ Sentinel cannot send embeds in {channel}.\nFix: give Sentinel the “Embed Links” permission in this channel.',
+        customEmbedChannelAttachMissing: '❌ Sentinel cannot attach files in {channel}.\nFix: give Sentinel the “Attach Files” permission in this channel.',
         customEmbedMentionPermissionMissing: '❌ Sentinel cannot mention this role.\nFix: make the role mentionable, or give Sentinel permission to mention roles.',
         customEmbedInvalidColor: '❌ Invalid color. Use `pink`, `cyan`, `green`, `red`, `purple`, or a code like `#ff2d9a`.',
         customEmbedInvalidUrl: '❌ Invalid URL for {field}. Use an `https://` URL, or enter `remove` while editing.',
+        customEmbedInvalidUpload: '❌ Invalid local image. Use a PNG, JPG, WebP, or GIF image.',
+        customEmbedUploadTooLarge: '❌ Local image too large. Keep the total under 8 MB per embed.',
         customEmbedTooLarge: '❌ This embed is too long. Keep the title under 256 characters, the message under 4000 characters, and the total under 6000 characters.',
         customEmbedLimitReached: '⭐ Free servers can keep **{limit}** active Sentinel embeds. You can edit existing embeds without limit with `/embed edit`, delete one with `/embed delete`, or upgrade to Premium for unlimited creation.',
         customEmbedCreated: '✅ Sentinel embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
@@ -5244,6 +5257,105 @@ function normalizeCustomEmbedUrl(value, field, language = 'fr', allowClear = fal
     }
 }
 
+function detectCustomEmbedImageMime(buffer) {
+    if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
+        return null;
+    }
+
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+        return 'image/png';
+    }
+
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+        return 'image/jpeg';
+    }
+
+    const header = buffer.subarray(0, 6).toString('ascii');
+
+    if (header === 'GIF87a' || header === 'GIF89a') {
+        return 'image/gif';
+    }
+
+    if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
+        return 'image/webp';
+    }
+
+    return null;
+}
+
+function normalizeCustomEmbedUpload(upload, slot, language = 'fr') {
+    if (!upload || typeof upload !== 'object' || !upload.dataUrl) {
+        return null;
+    }
+
+    const dataUrl = String(upload.dataUrl || '').trim();
+    const match = /^data:(image\/(?:png|jpe?g|gif|webp));base64,([a-z0-9+/=\r\n]+)$/i.exec(dataUrl);
+
+    if (!match) {
+        throw new Error(t(language, 'customEmbedInvalidUpload'));
+    }
+
+    const declaredMime = match[1].toLowerCase() === 'image/jpg'
+        ? 'image/jpeg'
+        : match[1].toLowerCase();
+    const cleanBase64 = match[2].replace(/\s+/g, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    const detectedMime = detectCustomEmbedImageMime(buffer);
+
+    if (!buffer.length || !detectedMime || detectedMime !== declaredMime || !CUSTOM_EMBED_UPLOAD_MIMES.has(detectedMime)) {
+        throw new Error(t(language, 'customEmbedInvalidUpload'));
+    }
+
+    if (buffer.length > CUSTOM_EMBED_UPLOAD_MAX_BYTES) {
+        throw new Error(t(language, 'customEmbedUploadTooLarge'));
+    }
+
+    const extension = CUSTOM_EMBED_UPLOAD_MIMES.get(detectedMime);
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 14);
+    const safeSlot = slot === 'thumbnail' ? 'thumbnail' : 'image';
+    const name = `sentinel-embed-${safeSlot}-${hash}.${extension}`;
+
+    return {
+        size: buffer.length,
+        url: `attachment://${name}`,
+        file: {
+            attachment: buffer,
+            name,
+            description: safeSlot === 'thumbnail'
+                ? 'Miniature embed Sentinel'
+                : 'Image embed Sentinel'
+        }
+    };
+}
+
+function hasCustomEmbedUpload(input = {}) {
+    return Boolean(
+        input?.imageUpload?.dataUrl
+        || input?.thumbnailUpload?.dataUrl
+    );
+}
+
+function prepareCustomEmbedUploads(input, data, language = 'fr') {
+    const imageUpload = normalizeCustomEmbedUpload(input?.imageUpload, 'image', language);
+    const thumbnailUpload = normalizeCustomEmbedUpload(input?.thumbnailUpload, 'thumbnail', language);
+    const uploads = [imageUpload, thumbnailUpload].filter(Boolean);
+    const totalSize = uploads.reduce((total, upload) => total + upload.size, 0);
+
+    if (totalSize > CUSTOM_EMBED_UPLOAD_MAX_BYTES) {
+        throw new Error(t(language, 'customEmbedUploadTooLarge'));
+    }
+
+    if (imageUpload) {
+        data.imageUrl = imageUpload.url;
+    }
+
+    if (thumbnailUpload) {
+        data.thumbnailUrl = thumbnailUpload.url;
+    }
+
+    return uploads.map(upload => upload.file);
+}
+
 function normalizeCustomEmbedOptionalText(value, allowClear = false) {
     const rawValue = String(value || '').trim();
 
@@ -5392,7 +5504,7 @@ function mapCustomEmbedMessageData(message) {
     };
 }
 
-function getCustomEmbedChannelError(guild, channel, roleToPing = null, language = 'fr') {
+function getCustomEmbedChannelError(guild, channel, roleToPing = null, language = 'fr', requiresFiles = false) {
     if (!channel || !channel.isTextBased()) {
         return t(language, 'channelNotText');
     }
@@ -5411,6 +5523,10 @@ function getCustomEmbedChannelError(guild, channel, roleToPing = null, language 
         return t(language, 'customEmbedChannelEmbedMissing', { channel });
     }
 
+    if (requiresFiles && !permissions.has(PermissionsBitField.Flags.AttachFiles)) {
+        return t(language, 'customEmbedChannelAttachMissing', { channel });
+    }
+
     if (roleToPing && !roleToPing.mentionable && !permissions.has(PermissionsBitField.Flags.MentionEveryone)) {
         return t(language, 'customEmbedMentionPermissionMissing');
     }
@@ -5418,13 +5534,17 @@ function getCustomEmbedChannelError(guild, channel, roleToPing = null, language 
     return null;
 }
 
-function buildCustomEmbedPayload(data, roleToPing = null, language = 'fr') {
+function buildCustomEmbedPayload(data, roleToPing = null, language = 'fr', files = []) {
     const payload = {
         embeds: [buildCustomAnnouncementEmbed(data, language)],
         allowedMentions: roleToPing
             ? { roles: [roleToPing.id] }
             : { parse: [] }
     };
+
+    if (Array.isArray(files) && files.length > 0) {
+        payload.files = files;
+    }
 
     if (roleToPing) {
         payload.content = `${roleToPing}`;
@@ -11292,6 +11412,7 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbeds,
             getCustomEmbedQuota,
             getCustomEmbedRecord,
+            hasCustomEmbedUpload,
             getDatabaseBackupStatus,
             getDossierRoleIds,
             getGuildConfig,
@@ -11340,6 +11461,7 @@ client.once(Events.ClientReady, async () => {
             normalizeUserId,
             parseDurationToMs,
             parseSlowmodeToSeconds,
+            prepareCustomEmbedUploads,
             removeAutomodWord,
             removeDossierRole,
             removeCommandRole,

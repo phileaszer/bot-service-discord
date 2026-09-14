@@ -27,6 +27,8 @@ let csrfToken = null;
 const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
 const GUILD_PREVIEW_CACHE_PREFIX = 'sentinel-dashboard-guild-preview';
 const PROFILE_STORAGE_KEY = 'sentinel-discord-profile';
+const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+const CUSTOM_EMBED_UPLOAD_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 const SERVER_PRESETS = [
   {
     id: 'standard',
@@ -381,6 +383,9 @@ function dashboardErrorMessage(input) {
       'Category not found.': 'Discord category not found.',
       'Sentinel cannot send this embed in the selected channel.': 'Sentinel cannot send this embed in the selected channel.',
       'Sentinel cannot use the selected channel.': 'Sentinel cannot use the selected channel.',
+      'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Invalid local image.',
+      'Local image too large. Keep the total under 8 MB per embed.': 'Local image too large.',
+      'Payload too large.': 'Uploaded image is too large.',
       'Discord refused the action.': 'Discord refused the action.',
       'Discord ban not found.': 'No Discord ban was found for this ID.',
       'No embed field provided.': 'Choose at least one embed field to update.',
@@ -408,6 +413,9 @@ function dashboardErrorMessage(input) {
       'Category not found.': 'Choose a Discord category that still exists.',
       'Sentinel cannot send this embed in the selected channel.': firstFix || 'Allow Sentinel to view the channel and send messages there.',
       'Sentinel cannot use the selected channel.': 'Fix the permissions of the selected channel, then try again.',
+      'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Choose a valid PNG, JPG, WebP, or GIF image.',
+      'Local image too large. Keep the total under 8 MB per embed.': 'Use a lighter image, up to 8 MB total per embed.',
+      'Payload too large.': 'Use a lighter image, up to 8 MB total per embed.',
       'Discord refused the action.': 'Open the permissions diagnostic, fix the red item, then try again.',
       'Discord ban not found.': 'Check the full Discord ID and make sure this user is still banned.',
       'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
@@ -457,6 +465,9 @@ function dashboardErrorMessage(input) {
     'Category not found.': 'Catégorie Discord introuvable.',
     'Sentinel cannot send this embed in the selected channel.': 'Sentinel ne peut pas envoyer cet embed dans le salon choisi.',
     'Sentinel cannot use the selected channel.': 'Sentinel ne peut pas utiliser le salon choisi.',
+    'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Image locale invalide.',
+    'Local image too large. Keep the total under 8 MB per embed.': 'Image locale trop lourde.',
+    'Payload too large.': 'Image envoyée trop lourde.',
     'Discord refused the action.': 'Discord a refusé l’action.',
     'Discord ban not found.': 'Aucun bannissement Discord n’a été trouvé pour cet ID.',
     'No embed field provided.': 'Indique au moins un champ à modifier.',
@@ -487,6 +498,9 @@ function dashboardErrorMessage(input) {
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
     'Sentinel cannot send this embed in the selected channel.': firstFix || 'Autorise Sentinel à voir le salon et à y envoyer des messages.',
     'Sentinel cannot use the selected channel.': 'Corrige les permissions du salon choisi, puis réessaie.',
+    'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Choisis une image PNG, JPG, WebP ou GIF valide.',
+    'Local image too large. Keep the total under 8 MB per embed.': 'Utilise une image plus légère, 8 Mo maximum au total par embed.',
+    'Payload too large.': 'Utilise une image plus légère, 8 Mo maximum au total par embed.',
     'Discord refused the action.': 'Ouvre le diagnostic permissions, corrige le point rouge, puis réessaie.',
     'Discord ban not found.': 'Vérifie l’ID Discord complet et assure-toi que cette personne est encore bannie.',
     'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
@@ -551,7 +565,74 @@ function optionList(items, selectedId = null, placeholder = 'Choisir') {
 }
 
 function formData(form) {
-  return Object.fromEntries(new FormData(form).entries());
+  const data = {};
+
+  for (const [key, value] of new FormData(form).entries()) {
+    if (typeof File !== 'undefined' && value instanceof File) {
+      continue;
+    }
+
+    data[key] = value;
+  }
+
+  return data;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener('load', () => resolve(String(reader.result || '')));
+    reader.addEventListener('error', () => reject(new Error('Lecture de l’image impossible.')));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function customEmbedUploadFromInput(input, label) {
+  const file = input?.files?.[0];
+
+  if (!file || !file.name) {
+    return null;
+  }
+
+  if (!CUSTOM_EMBED_UPLOAD_TYPES.has(file.type)) {
+    throw new Error(`${label} : choisis une image PNG, JPG, WebP ou GIF.`);
+  }
+
+  if (file.size > CUSTOM_EMBED_UPLOAD_MAX_BYTES) {
+    throw new Error(`${label} : image trop lourde. Maximum 8 Mo par embed.`);
+  }
+
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    dataUrl: await readFileAsDataUrl(file)
+  };
+}
+
+async function actionFormData(form, action) {
+  const data = formData(form);
+
+  if (action === 'custom-embed-create' || action === 'custom-embed-edit') {
+    const imageUpload = await customEmbedUploadFromInput(form.elements.imageFile, 'Image principale');
+    const thumbnailUpload = await customEmbedUploadFromInput(form.elements.thumbnailFile, 'Miniature');
+    const totalUploadSize = (imageUpload?.size || 0) + (thumbnailUpload?.size || 0);
+
+    if (totalUploadSize > CUSTOM_EMBED_UPLOAD_MAX_BYTES) {
+      throw new Error('Images trop lourdes. Maximum 8 Mo au total par embed.');
+    }
+
+    if (imageUpload) {
+      data.imageUpload = imageUpload;
+    }
+
+    if (thumbnailUpload) {
+      data.thumbnailUpload = thumbnailUpload;
+    }
+  }
+
+  return data;
 }
 
 function setLoading(button, isLoading) {
@@ -4049,7 +4130,10 @@ function renderDashboard() {
           <input name="color" placeholder="Couleur : rose, cyan, #ff2d9a">
           <select name="roleId">${pingRoleOptions}</select>
           <input name="imageUrl" placeholder="Image URL optionnelle">
+          <input name="imageFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Photo principale depuis ton PC">
           <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
+          <input name="thumbnailFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Miniature depuis ton PC">
+          <p class="form-hint">Tu peux choisir une image depuis ton PC. PNG, JPG, WebP ou GIF, 8 Mo maximum au total.</p>
           <input name="footer" placeholder="Footer optionnel">
           <button class="button" type="submit">Envoyer l’embed</button>
         </form>
@@ -4061,7 +4145,10 @@ function renderDashboard() {
           <textarea name="description" placeholder="Nouveau message"></textarea>
           <input name="color" placeholder="Nouvelle couleur">
           <input name="imageUrl" placeholder="Nouvelle image URL, ou retirer">
+          <input name="imageFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Nouvelle photo principale depuis ton PC">
           <input name="thumbnailUrl" placeholder="Nouvelle miniature URL, ou retirer">
+          <input name="thumbnailFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Nouvelle miniature depuis ton PC">
+          <p class="form-hint">Un fichier choisi ici remplace l’URL indiquée pour l’image ou la miniature.</p>
           <input name="footer" placeholder="Nouveau footer, ou retirer">
           <button class="button" type="submit">Modifier sans quota</button>
         </form>
@@ -4521,11 +4608,16 @@ function attachDashboardHandlers() {
   });
 
   $$('[data-action-form]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const action = form.dataset.actionForm;
       const button = $('button[type="submit"]', form);
-      runAction(action, formData(form), button);
+
+      try {
+        runAction(action, await actionFormData(form, action), button);
+      } catch (error) {
+        toast(error.message || 'Image impossible à préparer.', 'error');
+      }
     });
   });
 

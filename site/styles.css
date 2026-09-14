@@ -4023,6 +4023,13 @@ code {
   font: inherit;
 }
 
+.form-hint {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .embed-list code {
   overflow: hidden;
   max-width: 180px;
