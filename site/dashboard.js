@@ -635,6 +635,34 @@ async function actionFormData(form, action) {
   return data;
 }
 
+function fileUploadControl(name, title, emptyText, actionText = 'Choisir') {
+  return `
+          <label class="file-upload-control">
+            <input class="file-upload-input" data-file-upload name="${escapeHtml(name)}" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="${escapeHtml(title)}">
+            <span class="file-upload-visual">
+              <span class="file-upload-symbol" aria-hidden="true"></span>
+              <span class="file-upload-text">
+                <strong>${escapeHtml(title)}</strong>
+                <small data-file-upload-name data-empty-label="${escapeHtml(emptyText)}">${escapeHtml(emptyText)}</small>
+              </span>
+              <span class="file-upload-action">${escapeHtml(actionText)}</span>
+            </span>
+          </label>`;
+}
+
+function updateFileUploadName(input) {
+  const control = input.closest('.file-upload-control');
+  const label = control ? $('[data-file-upload-name]', control) : null;
+  const file = input.files?.[0] || null;
+
+  if (!control || !label) {
+    return;
+  }
+
+  label.textContent = file?.name || label.dataset.emptyLabel || 'Aucune image sélectionnée';
+  control.classList.toggle('has-file', Boolean(file?.name));
+}
+
 function setLoading(button, isLoading) {
   if (!button) return;
   button.disabled = isLoading;
@@ -4130,9 +4158,9 @@ function renderDashboard() {
           <input name="color" placeholder="Couleur : rose, cyan, #ff2d9a">
           <select name="roleId">${pingRoleOptions}</select>
           <input name="imageUrl" placeholder="Image URL optionnelle">
-          <input name="imageFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Photo principale depuis ton PC">
+          ${fileUploadControl('imageFile', 'Photo principale', 'Aucune photo sélectionnée', 'Importer')}
           <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
-          <input name="thumbnailFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Miniature depuis ton PC">
+          ${fileUploadControl('thumbnailFile', 'Miniature', 'Aucune miniature sélectionnée', 'Importer')}
           <p class="form-hint">Tu peux choisir une image depuis ton PC. PNG, JPG, WebP ou GIF, 8 Mo maximum au total.</p>
           <input name="footer" placeholder="Footer optionnel">
           <button class="button" type="submit">Envoyer l’embed</button>
@@ -4145,9 +4173,9 @@ function renderDashboard() {
           <textarea name="description" placeholder="Nouveau message"></textarea>
           <input name="color" placeholder="Nouvelle couleur">
           <input name="imageUrl" placeholder="Nouvelle image URL, ou retirer">
-          <input name="imageFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Nouvelle photo principale depuis ton PC">
+          ${fileUploadControl('imageFile', 'Nouvelle photo principale', 'Aucune nouvelle photo', 'Remplacer')}
           <input name="thumbnailUrl" placeholder="Nouvelle miniature URL, ou retirer">
-          <input name="thumbnailFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Nouvelle miniature depuis ton PC">
+          ${fileUploadControl('thumbnailFile', 'Nouvelle miniature', 'Aucune nouvelle miniature', 'Remplacer')}
           <p class="form-hint">Un fichier choisi ici remplace l’URL indiquée pour l’image ou la miniature.</p>
           <input name="footer" placeholder="Nouveau footer, ou retirer">
           <button class="button" type="submit">Modifier sans quota</button>
@@ -4605,6 +4633,11 @@ function attachDashboardHandlers() {
       dashboardPlanMode = nextPlan;
       renderDashboard();
     });
+  });
+
+  $$('[data-file-upload]').forEach((input) => {
+    updateFileUploadName(input);
+    input.addEventListener('change', () => updateFileUploadName(input));
   });
 
   $$('[data-action-form]').forEach((form) => {
