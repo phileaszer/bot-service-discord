@@ -4070,11 +4070,21 @@ code {
   position: relative;
   width: 36px;
   height: 36px;
+  overflow: hidden;
   border: 1px solid rgba(23, 231, 255, 0.36);
   border-radius: var(--radius);
   background:
     linear-gradient(135deg, rgba(23, 231, 255, 0.18), rgba(255, 45, 154, 0.12)),
     rgba(11, 15, 23, 0.92);
+}
+
+.file-upload-symbol img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity 160ms ease;
 }
 
 .file-upload-symbol::before {
@@ -4098,6 +4108,15 @@ code {
   border: 2px solid rgba(244, 248, 255, 0.84);
   border-bottom: 0;
   border-radius: 4px 4px 0 0;
+}
+
+.file-upload-control.has-file .file-upload-symbol img {
+  opacity: 1;
+}
+
+.file-upload-control.has-file .file-upload-symbol::before,
+.file-upload-control.has-file .file-upload-symbol::after {
+  opacity: 0;
 }
 
 .file-upload-text {

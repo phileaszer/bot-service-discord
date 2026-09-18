@@ -24,6 +24,7 @@ let canViewPremiumOverview = false;
 let dashboardHydrating = false;
 let selectedGuildPreview = null;
 let csrfToken = null;
+let activeUploadPreviewUrls = new Set();
 const LAST_GUILD_STORAGE_KEY = 'sentinel-dashboard-last-guild-id';
 const GUILD_PREVIEW_CACHE_PREFIX = 'sentinel-dashboard-guild-preview';
 const PROFILE_STORAGE_KEY = 'sentinel-discord-profile';
@@ -640,7 +641,9 @@ function fileUploadControl(name, title, emptyText, actionText = 'Choisir') {
           <label class="file-upload-control">
             <input class="file-upload-input" data-file-upload name="${escapeHtml(name)}" type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="${escapeHtml(title)}">
             <span class="file-upload-visual">
-              <span class="file-upload-symbol" aria-hidden="true"></span>
+              <span class="file-upload-symbol" aria-hidden="true">
+                <img data-file-upload-preview alt="">
+              </span>
               <span class="file-upload-text">
                 <strong>${escapeHtml(title)}</strong>
                 <small data-file-upload-name data-empty-label="${escapeHtml(emptyText)}">${escapeHtml(emptyText)}</small>
@@ -650,13 +653,39 @@ function fileUploadControl(name, title, emptyText, actionText = 'Choisir') {
           </label>`;
 }
 
+function revokeUploadPreviewUrls() {
+  for (const url of activeUploadPreviewUrls) {
+    URL.revokeObjectURL(url);
+  }
+
+  activeUploadPreviewUrls = new Set();
+}
+
 function updateFileUploadName(input) {
   const control = input.closest('.file-upload-control');
   const label = control ? $('[data-file-upload-name]', control) : null;
+  const preview = control ? $('[data-file-upload-preview]', control) : null;
   const file = input.files?.[0] || null;
 
   if (!control || !label) {
     return;
+  }
+
+  if (control.dataset.previewUrl) {
+    URL.revokeObjectURL(control.dataset.previewUrl);
+    activeUploadPreviewUrls.delete(control.dataset.previewUrl);
+    delete control.dataset.previewUrl;
+  }
+
+  if (preview) {
+    preview.removeAttribute('src');
+  }
+
+  if (file?.type?.startsWith('image/') && preview) {
+    const previewUrl = URL.createObjectURL(file);
+    control.dataset.previewUrl = previewUrl;
+    activeUploadPreviewUrls.add(previewUrl);
+    preview.src = previewUrl;
   }
 
   label.textContent = file?.name || label.dataset.emptyLabel || 'Aucune image sélectionnée';
@@ -4095,6 +4124,7 @@ function tabPanel(id, content) {
 
 function renderDashboard() {
   const main = $('[data-dashboard-main]');
+  revokeUploadPreviewUrls();
 
   if (!currentState) {
     main.innerHTML = dashboardHydrating || selectedGuildId
