@@ -281,6 +281,13 @@ CREATE TABLE IF NOT EXISTS user_site_settings (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS site_staff_users (
+    user_id TEXT PRIMARY KEY,
+    granted_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS dashboard_sessions (
     session_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -393,6 +400,9 @@ ON dashboard_sessions (user_id);
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expires
 ON dashboard_sessions (expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_site_staff_created
+ON site_staff_users (created_at);
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_audit_guild_created
 ON dashboard_audit_logs (guild_id, created_at);

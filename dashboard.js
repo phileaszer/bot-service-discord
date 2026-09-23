@@ -33,6 +33,11 @@ const CREATOR_USER_IDS = new Set(
         .map(value => value.trim())
         .filter(Boolean)
 );
+const SITE_ACCESS_ROLES = {
+    FOUNDER: 'founder',
+    STAFF: 'staff',
+    USER: 'user'
+};
 const ALLOWED_RETURN_PATHS = new Set([
     '/',
     '/index.html',
@@ -724,6 +729,86 @@ function getUserProfile(userId) {
         FROM user_profiles
         WHERE user_id = ?
     `).get(userId));
+}
+
+function isSiteStaffUser(userId) {
+    if (!userId) {
+        return false;
+    }
+
+    return Boolean(db.prepare(`
+        SELECT 1
+        FROM site_staff_users
+        WHERE user_id = ?
+    `).get(String(userId)));
+}
+
+function getSiteAccessRole(userId) {
+    if (isCreatorUser(userId)) {
+        return SITE_ACCESS_ROLES.FOUNDER;
+    }
+
+    if (isSiteStaffUser(userId)) {
+        return SITE_ACCESS_ROLES.STAFF;
+    }
+
+    return SITE_ACCESS_ROLES.USER;
+}
+
+function getSiteAccess(userId) {
+    const role = getSiteAccessRole(userId);
+
+    return {
+        role,
+        isFounder: role === SITE_ACCESS_ROLES.FOUNDER,
+        isStaff: role === SITE_ACCESS_ROLES.STAFF,
+        canViewSitePanel: role === SITE_ACCESS_ROLES.FOUNDER || role === SITE_ACCESS_ROLES.STAFF,
+        canManagePremium: role === SITE_ACCESS_ROLES.FOUNDER,
+        canManageSiteStaff: role === SITE_ACCESS_ROLES.FOUNDER
+    };
+}
+
+function requireFounderAccess(session) {
+    if (!isCreatorUser(session?.user?.id)) {
+        throw createHttpError(403, 'Founder access is required.');
+    }
+}
+
+function requireSitePanelAccess(session) {
+    const access = getSiteAccess(session?.user?.id);
+
+    if (!access.canViewSitePanel) {
+        throw createHttpError(403, 'Site staff access is required.');
+    }
+
+    return access;
+}
+
+function listSiteStaffRows() {
+    return db.prepare(`
+        SELECT user_id, granted_by_user_id, created_at, updated_at
+        FROM site_staff_users
+        ORDER BY datetime(created_at) DESC, user_id ASC
+    `).all();
+}
+
+function grantSiteStaffUser(userId, grantedByUserId = null) {
+    const timestamp = nowIso();
+
+    db.prepare(`
+        INSERT INTO site_staff_users (user_id, granted_by_user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            granted_by_user_id = excluded.granted_by_user_id,
+            updated_at = excluded.updated_at
+    `).run(String(userId), grantedByUserId || null, timestamp, timestamp);
+}
+
+function revokeSiteStaffUser(userId) {
+    db.prepare(`
+        DELETE FROM site_staff_users
+        WHERE user_id = ?
+    `).run(String(userId));
 }
 
 function getUserSiteSettings(userId) {
@@ -1552,6 +1637,7 @@ async function getOauthGuilds(session) {
 async function getDashboardAccess(ctx, session, guildId) {
     const oauthGuilds = await getOauthGuilds(session);
     const oauthGuild = oauthGuilds.find(guild => guild.id === guildId) || null;
+    const siteAccess = getSiteAccess(session?.user?.id);
     const guild = ctx.client.guilds.cache.get(guildId)
         || await ctx.client.guilds.fetch(guildId).catch(() => null);
 
@@ -1565,12 +1651,13 @@ async function getDashboardAccess(ctx, session, guildId) {
     const member = await guild.members.fetch(session.user.id).catch(() => null);
     const oauthManage = userCanManageOauthGuild(oauthGuild);
     const commandRoleAccess = member ? ctx.helpers.hasCommandRoleAccess(member) : false;
+    const siteRoleAccess = siteAccess.canViewSitePanel;
 
-    if (!oauthManage && !commandRoleAccess) {
+    if (!oauthManage && !commandRoleAccess && !siteRoleAccess) {
         throw createHttpError(403, 'You do not have access to this server dashboard.');
     }
 
-    return { guild, member, oauthGuild, oauthManage, commandRoleAccess };
+    return { guild, member, oauthGuild, oauthManage, commandRoleAccess, siteRoleAccess, siteAccess };
 }
 
 function requireSession(req) {
@@ -1891,7 +1978,70 @@ async function manageCreatorPremiumAccess(ctx, session, body) {
     throw createHttpError(400, 'Invalid Premium target.');
 }
 
-async function buildCreatorPremiumOverview(ctx) {
+async function getSiteStaffUsers(ctx) {
+    const staff = [];
+
+    for (const row of listSiteStaffRows()) {
+        const profile = getUserProfile(row.user_id);
+        const user = profile
+            ? null
+            : await ctx.client.users.fetch(row.user_id).catch(() => null);
+
+        staff.push({
+            id: row.user_id,
+            username: profile?.username || user?.username || null,
+            globalName: profile?.globalName || user?.globalName || null,
+            tag: user?.tag || profile?.username || row.user_id,
+            avatar: profile?.avatar || user?.displayAvatarURL?.() || null,
+            grantedByUserId: row.granted_by_user_id || null,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        });
+    }
+
+    return staff;
+}
+
+async function manageCreatorSiteStaffAccess(ctx, session, body) {
+    const action = String(body.action || '').trim().toLowerCase();
+    const add = action === 'add' || action === 'ajouter';
+    const remove = action === 'remove' || action === 'retirer';
+    const userId = normalizeDiscordIdValue(body.userId || body.utilisateurId);
+
+    if (!add && !remove) {
+        throw createHttpError(400, 'Invalid site staff action.');
+    }
+
+    if (!userId) {
+        throw createHttpError(400, 'Invalid Discord user ID.');
+    }
+
+    if (isCreatorUser(userId)) {
+        throw createHttpError(400, 'Founder access cannot be managed as staff.');
+    }
+
+    if (add) {
+        const user = await ctx.client.users.fetch(userId).catch(() => null);
+
+        if (user) {
+            saveUserProfile({
+                id: user.id,
+                username: user.username,
+                globalName: user.globalName,
+                avatar: user.displayAvatarURL?.() || null
+            });
+        }
+
+        grantSiteStaffUser(userId, session.user.id);
+        return `Accès staff site ajouté pour ${user?.tag || userId}.`;
+    }
+
+    revokeSiteStaffUser(userId);
+    return `Accès staff site retiré pour ${userId}.`;
+}
+
+async function buildCreatorPremiumOverview(ctx, session = null) {
+    const siteAccess = getSiteAccess(session?.user?.id);
     const configuredAdvancedGuildIds = new Set(getDashboardAdvancedGuildIds());
     const manualPremiumGuildIds = getManualPremiumGuildIds();
     const premiumRolesByGuild = getManualPremiumRolesByGuild();
@@ -2033,7 +2183,9 @@ async function buildCreatorPremiumOverview(ctx) {
     return {
         generatedAt: new Date().toISOString(),
         canView: true,
+        access: siteAccess,
         summary,
+        staff: await getSiteStaffUsers(ctx),
         guilds: items
     };
 }
@@ -2415,7 +2567,8 @@ async function buildGuildState(ctx, guild, session = null) {
         ctx.helpers.getCustomEmbedQuota(guild.id, viewerMember),
         advanced
     );
-    const canViewGlobalAudit = isCreatorUser(session?.user?.id);
+    const siteAccess = getSiteAccess(session?.user?.id);
+    const canViewGlobalAudit = siteAccess.isFounder;
     const auditLimit = advanced || canViewGlobalAudit ? 50 : 10;
     const moderationCaseLimit = advanced || canViewGlobalAudit ? 25 : 10;
     const dossierHistoryLimit = advanced || canViewGlobalAudit ? 100 : 10;
@@ -2464,8 +2617,12 @@ async function buildGuildState(ctx, guild, session = null) {
         },
         advanced,
         creator: {
-            canViewPremiumOverview: canViewGlobalAudit
+            canViewPremiumOverview: siteAccess.canViewSitePanel,
+            canManagePremium: siteAccess.canManagePremium,
+            canManageSiteStaff: siteAccess.canManageSiteStaff,
+            role: siteAccess.role
         },
+        siteAccess,
         inviteUrl: getInviteUrl(ctx, guild.id),
         config: {
             ...config,
@@ -3754,13 +3911,19 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/session') {
+        const siteAccess = getSiteAccess(session.user.id);
+
         json(res, 200, {
             ok: true,
             user: session.user,
             csrfToken: session.csrfToken,
             settings: getUserSiteSettings(session.user.id),
+            siteAccess,
             creator: {
-                canViewPremiumOverview: isCreatorUser(session.user.id)
+                canViewPremiumOverview: siteAccess.canViewSitePanel,
+                canManagePremium: siteAccess.canManagePremium,
+                canManageSiteStaff: siteAccess.canManageSiteStaff,
+                role: siteAccess.role
             }
         });
         return;
@@ -3793,9 +3956,24 @@ async function handleApi(req, res, ctx, url) {
     if (req.method === 'GET' && url.pathname === '/api/guilds') {
         const oauthGuilds = await getOauthGuilds(session);
         const hasPremiumSubscription = await hasDashboardPremiumSubscription(ctx, session);
+        const siteAccess = getSiteAccess(session.user.id);
         const guilds = [];
+        const oauthGuildIds = new Set(oauthGuilds.map(guild => guild.id));
+        const guildCandidates = siteAccess.canViewSitePanel
+            ? [
+                ...oauthGuilds,
+                ...Array.from(ctx.client.guilds.cache.values())
+                    .filter(guild => !oauthGuildIds.has(guild.id))
+                    .map(guild => ({
+                        id: guild.id,
+                        name: guild.name,
+                        icon: guild.icon,
+                        permissions: '0'
+                    }))
+            ]
+            : oauthGuilds;
 
-        for (const oauthGuild of oauthGuilds) {
+        for (const oauthGuild of guildCandidates) {
             const installed = ctx.client.guilds.cache.has(oauthGuild.id);
             let memberAccess = false;
             let advanced = ctx.helpers.isAdvancedGuild(oauthGuild.id)
@@ -3808,7 +3986,7 @@ async function handleApi(req, res, ctx, url) {
                 advanced = await hasDashboardAdvancedAccess(ctx, oauthGuild.id, member, session);
             }
 
-            if (!userCanManageOauthGuild(oauthGuild) && !memberAccess) {
+            if (!userCanManageOauthGuild(oauthGuild) && !memberAccess && !siteAccess.canViewSitePanel) {
                 continue;
             }
 
@@ -3829,21 +4007,17 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/creator/premium-overview') {
-        if (!isCreatorUser(session.user.id)) {
-            throw createHttpError(403, 'Premium overview is reserved for the Sentinel creator.');
-        }
+        requireSitePanelAccess(session);
 
         json(res, 200, {
             ok: true,
-            overview: await buildCreatorPremiumOverview(ctx)
+            overview: await buildCreatorPremiumOverview(ctx, session)
         });
         return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/creator/premium-access') {
-        if (!isCreatorUser(session.user.id)) {
-            throw createHttpError(403, 'Premium management is reserved for the Sentinel creator.');
-        }
+        requireFounderAccess(session);
 
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
         const body = await parseBody(req);
@@ -3852,7 +4026,22 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             message,
-            overview: await buildCreatorPremiumOverview(ctx)
+            overview: await buildCreatorPremiumOverview(ctx, session)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/site-staff') {
+        requireFounderAccess(session);
+
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        const message = await manageCreatorSiteStaffAccess(ctx, session, body);
+
+        json(res, 200, {
+            ok: true,
+            message,
+            overview: await buildCreatorPremiumOverview(ctx, session)
         });
         return;
     }

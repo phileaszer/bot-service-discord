@@ -21,6 +21,7 @@ let expandedDossierId = null;
 let creatorOverview = null;
 let creatorOverviewLoading = false;
 let canViewPremiumOverview = false;
+let currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
 let dashboardHydrating = false;
 let selectedGuildPreview = null;
 let csrfToken = null;
@@ -365,6 +366,10 @@ function dashboardErrorMessage(input) {
       'You do not have permission for this moderation action.': 'Your Discord role cannot perform this moderation action.',
       'Sentinel does not have the required Discord permission.': 'Sentinel does not have the required Discord permission.',
       'This action is reserved for Sentinel Premium.': 'This action is reserved for Sentinel Premium.',
+      'Founder access is required.': 'Only the founder can use this command.',
+      'Site staff access is required.': 'This panel is reserved for the founder and site staff.',
+      'Invalid site staff action.': 'Invalid site staff action.',
+      'Founder access cannot be managed as staff.': 'The founder account already has full access.',
       'Invalid Discord user ID.': 'The Discord ID is not valid.',
       'Text channel not found.': 'Text channel not found.',
       'Role not found.': 'Discord role not found.',
@@ -422,7 +427,11 @@ function dashboardErrorMessage(input) {
       'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
       'Sentinel embed not found.': 'Choose the channel where the embed is posted, then paste the message ID. If the Discord message was deleted, its slot will be freed.',
       'This channel is not a Sentinel dossier.': 'Choose an open Sentinel ticket channel.',
-      'This action is reserved for Sentinel Premium.': 'This option is shown to prepare Premium, but it stays locked on free servers.'
+      'This action is reserved for Sentinel Premium.': 'This option is shown to prepare Premium, but it stays locked on free servers.',
+      'Founder access is required.': 'Only the founder can change this access.',
+      'Site staff access is required.': 'Ask the founder to add your Discord account as site staff.',
+      'Invalid site staff action.': 'Choose add or remove.',
+      'Founder access cannot be managed as staff.': 'The founder account already has full access.'
     };
     const base = translated[message] || message || 'Action failed.';
     const resolution = payloadFix || resolutionByMessage[message];
@@ -447,6 +456,10 @@ function dashboardErrorMessage(input) {
     'You do not have permission for this moderation action.': 'Tu n’as pas la permission Discord nécessaire pour cette sanction.',
     'Sentinel does not have the required Discord permission.': 'Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
     'This action is reserved for Sentinel Premium.': 'Cette action est réservée à Sentinel Premium.',
+    'Founder access is required.': 'Seul le fondateur peut faire cette action.',
+    'Site staff access is required.': 'Ce panneau est réservé au fondateur et au staff site.',
+    'Invalid site staff action.': 'Action staff site invalide.',
+    'Founder access cannot be managed as staff.': 'Le compte fondateur possède déjà l’accès complet.',
     'Invalid Discord user ID.': 'L’ID Discord indiqué n’est pas valide.',
     'Text channel not found.': 'Salon textuel introuvable.',
     'Role not found.': 'Rôle Discord introuvable.',
@@ -507,7 +520,11 @@ function dashboardErrorMessage(input) {
     'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
     'Sentinel embed not found.': 'Choisis le salon où se trouve l’embed, puis colle l’ID du message. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This channel is not a Sentinel dossier.': 'Choisis un salon de ticket Sentinel ouvert.',
-    'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.'
+    'This action is reserved for Sentinel Premium.': 'Cette option est visible pour préparer le Premium, mais elle reste bloquée sur les serveurs gratuits.',
+    'Founder access is required.': 'Connecte-toi avec le compte Discord fondateur pour modifier cet accès.',
+    'Site staff access is required.': 'Demande au fondateur d’ajouter ton compte Discord au staff site.',
+    'Invalid site staff action.': 'Choisis ajouter ou retirer.',
+    'Founder access cannot be managed as staff.': 'Le compte fondateur n’a pas besoin d’être ajouté comme staff.'
   };
   const resolution = payloadFix || resolutionByMessage[message];
 
@@ -3680,6 +3697,7 @@ function premiumNameList(items = [], emptyText = 'Aucun', options = {}) {
 
   const target = options.target || null;
   const guildId = options.guildId || null;
+  const canManage = canManageFounderPanel();
 
   return `
     <ul class="compact-list founder-premium-list">
@@ -3689,7 +3707,7 @@ function premiumNameList(items = [], emptyText = 'Aucun', options = {}) {
             <strong>${escapeHtml(item.name || item.tag || item.username || item.id)}</strong>
             <small><code>${escapeHtml(item.id)}</code>${item.inGuild === false ? ' - hors serveur' : ''}${item.exists === false ? ' - supprimé sur Discord' : ''}</small>
           </span>
-          ${target ? `
+          ${target && canManage ? `
             <button
               class="button button-small button-ghost"
               type="button"
@@ -3705,6 +3723,56 @@ function premiumNameList(items = [], emptyText = 'Aucun', options = {}) {
   `;
 }
 
+function siteStaffList(overview) {
+  const staff = overview?.staff || [];
+
+  if (!staff.length) {
+    return '<p class="muted">Aucun accès staff site actif.</p>';
+  }
+
+  return `
+    <ul class="compact-list founder-premium-list site-staff-list">
+      ${staff.map((item) => `
+        <li>
+          <span>
+            <strong>${escapeHtml(item.globalName || item.tag || item.username || item.id)}</strong>
+            <small><code>${escapeHtml(item.id)}</code>${item.createdAt ? ` - depuis ${escapeHtml(formatAuditDate(item.createdAt))}` : ''}</small>
+          </span>
+          ${canManageFounderPanel() ? `
+            <button
+              class="button button-small button-ghost"
+              type="button"
+              data-creator-staff-click
+              data-action="remove"
+              data-user-id="${escapeHtml(item.id)}"
+            >Retirer</button>
+          ` : ''}
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+function creatorStaffManagePanel(overview) {
+  return `
+    <div class="founder-console-note">
+      <strong>Accès de régie</strong>
+      <span>Le grade staff site est lié au compte Discord. Il peut consulter la régie, mais seul le fondateur peut accorder Premium ou modifier les accès staff.</span>
+    </div>
+    ${canManageFounderPanel() ? `
+      <form class="creator-premium-form creator-staff-form" data-creator-staff-form>
+        <input type="hidden" name="action" value="add">
+        ${labelHelp('Ajouter un staff site', 'Seul le fondateur peut donner ce grade. Utilise l’ID Discord numérique complet du compte à autoriser.')}
+        <div class="creator-premium-row">
+          <input name="userId" placeholder="ID utilisateur Discord" required>
+          <button class="button button-small" type="submit">Ajouter staff</button>
+        </div>
+      </form>
+    ` : ''}
+    ${siteStaffList(overview)}
+  `;
+}
+
 function creatorPremiumGuildOptions(overview) {
   return (overview?.guilds || [])
     .map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`)
@@ -3713,6 +3781,7 @@ function creatorPremiumGuildOptions(overview) {
 
 function creatorPremiumManagePanel(overview) {
   const guildOptions = creatorPremiumGuildOptions(overview);
+  const canManage = canManageFounderPanel();
 
   return `
     <datalist id="creator-premium-guilds">
@@ -3720,8 +3789,11 @@ function creatorPremiumManagePanel(overview) {
     </datalist>
     <div class="founder-console-note">
       <strong>Attribution rapide</strong>
-      <span>Accorde ou retire un accès Premium à un serveur entier, à un grade d’un serveur, ou à une personne précise.</span>
+      <span>${canManage
+        ? 'Accorde ou retire un accès Premium à un serveur entier, à un grade d’un serveur, ou à une personne précise.'
+        : 'Vue lecture seule : les attributions Premium restent réservées au fondateur.'}</span>
     </div>
+    ${canManage ? `
     <div class="creator-premium-actions">
       <form class="creator-premium-form" data-creator-premium-form>
         <input type="hidden" name="target" value="server">
@@ -3762,6 +3834,7 @@ function creatorPremiumManagePanel(overview) {
         </div>
       </form>
     </div>
+    ` : ''}
   `;
 }
 
@@ -3804,7 +3877,9 @@ function founderPremiumGuildRows(overview) {
               <td>${premiumNameList(guild.premiumRoles, 'Aucun grade Premium', { target: 'role', guildId: guild.id })}</td>
               <td>${premiumNameList(guild.premiumUsers, 'Aucune personne Premium', { target: 'user' })}</td>
               <td>
-                ${guild.configuredPremium && !guild.manualPremium
+                ${!canManageFounderPanel()
+                  ? '<span class="muted">Lecture seule</span>'
+                  : guild.configuredPremium && !guild.manualPremium
                   ? '<span class="muted">Accès fixe</span>'
                   : `<button
                       class="button button-small ${guild.manualPremium ? 'button-ghost' : ''}"
@@ -3829,6 +3904,7 @@ function renderFounderPremiumPanel() {
   }
 
   const overview = creatorOverview;
+  const access = overview?.access || currentSiteAccess || currentState?.siteAccess || {};
   const summary = overview?.summary || {
     guildCount: 0,
     serverPremiumCount: 0,
@@ -3842,10 +3918,13 @@ function renderFounderPremiumPanel() {
     <section class="dashboard-panel module-panel founder-premium-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Console</p>
-          <h2>Console fondatrice</h2>
-          <p class="muted">Vue privée des accès Premium : serveurs, grades et personnes.</p>
+          <p class="eyebrow">Régie Sentinel</p>
+          <h2>${access?.canManageSiteStaff ? 'Console fondateur' : 'Console staff'}</h2>
+          <p class="muted">${access?.canManageSiteStaff
+            ? 'Vue privée des accès site, des staffs autorisés et des accès Premium.'
+            : 'Vue privée de régie : lecture des accès et suivi global sans commandes fondatrices.'}</p>
         </div>
+        <span class="status-badge is-site">${escapeHtml(siteAccessLabel(access))}</span>
         <button class="button button-small button-ghost" type="button" data-refresh-creator-premium ${creatorOverviewLoading ? 'disabled' : ''}>
           ${creatorOverviewLoading ? 'Lecture...' : 'Relire'}
         </button>
@@ -3882,9 +3961,10 @@ function renderFounderPremiumPanel() {
           <small>accès Premium manuel</small>
         </article>
       </div>
+      ${creatorStaffManagePanel(overview)}
       ${creatorPremiumManagePanel(overview)}
       ${creatorOverviewLoading && !overview
-        ? '<p class="muted">Lecture des accès Premium...</p>'
+        ? '<p class="muted">Lecture de la régie Sentinel...</p>'
         : founderPremiumGuildRows(overview)}
       ${overview?.generatedAt ? `<p class="muted">Dernière lecture : ${escapeHtml(formatAuditDate(overview.generatedAt))}</p>` : ''}
     </section>
@@ -3960,10 +4040,10 @@ const DASHBOARD_TABS = [
   },
   {
     id: 'founder',
-    label: 'Fondatrice',
-    eyebrow: 'Premium',
-    title: 'Vue Premium',
-    description: 'Voir qui a accès au Premium'
+    label: 'Régie',
+    eyebrow: 'Accès site',
+    title: 'Régie Sentinel',
+    description: 'Fonda, staff et accès Premium'
   }
 ];
 
@@ -3981,13 +4061,36 @@ const DASHBOARD_TAB_GROUPS = [
     tabs: ['audit']
   },
   {
-    label: 'Fondatrice',
+    label: 'Régie',
     tabs: ['founder']
   }
 ];
 
 function canShowFounderTab(state = currentState) {
-  return Boolean(canViewPremiumOverview || state?.creator?.canViewPremiumOverview || creatorOverview?.canView);
+  return Boolean(
+    canViewPremiumOverview
+    || currentSiteAccess?.canViewSitePanel
+    || state?.creator?.canViewPremiumOverview
+    || state?.siteAccess?.canViewSitePanel
+    || creatorOverview?.canView
+  );
+}
+
+function canManageFounderPanel() {
+  return Boolean(
+    currentSiteAccess?.canManagePremium
+    || currentSiteAccess?.canManageSiteStaff
+    || creatorOverview?.access?.canManagePremium
+    || creatorOverview?.access?.canManageSiteStaff
+    || currentState?.siteAccess?.canManagePremium
+    || currentState?.siteAccess?.canManageSiteStaff
+  );
+}
+
+function siteAccessLabel(access = currentSiteAccess) {
+  if (access?.isFounder || access?.role === 'founder') return 'Fondateur';
+  if (access?.isStaff || access?.role === 'staff') return 'Régie staff';
+  return 'Utilisateur';
 }
 
 function availableDashboardTabs(state = currentState) {
@@ -4443,6 +4546,7 @@ async function refreshGuildState() {
   if (!selectedGuildId) return;
   const payload = await api(`/api/guilds/${selectedGuildId}/state`);
   currentState = payload.state;
+  currentSiteAccess = currentState.siteAccess || currentSiteAccess;
   canViewPremiumOverview = Boolean(canViewPremiumOverview || currentState.creator?.canViewPremiumOverview);
   dashboardHydrating = false;
   rememberCurrentGuildPreview();
@@ -4459,6 +4563,7 @@ async function loadCreatorPremiumOverview(button = null, { silent = false } = {}
   try {
     const payload = await api('/api/creator/premium-overview');
     creatorOverview = payload.overview || null;
+    currentSiteAccess = creatorOverview?.access || currentSiteAccess;
     canViewPremiumOverview = Boolean(creatorOverview?.canView);
 
     if (!silent) {
@@ -4468,6 +4573,7 @@ async function loadCreatorPremiumOverview(button = null, { silent = false } = {}
     if (error.status === 403) {
       canViewPremiumOverview = false;
       creatorOverview = null;
+      currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
     }
 
     if (!silent) {
@@ -4492,6 +4598,7 @@ async function manageCreatorPremiumAccess(data, button = null) {
     });
 
     creatorOverview = payload.overview || creatorOverview;
+    currentSiteAccess = creatorOverview?.access || currentSiteAccess;
     canViewPremiumOverview = Boolean(creatorOverview?.canView);
 
     await loadGuilds().catch(() => {});
@@ -4505,6 +4612,29 @@ async function manageCreatorPremiumAccess(data, button = null) {
     }
 
     toast(payload.message || 'Accès Premium mis à jour.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function manageCreatorSiteStaffAccess(data, button = null) {
+  if (!currentSiteAccess?.canManageSiteStaff) return;
+
+  setLoading(button, true);
+
+  try {
+    const payload = await api('/api/creator/site-staff', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+
+    creatorOverview = payload.overview || creatorOverview;
+    currentSiteAccess = creatorOverview?.access || currentSiteAccess;
+    canViewPremiumOverview = Boolean(creatorOverview?.canView);
+    renderDashboard();
+    toast(payload.message || 'Accès staff site mis à jour.');
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
@@ -4646,6 +4776,23 @@ function attachDashboardHandlers() {
         target: button.dataset.target,
         guildId: button.dataset.guildId || '',
         roleId: button.dataset.roleId || '',
+        userId: button.dataset.userId || ''
+      }, button);
+    });
+  });
+
+  $$('[data-creator-staff-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = $('button[type="submit"]', form);
+      manageCreatorSiteStaffAccess(formData(form), button);
+    });
+  });
+
+  $$('[data-creator-staff-click]').forEach((button) => {
+    button.addEventListener('click', () => {
+      manageCreatorSiteStaffAccess({
+        action: button.dataset.action,
         userId: button.dataset.userId || ''
       }, button);
     });
@@ -4867,6 +5014,7 @@ async function bootstrap() {
     currentUser = session.user;
     csrfToken = session.csrfToken || csrfToken;
     currentSettings = session.settings || null;
+    currentSiteAccess = session.siteAccess || currentSiteAccess;
     canViewPremiumOverview = Boolean(session.creator?.canViewPremiumOverview);
     renderUser();
     if (canViewPremiumOverview) {
@@ -4902,6 +5050,7 @@ async function bootstrap() {
     creatorOverview = null;
     creatorOverviewLoading = false;
     canViewPremiumOverview = false;
+    currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
     dashboardHydrating = false;
     renderUser();
     renderGuilds();
@@ -5011,6 +5160,7 @@ $('[data-logout]')?.addEventListener('click', async () => {
   creatorOverview = null;
   creatorOverviewLoading = false;
   canViewPremiumOverview = false;
+  currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
   csrfToken = null;
   dashboardHydrating = false;
   dossierFilters = {};
