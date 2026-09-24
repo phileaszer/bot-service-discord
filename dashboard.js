@@ -2768,7 +2768,22 @@ async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
             guild
         })
         : null;
+    const payrollArchives = ctx.helpers.getWeeklyPayrollArchives
+        ? ctx.helpers.getWeeklyPayrollArchives(guild.id, {
+            language: ctx.helpers.getGuildLanguage(guild.id),
+            guild,
+            limit: 52
+        })
+        : { items: [] };
     const payrollLine = payroll?.items?.find(item => item.userId === userId) || null;
+    const payrollHistory = (payrollArchives.items || [])
+        .map(archive => ({
+            weekStart: archive.weekStart,
+            weekEnd: archive.weekEnd,
+            line: archive.items.find(item => item.userId === userId) || null
+        }))
+        .filter(item => item.line)
+        .slice(0, 12);
     const actionsByTarget = getDashboardAuditLogs({ guildId: guild.id, targetId: userId, limit: 10 });
     const actionsByActor = getDashboardAuditLogs({ guildId: guild.id, actorUserId: userId, limit: 10 });
     const actions = Array.from(
@@ -2820,7 +2835,14 @@ async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
                         paidAt: payrollLine.paidAt,
                         paidByUserId: payrollLine.paidByUserId
                     }
-                    : null
+                    : null,
+                history: payrollHistory.map(item => ({
+                    weekStart: item.weekStart,
+                    weekEnd: item.weekEnd,
+                    amountLabel: item.line.amountLabel,
+                    paid: item.line.paid,
+                    updatedAt: item.line.updatedAt
+                }))
             }
             : null,
         actions
@@ -2940,6 +2962,13 @@ async function buildGuildState(ctx, guild, session = null) {
         payroll: ctx.helpers.getWeeklyPayroll
             ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language, guild })
             : null,
+        payrollArchives: ctx.helpers.getWeeklyPayrollArchives
+            ? ctx.helpers.getWeeklyPayrollArchives(guild.id, {
+                language: config.language,
+                guild,
+                limit: 52
+            })
+            : { limit: 52, totalCount: 0, hasMore: false, items: [] },
         personalService: viewerUserId
             ? {
                 userId: viewerUserId,
@@ -4083,19 +4112,55 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             language
         });
 
-        return `Paie RP archivee pour ${archive.weekStart} - ${archive.weekEnd}.`;
+        return archive.replaced
+            ? `Archive de paie mise a jour pour ${archive.weekStart} - ${archive.weekEnd}.`
+            : `Paie RP archivee pour ${archive.weekStart} - ${archive.weekEnd}.`;
     }
 
     if (action === 'toggle-payroll-paid') {
         requireCommandAccess(ctx, member);
 
         const userId = normalizeUserId(ctx, body.userId);
-        const paid = String(body.paid || '').toLowerCase() === 'true' || body.paid === true || body.paid === '1';
-        ctx.helpers.setWeeklyPaymentStatus(guild.id, userId, body.weekStart, paid, member?.id || null);
+        const weekStart = String(body.weekStart || '');
+        const weekDate = new Date(`${weekStart}T00:00:00.000Z`);
+
+        if (
+            !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)
+            || Number.isNaN(weekDate.getTime())
+            || weekDate.toISOString().slice(0, 10) !== weekStart
+        ) {
+            throw createHttpError(400, 'Invalid payroll week.');
+        }
+
+        const archive = ctx.helpers.getWeeklyPayrollArchive
+            ? ctx.helpers.getWeeklyPayrollArchive(guild.id, weekStart, { guild, language })
+            : null;
+        const livePayroll = ctx.helpers.getWeeklyPayroll(guild.id, {
+            guild,
+            language,
+            weekStart
+        });
+        const line = archive?.items?.find(item => item.userId === userId)
+            || livePayroll?.items?.find(item => item.userId === userId);
+
+        if (!line) {
+            throw createHttpError(404, 'Payroll line not found.');
+        }
+
+        const paidInput = typeof body.paid === 'boolean'
+            ? String(body.paid)
+            : String(body.paid || '').toLowerCase();
+
+        if (!['true', 'false', '1', '0'].includes(paidInput)) {
+            throw createHttpError(400, 'Invalid payroll status.');
+        }
+
+        const paid = paidInput === 'true' || paidInput === '1';
+        ctx.helpers.setWeeklyPaymentStatus(guild.id, userId, weekStart, paid, member?.id || null);
 
         return paid
-            ? `Paie RP marquee comme payee pour ${userId}.`
-            : `Paie RP remise a payer pour ${userId}.`;
+            ? `Paie RP marquee comme payee pour ${userId}, semaine du ${weekStart}.`
+            : `Paie RP remise a payer pour ${userId}, semaine du ${weekStart}.`;
     }
 
     if (action === 'start-service') {
@@ -4396,6 +4461,26 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    const payrollArchivesMatch = /^\/api\/guilds\/(\d{17,20})\/payroll-archives$/.exec(url.pathname);
+    if (req.method === 'GET' && payrollArchivesMatch) {
+        const { guild } = await getDashboardAccess(ctx, session, payrollArchivesMatch[1]);
+        const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 52, 1), 52);
+        const offset = Math.min(Math.max(Number(url.searchParams.get('offset')) || 0, 0), 10000);
+
+        json(res, 200, {
+            ok: true,
+            payrollArchives: ctx.helpers.getWeeklyPayrollArchives
+                ? ctx.helpers.getWeeklyPayrollArchives(guild.id, {
+                    language: ctx.helpers.getGuildLanguage(guild.id),
+                    guild,
+                    limit,
+                    offset
+                })
+                : { limit, offset, totalCount: 0, hasMore: false, items: [] }
+        });
+        return;
+    }
+
     const userMatch = /^\/api\/guilds\/(\d{17,20})\/users\/([^/]+)$/.exec(url.pathname);
     if (req.method === 'GET' && userMatch) {
         const { guild } = await getDashboardAccess(ctx, session, userMatch[1]);
@@ -4498,10 +4583,19 @@ async function handleApi(req, res, ctx, url) {
             throw error;
         }
 
+        const state = await buildGuildState(ctx, guild, session);
+        const payrollArchive = body.action === 'toggle-payroll-paid' && ctx.helpers.getWeeklyPayrollArchive
+            ? ctx.helpers.getWeeklyPayrollArchive(guild.id, body.weekStart, {
+                language: ctx.helpers.getGuildLanguage(guild.id),
+                guild
+            })
+            : null;
+
         json(res, 200, {
             ok: true,
             message,
-            state: await buildGuildState(ctx, guild, session)
+            state,
+            payrollArchive
         });
         return;
     }

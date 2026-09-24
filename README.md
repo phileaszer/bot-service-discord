@@ -15,7 +15,7 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 ## Ce que fait Sentinel
 
 - Suivi des services : prise et fin de service, temps total, historique personnel, agents en service et classements.
-- Paie RP hebdomadaire : montant par heure, calcul estimé et suivi payé/non payé depuis le dashboard.
+- Paie RP hebdomadaire : montant par heure, calcul estimé, suivi payé/non payé, archives consultables et journal des règlements depuis le dashboard.
 - Modération : rôle automatique à l'arrivée, avertissements, timeout, expulsion, ban par ID, purge et consultation des sanctions.
 - Dossiers Sentinel : système de tickets privés pour le support, les signalements, les recrutements, les partenariats et les autres demandes.
 - Annonces : création et modification d'embeds publiés sous l'identité de Sentinel.
@@ -93,6 +93,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/en-service` | `/on-duty` | Voir les agents en service |
 | `/top-service` | `/top-service` | Voir le classement global |
 | `/paie-semaine` | `/weekly-payroll` | Voir la paie RP de la semaine |
+| `/paie-historique` | `/payroll-history` | Retrouver les archives et le suivi des anciennes paies RP |
 | `/paie-archive` | `/payroll-archive` | Archiver la paie RP de la semaine |
 | `/reset-heures` | `/reset-hours` | Remettre les heures d'une personne à zéro |
 | `/avertir` | `/warn` | Ajouter un avertissement |

@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-24-staff-discord-role-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-24-payroll-history-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -799,6 +799,8 @@ function resolveCommandName(commandName) {
         'top-week': 'top-semaine',
         'paie-semaine': 'paie-semaine',
         'weekly-payroll': 'paie-semaine',
+        'paie-historique': 'paie-historique',
+        'payroll-history': 'paie-historique',
         ping: 'ping',
         diagnostic: 'diagnostic',
         'sync-service': 'sync-service',
@@ -3503,8 +3505,17 @@ function getWeekStartDate(value = new Date()) {
     return utcDate.toISOString().slice(0, 10);
 }
 
+function isValidDateKey(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+        return false;
+    }
+
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function getWeekRange(weekStart = null) {
-    const normalizedWeekStart = /^\d{4}-\d{2}-\d{2}$/.test(String(weekStart || ''))
+    const normalizedWeekStart = isValidDateKey(weekStart)
         ? String(weekStart)
         : getWeekStartDate();
     const startDate = new Date(`${normalizedWeekStart}T00:00:00.000Z`);
@@ -3734,38 +3745,72 @@ function setWeeklyPaymentStatus(guildId, userId, weekStart, paid, paidByUserId =
     const range = getWeekRange(weekStart);
     const timestamp = new Date().toISOString();
     const paidValue = paid ? 1 : 0;
-
-    db.prepare(`
-        INSERT INTO weekly_payments (
-            guild_id,
-            user_id,
-            week_start,
-            paid,
-            paid_by_user_id,
-            paid_at,
-            updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(guild_id, user_id, week_start) DO UPDATE SET
-            paid = excluded.paid,
-            paid_by_user_id = excluded.paid_by_user_id,
-            paid_at = excluded.paid_at,
-            updated_at = excluded.updated_at
-    `).run(
-        guildId,
-        userId,
-        range.weekStart,
-        paidValue,
-        paidValue ? paidByUserId : null,
-        paidValue ? timestamp : null,
-        timestamp
-    );
-
-    return db.prepare(`
+    const existing = db.prepare(`
         SELECT guild_id, user_id, week_start, paid, paid_by_user_id, paid_at, updated_at
         FROM weekly_payments
         WHERE guild_id = ? AND user_id = ? AND week_start = ?
     `).get(guildId, userId, range.weekStart);
+
+    if (existing && Boolean(existing.paid) === Boolean(paidValue)) {
+        return existing;
+    }
+
+    return db.transaction(() => {
+        db.prepare(`
+            INSERT INTO weekly_payments (
+                guild_id,
+                user_id,
+                week_start,
+                paid,
+                paid_by_user_id,
+                paid_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(guild_id, user_id, week_start) DO UPDATE SET
+                paid = excluded.paid,
+                paid_by_user_id = excluded.paid_by_user_id,
+                paid_at = excluded.paid_at,
+                updated_at = excluded.updated_at
+        `).run(
+            guildId,
+            userId,
+            range.weekStart,
+            paidValue,
+            paidValue ? paidByUserId : null,
+            paidValue ? timestamp : null,
+            timestamp
+        );
+
+        db.prepare(`
+            INSERT INTO weekly_payment_events (
+                guild_id,
+                user_id,
+                week_start,
+                paid,
+                changed_by_user_id,
+                changed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(
+            guildId,
+            userId,
+            range.weekStart,
+            paidValue,
+            paidByUserId || null,
+            timestamp
+        );
+
+        const payment = db.prepare(`
+            SELECT guild_id, user_id, week_start, paid, paid_by_user_id, paid_at, updated_at
+            FROM weekly_payments
+            WHERE guild_id = ? AND user_id = ? AND week_start = ?
+        `).get(guildId, userId, range.weekStart);
+
+        syncPayrollArchivePaymentStatus(guildId, userId, range.weekStart, payment);
+
+        return payment;
+    })();
 }
 
 function formatPayAmount(amount, currency = DEFAULT_PAY_CURRENCY, language = 'fr') {
@@ -3887,6 +3932,7 @@ function getWeeklyPayroll(guildId, options = {}) {
     const items = Array.from(totalsByUser.entries())
         .map(([userId, totalTime]) => {
             const payment = paymentsByUser.get(userId) || {};
+            const member = options.guild?.members?.cache?.get(userId) || null;
             const roleRate = getPayrollRoleForUser(options.guild, userId, roleSettings);
             const hourlyRate = roleRate?.hourlyRate ?? settings.hourlyRate;
             const baseAmount = (totalTime / (60 * 60 * 1000)) * hourlyRate;
@@ -3896,6 +3942,9 @@ function getWeeklyPayroll(guildId, options = {}) {
 
             return {
                 userId,
+                displayName: member?.displayName || member?.user?.globalName || member?.user?.username || null,
+                username: member?.user?.username || null,
+                avatar: member?.displayAvatarURL?.() || member?.user?.displayAvatarURL?.() || null,
                 totalTime,
                 totalTimeLabel: formatDuration(totalTime),
                 hourlyRate,
@@ -3962,12 +4011,21 @@ function archiveWeeklyPayroll(guildId, archivedByUserId, options = {}) {
         language
     });
     const timestamp = new Date().toISOString();
+    const existingArchive = db.prepare(`
+        SELECT archived_at
+        FROM weekly_payroll_archives
+        WHERE guild_id = ? AND week_start = ?
+        LIMIT 1
+    `).get(guildId, payroll.weekStart);
     const details = {
         settings: payroll.settings,
         roleSettings: payroll.roleSettings,
         totals: payroll.totals,
         items: payroll.items.map(item => ({
             userId: item.userId,
+            displayName: item.displayName,
+            username: item.username,
+            avatar: item.avatar,
             totalTime: item.totalTime,
             totalTimeLabel: item.totalTimeLabel,
             hourlyRate: item.hourlyRate,
@@ -4026,8 +4084,282 @@ function archiveWeeklyPayroll(guildId, archivedByUserId, options = {}) {
         weekStart: payroll.weekStart,
         weekEnd: payroll.weekEnd,
         archivedAt: timestamp,
+        replaced: Boolean(existingArchive),
+        previousArchivedAt: existingArchive?.archived_at || null,
         totals: payroll.totals
     };
+}
+
+function parsePayrollArchiveDetails(value) {
+    try {
+        const details = JSON.parse(value || '{}');
+        return details && typeof details === 'object' ? details : {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function getPayrollIdentity(guild, userId, fallback = {}) {
+    const member = guild?.members?.cache?.get(String(userId)) || null;
+
+    return {
+        displayName: fallback.displayName
+            || member?.displayName
+            || member?.user?.globalName
+            || member?.user?.username
+            || null,
+        username: fallback.username || member?.user?.username || null,
+        avatar: fallback.avatar
+            || member?.displayAvatarURL?.()
+            || member?.user?.displayAvatarURL?.()
+            || null
+    };
+}
+
+function hydrateWeeklyPayrollArchiveRows(guildId, rows, options = {}) {
+    if (!rows.length) {
+        return [];
+    }
+
+    const language = options.language || getGuildLanguage(guildId);
+    const weekStarts = rows.map(row => row.week_start);
+    const placeholders = weekStarts.map(() => '?').join(', ');
+    const paymentRows = db.prepare(`
+        SELECT user_id, week_start, paid, paid_by_user_id, paid_at, updated_at
+        FROM weekly_payments
+        WHERE guild_id = ? AND week_start IN (${placeholders})
+    `).all(guildId, ...weekStarts);
+    const eventRows = db.prepare(`
+        SELECT id, user_id, week_start, paid, changed_by_user_id, changed_at
+        FROM weekly_payment_events
+        WHERE guild_id = ? AND week_start IN (${placeholders})
+        ORDER BY datetime(changed_at) DESC, id DESC
+        LIMIT 1000
+    `).all(guildId, ...weekStarts);
+    const paymentsByKey = new Map(paymentRows.map(row => [`${row.week_start}:${row.user_id}`, row]));
+    const eventsByWeek = new Map();
+
+    for (const event of eventRows) {
+        const list = eventsByWeek.get(event.week_start) || [];
+        list.push(event);
+        eventsByWeek.set(event.week_start, list);
+    }
+
+    return rows.map(row => {
+        const details = parsePayrollArchiveDetails(row.details_json);
+        const currency = details.settings?.currency || DEFAULT_PAY_CURRENCY;
+        const weekEvents = eventsByWeek.get(row.week_start) || [];
+        const latestEventByUser = new Map();
+        const eventCountByUser = new Map();
+
+        for (const event of weekEvents) {
+            if (!latestEventByUser.has(event.user_id)) {
+                latestEventByUser.set(event.user_id, event);
+            }
+
+            eventCountByUser.set(event.user_id, (eventCountByUser.get(event.user_id) || 0) + 1);
+        }
+
+        const items = (Array.isArray(details.items) ? details.items : []).map(item => {
+            const userId = String(item.userId || '');
+            const payment = paymentsByKey.get(`${row.week_start}:${userId}`) || null;
+            const latestEvent = latestEventByUser.get(userId) || null;
+            const identity = getPayrollIdentity(options.guild, userId, item);
+            const totalTime = Number(item.totalTime) || 0;
+            const hourlyRate = Number(item.hourlyRate) || 0;
+            const baseAmount = Number(item.baseAmount) || 0;
+            const adjustmentAmount = Number(item.adjustmentAmount) || 0;
+            const amount = Number(item.amount) || 0;
+            const paid = payment ? Boolean(payment.paid) : Boolean(item.paid);
+
+            return {
+                userId,
+                ...identity,
+                totalTime,
+                totalTimeLabel: item.totalTimeLabel || formatDuration(totalTime),
+                hourlyRate,
+                hourlyRateLabel: formatPayAmount(hourlyRate, currency, language),
+                payrollRoleId: item.payrollRoleId || null,
+                payrollRoleName: item.payrollRoleName || null,
+                baseAmount,
+                baseAmountLabel: formatPayAmount(baseAmount, currency, language),
+                adjustmentAmount,
+                adjustmentAmountLabel: formatSignedPayAmount(adjustmentAmount, currency, language),
+                amount,
+                amountLabel: formatPayAmount(amount, currency, language),
+                paid,
+                paidByUserId: payment?.paid_by_user_id || item.paidByUserId || null,
+                paidAt: payment?.paid_at || item.paidAt || null,
+                updatedAt: payment?.updated_at || latestEvent?.changed_at || item.updatedAt || null,
+                statusChangedByUserId: latestEvent?.changed_by_user_id || null,
+                statusEventCount: eventCountByUser.get(userId) || 0
+            };
+        });
+        const hasDetailedItems = items.length > 0;
+        const totalTime = hasDetailedItems
+            ? items.reduce((sum, item) => sum + item.totalTime, 0)
+            : Number(row.total_time) || 0;
+        const totalAmount = hasDetailedItems
+            ? items.reduce((sum, item) => sum + item.amount, 0)
+            : Number(row.total_amount) || 0;
+        const paidAmount = hasDetailedItems
+            ? items.filter(item => item.paid).reduce((sum, item) => sum + item.amount, 0)
+            : Number(row.paid_amount) || 0;
+        const paidCount = hasDetailedItems
+            ? items.filter(item => item.paid).length
+            : Number(details.totals?.paidCount) || 0;
+        const userCount = hasDetailedItems ? items.length : Number(row.user_count) || 0;
+        const unpaidCount = hasDetailedItems
+            ? items.length - paidCount
+            : Number(details.totals?.unpaidCount) || Math.max(0, userCount - paidCount);
+        const adjustmentAmount = items.reduce((sum, item) => sum + item.adjustmentAmount, 0);
+        const events = weekEvents.slice(0, 25).map(event => ({
+            id: event.id,
+            userId: event.user_id,
+            userDisplayName: getPayrollIdentity(options.guild, event.user_id).displayName,
+            paid: Boolean(event.paid),
+            changedByUserId: event.changed_by_user_id || null,
+            changedByDisplayName: event.changed_by_user_id
+                ? getPayrollIdentity(options.guild, event.changed_by_user_id).displayName
+                : null,
+            changedAt: event.changed_at
+        }));
+        const archivedByIdentity = row.archived_by_user_id
+            ? getPayrollIdentity(options.guild, row.archived_by_user_id)
+            : {};
+
+        return {
+            weekStart: row.week_start,
+            weekEnd: row.week_end,
+            archivedAt: row.archived_at,
+            archivedByUserId: row.archived_by_user_id || null,
+            archivedByDisplayName: archivedByIdentity.displayName || null,
+            settings: {
+                ...(details.settings || {}),
+                currency
+            },
+            totals: {
+                userCount,
+                totalTime,
+                totalTimeLabel: formatDuration(totalTime),
+                totalAmount,
+                totalAmountLabel: formatPayAmount(totalAmount, currency, language),
+                paidAmount,
+                paidAmountLabel: formatPayAmount(paidAmount, currency, language),
+                unpaidAmount: totalAmount - paidAmount,
+                unpaidAmountLabel: formatPayAmount(totalAmount - paidAmount, currency, language),
+                adjustmentAmount,
+                adjustmentAmountLabel: formatSignedPayAmount(adjustmentAmount, currency, language),
+                paidCount,
+                unpaidCount,
+                completionPercent: userCount ? Math.round((paidCount / userCount) * 100) : 0
+            },
+            items,
+            events,
+            paymentEventCount: weekEvents.length,
+            lastActivityAt: weekEvents[0]?.changed_at || row.archived_at
+        };
+    });
+}
+
+function getWeeklyPayrollArchives(guildId, options = {}) {
+    const limit = Math.min(Math.max(Number(options.limit) || 52, 1), 104);
+    const offset = Math.min(Math.max(Number(options.offset) || 0, 0), 10000);
+    const rows = db.prepare(`
+        SELECT guild_id, week_start, week_end, archived_by_user_id, archived_at,
+               user_count, total_time, total_amount, paid_amount, unpaid_amount, details_json
+        FROM weekly_payroll_archives
+        WHERE guild_id = ?
+        ORDER BY week_start DESC
+        LIMIT ? OFFSET ?
+    `).all(guildId, limit, offset);
+    const countRow = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM weekly_payroll_archives
+        WHERE guild_id = ?
+    `).get(guildId);
+    const items = hydrateWeeklyPayrollArchiveRows(guildId, rows, options);
+    const totalCount = Number(countRow?.count) || 0;
+
+    return {
+        limit,
+        offset,
+        totalCount,
+        hasMore: totalCount > offset + items.length,
+        items
+    };
+}
+
+function getWeeklyPayrollArchive(guildId, weekStart, options = {}) {
+    if (!isValidDateKey(weekStart)) {
+        return null;
+    }
+
+    const row = db.prepare(`
+        SELECT guild_id, week_start, week_end, archived_by_user_id, archived_at,
+               user_count, total_time, total_amount, paid_amount, unpaid_amount, details_json
+        FROM weekly_payroll_archives
+        WHERE guild_id = ? AND week_start = ?
+        LIMIT 1
+    `).get(guildId, String(weekStart));
+
+    return row
+        ? hydrateWeeklyPayrollArchiveRows(guildId, [row], options)[0]
+        : null;
+}
+
+function syncPayrollArchivePaymentStatus(guildId, userId, weekStart, payment) {
+    const row = db.prepare(`
+        SELECT details_json
+        FROM weekly_payroll_archives
+        WHERE guild_id = ? AND week_start = ?
+        LIMIT 1
+    `).get(guildId, weekStart);
+
+    if (!row) {
+        return false;
+    }
+
+    const details = parsePayrollArchiveDetails(row.details_json);
+    const items = Array.isArray(details.items) ? details.items : [];
+    const item = items.find(entry => String(entry.userId) === String(userId));
+
+    if (!item) {
+        return false;
+    }
+
+    item.paid = Boolean(payment?.paid);
+    item.paidByUserId = payment?.paid_by_user_id || null;
+    item.paidAt = payment?.paid_at || null;
+    item.updatedAt = payment?.updated_at || new Date().toISOString();
+
+    const totalAmount = items.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+    const paidAmount = items
+        .filter(entry => entry.paid)
+        .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+    const paidCount = items.filter(entry => entry.paid).length;
+
+    details.totals = {
+        ...(details.totals || {}),
+        paidAmount,
+        unpaidAmount: totalAmount - paidAmount,
+        paidCount,
+        unpaidCount: items.length - paidCount
+    };
+
+    db.prepare(`
+        UPDATE weekly_payroll_archives
+        SET paid_amount = ?, unpaid_amount = ?, details_json = ?
+        WHERE guild_id = ? AND week_start = ?
+    `).run(
+        paidAmount,
+        totalAmount - paidAmount,
+        JSON.stringify(details),
+        guildId,
+        weekStart
+    );
+
+    return true;
 }
 
 function getUserSessions(guildId, userId, limit = 10) {
@@ -6616,6 +6948,111 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
         );
 }
 
+function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
+    const language = getGuildLanguage(guild.id);
+    const isEnglish = language === 'en';
+    const selectedArchive = weekStart
+        ? getWeeklyPayrollArchive(guild.id, weekStart, { guild, language })
+        : null;
+
+    if (weekStart && !selectedArchive) {
+        return null;
+    }
+
+    const archives = selectedArchive
+        ? [selectedArchive]
+        : getWeeklyPayrollArchives(guild.id, { guild, language, limit: 8 }).items;
+
+    if (!archives.length) {
+        return null;
+    }
+
+    if (!selectedArchive) {
+        const lines = archives.map(archive => {
+            const settled = archive.totals.unpaidCount === 0 && archive.totals.userCount > 0;
+            const status = settled
+                ? (isEnglish ? 'Paid' : 'Réglée')
+                : (isEnglish ? `${archive.totals.unpaidCount} pending` : `${archive.totals.unpaidCount} en attente`);
+
+            return [
+                `**${archive.weekStart} → ${archive.weekEnd}**`,
+                `${archive.totals.totalAmountLabel} · ${status}`,
+                `${archive.totals.totalTimeLabel} · ${archive.totals.userCount} agent(s)`
+            ].join('\n');
+        });
+
+        return createSentinelEmbed({
+            color: SENTINEL_COLORS.accent,
+            title: isEnglish ? 'Sentinel | Payroll archives' : 'Sentinel | Archives de paie',
+            description: lines.join('\n\n'),
+            requester,
+            thumbnail: guild.iconURL(),
+            language
+        }).addFields({
+            name: isEnglish ? 'Full ledger' : 'Registre complet',
+            value: isEnglish
+                ? `Open ${getDashboardUrl('/dashboard')} to search all periods and update payment status.`
+                : `Ouvre ${getDashboardUrl('/dashboard')} pour rechercher toutes les périodes et suivre les règlements.`,
+            inline: false
+        });
+    }
+
+    const lines = selectedArchive.items.slice(0, 10).map(item => {
+        const status = item.paid
+            ? (isEnglish ? 'Paid' : 'Payé')
+            : (isEnglish ? 'Pending' : 'À payer');
+
+        return `<@${item.userId}> · **${item.amountLabel}** · ${item.totalTimeLabel} · ${status}`;
+    });
+    const hiddenCount = selectedArchive.items.length - lines.length;
+
+    if (hiddenCount > 0) {
+        lines.push(isEnglish
+            ? `... and **${hiddenCount}** other agent(s).`
+            : `... et **${hiddenCount}** autre(s) agent(s).`);
+    }
+
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.accent,
+        title: isEnglish ? 'Sentinel | Archived payroll' : 'Sentinel | Paie archivée',
+        description: lines.join('\n') || (isEnglish ? 'No payroll line in this archive.' : 'Aucune ligne de paie dans cette archive.'),
+        requester,
+        thumbnail: guild.iconURL(),
+        language
+    }).addFields(
+        {
+            name: isEnglish ? 'Period' : 'Période',
+            value: `**${selectedArchive.weekStart} → ${selectedArchive.weekEnd}**`,
+            inline: true
+        },
+        {
+            name: isEnglish ? 'Total' : 'Total',
+            value: `**${selectedArchive.totals.totalAmountLabel}**`,
+            inline: true
+        },
+        {
+            name: isEnglish ? 'Progress' : 'Avancement',
+            value: `**${selectedArchive.totals.paidCount}/${selectedArchive.totals.userCount} · ${selectedArchive.totals.completionPercent}%**`,
+            inline: true
+        },
+        {
+            name: isEnglish ? 'Already paid' : 'Déjà payé',
+            value: `**${selectedArchive.totals.paidAmountLabel}**`,
+            inline: true
+        },
+        {
+            name: isEnglish ? 'Still to pay' : 'Reste à payer',
+            value: `**${selectedArchive.totals.unpaidAmountLabel}**`,
+            inline: true
+        },
+        {
+            name: isEnglish ? 'Last activity' : 'Dernière activité',
+            value: `<t:${Math.floor(new Date(selectedArchive.lastActivityAt).getTime() / 1000)}:R>`,
+            inline: true
+        }
+    );
+}
+
 function diagnosticLine(ok, label, detail = '') {
     return `${ok ? 'OK' : 'À vérifier'} - ${label}${detail ? ` : ${detail}` : ''}`;
 }
@@ -7412,7 +7849,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             ? '`/top-service`, `/top-semaine`, `/resume-service` - classements et resume complet'
             : '`/top-service` - top 10 du serveur',
         '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
-        '`/config-paie`, `/paie-semaine`, `/paie-archive` - regler, consulter et archiver la paie RP hebdomadaire',
+        '`/config-paie`, `/paie-semaine`, `/paie-historique`, `/paie-archive` - régler, consulter et archiver la paie RP hebdomadaire',
         '`/config-role`, `/config-autorole`, `/config-logs`, `/config-statut`, `/config-permissions`, `/config-voir` - configuration',
         '`/embed creer` - publier une annonce sous l identite de Sentinel'
     ];
@@ -7754,6 +8191,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/payroll-config` sets the global hourly RP amount.',
                             '`/weekly-payroll` shows who is paid or still to pay this week.',
+                            '`/payroll-history` retrieves prior payroll archives.',
                             '`/payroll-mark paid:true member:@member` marks a line as paid or unpaid.',
                             '`/payroll-archive` archives the current week payroll.',
                             '`/autorole-config` manages the role given to new members.',
@@ -8071,6 +8509,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/config-paie` règle le montant horaire RP.',
                         '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
+                        '`/paie-historique` retrouve les anciennes archives de paie.',
                         '`/paie-marquer paye:true membre:@membre` marque une ligne comme payée ou non payée.',
                         '`/config-autorole` gère le rôle donné automatiquement aux nouveaux membres.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
@@ -8496,6 +8935,10 @@ function mapDiscordAuditAction(interaction) {
     }
 
     if (commandName === 'paie-semaine') {
+        return null;
+    }
+
+    if (commandName === 'paie-historique') {
         return null;
     }
 
@@ -11445,6 +11888,8 @@ client.once(Events.ClientReady, async () => {
             getTemporaryBan,
             getTopService,
             getTopWeek,
+            getWeeklyPayrollArchive,
+            getWeeklyPayrollArchives,
             getWeeklyPayroll,
             getUserData,
             getUserSessions,
@@ -12175,7 +12620,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 });
             }
 
-            if (requestedWeekStart && !/^\d{4}-\d{2}-\d{2}$/.test(requestedWeekStart)) {
+            if (requestedWeekStart && !isValidDateKey(requestedWeekStart)) {
                 return interaction.reply({
                     content: t(language, 'payrollWeekInvalid'),
                     flags: MessageFlags.Ephemeral
@@ -12221,6 +12666,46 @@ client.on(Events.InteractionCreate, async interaction => {
             }
 
             const embed = buildConfigEmbed(interaction.guild, interaction.user);
+
+            return interaction.reply({
+                embeds: [embed],
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (commandName === 'paie-historique') {
+            if (!hasCommandRoleAccess(interaction.member)) {
+                return interaction.reply({
+                    content: getCommandRoleAccessDeniedMessage(language),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const requestedWeekStart = interaction.options.getString('semaine')
+                || interaction.options.getString('week')
+                || null;
+
+            if (requestedWeekStart && !isValidDateKey(requestedWeekStart)) {
+                return interaction.reply({
+                    content: t(language, 'payrollWeekInvalid'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const embed = buildPayrollArchiveHistoryEmbed(
+                interaction.guild,
+                interaction.user,
+                requestedWeekStart
+            );
+
+            if (!embed) {
+                return interaction.reply({
+                    content: language === 'en'
+                        ? 'No payroll archive was found for this period.'
+                        : 'Aucune archive de paie n’a été trouvée pour cette période.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
 
             return interaction.reply({
                 embeds: [embed],
@@ -13065,6 +13550,30 @@ client.on(Events.MessageCreate, async message => {
             weekEnd: archive.weekEnd,
             amount: archive.totals.totalAmountLabel
         }));
+    }
+
+    if (/^!(paie-historique|payroll-history)\b/i.test(content)) {
+        if (!hasCommandRoleAccess(message.member)) {
+            return message.reply(getCommandRoleAccessDeniedMessage(language));
+        }
+
+        const requestedWeekStart = content
+            .replace(/^!(paie-historique|payroll-history)\s*/i, '')
+            .trim() || null;
+
+        if (requestedWeekStart && !isValidDateKey(requestedWeekStart)) {
+            return message.reply(t(language, 'payrollWeekInvalid'));
+        }
+
+        const embed = buildPayrollArchiveHistoryEmbed(message.guild, message.author, requestedWeekStart);
+
+        if (!embed) {
+            return message.reply(language === 'en'
+                ? 'No payroll archive was found for this period.'
+                : 'Aucune archive de paie n’a été trouvée pour cette période.');
+        }
+
+        return message.reply({ embeds: [embed] });
     }
 
     if (/^!(paie-semaine|weekly-payroll)$/i.test(content)) {

@@ -92,6 +92,16 @@ CREATE TABLE IF NOT EXISTS weekly_payroll_archives (
     PRIMARY KEY (guild_id, week_start)
 );
 
+CREATE TABLE IF NOT EXISTS weekly_payment_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    paid INTEGER NOT NULL,
+    changed_by_user_id TEXT,
+    changed_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS guild_command_roles (
     guild_id TEXT,
     role_id TEXT,
@@ -343,6 +353,12 @@ ON weekly_pay_adjustments (guild_id, user_id, week_start);
 
 CREATE INDEX IF NOT EXISTS idx_weekly_payroll_archives_guild_week
 ON weekly_payroll_archives (guild_id, week_start);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_payment_events_guild_week
+ON weekly_payment_events (guild_id, week_start, changed_at);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_payment_events_user_week
+ON weekly_payment_events (guild_id, user_id, week_start, changed_at);
 
 CREATE INDEX IF NOT EXISTS idx_guild_command_roles_guild
 ON guild_command_roles (guild_id);

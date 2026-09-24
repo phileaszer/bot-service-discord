@@ -196,6 +196,16 @@ const publicCommands = [
 
     command('paie-semaine', 'weekly-payroll', 'Affiche la paie RP estimee de la semaine.', 'Shows this week estimated RP payroll.'),
 
+    command('paie-historique', 'payroll-history', 'Consulte les anciennes archives de paie RP.', 'Reviews previous RP payroll archives.')
+        .addStringOption(option =>
+            option
+                .setName('semaine')
+                .setNameLocalizations(en('week'))
+                .setDescription('Lundi de la semaine, format AAAA-MM-JJ. Vide = dernières archives')
+                .setDescriptionLocalizations(en('Week Monday, YYYY-MM-DD. Empty = latest archives'))
+                .setRequired(false)
+        ),
+
     command('paie-ajustement', 'payroll-adjustment', 'Ajoute une prime, une retenue ou une correction de paie RP.', 'Adds a bonus, deduction, or correction to RP payroll.')
         .addStringOption(option =>
             option

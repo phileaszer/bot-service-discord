@@ -15,6 +15,8 @@ let auditScope = 'server';
 let auditFilters = {};
 let moderationFilters = {};
 let expandedModerationCaseId = null;
+let payrollHistoryFilters = { query: '', status: 'all' };
+let expandedPayrollArchiveWeek = null;
 let selectedUserProfile = null;
 let dossierFilters = {};
 let expandedDossierId = null;
@@ -393,6 +395,9 @@ function dashboardErrorMessage(input) {
       'Invalid slowmode duration.': 'Invalid slowmode duration.',
       'Invalid hourly rate.': 'Invalid hourly rate.',
       'Invalid payroll adjustment.': 'Invalid payroll adjustment.',
+      'Invalid payroll week.': 'The payroll week is invalid.',
+      'Invalid payroll status.': 'The payroll status is invalid.',
+      'Payroll line not found.': 'This payroll line no longer exists.',
       'Invalid message ID.': 'Invalid message ID.',
       'No service role is configured.': 'No duty role is configured.',
       'This user must be in the server to start duty.': 'This person must be in the server to start duty from the dashboard.',
@@ -429,6 +434,9 @@ function dashboardErrorMessage(input) {
       'Invalid server profile.': 'Choose one of the profiles shown in the assistant.',
       'Invalid hourly rate.': 'Enter a positive hourly amount, for example 500 or 1250.',
       'Invalid payroll adjustment.': 'Enter a Discord ID, a type, a positive amount, and a short reason.',
+      'Invalid payroll week.': 'Open the archive again and retry from its own payment line.',
+      'Invalid payroll status.': 'Refresh the dashboard and use the button on the payroll line.',
+      'Payroll line not found.': 'Refresh the dashboard and choose an existing current or archived payroll line.',
       'Invalid message ID.': 'Copy the full numeric ID of the message sent by Sentinel.',
       'Case not found.': 'Check the case ID in the latest cases table.',
       'Category not found.': 'Choose a Discord category that still exists.',
@@ -496,6 +504,9 @@ function dashboardErrorMessage(input) {
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Invalid hourly rate.': 'Montant horaire invalide.',
     'Invalid payroll adjustment.': 'Ajustement de paie invalide.',
+    'Invalid payroll week.': 'La semaine de paie indiquée est invalide.',
+    'Invalid payroll status.': 'L’état de paie indiqué est invalide.',
+    'Payroll line not found.': 'Cette ligne de paie n’existe plus.',
     'Invalid message ID.': 'ID de message invalide.',
     'No service role is configured.': 'Aucun rôle de service n’est configuré.',
     'This user must be in the server to start duty.': 'Cette personne doit être présente sur le serveur pour prendre son service depuis le dashboard.',
@@ -535,6 +546,9 @@ function dashboardErrorMessage(input) {
     'Invalid server profile.': 'Choisis un profil proposé dans l’assistant.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
     'Invalid payroll adjustment.': 'Indique un ID Discord, un type, un montant positif et une raison courte.',
+    'Invalid payroll week.': 'Rouvre l’archive puis relance l’action depuis sa ligne de paiement.',
+    'Invalid payroll status.': 'Actualise le dashboard et utilise le bouton présent sur la ligne de paie.',
+    'Payroll line not found.': 'Actualise le dashboard et choisis une ligne de paie actuelle ou archivée.',
     'Invalid message ID.': 'Copie l’ID numérique complet du message envoyé par Sentinel.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
@@ -2080,6 +2094,30 @@ function payrollCopy() {
         archive: 'Archive week',
         archiveHelp: 'Saves a snapshot of the current week: hours, amounts, paid status, and adjustments.',
         archiveButton: 'Archive this week',
+        updateArchiveButton: 'Refresh this archive',
+        currentArchive: 'This week was archived on',
+        historyTitle: 'Payroll archives',
+        historyEyebrow: 'Ledger',
+        historyHelp: 'Review prior periods, find an agent, and continue payment tracking without changing frozen hours or amounts.',
+        historySearch: 'Search by period, agent, or Discord ID',
+        historyStatus: 'Payment status',
+        historyAll: 'All periods',
+        historyOpen: 'Payment pending',
+        historySettled: 'Fully paid',
+        historyCount: 'archived period(s)',
+        historyEmpty: 'No payroll period has been archived yet.',
+        historyNoMatch: 'No archive matches these filters.',
+        archivedOn: 'Archived on',
+        archivedBy: 'Archived by',
+        lastActivity: 'Last activity',
+        paymentProgress: 'Payment progress',
+        paymentJournal: 'Payment journal',
+        paymentJournalEmpty: 'No status change has been recorded for this period yet.',
+        markedPaid: 'marked as paid',
+        markedUnpaid: 'returned to pending',
+        clearFilters: 'Clear filters',
+        filterButton: 'Filter',
+        loadMoreArchives: 'Load older periods',
         summary: 'Weekly summary',
         week: 'Current week',
         agents: 'Agents',
@@ -2130,6 +2168,30 @@ function payrollCopy() {
         archive: 'Archiver la semaine',
         archiveHelp: 'Enregistre une capture de la semaine : heures, montants, état payé/non payé et ajustements.',
         archiveButton: 'Archiver cette semaine',
+        updateArchiveButton: 'Actualiser cette archive',
+        currentArchive: 'Cette semaine a été archivée le',
+        historyTitle: 'Archives de paie',
+        historyEyebrow: 'Registre',
+        historyHelp: 'Retrouve les périodes précédentes, cherche un agent et poursuis le suivi des règlements sans modifier les heures ni les montants figés.',
+        historySearch: 'Rechercher une période, un agent ou un ID Discord',
+        historyStatus: 'État des règlements',
+        historyAll: 'Toutes les périodes',
+        historyOpen: 'Paiements en attente',
+        historySettled: 'Entièrement réglées',
+        historyCount: 'période(s) archivée(s)',
+        historyEmpty: 'Aucune période de paie n’a encore été archivée.',
+        historyNoMatch: 'Aucune archive ne correspond à ces filtres.',
+        archivedOn: 'Archivée le',
+        archivedBy: 'Archivée par',
+        lastActivity: 'Dernière activité',
+        paymentProgress: 'Avancement des règlements',
+        paymentJournal: 'Journal des règlements',
+        paymentJournalEmpty: 'Aucun changement d’état n’a encore été enregistré pour cette période.',
+        markedPaid: 'a marqué la paie comme réglée',
+        markedUnpaid: 'a remis la paie en attente',
+        clearFilters: 'Effacer les filtres',
+        filterButton: 'Filtrer',
+        loadMoreArchives: 'Charger les périodes plus anciennes',
         summary: 'Résumé semaine',
         week: 'Semaine en cours',
         agents: 'Agents',
@@ -2202,7 +2264,10 @@ function payrollTable(payroll, copy) {
             const nextPaid = item.paid ? 'false' : 'true';
             return `
               <tr>
-                <td><code>${escapeHtml(item.userId)}</code></td>
+                <td>
+                  <strong>${escapeHtml(item.displayName || item.username || item.userId)}</strong>
+                  <small><code>${escapeHtml(item.userId)}</code></small>
+                </td>
                 <td><strong>${escapeHtml(item.totalTimeLabel)}</strong></td>
                 <td>
                   <strong>${escapeHtml(item.hourlyRateLabel || '')}</strong>
@@ -2282,6 +2347,212 @@ function payrollAdjustmentList(payroll, copy) {
   `;
 }
 
+function normalizePayrollSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function payrollArchiveTable(archive, copy) {
+  const items = archive.items || [];
+
+  if (!items.length) {
+    return `<p class="muted">${escapeHtml(copy.empty)}</p>`;
+  }
+
+  return `
+    <div class="table-shell payroll-table-shell">
+      <table class="dashboard-table payroll-table payroll-archive-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>${escapeHtml(copy.totalHours)}</th>
+            <th>${escapeHtml(copy.hourlyRate)}</th>
+            <th>${escapeHtml(copy.basePay)}</th>
+            <th>${escapeHtml(copy.adjustmentTotal)}</th>
+            <th>${escapeHtml(copy.estimatedPay)}</th>
+            <th>${escapeHtml(copy.status)}</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => {
+            const nextPaid = item.paid ? 'false' : 'true';
+            return `
+              <tr>
+                <td>
+                  <strong>${escapeHtml(item.displayName || item.username || item.userId)}</strong>
+                  <small><code>${escapeHtml(item.userId)}</code></small>
+                </td>
+                <td><strong>${escapeHtml(item.totalTimeLabel)}</strong></td>
+                <td>
+                  <strong>${escapeHtml(item.hourlyRateLabel || '')}</strong>
+                  ${item.payrollRoleName ? `<small>${escapeHtml(item.payrollRoleName)}</small>` : ''}
+                </td>
+                <td>${escapeHtml(item.baseAmountLabel || item.amountLabel)}</td>
+                <td><strong>${escapeHtml(item.adjustmentAmountLabel || '')}</strong></td>
+                <td><strong>${escapeHtml(item.amountLabel)}</strong></td>
+                <td>
+                  ${statusBadge(item.paid ? copy.paid : copy.unpaid, item.paid)}
+                  ${item.updatedAt ? `<small>${escapeHtml(formatSessionDate(item.updatedAt))}</small>` : ''}
+                  ${item.statusChangedByUserId ? `<small>${escapeHtml(copy.paidBy)} : ${escapeHtml(item.statusChangedByUserId)}</small>` : ''}
+                </td>
+                <td>
+                  <form class="table-action-form payroll-action-form" data-action-form="toggle-payroll-paid" data-payroll-archive-week="${escapeHtml(archive.weekStart)}">
+                    <input type="hidden" name="userId" value="${escapeHtml(item.userId)}">
+                    <input type="hidden" name="weekStart" value="${escapeHtml(archive.weekStart)}">
+                    <input type="hidden" name="paid" value="${nextPaid}">
+                    <button class="button button-small${item.paid ? ' button-ghost' : ''}" type="submit">${escapeHtml(item.paid ? copy.markUnpaid : copy.markPaid)}</button>
+                  </form>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function payrollArchiveJournal(archive, copy) {
+  const events = archive.events || [];
+
+  if (!events.length) {
+    return `<p class="muted">${escapeHtml(copy.paymentJournalEmpty)}</p>`;
+  }
+
+  return `
+    <ol class="payroll-event-list">
+      ${events.map((event) => {
+        const actor = event.changedByDisplayName || event.changedByUserId || 'Sentinel';
+        const agent = event.userDisplayName || event.userId;
+        return `
+          <li>
+            <span class="payroll-event-marker ${event.paid ? 'is-paid' : 'is-unpaid'}" aria-hidden="true"></span>
+            <span>
+              <strong>${escapeHtml(actor)}</strong>
+              ${escapeHtml(event.paid ? copy.markedPaid : copy.markedUnpaid)}
+              <strong>${escapeHtml(agent)}</strong>
+              <small>${escapeHtml(formatSessionDate(event.changedAt))} · <code>${escapeHtml(event.userId)}</code></small>
+            </span>
+          </li>
+        `;
+      }).join('')}
+    </ol>
+  `;
+}
+
+function payrollArchiveHistory(history, copy) {
+  const archives = history?.items || [];
+
+  if (!archives.length) {
+    return `
+      <section class="payroll-history">
+        <div class="panel-heading">
+          <p class="eyebrow">${escapeHtml(copy.historyEyebrow)}</p>
+          <h3>${escapeHtml(copy.historyTitle)}</h3>
+          <p class="muted">${escapeHtml(copy.historyHelp)}</p>
+        </div>
+        <p class="muted">${escapeHtml(copy.historyEmpty)}</p>
+      </section>
+    `;
+  }
+
+  const query = normalizePayrollSearch(payrollHistoryFilters.query);
+  const status = ['open', 'settled'].includes(payrollHistoryFilters.status)
+    ? payrollHistoryFilters.status
+    : 'all';
+  const filtered = archives.filter((archive) => {
+    const settled = (archive.totals?.userCount || 0) > 0 && (archive.totals?.unpaidCount || 0) === 0;
+
+    if (status === 'open' && settled) return false;
+    if (status === 'settled' && !settled) return false;
+    if (!query) return true;
+
+    const haystack = [
+      archive.weekStart,
+      archive.weekEnd,
+      archive.archivedByDisplayName,
+      archive.archivedByUserId,
+      ...(archive.items || []).flatMap((item) => [item.userId, item.displayName, item.username])
+    ].map(normalizePayrollSearch).join(' ');
+
+    return haystack.includes(query);
+  });
+
+  return `
+    <section class="payroll-history">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">${escapeHtml(copy.historyEyebrow)}</p>
+          <h3>${escapeHtml(copy.historyTitle)}</h3>
+          <p class="muted">${escapeHtml(copy.historyHelp)}</p>
+        </div>
+        <span class="status-badge">${escapeHtml(history.totalCount || archives.length)} ${escapeHtml(copy.historyCount)}</span>
+      </div>
+      <form class="payroll-history-filters" data-payroll-history-filter>
+        <label>
+          <span>${escapeHtml(copy.historySearch)}</span>
+          <input name="query" type="search" value="${escapeHtml(payrollHistoryFilters.query)}" placeholder="${escapeHtml(copy.historySearch)}">
+        </label>
+        <label>
+          <span>${escapeHtml(copy.historyStatus)}</span>
+          <select name="status">
+            <option value="all"${status === 'all' ? ' selected' : ''}>${escapeHtml(copy.historyAll)}</option>
+            <option value="open"${status === 'open' ? ' selected' : ''}>${escapeHtml(copy.historyOpen)}</option>
+            <option value="settled"${status === 'settled' ? ' selected' : ''}>${escapeHtml(copy.historySettled)}</option>
+          </select>
+        </label>
+        <button class="button button-small" type="submit">${escapeHtml(copy.filterButton)}</button>
+        <button class="button button-small button-ghost" type="button" data-payroll-history-reset>${escapeHtml(copy.clearFilters)}</button>
+      </form>
+      ${history.hasMore ? `<p class="muted">${escapeHtml(archives.length)} / ${escapeHtml(history.totalCount)} ${escapeHtml(copy.historyCount)}</p>` : ''}
+      <div class="payroll-history-list">
+        ${filtered.length ? filtered.map((archive) => {
+          const totals = archive.totals || {};
+          const settled = (totals.userCount || 0) > 0 && (totals.unpaidCount || 0) === 0;
+          const open = expandedPayrollArchiveWeek === archive.weekStart ? ' open' : '';
+          return `
+            <details class="payroll-history-period" data-payroll-history-period="${escapeHtml(archive.weekStart)}"${open}>
+              <summary>
+                <span>
+                  <strong>${escapeHtml(archive.weekStart)} → ${escapeHtml(archive.weekEnd)}</strong>
+                  <small>${escapeHtml(copy.archivedOn)} ${escapeHtml(formatSessionDate(archive.archivedAt))}</small>
+                </span>
+                <span class="payroll-history-period-totals">
+                  <strong>${escapeHtml(totals.totalAmountLabel || '')}</strong>
+                  <small>${escapeHtml(totals.paidCount || 0)}/${escapeHtml(totals.userCount || 0)} ${escapeHtml(copy.paid.toLowerCase())}</small>
+                  ${statusBadge(settled ? copy.historySettled : copy.historyOpen, settled)}
+                </span>
+              </summary>
+              <div class="payroll-history-period-body">
+                <div class="payroll-history-meta">
+                  <div><span>${escapeHtml(copy.totalHours)}</span><strong>${escapeHtml(totals.totalTimeLabel || '')}</strong></div>
+                  <div><span>${escapeHtml(copy.alreadyPaid)}</span><strong>${escapeHtml(totals.paidAmountLabel || '')}</strong></div>
+                  <div><span>${escapeHtml(copy.toPay)}</span><strong>${escapeHtml(totals.unpaidAmountLabel || '')}</strong></div>
+                  <div><span>${escapeHtml(copy.paymentProgress)}</span><strong>${escapeHtml(totals.completionPercent || 0)}%</strong></div>
+                </div>
+                <p class="payroll-history-context">
+                  ${archive.archivedByUserId ? `${escapeHtml(copy.archivedBy)} <strong>${escapeHtml(archive.archivedByDisplayName || archive.archivedByUserId)}</strong> · ` : ''}
+                  ${escapeHtml(copy.lastActivity)} ${escapeHtml(formatSessionDate(archive.lastActivityAt))}
+                </p>
+                ${payrollArchiveTable(archive, copy)}
+                <div class="payroll-event-log">
+                  <h4>${escapeHtml(copy.paymentJournal)}</h4>
+                  ${payrollArchiveJournal(archive, copy)}
+                </div>
+              </div>
+            </details>
+          `;
+        }).join('') : `<p class="muted">${escapeHtml(copy.historyNoMatch)}</p>`}
+      </div>
+      ${history.hasMore ? `<button class="button button-ghost payroll-history-more" type="button" data-payroll-history-more>${escapeHtml(copy.loadMoreArchives)}</button>` : ''}
+    </section>
+  `;
+}
+
 function renderPayrollPanel(state) {
   const payroll = state.payroll || {
     weekStart: '',
@@ -2295,6 +2566,8 @@ function renderPayrollPanel(state) {
   const premiumDisabled = state.advanced ? '' : ' disabled';
   const premiumHint = state.advanced ? '' : `<p class="premium-inline-note">${escapeHtml(copy.premiumOnly)}</p>`;
   const premiumMode = isPremiumPlanVisible(state);
+  const payrollArchives = state.payrollArchives || { totalCount: 0, hasMore: false, items: [] };
+  const currentArchive = (payrollArchives.items || []).find((archive) => archive.weekStart === payroll.weekStart) || null;
 
   return `
     <section class="dashboard-panel payroll-panel">
@@ -2352,10 +2625,14 @@ function renderPayrollPanel(state) {
       `, state)}
       ${!premiumMode ? premiumLockedHint(state) : ''}
       <form class="payroll-archive-form" data-action-form="archive-payroll">
-        ${labelHelp(copy.archive, copy.archiveHelp)}
-        <button class="button button-ghost" type="submit">${escapeHtml(copy.archiveButton)}</button>
+        <div>
+          ${labelHelp(copy.archive, copy.archiveHelp)}
+          ${currentArchive ? `<small>${escapeHtml(copy.currentArchive)} ${escapeHtml(formatSessionDate(currentArchive.archivedAt))}</small>` : ''}
+        </div>
+        <button class="button button-ghost" type="submit">${escapeHtml(currentArchive ? copy.updateArchiveButton : copy.archiveButton)}</button>
       </form>
       ${payrollTable(payroll, copy)}
+      ${payrollArchiveHistory(payrollArchives, copy)}
     </section>
   `;
 }
@@ -3485,12 +3762,14 @@ function profilePayrollSummary(payroll) {
     return '<p class="muted">La paie RP n’est pas disponible sur ce serveur.</p>';
   }
 
-  if (!payroll.line) {
-    return '<p class="muted">Aucune ligne de paie trouvée pour cette semaine.</p>';
+  const history = payroll.history || [];
+
+  if (!payroll.line && !history.length) {
+    return '<p class="muted">Aucune ligne de paie actuelle ou archivée pour cette personne.</p>';
   }
 
   return `
-    <div class="profile-payroll-card">
+    ${payroll.line ? `<div class="profile-payroll-card">
       <div>
         <span>Semaine</span>
         <strong>${escapeHtml(payroll.weekStart)} → ${escapeHtml(payroll.weekEnd)}</strong>
@@ -3504,7 +3783,20 @@ function profilePayrollSummary(payroll) {
         <strong>${payroll.line.paid ? 'Payé' : 'À payer'}</strong>
         ${payroll.line.paidAt ? `<small>${escapeHtml(formatSessionDate(payroll.line.paidAt))}</small>` : ''}
       </div>
-    </div>
+    </div>` : '<p class="muted">Aucune ligne sur la semaine en cours.</p>'}
+    ${history.length ? `
+      <div class="profile-payroll-history">
+        <h5>Historique de paie</h5>
+        <ul class="compact-list">
+          ${history.map((item) => `
+            <li>
+              <span>${escapeHtml(item.weekStart)} → ${escapeHtml(item.weekEnd)}</span>
+              <strong>${escapeHtml(item.amountLabel)} · ${item.paid ? 'Payé' : 'À payer'}</strong>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    ` : ''}
   `;
 }
 
@@ -4679,16 +4971,72 @@ async function runAction(action, data, button = null) {
   setLoading(button, true);
 
   try {
+    const previousArchives = currentState?.payrollArchives || null;
     const payload = await api(`/api/guilds/${selectedGuildId}/action`, {
       method: 'POST',
       body: JSON.stringify({ action, ...data })
     });
     currentState = payload.state;
+
+    if (previousArchives?.items?.length && currentState?.payrollArchives) {
+      const merged = new Map(previousArchives.items.map((archive) => [archive.weekStart, archive]));
+
+      for (const archive of currentState.payrollArchives.items || []) {
+        merged.set(archive.weekStart, archive);
+      }
+
+      if (payload.payrollArchive?.weekStart) {
+        merged.set(payload.payrollArchive.weekStart, payload.payrollArchive);
+      }
+
+      const items = Array.from(merged.values()).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+      const totalCount = currentState.payrollArchives.totalCount || previousArchives.totalCount || items.length;
+      currentState.payrollArchives = {
+        ...currentState.payrollArchives,
+        offset: 0,
+        totalCount,
+        hasMore: totalCount > items.length,
+        items
+      };
+    }
+
     dashboardHydrating = false;
     rememberCurrentGuildPreview();
     renderDashboard();
     renderGuilds();
     toast(payload.message || 'Action terminée.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function loadMorePayrollArchives(button = null) {
+  if (!selectedGuildId || !currentState?.payrollArchives?.hasMore) return;
+  setLoading(button, true);
+
+  try {
+    const currentItems = currentState.payrollArchives.items || [];
+    const params = new URLSearchParams({
+      limit: '52',
+      offset: String(currentItems.length)
+    });
+    const payload = await api(`/api/guilds/${selectedGuildId}/payroll-archives?${params}`);
+    const next = payload.payrollArchives || { items: [], hasMore: false };
+    const merged = new Map(currentItems.map((archive) => [archive.weekStart, archive]));
+
+    for (const archive of next.items || []) {
+      merged.set(archive.weekStart, archive);
+    }
+
+    currentState.payrollArchives = {
+      ...next,
+      offset: 0,
+      items: Array.from(merged.values()).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+    };
+    rememberCurrentGuildPreview();
+    renderDashboard();
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
@@ -4855,10 +5203,49 @@ function attachDashboardHandlers() {
       const action = form.dataset.actionForm;
       const button = $('button[type="submit"]', form);
 
+      if (form.dataset.payrollArchiveWeek) {
+        expandedPayrollArchiveWeek = form.dataset.payrollArchiveWeek;
+      }
+
       try {
         runAction(action, await actionFormData(form, action), button);
       } catch (error) {
         toast(error.message || 'Image impossible à préparer.', 'error');
+      }
+    });
+  });
+
+  $$('[data-payroll-history-filter]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = formData(form);
+      payrollHistoryFilters = {
+        query: String(data.query || '').trim().slice(0, 120),
+        status: ['open', 'settled'].includes(data.status) ? data.status : 'all'
+      };
+      expandedPayrollArchiveWeek = null;
+      renderDashboard();
+    });
+  });
+
+  $$('[data-payroll-history-reset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      payrollHistoryFilters = { query: '', status: 'all' };
+      expandedPayrollArchiveWeek = null;
+      renderDashboard();
+    });
+  });
+
+  $$('[data-payroll-history-more]').forEach((button) => {
+    button.addEventListener('click', () => loadMorePayrollArchives(button));
+  });
+
+  $$('[data-payroll-history-period]').forEach((details) => {
+    details.addEventListener('toggle', () => {
+      if (details.open) {
+        expandedPayrollArchiveWeek = details.dataset.payrollHistoryPeriod || null;
+      } else if (expandedPayrollArchiveWeek === details.dataset.payrollHistoryPeriod) {
+        expandedPayrollArchiveWeek = null;
       }
     });
   });
@@ -4986,6 +5373,8 @@ async function selectGuild(guildId, { restored = false } = {}) {
   auditFilters = {};
   moderationFilters = {};
   expandedModerationCaseId = null;
+  payrollHistoryFilters = { query: '', status: 'all' };
+  expandedPayrollArchiveWeek = null;
   selectedUserProfile = null;
   dossierFilters = {};
   expandedDossierId = null;
