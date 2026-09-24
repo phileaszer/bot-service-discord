@@ -23,6 +23,14 @@ const {
 } = require('discord.js');
 
 const db = require('./database/database');
+const {
+    compressExistingDatabaseBackups,
+    createCompressedDatabaseBackup,
+    getDatabaseStorageStatus,
+    listDatabaseBackups,
+    pruneDatabaseBackups,
+    runDatabaseMaintenance
+} = require('./database/storage');
 const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
 
@@ -127,7 +135,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-24-dashboard-performance-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-24-storage-optimization-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -167,9 +175,34 @@ const DATABASE_BACKUP_INTERVAL_MS = Math.max(
 ) * 60 * 60 * 1000;
 const DATABASE_BACKUP_KEEP = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_KEEP || '14', 10), 1);
 const DATABASE_BACKUP_DIR = process.env.DATABASE_BACKUP_DIR || path.join(path.dirname(DATABASE_FILE_PATH), 'backups');
+const DATABASE_BACKUP_COMPRESS = String(process.env.DATABASE_BACKUP_COMPRESS || 'true').toLowerCase() !== 'false';
+const DATABASE_BACKUP_COMPRESSION_LEVEL = Math.min(Math.max(
+    Number.parseInt(process.env.DATABASE_BACKUP_COMPRESSION_LEVEL || '9', 10),
+    1
+), 9);
+const DATABASE_BACKUP_MAX_BYTES = Math.max(
+    Number.parseInt(process.env.DATABASE_BACKUP_MAX_MB || '96', 10),
+    16
+) * 1024 * 1024;
+const DATABASE_BACKUP_STARTUP_MIN_AGE_MS = Math.max(
+    Number.parseInt(process.env.DATABASE_BACKUP_STARTUP_MIN_AGE_HOURS || '6', 10),
+    1
+) * 60 * 60 * 1000;
+const DATABASE_AUTOMOD_RETENTION_DAYS = Math.max(
+    Number.parseInt(process.env.DATABASE_AUTOMOD_RETENTION_DAYS || '180', 10),
+    30
+);
+const DATABASE_AUDIT_RETENTION_DAYS = Math.max(
+    Number.parseInt(process.env.DATABASE_AUDIT_RETENTION_DAYS || '365', 10),
+    90
+);
+const DATABASE_INCREMENTAL_VACUUM_ENABLED = String(
+    process.env.DATABASE_INCREMENTAL_VACUUM_ENABLED || 'true'
+).toLowerCase() !== 'false';
 let lastSentinelServerSync = null;
 let lastSentinelServerSyncResult = null;
 let lastDatabaseBackup = null;
+let lastDatabaseMaintenance = null;
 const automodSpamBuckets = new Map();
 const automodRaidBuckets = new Map();
 let lastSlashCommandCheck = {
@@ -180,6 +213,7 @@ let lastSlashCommandCheck = {
     error: null
 };
 let databaseBackupTimer = null;
+let databaseStorageCyclePromise = null;
 
 const SUPPORTED_LANGUAGES = new Set(['fr', 'en']);
 const MODERATION_ACTION_LABELS = {
@@ -1503,93 +1537,134 @@ function checkDatabase() {
     db.prepare('SELECT 1').get();
 }
 
-function getDatabaseBackupFilename(reason = 'auto') {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const cleanReason = String(reason || 'auto')
-        .replace(/[^a-z0-9_-]/gi, '-')
-        .replace(/-+/g, '-')
-        .slice(0, 32) || 'auto';
-
-    return `service-${cleanReason}-${stamp}.db`;
-}
-
-function pruneDatabaseBackups() {
-    if (!fs.existsSync(DATABASE_BACKUP_DIR)) {
-        return;
-    }
-
-    const backups = listDatabaseBackups();
-
-    for (const backup of backups.slice(DATABASE_BACKUP_KEEP)) {
-        fs.unlinkSync(backup.fullPath);
-    }
-}
-
-function listDatabaseBackups() {
-    if (!fs.existsSync(DATABASE_BACKUP_DIR)) {
-        return [];
-    }
-
-    return fs.readdirSync(DATABASE_BACKUP_DIR)
-        .filter(fileName => /^service-.*\.db$/i.test(fileName))
-        .map(fileName => {
-            const fullPath = path.join(DATABASE_BACKUP_DIR, fileName);
-            const stat = fs.statSync(fullPath);
-            return {
-                fileName,
-                fullPath,
-                sizeBytes: stat.size,
-                createdAt: stat.mtime.toISOString(),
-                mtimeMs: stat.mtimeMs
-            };
-        })
-        .sort((a, b) => b.mtimeMs - a.mtimeMs);
-}
-
 async function createDatabaseBackup(reason = 'auto') {
-    fs.mkdirSync(DATABASE_BACKUP_DIR, { recursive: true });
-
-    const backupPath = path.join(DATABASE_BACKUP_DIR, getDatabaseBackupFilename(reason));
-    await db.backup(backupPath);
-    pruneDatabaseBackups();
+    const backup = await createCompressedDatabaseBackup(db, {
+        backupDirectory: DATABASE_BACKUP_DIR,
+        reason,
+        compress: DATABASE_BACKUP_COMPRESS,
+        compressionLevel: DATABASE_BACKUP_COMPRESSION_LEVEL
+    });
+    pruneDatabaseBackups(DATABASE_BACKUP_DIR, {
+        keep: DATABASE_BACKUP_KEEP,
+        maxBytes: DATABASE_BACKUP_MAX_BYTES
+    });
     lastDatabaseBackup = {
         createdAt: new Date().toISOString(),
-        fileName: path.basename(backupPath),
+        fileName: backup.fileName,
         reason
     };
 
-    return backupPath;
+    return backup.fullPath;
+}
+
+function shouldCreateStartupBackup() {
+    const latest = listDatabaseBackups(DATABASE_BACKUP_DIR)[0] || null;
+
+    return !latest || Date.now() - latest.mtimeMs >= DATABASE_BACKUP_STARTUP_MIN_AGE_MS;
+}
+
+async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } = {}) {
+    if (databaseStorageCyclePromise) {
+        return databaseStorageCyclePromise;
+    }
+
+    databaseStorageCyclePromise = (async () => {
+        fs.mkdirSync(DATABASE_BACKUP_DIR, { recursive: true });
+
+        const compression = DATABASE_BACKUP_COMPRESS
+            ? await compressExistingDatabaseBackups(
+                DATABASE_BACKUP_DIR,
+                DATABASE_BACKUP_COMPRESSION_LEVEL
+            )
+            : { compressedCount: 0, reclaimedBytes: 0 };
+
+        pruneDatabaseBackups(DATABASE_BACKUP_DIR, {
+            keep: DATABASE_BACKUP_KEEP,
+            maxBytes: DATABASE_BACKUP_MAX_BYTES
+        });
+
+        const createBackup = DATABASE_BACKUP_ENABLED && (
+            forceBackup
+            || reason !== 'startup'
+            || shouldCreateStartupBackup()
+        );
+        const backupPath = createBackup
+            ? await createDatabaseBackup(reason)
+            : null;
+        const maintenance = runDatabaseMaintenance(db, {
+            automodRetentionDays: DATABASE_AUTOMOD_RETENTION_DAYS,
+            auditRetentionDays: DATABASE_AUDIT_RETENTION_DAYS,
+            enableIncrementalVacuum: DATABASE_INCREMENTAL_VACUUM_ENABLED
+        });
+
+        lastDatabaseMaintenance = {
+            ...maintenance,
+            reason,
+            compressedBackups: compression.compressedCount,
+            reclaimedBackupBytes: compression.reclaimedBytes
+        };
+
+        const backupLabel = backupPath
+            ? path.basename(backupPath)
+            : 'recente, aucune copie dupliquee';
+        console.log([
+            'Entretien stockage Sentinel termine',
+            `sauvegarde=${backupLabel}`,
+            `anciennes copies compressees=${compression.compressedCount}`,
+            `sessions expirees=${maintenance.cleanup.expiredSessions}`,
+            `journaux automod retires=${maintenance.cleanup.automodEvents}`,
+            `journaux dashboard retires=${maintenance.cleanup.dashboardAuditLogs}`,
+            `duree=${maintenance.durationMs}ms`
+        ].join(' | '));
+
+        return {
+            backupPath,
+            compression,
+            maintenance
+        };
+    })().finally(() => {
+        databaseStorageCyclePromise = null;
+    });
+
+    return databaseStorageCyclePromise;
 }
 
 function startDatabaseBackupSchedule() {
-    if (!DATABASE_BACKUP_ENABLED || databaseBackupTimer) {
+    if (databaseBackupTimer) {
         return;
     }
 
-    createDatabaseBackup('startup')
-        .then(backupPath => console.log(`Sauvegarde locale créée : ${backupPath}`))
-        .catch(error => console.error('Erreur sauvegarde locale au demarrage :', error));
+    runDatabaseStorageCycle('startup')
+        .catch(error => console.error('Erreur entretien stockage au demarrage :', error));
 
     databaseBackupTimer = setInterval(() => {
-        createDatabaseBackup('auto')
-            .then(backupPath => console.log(`Sauvegarde locale créée : ${backupPath}`))
-            .catch(error => console.error('Erreur sauvegarde locale planifiee :', error));
+        runDatabaseStorageCycle('auto', { forceBackup: true })
+            .catch(error => console.error('Erreur entretien stockage planifie :', error));
     }, DATABASE_BACKUP_INTERVAL_MS);
+    databaseBackupTimer.unref();
 }
 
 function getDatabaseBackupStatus() {
-    const backups = listDatabaseBackups();
-    const latest = backups[0] || null;
-
-    return {
-        enabled: DATABASE_BACKUP_ENABLED,
-        latestAt: lastDatabaseBackup?.createdAt || latest?.createdAt || null,
-        latestFile: lastDatabaseBackup?.fileName || latest?.fileName || null,
-        latestReason: lastDatabaseBackup?.reason || null,
-        count: backups.length,
-        keep: DATABASE_BACKUP_KEEP,
-        intervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000)
-    };
+    try {
+        return getDatabaseStorageStatus(db, {
+            databasePath: DATABASE_FILE_PATH,
+            backupDirectory: DATABASE_BACKUP_DIR,
+            backupKeep: DATABASE_BACKUP_KEEP,
+            backupMaxBytes: DATABASE_BACKUP_MAX_BYTES,
+            automodRetentionDays: DATABASE_AUTOMOD_RETENTION_DAYS,
+            auditRetentionDays: DATABASE_AUDIT_RETENTION_DAYS,
+            lastBackup: lastDatabaseBackup,
+            lastMaintenance: lastDatabaseMaintenance,
+            backupEnabled: DATABASE_BACKUP_ENABLED,
+            backupIntervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000)
+        });
+    } catch (error) {
+        return {
+            enabled: DATABASE_BACKUP_ENABLED,
+            error: 'Storage status unavailable.',
+            lastMaintenance: lastDatabaseMaintenance
+        };
+    }
 }
 
 function getSentinelSyncStatus() {

@@ -108,6 +108,18 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 
 La liste complète et les explications détaillées sont disponibles sur le site.
 
+## Stockage et sauvegardes
+
+Sentinel conserve sans expiration les archives de paie, les heures de service, les dossiers et les sanctions. Les sessions web expirées et les journaux techniques anciens sont nettoyés automatiquement selon les durées configurées.
+
+La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauvegardes sont compressées en `.db.gz`, limitées à 14 copies et à 96 Mo par défaut. Un redéploiement rapproché ne crée pas une copie identique supplémentaire. Les anciennes sauvegardes `.db` sont converties automatiquement au démarrage.
+
+- `npm run backup:db` crée une sauvegarde manuelle compressée et vérifie la politique de rétention.
+- `npm run restore:db` liste les sauvegardes `.db` et `.db.gz` disponibles.
+- `npm run restore:db -- <fichier.db.gz>` vérifie l'intégrité SQLite avant de restaurer la base et crée d'abord une copie de sécurité compressée.
+
+Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`, `DATABASE_AUTOMOD_RETENTION_DAYS`, `DATABASE_AUDIT_RETENTION_DAYS` et `DATABASE_INCREMENTAL_VACUUM_ENABLED` décrites dans `.env.example`.
+
 ## Sécurité et données
 
 Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe, ne collecte pas les informations de paiement et ne vend aucune donnée.

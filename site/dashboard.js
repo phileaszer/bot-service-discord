@@ -4077,6 +4077,79 @@ function siteStaffList(overview) {
   `;
 }
 
+function formatStorageBytes(value) {
+  const bytes = Math.max(Number(value) || 0, 0);
+
+  if (bytes < 1024) return `${Math.round(bytes)} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} Go`;
+}
+
+function founderStoragePanel(overview) {
+  const storage = overview?.storage;
+
+  if (!storage) {
+    return '';
+  }
+
+  if (storage.error) {
+    return `
+      <section class="founder-storage-panel" aria-label="Stockage Sentinel">
+        <div class="founder-console-note">
+          <strong>Stockage Sentinel</strong>
+          <span>Le relevé est momentanément indisponible. L’entretien automatique reste actif et sera relu au prochain passage.</span>
+        </div>
+      </section>
+    `;
+  }
+
+  const maintenance = storage.lastMaintenance || null;
+  const cleanup = maintenance?.cleanup || {};
+  const allCompressed = storage.count > 0 && storage.compressedCount === storage.count;
+
+  return `
+    <section class="founder-storage-panel" aria-label="Stockage Sentinel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Conservation</p>
+          <h3>Stockage Sentinel</h3>
+          <p class="muted">Les archives de paie, heures, dossiers et sanctions restent conservées. Seuls les journaux techniques arrivés à échéance sont retirés.</p>
+        </div>
+        ${statusBadge(allCompressed ? 'Copies compressées' : 'Entretien en cours', allCompressed)}
+      </div>
+      <div class="dashboard-metrics dashboard-kpis founder-storage-kpis">
+        <article class="dashboard-kpi">
+          <span>Base active</span>
+          <strong>${escapeHtml(formatStorageBytes(storage.databaseBytes))}</strong>
+          <small>données actuellement utilisées</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Copies protégées</span>
+          <strong>${escapeHtml(formatStorageBytes(storage.backupBytes))}</strong>
+          <small>${escapeHtml(storage.count)} / ${escapeHtml(storage.keep)} conservées</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Total géré</span>
+          <strong>${escapeHtml(formatStorageBytes(storage.managedBytes))}</strong>
+          <small>plafond copies : ${escapeHtml(formatStorageBytes(storage.maxBackupBytes))}</small>
+        </article>
+        <article class="dashboard-kpi">
+          <span>Compression</span>
+          <strong>${escapeHtml(storage.compressedCount)} / ${escapeHtml(storage.count)}</strong>
+          <small>copies allégées</small>
+        </article>
+      </div>
+      <div class="founder-console-note">
+        <strong>Entretien automatique</strong>
+        <span>${maintenance?.completedAt
+          ? `Dernier passage : ${escapeHtml(formatAuditDate(maintenance.completedAt))}. ${escapeHtml((cleanup.expiredSessions || 0) + (cleanup.automodEvents || 0) + (cleanup.dashboardAuditLogs || 0))} ligne(s) technique(s) arrivée(s) à échéance.`
+          : 'Le premier entretien sera lancé automatiquement au démarrage de cette version.'}</span>
+      </div>
+    </section>
+  `;
+}
+
 function creatorStaffManagePanel(overview) {
   return `
     <div class="founder-console-note">
@@ -4285,6 +4358,7 @@ function renderFounderPremiumPanel() {
           <small>accès Premium manuel</small>
         </article>
       </div>
+      ${founderStoragePanel(overview)}
       ${creatorStaffManagePanel(overview)}
       ${creatorPremiumManagePanel(overview)}
       ${creatorOverviewLoading && !overview

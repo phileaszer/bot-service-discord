@@ -1,44 +1,44 @@
 require('dotenv').config();
 
-const fs = require('fs');
 const path = require('path');
 const db = require('../database/database');
+const {
+    compressExistingDatabaseBackups,
+    createCompressedDatabaseBackup,
+    pruneDatabaseBackups
+} = require('../database/storage');
 
 const databasePath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'service.db');
 const backupDirectory = process.env.DATABASE_BACKUP_DIR || path.join(path.dirname(databasePath), 'backups');
 const backupKeep = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_KEEP || '14', 10), 1);
-
-function backupFileName() {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    return `service-manual-${stamp}.db`;
-}
-
-function pruneBackups() {
-    const backups = fs.readdirSync(backupDirectory)
-        .filter(fileName => /^service-.*\.db$/i.test(fileName))
-        .map(fileName => {
-            const fullPath = path.join(backupDirectory, fileName);
-            return {
-                fullPath,
-                mtimeMs: fs.statSync(fullPath).mtimeMs
-            };
-        })
-        .sort((a, b) => b.mtimeMs - a.mtimeMs);
-
-    for (const backup of backups.slice(backupKeep)) {
-        fs.unlinkSync(backup.fullPath);
-    }
-}
+const backupCompress = String(process.env.DATABASE_BACKUP_COMPRESS || 'true').toLowerCase() !== 'false';
+const compressionLevel = Math.min(Math.max(
+    Number.parseInt(process.env.DATABASE_BACKUP_COMPRESSION_LEVEL || '9', 10),
+    1
+), 9);
+const backupMaxBytes = Math.max(
+    Number.parseInt(process.env.DATABASE_BACKUP_MAX_MB || '96', 10),
+    16
+) * 1024 * 1024;
 
 (async () => {
-    fs.mkdirSync(backupDirectory, { recursive: true });
+    if (backupCompress) {
+        await compressExistingDatabaseBackups(backupDirectory, compressionLevel);
+    }
 
-    const destination = path.join(backupDirectory, backupFileName());
-    await db.backup(destination);
-    pruneBackups();
+    const backup = await createCompressedDatabaseBackup(db, {
+        backupDirectory,
+        reason: 'manual',
+        compress: backupCompress,
+        compressionLevel
+    });
+    pruneDatabaseBackups(backupDirectory, {
+        keep: backupKeep,
+        maxBytes: backupMaxBytes
+    });
     db.close();
 
-    console.log(`Sauvegarde locale créée : ${destination}`);
+    console.log(`Sauvegarde locale creee : ${backup.fullPath}`);
 })().catch(error => {
     console.error('Erreur sauvegarde locale :', error);
     process.exitCode = 1;

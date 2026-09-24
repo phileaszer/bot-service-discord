@@ -130,6 +130,8 @@ const STATIC_CACHE_MAX_ENTRY_BYTES = 8 * 1024 * 1024;
 const STATIC_ASSET_CACHE_CONTROL = 'public, max-age=3600, stale-while-revalidate=86400';
 const STATIC_SCRIPT_CACHE_CONTROL = 'no-cache';
 const STATIC_HTML_CACHE_CONTROL = 'no-cache';
+const STATIC_VERSIONED_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const JSON_COMPRESSION_MIN_BYTES = 1024;
 
 function createHttpError(status, message, details = {}) {
     const error = new Error(message);
@@ -1614,10 +1616,30 @@ function writeResponse(res, status, headers = {}, body = undefined) {
 }
 
 function json(res, status, payload) {
-    writeResponse(res, status, {
+    const req = res.sentinelRequest;
+    const headers = {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store'
-    }, JSON.stringify(payload));
+    };
+    let content = Buffer.from(JSON.stringify(payload));
+    const canCompress = !payload?.csrfToken && content.length >= JSON_COMPRESSION_MIN_BYTES;
+
+    if (canCompress && acceptsEncoding(req, 'br')) {
+        content = zlib.brotliCompressSync(content, {
+            params: {
+                [zlib.constants.BROTLI_PARAM_QUALITY]: 4
+            }
+        });
+        headers['Content-Encoding'] = 'br';
+        headers.Vary = 'Accept-Encoding';
+    } else if (canCompress && acceptsEncoding(req, 'gzip')) {
+        content = zlib.gzipSync(content, { level: 6 });
+        headers['Content-Encoding'] = 'gzip';
+        headers.Vary = 'Accept-Encoding';
+    }
+
+    headers['Content-Length'] = content.length;
+    writeResponse(res, status, headers, content);
 }
 
 function redirect(res, location) {
@@ -2471,6 +2493,9 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
         canView: true,
         access: siteAccess,
         summary,
+        storage: ctx.helpers.getDatabaseBackupStatus
+            ? ctx.helpers.getDatabaseBackupStatus()
+            : null,
         staff: await getSiteStaffUsers(ctx),
         guilds: items
     };
@@ -4709,13 +4734,17 @@ function serveStatic(req, res, url) {
 
     const stats = fs.statSync(finalPath);
     const entry = getCachedStaticFile(finalPath, ext, stats);
+    const versionedAsset = ['.css', '.js'].includes(ext)
+        && /^[a-z0-9._-]{1,64}$/i.test(url.searchParams.get('v') || '');
     const cacheControl = statusCode === 404
         ? 'no-store'
         : (finalPath === path.join(siteDir, 'dashboard.html')
             ? 'no-store'
-            : (ext === '.html'
-            ? STATIC_HTML_CACHE_CONTROL
-            : (ext === '.js' ? STATIC_SCRIPT_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL)));
+            : (versionedAsset
+                ? STATIC_VERSIONED_CACHE_CONTROL
+                : (ext === '.html'
+                    ? STATIC_HTML_CACHE_CONTROL
+                    : (ext === '.js' ? STATIC_SCRIPT_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL))));
     const headers = {
         'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
         'Cache-Control': cacheControl,

@@ -10,6 +10,27 @@ if (databaseDirectory && databaseDirectory !== '.') {
 }
 
 const db = new Database(databasePath);
+const hasExistingSchema = Boolean(db.prepare(`
+    SELECT 1
+    FROM sqlite_master
+    WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+    LIMIT 1
+`).get());
+
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
+db.pragma('temp_store = MEMORY');
+db.pragma('cache_size = -16000');
+db.pragma('mmap_size = 67108864');
+db.pragma('wal_autocheckpoint = 1000');
+db.pragma('journal_size_limit = 8388608');
+db.pragma('secure_delete = FAST');
+
+if (!hasExistingSchema) {
+    db.pragma('auto_vacuum = INCREMENTAL');
+}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS guild_configs (
