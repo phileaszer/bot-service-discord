@@ -834,7 +834,7 @@ function getSiteAccessRole(userId) {
     return SITE_ACCESS_ROLES.USER;
 }
 
-function getSiteAccess(userId) {
+function getStoredSiteAccess(userId) {
     const role = getSiteAccessRole(userId);
 
     return {
@@ -843,7 +843,59 @@ function getSiteAccess(userId) {
         isStaff: role === SITE_ACCESS_ROLES.STAFF,
         canViewSitePanel: role === SITE_ACCESS_ROLES.FOUNDER || role === SITE_ACCESS_ROLES.STAFF,
         canManagePremium: role === SITE_ACCESS_ROLES.FOUNDER,
-        canManageSiteStaff: role === SITE_ACCESS_ROLES.FOUNDER
+        canManageSiteStaff: role === SITE_ACCESS_ROLES.FOUNDER,
+        staffAssignment: role === SITE_ACCESS_ROLES.STAFF,
+        discordStaffRole: role === SITE_ACCESS_ROLES.FOUNDER
+    };
+}
+
+async function getReferenceStaffRoleState(ctx, userId) {
+    const guild = ctx.client.guilds.cache.get(SENTINEL_REFERENCE_GUILD_ID)
+        || await ctx.client.guilds.fetch(SENTINEL_REFERENCE_GUILD_ID).catch(() => null);
+    const requiredRoleIds = guild && ctx.helpers.getCommandRoleIds
+        ? ctx.helpers.getCommandRoleIds(guild.id)
+        : [];
+    const member = guild && userId
+        ? await guild.members.fetch({ user: String(userId), force: true }).catch(() => null)
+        : null;
+    const matchingRoleIds = member
+        ? requiredRoleIds.filter(roleId => member.roles.cache.has(roleId))
+        : [];
+
+    return {
+        guild,
+        member,
+        requiredRoleIds,
+        matchingRoleIds,
+        hasRequiredRole: matchingRoleIds.length > 0
+    };
+}
+
+async function getSiteAccess(ctx, userId) {
+    const storedAccess = getStoredSiteAccess(userId);
+
+    if (!storedAccess.isStaff) {
+        return storedAccess;
+    }
+
+    const roleState = await getReferenceStaffRoleState(ctx, userId);
+
+    if (!roleState.hasRequiredRole) {
+        return {
+            role: SITE_ACCESS_ROLES.USER,
+            isFounder: false,
+            isStaff: false,
+            canViewSitePanel: false,
+            canManagePremium: false,
+            canManageSiteStaff: false,
+            staffAssignment: true,
+            discordStaffRole: false
+        };
+    }
+
+    return {
+        ...storedAccess,
+        discordStaffRole: true
     };
 }
 
@@ -900,10 +952,14 @@ async function requireFounderAccess(session, options = {}) {
     }
 }
 
-async function requireSitePanelAccess(session) {
-    const access = getSiteAccess(session?.user?.id);
+async function requireSitePanelAccess(ctx, session) {
+    const access = await getSiteAccess(ctx, session?.user?.id);
 
     if (!access.canViewSitePanel) {
+        if (access.staffAssignment && !access.discordStaffRole) {
+            throw createHttpError(403, 'A Sentinel Discord staff role is required for site staff access.');
+        }
+
         throw createHttpError(403, 'Site staff access is required.');
     }
 
@@ -1837,7 +1893,7 @@ async function getOauthGuilds(session) {
 async function getDashboardAccess(ctx, session, guildId) {
     const oauthGuilds = await getOauthGuilds(session);
     const oauthGuild = oauthGuilds.find(guild => guild.id === guildId) || null;
-    const siteAccess = getSiteAccess(session?.user?.id);
+    const siteAccess = await getSiteAccess(ctx, session?.user?.id);
     const guild = ctx.client.guilds.cache.get(guildId)
         || await ctx.client.guilds.fetch(guildId).catch(() => null);
 
@@ -2183,9 +2239,12 @@ async function getSiteStaffUsers(ctx) {
 
     for (const row of listSiteStaffRows()) {
         const profile = getUserProfile(row.user_id);
-        const user = profile
-            ? null
-            : await ctx.client.users.fetch(row.user_id).catch(() => null);
+        const roleState = await getReferenceStaffRoleState(ctx, row.user_id);
+        const user = roleState.member?.user || (
+            profile
+                ? null
+                : await ctx.client.users.fetch(row.user_id).catch(() => null)
+        );
 
         staff.push({
             id: row.user_id,
@@ -2193,6 +2252,9 @@ async function getSiteStaffUsers(ctx) {
             globalName: profile?.globalName || user?.globalName || null,
             tag: user?.tag || profile?.username || row.user_id,
             avatar: profile?.avatar || user?.displayAvatarURL?.() || null,
+            inReferenceGuild: Boolean(roleState.member),
+            discordRoleVerified: roleState.hasRequiredRole,
+            matchingRoleIds: roleState.matchingRoleIds,
             grantedByUserId: row.granted_by_user_id || null,
             createdAt: row.created_at,
             updatedAt: row.updated_at
@@ -2221,7 +2283,8 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
     }
 
     if (add) {
-        const user = await ctx.client.users.fetch(userId).catch(() => null);
+        const roleState = await getReferenceStaffRoleState(ctx, userId);
+        const user = roleState.member?.user || await ctx.client.users.fetch(userId).catch(() => null);
 
         if (!user) {
             throw createHttpError(404, 'Discord user not found.');
@@ -2229,6 +2292,22 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
 
         if (user.bot) {
             throw createHttpError(400, 'Bot accounts cannot receive site staff access.');
+        }
+
+        if (!roleState.guild) {
+            throw createHttpError(503, 'The Sentinel Discord server is unavailable.');
+        }
+
+        if (roleState.requiredRoleIds.length === 0) {
+            throw createHttpError(409, 'No Sentinel Discord staff role is configured.');
+        }
+
+        if (!roleState.member) {
+            throw createHttpError(403, 'The user must join the Sentinel Discord server before receiving site staff access.');
+        }
+
+        if (!roleState.hasRequiredRole) {
+            throw createHttpError(403, 'The user must have a Sentinel Discord staff role before receiving site staff access.');
         }
 
         saveUserProfile({
@@ -2248,7 +2327,7 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
 }
 
 async function buildCreatorPremiumOverview(ctx, session = null) {
-    const siteAccess = getSiteAccess(session?.user?.id);
+    const siteAccess = await getSiteAccess(ctx, session?.user?.id);
     const configuredAdvancedGuildIds = new Set(getDashboardAdvancedGuildIds());
     const manualPremiumGuildIds = getManualPremiumGuildIds();
     const premiumRolesByGuild = getManualPremiumRolesByGuild();
@@ -2774,7 +2853,7 @@ async function buildGuildState(ctx, guild, session = null) {
         ctx.helpers.getCustomEmbedQuota(guild.id, viewerMember),
         advanced
     );
-    const siteAccess = getSiteAccess(session?.user?.id);
+    const siteAccess = await getSiteAccess(ctx, session?.user?.id);
     const canViewGlobalAudit = siteAccess.isFounder;
     const auditLimit = advanced || canViewGlobalAudit ? 50 : 10;
     const moderationCaseLimit = advanced || canViewGlobalAudit ? 25 : 10;
@@ -4118,7 +4197,7 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/session') {
-        const siteAccess = getSiteAccess(session.user.id);
+        const siteAccess = await getSiteAccess(ctx, session.user.id);
 
         json(res, 200, {
             ok: true,
@@ -4163,7 +4242,7 @@ async function handleApi(req, res, ctx, url) {
     if (req.method === 'GET' && url.pathname === '/api/guilds') {
         const oauthGuilds = await getOauthGuilds(session);
         const hasPremiumSubscription = await hasDashboardPremiumSubscription(ctx, session);
-        const siteAccess = getSiteAccess(session.user.id);
+        const siteAccess = await getSiteAccess(ctx, session.user.id);
         const guilds = [];
         const oauthGuildIds = new Set(oauthGuilds.map(guild => guild.id));
         const guildCandidates = siteAccess.canViewSitePanel
@@ -4214,7 +4293,7 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/creator/premium-overview') {
-        await requireSitePanelAccess(session);
+        await requireSitePanelAccess(ctx, session);
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
 
         json(res, 200, {

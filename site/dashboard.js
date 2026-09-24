@@ -380,6 +380,11 @@ function dashboardErrorMessage(input) {
       'Discord user not found.': 'This Discord account could not be found.',
       'Bot accounts cannot receive site staff access.': 'A bot account cannot receive site staff access.',
       'Site staff must be a member of this Discord server to perform actions.': 'Join this Discord server before performing an action.',
+      'A Sentinel Discord staff role is required for site staff access.': 'A staff role on the Sentinel Discord server is also required.',
+      'The Sentinel Discord server is unavailable.': 'The Sentinel Discord server is unavailable.',
+      'No Sentinel Discord staff role is configured.': 'No staff role is configured on the Sentinel Discord server.',
+      'The user must join the Sentinel Discord server before receiving site staff access.': 'This person must join the Sentinel Discord server first.',
+      'The user must have a Sentinel Discord staff role before receiving site staff access.': 'Give this person a staff role on the Sentinel Discord server first.',
       'Invalid Discord user ID.': 'The Discord ID is not valid.',
       'Text channel not found.': 'Text channel not found.',
       'Role not found.': 'Discord role not found.',
@@ -443,7 +448,8 @@ function dashboardErrorMessage(input) {
       'Invalid site staff action.': 'Choose add or remove.',
       'Founder access cannot be managed as staff.': 'The founder account already has full access.',
       'Recent Discord login is required.': 'Reconnect with Discord, then retry the protected action.',
-      'Discord session verification failed.': 'Reconnect with Discord to verify your identity.'
+      'Discord session verification failed.': 'Reconnect with Discord to verify your identity.',
+      'A Sentinel Discord staff role is required for site staff access.': 'Ask the founder to assign you a staff role on the Sentinel Discord server.'
     };
     const base = translated[message] || message || 'Action failed.';
     const resolution = payloadFix || resolutionByMessage[message];
@@ -477,6 +483,11 @@ function dashboardErrorMessage(input) {
     'Discord user not found.': 'Ce compte Discord est introuvable.',
     'Bot accounts cannot receive site staff access.': 'Un compte bot ne peut pas recevoir le grade staff du site.',
     'Site staff must be a member of this Discord server to perform actions.': 'Tu dois être membre de ce serveur Discord pour y effectuer une action.',
+    'A Sentinel Discord staff role is required for site staff access.': 'Un rôle staff sur le Discord Sentinel est aussi obligatoire.',
+    'The Sentinel Discord server is unavailable.': 'Le serveur Discord Sentinel est temporairement indisponible.',
+    'No Sentinel Discord staff role is configured.': 'Aucun rôle staff n’est configuré sur le Discord Sentinel.',
+    'The user must join the Sentinel Discord server before receiving site staff access.': 'Cette personne doit d’abord rejoindre le Discord Sentinel.',
+    'The user must have a Sentinel Discord staff role before receiving site staff access.': 'Donne d’abord un rôle staff à cette personne sur le Discord Sentinel.',
     'Invalid Discord user ID.': 'L’ID Discord indiqué n’est pas valide.',
     'Text channel not found.': 'Salon textuel introuvable.',
     'Role not found.': 'Rôle Discord introuvable.',
@@ -543,7 +554,8 @@ function dashboardErrorMessage(input) {
     'Invalid site staff action.': 'Choisis ajouter ou retirer.',
     'Founder access cannot be managed as staff.': 'Le compte fondateur n’a pas besoin d’être ajouté comme staff.',
     'Recent Discord login is required.': 'Reconnecte-toi avec Discord puis relance l’action protégée.',
-    'Discord session verification failed.': 'Reconnecte-toi avec Discord pour confirmer ton identité.'
+    'Discord session verification failed.': 'Reconnecte-toi avec Discord pour confirmer ton identité.',
+    'A Sentinel Discord staff role is required for site staff access.': 'Demande au fondateur de t’attribuer un rôle staff sur le Discord Sentinel.'
   };
   const resolution = payloadFix || resolutionByMessage[message];
 
@@ -3752,10 +3764,11 @@ function siteStaffList(overview) {
   return `
     <ul class="compact-list founder-premium-list site-staff-list">
       ${staff.map((item) => `
-        <li>
+        <li class="${item.discordRoleVerified ? '' : 'is-warning'}">
           <span>
             <strong>${escapeHtml(item.globalName || item.tag || item.username || item.id)}</strong>
             <small><code>${escapeHtml(item.id)}</code>${item.createdAt ? ` - depuis ${escapeHtml(formatAuditDate(item.createdAt))}` : ''}</small>
+            <small>${item.discordRoleVerified ? 'Rôle Discord vérifié' : (item.inReferenceGuild ? 'Rôle staff Discord manquant' : 'Hors du Discord Sentinel')}</small>
           </span>
           ${canManageFounderPanel() ? `
             <button
@@ -3776,12 +3789,12 @@ function creatorStaffManagePanel(overview) {
   return `
     <div class="founder-console-note">
       <strong>Accès de régie</strong>
-      <span>Le grade staff site est lié au compte Discord. Il peut consulter la régie, mais seul le fondateur peut accorder Premium ou modifier les accès staff.</span>
+      <span>L’accès exige les deux validations : ajout par le fondateur dans la Régie et rôle staff sur le Discord Sentinel. Seul le fondateur peut accorder Premium ou modifier ces accès.</span>
     </div>
     ${canManageFounderPanel() ? `
       <form class="creator-premium-form creator-staff-form" data-creator-staff-form>
         <input type="hidden" name="action" value="add">
-        ${labelHelp('Ajouter un staff site', 'Seul le fondateur peut donner ce grade. Utilise l’ID Discord numérique complet du compte à autoriser.')}
+        ${labelHelp('Ajouter un staff site', 'La personne doit déjà être sur le Discord Sentinel et y posséder un rôle staff configuré. Utilise son ID Discord numérique complet.')}
         <div class="creator-premium-row">
           <input name="userId" placeholder="ID utilisateur Discord" required>
           <button class="button button-small" type="submit">Ajouter staff</button>
