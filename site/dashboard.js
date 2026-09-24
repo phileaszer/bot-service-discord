@@ -2513,9 +2513,9 @@ function payrollArchiveHistory(history, copy) {
         ${filtered.length ? filtered.map((archive) => {
           const totals = archive.totals || {};
           const settled = (totals.userCount || 0) > 0 && (totals.unpaidCount || 0) === 0;
-          const open = expandedPayrollArchiveWeek === archive.weekStart ? ' open' : '';
+          const isExpanded = expandedPayrollArchiveWeek === archive.weekStart;
           return `
-            <details class="payroll-history-period" data-payroll-history-period="${escapeHtml(archive.weekStart)}"${open}>
+            <details class="payroll-history-period" data-payroll-history-period="${escapeHtml(archive.weekStart)}"${isExpanded ? ' open' : ''}>
               <summary>
                 <span>
                   <strong>${escapeHtml(archive.weekStart)} → ${escapeHtml(archive.weekEnd)}</strong>
@@ -2527,7 +2527,7 @@ function payrollArchiveHistory(history, copy) {
                   ${statusBadge(settled ? copy.historySettled : copy.historyOpen, settled)}
                 </span>
               </summary>
-              <div class="payroll-history-period-body">
+              ${isExpanded ? `<div class="payroll-history-period-body">
                 <div class="payroll-history-meta">
                   <div><span>${escapeHtml(copy.totalHours)}</span><strong>${escapeHtml(totals.totalTimeLabel || '')}</strong></div>
                   <div><span>${escapeHtml(copy.alreadyPaid)}</span><strong>${escapeHtml(totals.paidAmountLabel || '')}</strong></div>
@@ -2543,7 +2543,7 @@ function payrollArchiveHistory(history, copy) {
                   <h4>${escapeHtml(copy.paymentJournal)}</h4>
                   ${payrollArchiveJournal(archive, copy)}
                 </div>
-              </div>
+              </div>` : ''}
             </details>
           `;
         }).join('') : `<p class="muted">${escapeHtml(copy.historyNoMatch)}</p>`}
@@ -4541,9 +4541,14 @@ function renderDashboardTabs(state, premiumBadge) {
   `;
 }
 
-function tabPanel(id, content) {
+function tabPanel(id, renderContent) {
+  const isActive = id === activeDashboardTab;
+  const content = isActive
+    ? (typeof renderContent === 'function' ? renderContent() : renderContent)
+    : '';
+
   return `
-    <section class="dashboard-tab-panel${id === activeDashboardTab ? ' is-active' : ''}" data-dashboard-tab-panel="${id}" ${id === activeDashboardTab ? '' : 'hidden'}>
+    <section class="dashboard-tab-panel${isActive ? ' is-active' : ''}" data-dashboard-tab-panel="${id}" ${isActive ? '' : 'hidden'}>
       ${content}
     </section>
   `;
@@ -4574,13 +4579,14 @@ function renderDashboard() {
     activeDashboardTab = tabs[0]?.id || 'overview';
   }
 
-  const roleOptions = optionList(state.roles, state.config.serviceRoleId, 'Choisir un rôle');
-  const autoRoleOptions = optionList(state.roles, state.config.autoRoleId, 'Choisir un rôle automatique');
-  const commandRoleOptions = optionList(state.roles, null, 'Choisir un rôle autorisé');
-  const dossierRoleOptions = optionList(state.roles, null, 'Choisir un rôle responsable');
-  const pingRoleOptions = optionList(state.roles, null, 'Aucun ping de rôle');
-  const channelOptions = optionList(state.channels, state.config.logChannelId, 'Choisir un salon');
-  const statusChannelOptions = optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut');
+  const optionMarkup = {};
+  const getRoleOptions = () => (optionMarkup.roles ??= optionList(state.roles, state.config.serviceRoleId, 'Choisir un rôle'));
+  const getAutoRoleOptions = () => (optionMarkup.autoRoles ??= optionList(state.roles, state.config.autoRoleId, 'Choisir un rôle automatique'));
+  const getCommandRoleOptions = () => (optionMarkup.commandRoles ??= optionList(state.roles, null, 'Choisir un rôle autorisé'));
+  const getDossierRoleOptions = () => (optionMarkup.dossierRoles ??= optionList(state.roles, null, 'Choisir un rôle responsable'));
+  const getPingRoleOptions = () => (optionMarkup.pingRoles ??= optionList(state.roles, null, 'Aucun ping de rôle'));
+  const getChannelOptions = () => (optionMarkup.channels ??= optionList(state.channels, state.config.logChannelId, 'Choisir un salon'));
+  const getStatusChannelOptions = () => (optionMarkup.statusChannels ??= optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut'));
   const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
   const premiumTag = '<span class="premium-tag">Option Premium</span>';
   const planClass = premiumVisibilityClass(state);
@@ -4588,15 +4594,15 @@ function renderDashboard() {
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
     <div class="dashboard-tab-stage${planClass}">
-      ${tabPanel('overview', renderServerHome(state, premiumBadge))}
+      ${tabPanel('overview', () => renderServerHome(state, premiumBadge))}
 
-      ${tabPanel('setup', renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions))}
+      ${tabPanel('setup', () => renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions()))}
 
-      ${tabPanel('configuration', renderConfigurationHub(state, channelOptions, statusChannelOptions))}
+      ${tabPanel('configuration', () => renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions()))}
 
-      ${tabPanel('service', renderServicePanel(state, premiumBadge, premiumTag))}
+      ${tabPanel('service', () => renderServicePanel(state, premiumBadge, premiumTag))}
 
-      ${tabPanel('embeds', `
+      ${tabPanel('embeds', () => `
     <section class="dashboard-panel module-panel announcements-panel" id="embeds">
       <div class="panel-heading row-heading">
         <div>
@@ -4609,11 +4615,11 @@ function renderDashboard() {
       <div class="form-grid module-form-grid">
         <form data-action-form="custom-embed-create">
           ${labelHelp('Créer un embed Sentinel', 'Publie une annonce propre sous l’identité de Sentinel dans le salon choisi. Le gratuit garde un nombre limité d’embeds actifs.')}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="title" placeholder="Titre" maxlength="256" required>
           <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
           <input name="color" placeholder="Couleur : rose, cyan, #ff2d9a">
-          <select name="roleId">${pingRoleOptions}</select>
+          <select name="roleId">${getPingRoleOptions()}</select>
           <input name="imageUrl" placeholder="Image URL optionnelle">
           ${fileUploadControl('imageFile', 'Photo principale', 'Aucune photo sélectionnée', 'Importer')}
           <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
@@ -4624,7 +4630,7 @@ function renderDashboard() {
         </form>
         <form data-action-form="custom-embed-edit">
           ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message. Choisis le salon si l’embed n’apparaît pas encore dans la liste gérée.')}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <input name="title" placeholder="Nouveau titre">
           <textarea name="description" placeholder="Nouveau message"></textarea>
@@ -4639,7 +4645,7 @@ function renderDashboard() {
         </form>
         <form data-action-form="custom-embed-delete">
           ${labelHelp('Supprimer un embed Sentinel', 'Supprime un embed géré par Sentinel avec son ID de message et libère son emplacement gratuit si le serveur n’est pas Premium.')}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <button class="button button-ghost" type="submit">Supprimer</button>
         </form>
@@ -4659,7 +4665,7 @@ function renderDashboard() {
     </section>
       `)}
 
-      ${tabPanel('dossiers', `
+      ${tabPanel('dossiers', () => `
     <section class="dashboard-panel module-panel dossiers-panel" id="dossiers">
       <div class="panel-heading row-heading">
         <div>
@@ -4677,7 +4683,7 @@ function renderDashboard() {
       <div class="form-grid module-form-grid">
         <form data-action-form="publish-dossier-panel">
           ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau de tickets. En gratuit, un serveur garde un seul panneau actif ; en Premium, les panneaux seront illimités.')}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <button class="button" type="submit">Publier le bureau</button>
         </form>
         <article class="inline-form dossier-explain-card">
@@ -4687,7 +4693,7 @@ function renderDashboard() {
         <article class="inline-form dossier-explain-card">
           ${labelHelp('Rôles responsables', 'Ces rôles peuvent voir les tickets, les prendre en charge, changer leur statut, générer l’archive et clôturer le salon.')}
           <form data-action-form="add-dossier-role">
-            <select name="roleId">${dossierRoleOptions}</select>
+            <select name="roleId">${getDossierRoleOptions()}</select>
             <button class="button" type="submit">Ajouter le rôle</button>
           </form>
           ${dossierRoleList(state)}
@@ -4712,11 +4718,11 @@ function renderDashboard() {
     </section>
       `)}
 
-      ${tabPanel('audit', renderAuditPanel(state))}
+      ${tabPanel('audit', () => renderAuditPanel(state))}
 
-      ${canShowFounderTab(state) ? tabPanel('founder', renderFounderPremiumPanel()) : ''}
+      ${canShowFounderTab(state) ? tabPanel('founder', () => renderFounderPremiumPanel()) : ''}
 
-      ${tabPanel('moderation', `
+      ${tabPanel('moderation', () => `
     <section class="dashboard-panel module-panel moderation-panel" id="moderation">
       <div class="panel-heading">
         <p class="eyebrow">Sécurité</p>
@@ -4729,7 +4735,7 @@ function renderDashboard() {
           ${labelHelp('Grade automatique d’arrivée', 'Donne automatiquement un grade aux nouveaux membres qui rejoignent le serveur. Sentinel doit avoir Gérer les rôles et être placé au-dessus du grade choisi.')}
           <p class="muted">Actuel : ${state.config.autoRoleId ? escapeHtml(resolveRole(state, state.config.autoRoleId)?.name || 'rôle supprimé sur Discord') : 'désactivé'}</p>
           <form data-action-form="set-auto-role">
-            <select name="roleId">${autoRoleOptions}</select>
+            <select name="roleId">${getAutoRoleOptions()}</select>
             <button class="button" type="submit">Configurer le grade</button>
           </form>
           <form data-action-form="disable-auto-role">
@@ -4771,7 +4777,7 @@ function renderDashboard() {
         </form>
         <form data-action-form="purge">
           ${labelHelp('Nettoyer un salon', 'Supprime rapidement un nombre défini de messages récents dans le salon choisi.')}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="count" type="number" min="1" max="100" value="10">
           <button class="button" type="submit">Purger</button>
         </form>
@@ -4815,19 +4821,19 @@ function renderDashboard() {
         </form>
         <form data-action-form="lock">
           ${labelHelp('Verrouiller salon', 'Option Premium : bloque l’envoi de messages dans un salon pour calmer une situation ou préparer une annonce.', ` ${premiumTag}`)}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Verrouiller</button>
         </form>
         <form data-action-form="unlock">
           ${labelHelp('Rouvrir un salon', 'Option Premium : remet un salon verrouillé en mode normal pour permettre aux membres de reparler.', ` ${premiumTag}`)}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Rouvrir</button>
         </form>
         <form data-action-form="slowmode">
           ${labelHelp('Ralentir un salon', 'Option Premium : impose un délai entre deux messages pour calmer un salon trop actif.', ` ${premiumTag}`)}
-          <select name="channelId">${channelOptions}</select>
+          <select name="channelId">${getChannelOptions()}</select>
           <input name="duration" placeholder="10s, 5m, 0">
           <input name="reason" placeholder="Raison">
           <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Ralentir</button>
@@ -5019,7 +5025,7 @@ async function loadMorePayrollArchives(button = null) {
   try {
     const currentItems = currentState.payrollArchives.items || [];
     const params = new URLSearchParams({
-      limit: '52',
+      limit: '24',
       offset: String(currentItems.length)
     });
     const payload = await api(`/api/guilds/${selectedGuildId}/payroll-archives?${params}`);
@@ -5242,9 +5248,12 @@ function attachDashboardHandlers() {
 
   $$('[data-payroll-history-period]').forEach((details) => {
     details.addEventListener('toggle', () => {
-      if (details.open) {
-        expandedPayrollArchiveWeek = details.dataset.payrollHistoryPeriod || null;
-      } else if (expandedPayrollArchiveWeek === details.dataset.payrollHistoryPeriod) {
+      const weekStart = details.dataset.payrollHistoryPeriod || null;
+
+      if (details.open && expandedPayrollArchiveWeek !== weekStart) {
+        expandedPayrollArchiveWeek = weekStart;
+        renderDashboard();
+      } else if (!details.open && expandedPayrollArchiveWeek === weekStart) {
         expandedPayrollArchiveWeek = null;
       }
     });

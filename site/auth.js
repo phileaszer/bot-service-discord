@@ -234,8 +234,9 @@
     const header = document.querySelector('.site-header');
     const nav = header?.querySelector('.nav-links');
     const actions = header?.querySelector('.header-actions');
+    const brand = header?.querySelector('.brand');
 
-    if (!header || !nav || !actions || header.querySelector('[data-nav-toggle]')) {
+    if (!header || !nav || !actions || !brand || header.querySelector('[data-nav-toggle]')) {
       return;
     }
 
@@ -252,10 +253,73 @@
     toggle.textContent = 'Menu';
     actions.prepend(toggle);
 
+    let measureFrame = null;
+
     function setOpen(isOpen) {
       header.classList.toggle('is-nav-open', isOpen);
       toggle.setAttribute('aria-expanded', String(isOpen));
       toggle.textContent = isOpen ? 'Fermer' : 'Menu';
+    }
+
+    function outerWidth(element) {
+      const style = window.getComputedStyle(element);
+      return element.getBoundingClientRect().width
+        + (Number.parseFloat(style.marginLeft) || 0)
+        + (Number.parseFloat(style.marginRight) || 0);
+    }
+
+    function childrenWidth(container, excludedElement = null) {
+      const style = window.getComputedStyle(container);
+      const visibleChildren = Array.from(container.children).filter((child) => (
+        child !== excludedElement
+        && !child.hidden
+        && window.getComputedStyle(child).display !== 'none'
+      ));
+      const gap = Number.parseFloat(style.columnGap || style.gap) || 0;
+      const padding = (Number.parseFloat(style.paddingLeft) || 0)
+        + (Number.parseFloat(style.paddingRight) || 0);
+      const borders = (Number.parseFloat(style.borderLeftWidth) || 0)
+        + (Number.parseFloat(style.borderRightWidth) || 0);
+
+      return visibleChildren.reduce((total, child) => total + outerWidth(child), 0)
+        + Math.max(0, visibleChildren.length - 1) * gap
+        + padding
+        + borders;
+    }
+
+    function syncMenuMode() {
+      measureFrame = null;
+      const wasOpen = header.classList.contains('is-nav-open');
+
+      header.classList.remove('has-collapsed-nav', 'is-nav-open');
+
+      const headerStyle = window.getComputedStyle(header);
+      const availableWidth = header.clientWidth
+        - (Number.parseFloat(headerStyle.paddingLeft) || 0)
+        - (Number.parseFloat(headerStyle.paddingRight) || 0);
+      const columnGap = Number.parseFloat(headerStyle.columnGap || headerStyle.gap) || 0;
+      const requiredWidth = outerWidth(brand)
+        + childrenWidth(nav)
+        + childrenWidth(actions, toggle)
+        + (columnGap * 2)
+        + 8;
+      const shouldCollapse = requiredWidth > availableWidth;
+
+      header.classList.toggle('has-collapsed-nav', shouldCollapse);
+
+      if (shouldCollapse && wasOpen) {
+        setOpen(true);
+      } else {
+        setOpen(false);
+      }
+    }
+
+    function scheduleMenuMode() {
+      if (measureFrame !== null) {
+        return;
+      }
+
+      measureFrame = window.requestAnimationFrame(syncMenuMode);
     }
 
     toggle.addEventListener('click', () => {
@@ -273,13 +337,21 @@
         setOpen(false);
       }
     });
+
+    window.addEventListener('resize', scheduleMenuMode, { passive: true });
+    window.addEventListener('load', scheduleMenuMode, { once: true });
+    document.fonts?.ready?.then(scheduleMenuMode).catch(() => {});
+    window.addEventListener('sentinel:site-language-change', scheduleMenuMode);
+
+    scheduleMenuMode();
+    return scheduleMenuMode;
   }
 
   function init() {
-    initHeaderMenu();
+    const refreshHeaderMenu = initHeaderMenu();
     decorateLoginLinks();
     attachCopyCommands();
-    loadSession();
+    loadSession().finally(() => refreshHeaderMenu?.());
   }
 
   window.SentinelAuth = {

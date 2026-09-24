@@ -2850,8 +2850,10 @@ async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
 }
 
 async function buildGuildState(ctx, guild, session = null) {
-    await guild.roles.fetch().catch(() => null);
-    await guild.channels.fetch().catch(() => null);
+    await Promise.all([
+        guild.roles.fetch().catch(() => null),
+        guild.channels.fetch().catch(() => null)
+    ]);
 
     const config = ctx.helpers.getGuildConfig(guild.id);
     const summary = ctx.helpers.getServiceSummary(guild.id);
@@ -2966,9 +2968,9 @@ async function buildGuildState(ctx, guild, session = null) {
             ? ctx.helpers.getWeeklyPayrollArchives(guild.id, {
                 language: config.language,
                 guild,
-                limit: 52
+                limit: 12
             })
-            : { limit: 52, totalCount: 0, hasMore: false, items: [] },
+            : { limit: 12, totalCount: 0, hasMore: false, items: [] },
         personalService: viewerUserId
             ? {
                 userId: viewerUserId,
@@ -4464,7 +4466,7 @@ async function handleApi(req, res, ctx, url) {
     const payrollArchivesMatch = /^\/api\/guilds\/(\d{17,20})\/payroll-archives$/.exec(url.pathname);
     if (req.method === 'GET' && payrollArchivesMatch) {
         const { guild } = await getDashboardAccess(ctx, session, payrollArchivesMatch[1]);
-        const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 52, 1), 52);
+        const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 24, 1), 52);
         const offset = Math.min(Math.max(Number(url.searchParams.get('offset')) || 0, 0), 10000);
 
         json(res, 200, {
