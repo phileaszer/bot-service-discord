@@ -115,6 +115,10 @@ Les données nécessaires au fonctionnement sont décrites dans la Politique de 
 
 Les informations d'exploitation du bot restent privées. Les fichiers de configuration, données internes, logs et sauvegardes locales ne doivent jamais être publiés.
 
+Le dashboard applique une autorisation côté serveur à chaque requête. Le grade staff du site donne une vue de régie, mais ne donne ni le rôle fondateur ni les permissions d'administration d'un serveur Discord. Toute action sur un serveur exige aussi que la personne soit membre du serveur et possède les permissions Discord ou le rôle Sentinel attendu.
+
+Les changements de grade staff et d'accès Premium sont réservés au compte fondateur, exigent une connexion Discord récente et sont inscrits dans le journal d'audit. Retirer le grade staff révoque immédiatement toutes les sessions dashboard de la personne.
+
 ## Licence
 
 Sentinel est un projet propriétaire. Le dépôt est consultable publiquement pour présenter le bot et suivre son évolution, mais le code ne peut pas être copié, redistribué ou réutilisé sans autorisation préalable.

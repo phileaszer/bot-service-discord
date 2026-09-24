@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
 const path = require('path');
 const zlib = require('zlib');
 const { ChannelType, PermissionsBitField } = require('discord.js');
@@ -12,9 +13,22 @@ const staticFileCache = new Map();
 let dashboardServer = null;
 const dashboardStartedAt = new Date().toISOString();
 
+function boundedEnvInteger(name, fallback, min, max) {
+    const parsed = Number.parseInt(process.env[name] || '', 10);
+    const value = Number.isSafeInteger(parsed) ? parsed : fallback;
+    return Math.min(Math.max(value, min), max);
+}
+
 const DISCORD_API = 'https://discord.com/api/v10';
 const SESSION_COOKIE = 'sentinel_session';
+const SECURE_SESSION_COOKIE = '__Host-sentinel_session';
+const OAUTH_COOKIE = 'sentinel_oauth';
+const SECURE_OAUTH_COOKIE = '__Host-sentinel_oauth';
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
+const OAUTH_STATE_TTL = 10 * 60 * 1000;
+const OAUTH_STATES_MAX = 1000;
+const PRIVILEGED_REAUTH_TTL = boundedEnvInteger('DASHBOARD_PRIVILEGED_REAUTH_MINUTES', 30, 5, 120) * 60 * 1000;
+const PRIVILEGED_IDENTITY_TTL = boundedEnvInteger('DASHBOARD_PRIVILEGED_VERIFY_SECONDS', 300, 60, 900) * 1000;
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
@@ -31,7 +45,7 @@ const CREATOR_USER_IDS = new Set(
     String(process.env.SENTINEL_CREATOR_USER_ID || process.env.CREATOR_USER_ID || '')
         .split(/[,\s]+/)
         .map(value => value.trim())
-        .filter(Boolean)
+        .filter(value => /^\d{17,20}$/.test(value))
 );
 const SITE_ACCESS_ROLES = {
     FOUNDER: 'founder',
@@ -409,14 +423,32 @@ function getAllowedPublicOrigins() {
     ]);
 }
 
+function normalizeClientIp(value) {
+    const raw = String(firstHeaderValue(value) || '').trim();
+
+    if (!raw) {
+        return null;
+    }
+
+    const normalized = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+    return net.isIP(normalized) ? normalized : null;
+}
+
 function getClientIp(req) {
+    const railwayRealIp = normalizeClientIp(req.headers['x-real-ip']);
+
+    if (railwayRealIp) {
+        return railwayRealIp;
+    }
+
     const forwardedFor = req.headers['x-forwarded-for'];
     const forwarded = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-    const ip = forwarded?.split(',')[0]?.trim()
-        || req.socket?.remoteAddress
-        || null;
+    const forwardedIp = String(forwarded || '')
+        .split(',')
+        .map(value => normalizeClientIp(value))
+        .find(Boolean);
 
-    return ip;
+    return forwardedIp || normalizeClientIp(req.socket?.remoteAddress);
 }
 
 function hashSessionValue(value) {
@@ -616,6 +648,53 @@ function addDashboardAuditLog({ guild, actor, body, status, summary }) {
     );
 }
 
+function addSiteAccessAuditLog({ session, body, status, summary, kind }) {
+    const operation = ['add', 'remove', 'ajouter', 'retirer'].includes(String(body?.action || '').toLowerCase())
+        ? String(body.action).toLowerCase()
+        : 'unknown';
+    const target = kind === 'site_staff'
+        ? 'user'
+        : String(body?.target || 'unknown').toLowerCase();
+    const guildId = normalizeDiscordIdValue(body?.guildId || body?.serverId || body?.serveurId);
+    const targetId = normalizeDiscordIdValue(
+        body?.userId
+        || body?.utilisateurId
+        || body?.roleId
+        || guildId
+    );
+
+    db.prepare(`
+        INSERT INTO dashboard_audit_logs (
+            guild_id,
+            guild_name,
+            actor_user_id,
+            actor_username,
+            action,
+            status,
+            target_type,
+            target_id,
+            summary,
+            details,
+            source,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        guildId || 'site',
+        guildId ? null : 'Régie Sentinel',
+        session?.user?.id || 'unknown',
+        truncateText(session?.user?.username || session?.user?.globalName || null, 200),
+        truncateText(`${kind}_${operation}_${target}`, 500),
+        status,
+        target,
+        targetId,
+        truncateText(summary || 'Action protégée Sentinel.', 800),
+        JSON.stringify({ kind, operation, target }),
+        'site',
+        nowIso()
+    );
+}
+
 function buildAuditQuery({ guildId = null, actorUserId = null, targetId = null, action = null, status = null, source = null, limit = 25 } = {}) {
     const where = [];
     const params = [];
@@ -768,18 +847,67 @@ function getSiteAccess(userId) {
     };
 }
 
-function requireFounderAccess(session) {
+async function verifyPrivilegedDiscordIdentity(session) {
+    if (!session?.user?.id || !session.accessToken) {
+        throw createHttpError(401, 'Login required.');
+    }
+
+    if (
+        session.privilegedIdentityVerifiedAt
+        && session.privilegedIdentityVerifiedAt > Date.now() - PRIVILEGED_IDENTITY_TTL
+    ) {
+        return;
+    }
+
+    let user;
+
+    try {
+        user = await discordFetch('/users/@me', session.accessToken);
+    } catch (error) {
+        throw createHttpError(401, 'Discord session verification failed.', {
+            code: 'REAUTH_REQUIRED',
+            reauthUrl: '/auth/login?return_to=%2Fdashboard'
+        });
+    }
+
+    if (String(user.id) !== String(session.user.id)) {
+        throw createHttpError(401, 'Discord session verification failed.', {
+            code: 'REAUTH_REQUIRED',
+            reauthUrl: '/auth/login?return_to=%2Fdashboard'
+        });
+    }
+
+    session.privilegedIdentityVerifiedAt = Date.now();
+}
+
+async function requireFounderAccess(session, options = {}) {
     if (!isCreatorUser(session?.user?.id)) {
         throw createHttpError(403, 'Founder access is required.');
     }
+
+    await verifyPrivilegedDiscordIdentity(session);
+
+    const createdAt = Number(session.createdAt);
+
+    if (
+        options.recentLogin
+        && (!Number.isFinite(createdAt) || createdAt < Date.now() - PRIVILEGED_REAUTH_TTL)
+    ) {
+        throw createHttpError(401, 'Recent Discord login is required.', {
+            code: 'REAUTH_REQUIRED',
+            reauthUrl: '/auth/login?return_to=%2Fdashboard'
+        });
+    }
 }
 
-function requireSitePanelAccess(session) {
+async function requireSitePanelAccess(session) {
     const access = getSiteAccess(session?.user?.id);
 
     if (!access.canViewSitePanel) {
         throw createHttpError(403, 'Site staff access is required.');
     }
+
+    await verifyPrivilegedDiscordIdentity(session);
 
     return access;
 }
@@ -957,17 +1085,65 @@ function parseCookies(req) {
     }, {});
 }
 
+function appendSetCookie(res, value) {
+    const current = res.getHeader('Set-Cookie');
+
+    if (!current) {
+        res.setHeader('Set-Cookie', value);
+        return;
+    }
+
+    res.setHeader('Set-Cookie', [
+        ...(Array.isArray(current) ? current : [current]),
+        value
+    ]);
+}
+
+function getSessionCookieName(req) {
+    return shouldUseSecureCookies(req) ? SECURE_SESSION_COOKIE : SESSION_COOKIE;
+}
+
+function getOauthCookieName(req) {
+    return shouldUseSecureCookies(req) ? SECURE_OAUTH_COOKIE : OAUTH_COOKIE;
+}
+
 function sessionCookieAttributes(req, maxAge) {
+    const secure = shouldUseSecureCookies(req) ? '; Secure' : '';
+    return `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}; Priority=High${secure}`;
+}
+
+function oauthCookieAttributes(req, maxAge) {
     const secure = shouldUseSecureCookies(req) ? '; Secure' : '';
     return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}; Priority=High${secure}`;
 }
 
 function setSessionCookie(res, req, sessionId) {
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; ${sessionCookieAttributes(req, Math.floor(SESSION_TTL / 1000))}`);
+    const cookieName = getSessionCookieName(req);
+    appendSetCookie(res, `${cookieName}=${encodeURIComponent(sessionId)}; ${sessionCookieAttributes(req, Math.floor(SESSION_TTL / 1000))}`);
+
+    if (cookieName !== SESSION_COOKIE) {
+        appendSetCookie(res, `${SESSION_COOKIE}=; ${sessionCookieAttributes(req, 0)}`);
+    }
 }
 
 function clearSessionCookie(res, req) {
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; ${sessionCookieAttributes(req, 0)}`);
+    appendSetCookie(res, `${getSessionCookieName(req)}=; ${sessionCookieAttributes(req, 0)}`);
+
+    if (getSessionCookieName(req) !== SESSION_COOKIE) {
+        appendSetCookie(res, `${SESSION_COOKIE}=; ${sessionCookieAttributes(req, 0)}`);
+    }
+}
+
+function setOauthCookie(res, req, nonce) {
+    appendSetCookie(res, `${getOauthCookieName(req)}=${encodeURIComponent(nonce)}; ${oauthCookieAttributes(req, Math.floor(OAUTH_STATE_TTL / 1000))}`);
+}
+
+function clearOauthCookie(res, req) {
+    appendSetCookie(res, `${getOauthCookieName(req)}=; ${oauthCookieAttributes(req, 0)}`);
+
+    if (getOauthCookieName(req) !== OAUTH_COOKIE) {
+        appendSetCookie(res, `${OAUTH_COOKIE}=; ${oauthCookieAttributes(req, 0)}`);
+    }
 }
 
 function isValidSessionId(sessionId) {
@@ -1183,6 +1359,18 @@ function deleteDashboardSession(sessionId) {
     }
 }
 
+function deleteDashboardSessionsForUser(userId) {
+    const normalizedUserId = String(userId || '');
+
+    for (const [sessionId, session] of sessions.entries()) {
+        if (String(session?.user?.id || '') === normalizedUserId) {
+            sessions.delete(sessionId);
+        }
+    }
+
+    db.prepare('DELETE FROM dashboard_sessions WHERE user_id = ?').run(normalizedUserId);
+}
+
 function sessionFingerprintMatches(req, session) {
     const fingerprint = getSessionFingerprint(req);
 
@@ -1203,7 +1391,7 @@ function sessionFingerprintMatches(req, session) {
 }
 
 function getSession(req) {
-    const sessionId = parseCookies(req)[SESSION_COOKIE];
+    const sessionId = parseCookies(req)[getSessionCookieName(req)];
 
     if (!isValidSessionId(sessionId)) {
         return null;
@@ -1249,6 +1437,7 @@ function createSession(payload, req = null) {
     const session = {
         ...payload,
         csrfToken: createCsrfToken(),
+        privilegedIdentityVerifiedAt: Date.now(),
         ipHash: fingerprint.ipHash || null,
         userAgent: fingerprint.userAgent || null,
         createdAt: Date.now(),
@@ -1299,12 +1488,14 @@ function buildContentSecurityPolicy(req) {
 function securityHeaders(req, headers = {}) {
     const next = {
         'X-Content-Type-Options': 'nosniff',
+        'X-DNS-Prefetch-Control': 'off',
         'X-Frame-Options': 'DENY',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Referrer-Policy': 'no-referrer',
         'Permissions-Policy': 'accelerometer=(), autoplay=(), camera=(), clipboard-read=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), browsing-topics=()',
-        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+        'Cross-Origin-Opener-Policy': 'same-origin',
         'Origin-Agent-Cluster': '?1',
         'X-Permitted-Cross-Domain-Policies': 'none',
+        'Cross-Origin-Resource-Policy': 'same-origin',
         'Content-Security-Policy': buildContentSecurityPolicy(req),
         ...headers
     };
@@ -1347,6 +1538,15 @@ function responseHeaders(res, headers = {}) {
 
     if (next['Access-Control-Allow-Origin']) {
         appendVary(next, 'Origin');
+        next['Cross-Origin-Resource-Policy'] = 'cross-origin';
+    }
+
+    if (
+        url?.pathname?.startsWith('/api/')
+        || url?.pathname?.startsWith('/auth/')
+        || ['/dashboard', '/dashboard.html'].includes(url?.pathname)
+    ) {
+        next['X-Robots-Tag'] = 'noindex, nofollow, noarchive';
     }
 
     return next;
@@ -2023,20 +2223,27 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
     if (add) {
         const user = await ctx.client.users.fetch(userId).catch(() => null);
 
-        if (user) {
-            saveUserProfile({
-                id: user.id,
-                username: user.username,
-                globalName: user.globalName,
-                avatar: user.displayAvatarURL?.() || null
-            });
+        if (!user) {
+            throw createHttpError(404, 'Discord user not found.');
         }
 
+        if (user.bot) {
+            throw createHttpError(400, 'Bot accounts cannot receive site staff access.');
+        }
+
+        saveUserProfile({
+            id: user.id,
+            username: user.username,
+            globalName: user.globalName,
+            avatar: user.displayAvatarURL?.() || null
+        });
+
         grantSiteStaffUser(userId, session.user.id);
-        return `Accès staff site ajouté pour ${user?.tag || userId}.`;
+        return `Accès staff site ajouté pour ${user.tag || userId}.`;
     }
 
     revokeSiteStaffUser(userId);
+    deleteDashboardSessionsForUser(userId);
     return `Accès staff site retiré pour ${userId}.`;
 }
 
@@ -3888,7 +4095,7 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/logout') {
-        const sessionId = parseCookies(req)[SESSION_COOKIE];
+        const sessionId = parseCookies(req)[getSessionCookieName(req)];
         const session = getSession(req);
 
         if (session) {
@@ -4007,7 +4214,8 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/creator/premium-overview') {
-        requireSitePanelAccess(session);
+        await requireSitePanelAccess(session);
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
 
         json(res, 200, {
             ok: true,
@@ -4017,11 +4225,25 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/creator/premium-access') {
-        requireFounderAccess(session);
+        await requireFounderAccess(session, { recentLogin: true });
 
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
         const body = await parseBody(req);
-        const message = await manageCreatorPremiumAccess(ctx, session, body);
+        let message;
+
+        try {
+            message = await manageCreatorPremiumAccess(ctx, session, body);
+            addSiteAccessAuditLog({ session, body, status: 'success', summary: message, kind: 'premium' });
+        } catch (error) {
+            addSiteAccessAuditLog({
+                session,
+                body,
+                status: 'failed',
+                summary: error.message || 'Modification Premium refusée.',
+                kind: 'premium'
+            });
+            throw error;
+        }
 
         json(res, 200, {
             ok: true,
@@ -4032,11 +4254,25 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/creator/site-staff') {
-        requireFounderAccess(session);
+        await requireFounderAccess(session, { recentLogin: true });
 
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
         const body = await parseBody(req);
-        const message = await manageCreatorSiteStaffAccess(ctx, session, body);
+        let message;
+
+        try {
+            message = await manageCreatorSiteStaffAccess(ctx, session, body);
+            addSiteAccessAuditLog({ session, body, status: 'success', summary: message, kind: 'site_staff' });
+        } catch (error) {
+            addSiteAccessAuditLog({
+                session,
+                body,
+                status: 'failed',
+                summary: error.message || 'Modification staff refusée.',
+                kind: 'site_staff'
+            });
+            throw error;
+        }
 
         json(res, 200, {
             ok: true,
@@ -4146,6 +4382,11 @@ async function handleApi(req, res, ctx, url) {
     const actionMatch = /^\/api\/guilds\/(\d{17,20})\/action$/.exec(url.pathname);
     if (req.method === 'POST' && actionMatch) {
         const { guild, member } = await getDashboardAccess(ctx, session, actionMatch[1]);
+
+        if (!member) {
+            throw createHttpError(403, 'Site staff must be a member of this Discord server to perform actions.');
+        }
+
         updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
         const body = await parseBody(req);
         const auditActor = member || {
@@ -4295,9 +4536,11 @@ function serveStatic(req, res, url) {
     const entry = getCachedStaticFile(finalPath, ext, stats);
     const cacheControl = statusCode === 404
         ? 'no-store'
-        : (ext === '.html'
+        : (finalPath === path.join(siteDir, 'dashboard.html')
+            ? 'no-store'
+            : (ext === '.html'
             ? STATIC_HTML_CACHE_CONTROL
-            : (ext === '.js' ? STATIC_SCRIPT_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL));
+            : (ext === '.js' ? STATIC_SCRIPT_CACHE_CONTROL : STATIC_ASSET_CACHE_CONTROL)));
     const headers = {
         'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
         'Cache-Control': cacheControl,
@@ -4340,11 +4583,17 @@ async function handleRequest(req, res, ctx) {
                 throw createHttpError(503, 'Discord OAuth is not configured. Add CLIENT_SECRET on Railway.');
             }
 
-            const state = crypto.randomBytes(16).toString('hex');
+            while (oauthStates.size >= OAUTH_STATES_MAX) {
+                oauthStates.delete(oauthStates.keys().next().value);
+            }
+
+            const state = crypto.randomBytes(32).toString('hex');
+            const oauthNonce = crypto.randomBytes(32).toString('hex');
             const returnTo = getSafeReturnTo(req, url.searchParams.get('return_to'));
             oauthStates.set(state, {
-                expiresAt: Date.now() + 10 * 60 * 1000,
-                returnTo
+                expiresAt: Date.now() + OAUTH_STATE_TTL,
+                returnTo,
+                oauthNonceHash: hashSessionValue(oauthNonce)
             });
             const oauthUrl = new URL('https://discord.com/oauth2/authorize');
             oauthUrl.searchParams.set('client_id', process.env.CLIENT_ID);
@@ -4353,12 +4602,13 @@ async function handleRequest(req, res, ctx) {
             oauthUrl.searchParams.set('scope', 'identify guilds');
             oauthUrl.searchParams.set('state', state);
 
+            setOauthCookie(res, req, oauthNonce);
             redirect(res, oauthUrl.toString());
             return;
         }
 
         if (req.method === 'GET' && url.pathname === '/auth/logout') {
-            const sessionId = parseCookies(req)[SESSION_COOKIE];
+            const sessionId = parseCookies(req)[getSessionCookieName(req)];
 
             if (sessionId) {
                 deleteDashboardSession(sessionId);
@@ -4372,19 +4622,34 @@ async function handleRequest(req, res, ctx) {
         if (req.method === 'GET' && url.pathname === '/auth/callback') {
             const code = url.searchParams.get('code');
             const state = url.searchParams.get('state');
+            const oauthNonce = parseCookies(req)[getOauthCookieName(req)];
 
-            if (!code) {
+            if (!code || code.length > 2048) {
+                clearOauthCookie(res, req);
                 throw createHttpError(400, 'Missing Discord authorization code.');
             }
 
-            const stateData = state ? oauthStates.get(state) : null;
-            const stateExpiresAt = typeof stateData === 'number' ? stateData : stateData?.expiresAt;
+            if (!state || !/^[a-f0-9]{64}$/i.test(state)) {
+                clearOauthCookie(res, req);
+                throw createHttpError(400, 'Invalid Discord authorization state.');
+            }
 
-            if (!state || !stateData || stateExpiresAt <= Date.now()) {
+            const stateData = oauthStates.get(state);
+            const stateExpiresAt = typeof stateData === 'number' ? stateData : stateData?.expiresAt;
+            const nonceMatches = Boolean(
+                oauthNonce
+                && stateData?.oauthNonceHash
+                && constantTimeEqual(hashSessionValue(oauthNonce), stateData.oauthNonceHash)
+            );
+
+            if (!stateData || stateExpiresAt <= Date.now() || !nonceMatches) {
+                oauthStates.delete(state);
+                clearOauthCookie(res, req);
                 throw createHttpError(400, 'Invalid Discord authorization state.');
             }
 
             oauthStates.delete(state);
+            clearOauthCookie(res, req);
             const token = await exchangeCode(req, code);
             const user = await discordFetch('/users/@me', token.access_token);
             const profile = saveUserProfile({
@@ -4479,15 +4744,23 @@ function startDashboardServer(ctx) {
 
     const port = Number(process.env.PORT || process.env.DASHBOARD_PORT || 3000);
 
-    dashboardServer = http.createServer((req, res) => {
+    dashboardServer = http.createServer({
+        maxHeaderSize: 16 * 1024,
+        requestTimeout: 30 * 1000,
+        headersTimeout: 15 * 1000,
+        keepAliveTimeout: 5 * 1000
+    }, (req, res) => {
         handleRequest(req, res, ctx);
     });
+    dashboardServer.maxHeadersCount = 100;
+    dashboardServer.maxRequestsPerSocket = 100;
 
     dashboardServer.listen(port, () => {
         console.log(`Dashboard Sentinel actif sur le port ${port}`);
     });
 
-    setInterval(cleanupSessions, 60 * 60 * 1000);
+    const cleanupTimer = setInterval(cleanupSessions, 60 * 60 * 1000);
+    cleanupTimer.unref();
     return dashboardServer;
 }
 

@@ -127,7 +127,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-23-site-staff-access-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-24-dashboard-security-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -142,7 +142,7 @@ const CREATOR_USER_IDS = new Set(
     String(process.env.SENTINEL_CREATOR_USER_ID || process.env.CREATOR_USER_ID || '')
         .split(/[,\s]+/)
         .map(value => value.trim())
-        .filter(Boolean)
+        .filter(value => /^\d{17,20}$/.test(value))
 );
 const REFERENCE_SERVICE_ROLE_NAME = '🟢 Sentinel | En service';
 const REFERENCE_LOG_CHANNEL_NAMES = ['📂｜logs'];

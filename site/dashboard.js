@@ -332,6 +332,11 @@ async function api(path, options = {}) {
     const error = new Error(message);
     error.payload = payload;
     error.status = response.status;
+
+    if (payload.code === 'REAUTH_REQUIRED' && typeof payload.reauthUrl === 'string') {
+      window.location.assign(payload.reauthUrl);
+    }
+
     throw error;
   }
 
@@ -370,6 +375,11 @@ function dashboardErrorMessage(input) {
       'Site staff access is required.': 'This panel is reserved for the founder and site staff.',
       'Invalid site staff action.': 'Invalid site staff action.',
       'Founder access cannot be managed as staff.': 'The founder account already has full access.',
+      'Recent Discord login is required.': 'Reconnect with Discord before changing protected access.',
+      'Discord session verification failed.': 'Your Discord session must be verified again.',
+      'Discord user not found.': 'This Discord account could not be found.',
+      'Bot accounts cannot receive site staff access.': 'A bot account cannot receive site staff access.',
+      'Site staff must be a member of this Discord server to perform actions.': 'Join this Discord server before performing an action.',
       'Invalid Discord user ID.': 'The Discord ID is not valid.',
       'Text channel not found.': 'Text channel not found.',
       'Role not found.': 'Discord role not found.',
@@ -431,7 +441,9 @@ function dashboardErrorMessage(input) {
       'Founder access is required.': 'Only the founder can change this access.',
       'Site staff access is required.': 'Ask the founder to add your Discord account as site staff.',
       'Invalid site staff action.': 'Choose add or remove.',
-      'Founder access cannot be managed as staff.': 'The founder account already has full access.'
+      'Founder access cannot be managed as staff.': 'The founder account already has full access.',
+      'Recent Discord login is required.': 'Reconnect with Discord, then retry the protected action.',
+      'Discord session verification failed.': 'Reconnect with Discord to verify your identity.'
     };
     const base = translated[message] || message || 'Action failed.';
     const resolution = payloadFix || resolutionByMessage[message];
@@ -460,6 +472,11 @@ function dashboardErrorMessage(input) {
     'Site staff access is required.': 'Ce panneau est réservé au fondateur et au staff site.',
     'Invalid site staff action.': 'Action staff site invalide.',
     'Founder access cannot be managed as staff.': 'Le compte fondateur possède déjà l’accès complet.',
+    'Recent Discord login is required.': 'Une reconnexion Discord récente est nécessaire.',
+    'Discord session verification failed.': 'Ta session Discord doit être vérifiée à nouveau.',
+    'Discord user not found.': 'Ce compte Discord est introuvable.',
+    'Bot accounts cannot receive site staff access.': 'Un compte bot ne peut pas recevoir le grade staff du site.',
+    'Site staff must be a member of this Discord server to perform actions.': 'Tu dois être membre de ce serveur Discord pour y effectuer une action.',
     'Invalid Discord user ID.': 'L’ID Discord indiqué n’est pas valide.',
     'Text channel not found.': 'Salon textuel introuvable.',
     'Role not found.': 'Rôle Discord introuvable.',
@@ -524,7 +541,9 @@ function dashboardErrorMessage(input) {
     'Founder access is required.': 'Connecte-toi avec le compte Discord fondateur pour modifier cet accès.',
     'Site staff access is required.': 'Demande au fondateur d’ajouter ton compte Discord au staff site.',
     'Invalid site staff action.': 'Choisis ajouter ou retirer.',
-    'Founder access cannot be managed as staff.': 'Le compte fondateur n’a pas besoin d’être ajouté comme staff.'
+    'Founder access cannot be managed as staff.': 'Le compte fondateur n’a pas besoin d’être ajouté comme staff.',
+    'Recent Discord login is required.': 'Reconnecte-toi avec Discord puis relance l’action protégée.',
+    'Discord session verification failed.': 'Reconnecte-toi avec Discord pour confirmer ton identité.'
   };
   const resolution = payloadFix || resolutionByMessage[message];
 
