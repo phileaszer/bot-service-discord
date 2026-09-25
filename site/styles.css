@@ -3173,6 +3173,151 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.storage-capacity {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 12px 0;
+}
+
+.storage-capacity > span {
+  display: grid;
+  gap: 3px;
+}
+
+.storage-capacity small {
+  color: var(--muted);
+}
+
+.storage-capacity-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(234, 242, 255, 0.14);
+  background: rgba(5, 7, 12, 0.56);
+}
+
+.storage-capacity-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--mint), var(--cyan), var(--warning));
+}
+
+.maintenance-alerts {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--warning);
+  background: rgba(255, 79, 184, 0.08);
+}
+
+.maintenance-alerts p {
+  margin: 0;
+  color: var(--text);
+}
+
+.maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+  margin: 20px 0;
+}
+
+.maintenance-section {
+  min-width: 0;
+  padding: 14px 0;
+  border-top: 1px solid rgba(234, 242, 255, 0.1);
+}
+
+.maintenance-section h4,
+.maintenance-history summary {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
+.storage-distribution {
+  display: grid;
+  gap: 8px;
+}
+
+.storage-distribution > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(234, 242, 255, 0.06);
+}
+
+.storage-distribution span {
+  color: var(--muted);
+}
+
+.maintenance-toolbar,
+.maintenance-file-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.maintenance-toolbar {
+  margin: 14px 0;
+}
+
+.maintenance-history {
+  margin-top: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(234, 242, 255, 0.1);
+}
+
+.maintenance-history summary {
+  cursor: pointer;
+}
+
+.maintenance-file-list {
+  display: grid;
+  gap: 0;
+  margin-top: 10px;
+}
+
+.maintenance-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(234, 242, 255, 0.07);
+}
+
+.maintenance-file-row > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.maintenance-file-row small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.maintenance-restore form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.maintenance-restore label {
+  display: grid;
+  gap: 6px;
+}
+
 .founder-console-note {
   display: flex;
   align-items: center;
@@ -5591,6 +5736,23 @@ code {
   .row-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .storage-capacity,
+  .maintenance-grid,
+  .maintenance-restore form {
+    grid-template-columns: 1fr;
+  }
+
+  .maintenance-file-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .maintenance-file-actions .button,
+  .maintenance-toolbar .button,
+  .maintenance-restore .button {
+    width: 100%;
   }
 
   .payroll-archive-form,

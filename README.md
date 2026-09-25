@@ -110,15 +110,17 @@ La liste complète et les explications détaillées sont disponibles sur le site
 
 ## Stockage et sauvegardes
 
-Sentinel conserve sans expiration les archives de paie, les heures de service, les dossiers et les sanctions. Les sessions web expirées et les journaux techniques anciens sont nettoyés automatiquement selon les durées configurées.
+Sentinel conserve sans expiration les archives de paie, les heures de service, les dossiers et les sanctions. Les sessions web expirées sont nettoyées automatiquement. Avant de quitter la base active, les anciens journaux d'auto-modération et de régie sont écrits dans des archives `jsonl.gz`, validés puis restent téléchargeables par le fondateur.
 
-La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauvegardes sont compressées en `.db.gz`, limitées à 14 copies et à 96 Mo par défaut. Un redéploiement rapproché ne crée pas une copie identique supplémentaire. Les anciennes sauvegardes `.db` sont converties automatiquement au démarrage.
+La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauvegardes sont compressées en `.db.gz` et suivent trois générations par défaut : 7 quotidiennes, 8 hebdomadaires et 12 mensuelles, dans une enveloppe de 96 Mo. Chaque nouvelle copie est restaurée dans une base temporaire et soumise à `PRAGMA integrity_check`. Un redéploiement rapproché ne crée pas de copie identique supplémentaire et les anciennes sauvegardes `.db` sont converties automatiquement.
+
+La Console fondateur contient le Centre de maintenance : capacité du volume, répartition de la base, alertes à 60 %, 75 % et 90 %, croissance anormale, suivi SQLite/site/Discord, copies protégées, archives froides et registre des médias d'embeds. Les images locales sont dédupliquées par SHA-256 ; une référence orpheline passe 30 jours en corbeille avant suppression. Les téléchargements, contrôles manuels et restaurations sont autorisés côté serveur uniquement au fondateur avec une session Discord récente. Une restauration crée d'abord une copie de sécurité vérifiée puis est appliquée au redémarrage.
 
 - `npm run backup:db` crée une sauvegarde manuelle compressée et vérifie la politique de rétention.
 - `npm run restore:db` liste les sauvegardes `.db` et `.db.gz` disponibles.
 - `npm run restore:db -- <fichier.db.gz>` vérifie l'intégrité SQLite avant de restaurer la base et crée d'abord une copie de sécurité compressée.
 
-Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`, `DATABASE_AUTOMOD_RETENTION_DAYS`, `DATABASE_AUDIT_RETENTION_DAYS` et `DATABASE_INCREMENTAL_VACUUM_ENABLED` décrites dans `.env.example`.
+Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`, `DATABASE_AUTOMOD_RETENTION_DAYS`, `DATABASE_AUDIT_RETENTION_DAYS`, `DATABASE_SLOW_QUERY_MS`, `EMBED_MEDIA_*` et `DATABASE_INCREMENTAL_VACUUM_ENABLED` décrites dans `.env.example`.
 
 ## Sécurité et données
 

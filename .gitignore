@@ -9,6 +9,11 @@ database/*.db-*
 database/*.sqlite
 database/*.sqlite-*
 database/backups/
+database/cold-archives/
+database/embed-media/
+database/*.restore-pending
+database/*.restore-pending.json
+database/*.restore-replaced
 bot.log
 bot.err
 *.log

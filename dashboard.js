@@ -1615,6 +1615,23 @@ function writeResponse(res, status, headers = {}, body = undefined) {
     res.end(body);
 }
 
+function streamPrivateFile(res, file) {
+    const stat = fs.statSync(file.fullPath);
+    res.writeHead(200, responseHeaders(res, {
+        'Content-Type': file.contentType || 'application/octet-stream',
+        'Content-Length': stat.size,
+        'Content-Disposition': `attachment; filename="${file.fileName}"`,
+        'Cache-Control': 'no-store, private',
+        'X-Content-Type-Options': 'nosniff'
+    }));
+    const stream = fs.createReadStream(file.fullPath);
+    stream.on('error', error => {
+        console.error('Erreur lecture archive Sentinel :', error);
+        res.destroy(error);
+    });
+    stream.pipe(res);
+}
+
 function json(res, status, payload) {
     const req = res.sentinelRequest;
     const headers = {
@@ -2488,14 +2505,80 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
         premiumUserCount: 0
     });
 
+    const storage = ctx.helpers.getDatabaseBackupStatus
+        ? ctx.helpers.getDatabaseBackupStatus()
+        : null;
+    const protectedStorage = storage && !siteAccess.isFounder && !storage.error
+        ? {
+            ...storage,
+            latestFile: null,
+            lastBackupFailure: storage.lastBackupFailure ? { occurredAt: storage.lastBackupFailure.occurredAt } : null,
+            backups: (storage.backups || []).map(({ fileName, ...backup }) => ({
+                ...backup,
+                verification: backup.verification ? {
+                    status: backup.verification.status,
+                    checkedAt: backup.verification.checkedAt,
+                    integrityResult: backup.verification.integrityResult,
+                    durationMs: backup.verification.durationMs
+                } : null
+            })),
+            coldArchives: (storage.coldArchives || []).map(({ fileName, ...archive }) => archive),
+            lastMaintenance: storage.lastMaintenance ? {
+                startedAt: storage.lastMaintenance.startedAt,
+                completedAt: storage.lastMaintenance.completedAt,
+                durationMs: storage.lastMaintenance.durationMs,
+                reason: storage.lastMaintenance.reason,
+                cleanup: storage.lastMaintenance.cleanup,
+                archived: storage.lastMaintenance.archived ? {
+                    automodEvents: storage.lastMaintenance.archived.automodEvents,
+                    dashboardAuditLogs: storage.lastMaintenance.archived.dashboardAuditLogs,
+                    bytes: storage.lastMaintenance.archived.bytes
+                } : null,
+                backupVerification: storage.lastMaintenance.backupVerification ? {
+                    status: storage.lastMaintenance.backupVerification.status,
+                    checkedAt: storage.lastMaintenance.backupVerification.checkedAt,
+                    durationMs: storage.lastMaintenance.backupVerification.durationMs
+                } : null,
+                media: storage.lastMaintenance.media ? {
+                    checked: storage.lastMaintenance.media.checked,
+                    orphaned: storage.lastMaintenance.media.orphaned,
+                    synchronized: storage.lastMaintenance.media.synchronized,
+                    purged: storage.lastMaintenance.media.purged
+                } : null
+            } : null,
+            alerts: (storage.alerts || []).map(alert => ({
+                key: alert.key,
+                level: alert.level,
+                message: alert.message,
+                firstSeenAt: alert.firstSeenAt,
+                lastSeenAt: alert.lastSeenAt
+            })),
+            performance: {
+                database: storage.performance?.database ? {
+                    ...storage.performance.database,
+                    recentSlowQueries: []
+                } : null,
+                runtime: storage.performance?.runtime ? {
+                    ...storage.performance.runtime,
+                    dashboard: {
+                        ...storage.performance.runtime.dashboard,
+                        recentSlowRequests: []
+                    },
+                    discord: {
+                        ...storage.performance.runtime.discord,
+                        recentSlowInteractions: []
+                    }
+                } : null
+            }
+        }
+        : storage;
+
     return {
         generatedAt: new Date().toISOString(),
         canView: true,
         access: siteAccess,
         summary,
-        storage: ctx.helpers.getDatabaseBackupStatus
-            ? ctx.helpers.getDatabaseBackupStatus()
-            : null,
+        storage: protectedStorage,
         staff: await getSiteStaffUsers(ctx),
         guilds: items
     };
@@ -3587,6 +3670,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, sentMessage.id, actor.id, data);
+        ctx.helpers.syncCustomEmbedMedia?.(sentMessage, body, language);
 
         return `Embed Sentinel envoye dans #${channel.name}. ID : ${sentMessage.id}. ${formatDashboardCustomEmbedQuota(ctx, guild.id, language, actor, advanced)}`;
     }
@@ -3630,6 +3714,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, message.id, actor.id, data);
+        ctx.helpers.syncCustomEmbedMedia?.(message, null, language);
         record = ctx.helpers.getCustomEmbedRecord(guild.id, message.id);
     }
 
@@ -3709,7 +3794,8 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
                 editPayload.attachments = keptAttachments;
             }
 
-            await message.edit(editPayload);
+            const editedMessage = await message.edit(editPayload);
+            ctx.helpers.syncCustomEmbedMedia?.(editedMessage, body, language);
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
@@ -4395,6 +4481,69 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/creator/maintenance/download') {
+        await requireFounderAccess(session, { recentLogin: true });
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const kind = url.searchParams.get('kind');
+        const fileName = url.searchParams.get('file');
+        const file = ctx.helpers.resolveMaintenanceFile?.(kind, fileName);
+
+        if (!file) {
+            throw createHttpError(404, 'Archive Sentinel introuvable.');
+        }
+
+        streamPrivateFile(res, file);
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/maintenance') {
+        await requireFounderAccess(session, { recentLogin: true });
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        const action = String(body.action || '').trim();
+        let message;
+
+        try {
+            if (action === 'run-maintenance') {
+                const result = await ctx.helpers.runManualDatabaseMaintenance();
+                message = `Entretien terminé. ${result.maintenance?.cleanup?.expiredSessions || 0} session(s) expirée(s), ${result.maintenance?.archived?.files?.length || 0} archive(s) froide(s).`;
+            } else if (action === 'verify-backup') {
+                const check = await ctx.helpers.verifyManagedDatabaseBackup(body.fileName);
+                message = `Copie ${check.fileName} vérifiée : intégrité ${check.integrityResult}.`;
+            } else if (action === 'scan-media') {
+                const scan = await ctx.helpers.scanCustomEmbedMediaOrphans(250);
+                message = `Médias contrôlés : ${scan.checked}, orphelins placés en corbeille : ${scan.orphaned}, purgés : ${scan.purged?.links || 0}.`;
+            } else if (action === 'restore-backup') {
+                if (String(body.confirmation || '').trim() !== 'RESTAURER SENTINEL') {
+                    throw createHttpError(400, 'Confirmation invalide. Écris exactement RESTAURER SENTINEL.');
+                }
+
+                const restore = await ctx.helpers.restoreManagedDatabaseBackup(body.fileName);
+                message = `Restauration de ${restore.backupFile} préparée. Copie de sécurité : ${restore.safetyBackupFile}. Sentinel va redémarrer.`;
+            } else {
+                throw createHttpError(400, 'Action de maintenance inconnue.');
+            }
+
+            addSiteAccessAuditLog({ session, body, status: 'success', summary: message, kind: 'maintenance' });
+        } catch (error) {
+            addSiteAccessAuditLog({
+                session,
+                body: { action, fileName: body.fileName || null },
+                status: 'failed',
+                summary: error.message || 'Action de maintenance refusée.',
+                kind: 'maintenance'
+            });
+            throw error;
+        }
+
+        json(res, 200, {
+            ok: true,
+            message,
+            overview: await buildCreatorPremiumOverview(ctx, session)
+        });
+        return;
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/creator/premium-access') {
         await requireFounderAccess(session, { recentLogin: true });
 
@@ -4774,7 +4923,17 @@ function serveStatic(req, res, url) {
 
 async function handleRequest(req, res, ctx) {
     let url = null;
+    const requestStartedAt = process.hrtime.bigint();
     res.sentinelRequest = req;
+    res.once('finish', () => {
+        const durationMs = Number(process.hrtime.bigint() - requestStartedAt) / 1e6;
+        ctx.helpers.recordDashboardRequestMetric?.({
+            durationMs,
+            status: res.statusCode,
+            method: req.method,
+            route: res.sentinelUrl?.pathname || '/invalid-request'
+        });
+    });
 
     try {
         requireTrustedHost(req);

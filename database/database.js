@@ -1,12 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { applyPendingDatabaseRestore } = require('./storage');
 
 const databasePath = process.env.DATABASE_PATH || './database/service.db';
 const databaseDirectory = path.dirname(databasePath);
 
 if (databaseDirectory && databaseDirectory !== '.') {
     fs.mkdirSync(databaseDirectory, { recursive: true });
+}
+
+const pendingRestore = applyPendingDatabaseRestore(databasePath);
+
+if (pendingRestore?.restored) {
+    console.log(`Restauration Sentinel appliquee au demarrage : ${pendingRestore.restoredAt}`);
 }
 
 const db = new Database(databasePath);
@@ -348,6 +355,86 @@ CREATE TABLE IF NOT EXISTS dashboard_audit_logs (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS storage_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    captured_at TEXT NOT NULL,
+    database_bytes INTEGER NOT NULL DEFAULT 0,
+    backup_bytes INTEGER NOT NULL DEFAULT 0,
+    archive_bytes INTEGER NOT NULL DEFAULT 0,
+    media_bytes INTEGER NOT NULL DEFAULT 0,
+    volume_used_bytes INTEGER NOT NULL DEFAULT 0,
+    volume_total_bytes INTEGER NOT NULL DEFAULT 0,
+    usage_percent REAL NOT NULL DEFAULT 0,
+    database_growth_bytes INTEGER NOT NULL DEFAULT 0,
+    alert_level INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS storage_table_metrics (
+    captured_at TEXT NOT NULL,
+    category TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (captured_at, category)
+);
+
+CREATE TABLE IF NOT EXISTS storage_alerts (
+    alert_key TEXT PRIMARY KEY,
+    level INTEGER NOT NULL DEFAULT 0,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    last_notified_at TEXT,
+    resolved_at TEXT,
+    details_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS storage_backup_checks (
+    file_name TEXT PRIMARY KEY,
+    checked_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    integrity_result TEXT,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cold_archive_manifests (
+    file_name TEXT PRIMARY KEY,
+    table_name TEXT NOT NULL,
+    min_row_id INTEGER,
+    max_row_id INTEGER,
+    row_count INTEGER NOT NULL DEFAULT 0,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    from_at TEXT,
+    to_at TEXT,
+    created_at TEXT NOT NULL,
+    verified_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS embed_media_objects (
+    content_hash TEXT PRIMARY KEY,
+    file_name TEXT NOT NULL UNIQUE,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS embed_media_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_hash TEXT,
+    guild_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    attachment_name TEXT,
+    attachment_url TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    trashed_at TEXT,
+    purge_after TEXT,
+    UNIQUE (message_id, slot),
+    FOREIGN KEY (content_hash) REFERENCES embed_media_objects(content_hash) ON DELETE SET NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -452,6 +539,30 @@ ON dashboard_audit_logs (target_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_audit_action_created
 ON dashboard_audit_logs (action, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_storage_metrics_captured
+ON storage_metrics (captured_at);
+
+CREATE INDEX IF NOT EXISTS idx_storage_metrics_usage
+ON storage_metrics (usage_percent, captured_at);
+
+CREATE INDEX IF NOT EXISTS idx_storage_table_metrics_category
+ON storage_table_metrics (category, captured_at);
+
+CREATE INDEX IF NOT EXISTS idx_backup_checks_checked
+ON storage_backup_checks (checked_at);
+
+CREATE INDEX IF NOT EXISTS idx_cold_archives_table_created
+ON cold_archive_manifests (table_name, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_embed_media_links_status_purge
+ON embed_media_links (status, purge_after);
+
+CREATE INDEX IF NOT EXISTS idx_embed_media_links_message
+ON embed_media_links (guild_id, message_id);
+
+CREATE INDEX IF NOT EXISTS idx_embed_media_links_hash
+ON embed_media_links (content_hash, status);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
@@ -517,5 +628,94 @@ if (!dossierColumns.includes('subject')) {
 if (!dossierColumns.includes('description')) {
     db.prepare('ALTER TABLE sentinel_dossiers ADD COLUMN description TEXT').run();
 }
+
+const databasePerformance = {
+    startedAt: new Date().toISOString(),
+    queryCount: 0,
+    errorCount: 0,
+    slowQueryCount: 0,
+    totalDurationMs: 0,
+    maxDurationMs: 0,
+    recentSlowQueries: []
+};
+const slowQueryThresholdMs = Math.min(Math.max(
+    Number.parseInt(process.env.DATABASE_SLOW_QUERY_MS || '80', 10),
+    10
+), 5000);
+const nativePrepare = db.prepare.bind(db);
+
+function databaseQueryLabel(sql) {
+    return String(sql || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/'(?:''|[^'])*'/g, '?')
+        .replace(/\b\d{8,}\b/g, ':number')
+        .replace(/\b(VALUES|IN)\s*\([^)]{80,}\)/gi, '$1 (...)')
+        .slice(0, 220);
+}
+
+function recordDatabaseQuery(sql, method, startedAt, failed) {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    databasePerformance.queryCount += 1;
+    databasePerformance.totalDurationMs += durationMs;
+    databasePerformance.maxDurationMs = Math.max(databasePerformance.maxDurationMs, durationMs);
+
+    if (failed) {
+        databasePerformance.errorCount += 1;
+    }
+
+    if (durationMs >= slowQueryThresholdMs) {
+        databasePerformance.slowQueryCount += 1;
+        databasePerformance.recentSlowQueries.unshift({
+            operation: method,
+            query: databaseQueryLabel(sql),
+            durationMs: Math.round(durationMs * 10) / 10,
+            failed: Boolean(failed),
+            occurredAt: new Date().toISOString()
+        });
+        databasePerformance.recentSlowQueries.length = Math.min(
+            databasePerformance.recentSlowQueries.length,
+            25
+        );
+    }
+}
+
+db.prepare = function monitoredPrepare(sql) {
+    const statement = nativePrepare(sql);
+
+    return new Proxy(statement, {
+        get(target, property) {
+            const value = Reflect.get(target, property, target);
+
+            if (!['run', 'get', 'all'].includes(property) || typeof value !== 'function') {
+                return typeof value === 'function' ? value.bind(target) : value;
+            }
+
+            return (...args) => {
+                const startedAt = process.hrtime.bigint();
+
+                try {
+                    const result = value.apply(target, args);
+                    recordDatabaseQuery(sql, property, startedAt, false);
+                    return result;
+                } catch (error) {
+                    recordDatabaseQuery(sql, property, startedAt, true);
+                    throw error;
+                }
+            };
+        }
+    });
+};
+
+db.getSentinelPerformance = () => ({
+    ...databasePerformance,
+    averageDurationMs: databasePerformance.queryCount
+        ? Math.round((databasePerformance.totalDurationMs / databasePerformance.queryCount) * 100) / 100
+        : 0,
+    totalDurationMs: Math.round(databasePerformance.totalDurationMs * 100) / 100,
+    maxDurationMs: Math.round(databasePerformance.maxDurationMs * 100) / 100,
+    slowQueryThresholdMs,
+    recentSlowQueries: databasePerformance.recentSlowQueries.map(item => ({ ...item }))
+});
 
 module.exports = db;

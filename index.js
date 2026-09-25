@@ -24,12 +24,20 @@ const {
 
 const db = require('./database/database');
 const {
+    BACKUP_PATTERN,
+    COLD_ARCHIVE_PATTERN,
     compressExistingDatabaseBackups,
     createCompressedDatabaseBackup,
+    evaluateStorageAlerts,
     getDatabaseStorageStatus,
     listDatabaseBackups,
-    pruneDatabaseBackups,
-    runDatabaseMaintenance
+    markStorageAlertsNotified,
+    pruneDatabaseBackupGenerations,
+    resolveManagedStorageFile,
+    runDatabaseMaintenance,
+    saveBackupVerification,
+    stageDatabaseRestore,
+    verifyDatabaseBackup
 } = require('./database/storage');
 const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
@@ -135,7 +143,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-24-storage-optimization-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-25-maintenance-center-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -175,6 +183,13 @@ const DATABASE_BACKUP_INTERVAL_MS = Math.max(
 ) * 60 * 60 * 1000;
 const DATABASE_BACKUP_KEEP = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_KEEP || '14', 10), 1);
 const DATABASE_BACKUP_DIR = process.env.DATABASE_BACKUP_DIR || path.join(path.dirname(DATABASE_FILE_PATH), 'backups');
+const DATABASE_COLD_ARCHIVE_DIR = process.env.DATABASE_COLD_ARCHIVE_DIR
+    || path.join(path.dirname(DATABASE_FILE_PATH), 'cold-archives');
+const EMBED_MEDIA_DIR = process.env.EMBED_MEDIA_DIR
+    || path.join(path.dirname(DATABASE_FILE_PATH), 'embed-media');
+const EMBED_MEDIA_TRASH_DAYS = Math.max(Number.parseInt(process.env.EMBED_MEDIA_TRASH_DAYS || '30', 10), 1);
+const EMBED_MEDIA_MAX_BYTES = Math.max(Number.parseInt(process.env.EMBED_MEDIA_MAX_MB || '128', 10), 16)
+    * 1024 * 1024;
 const DATABASE_BACKUP_COMPRESS = String(process.env.DATABASE_BACKUP_COMPRESS || 'true').toLowerCase() !== 'false';
 const DATABASE_BACKUP_COMPRESSION_LEVEL = Math.min(Math.max(
     Number.parseInt(process.env.DATABASE_BACKUP_COMPRESSION_LEVEL || '9', 10),
@@ -188,6 +203,9 @@ const DATABASE_BACKUP_STARTUP_MIN_AGE_MS = Math.max(
     Number.parseInt(process.env.DATABASE_BACKUP_STARTUP_MIN_AGE_HOURS || '6', 10),
     1
 ) * 60 * 60 * 1000;
+const DATABASE_BACKUP_DAILY = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_DAILY || '7', 10), 1);
+const DATABASE_BACKUP_WEEKLY = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_WEEKLY || '8', 10), 1);
+const DATABASE_BACKUP_MONTHLY = Math.max(Number.parseInt(process.env.DATABASE_BACKUP_MONTHLY || '12', 10), 1);
 const DATABASE_AUTOMOD_RETENTION_DAYS = Math.max(
     Number.parseInt(process.env.DATABASE_AUTOMOD_RETENTION_DAYS || '180', 10),
     30
@@ -203,6 +221,27 @@ let lastSentinelServerSync = null;
 let lastSentinelServerSyncResult = null;
 let lastDatabaseBackup = null;
 let lastDatabaseMaintenance = null;
+let lastDatabaseBackupFailure = null;
+let mediaScanPromise = null;
+const runtimePerformance = {
+    startedAt: new Date().toISOString(),
+    dashboard: {
+        requestCount: 0,
+        errorCount: 0,
+        slowRequestCount: 0,
+        maxDurationMs: 0,
+        recentDurations: [],
+        recentSlowRequests: []
+    },
+    discord: {
+        interactionCount: 0,
+        errorCount: 0,
+        slowInteractionCount: 0,
+        maxDurationMs: 0,
+        recentDurations: [],
+        recentSlowInteractions: []
+    }
+};
 const automodSpamBuckets = new Map();
 const automodRaidBuckets = new Map();
 let lastSlashCommandCheck = {
@@ -1537,6 +1576,87 @@ function checkDatabase() {
     db.prepare('SELECT 1').get();
 }
 
+function recordDashboardRequestMetric({ durationMs, status, method, route }) {
+    const bucket = runtimePerformance.dashboard;
+    const duration = Math.max(Number(durationMs) || 0, 0);
+    bucket.requestCount += 1;
+    bucket.errorCount += Number(status) >= 500 ? 1 : 0;
+    bucket.maxDurationMs = Math.max(bucket.maxDurationMs, duration);
+    bucket.recentDurations.push(duration);
+    bucket.recentDurations = bucket.recentDurations.slice(-500);
+
+    if (duration >= 1000) {
+        bucket.slowRequestCount += 1;
+        bucket.recentSlowRequests.unshift({
+            method: String(method || 'GET').slice(0, 12),
+            route: String(route || '/').replace(/\d{17,20}/g, ':id').slice(0, 160),
+            status: Number(status) || 0,
+            durationMs: Math.round(duration),
+            occurredAt: new Date().toISOString()
+        });
+        bucket.recentSlowRequests.length = Math.min(bucket.recentSlowRequests.length, 25);
+    }
+}
+
+function recordDiscordInteractionMetric(interaction, durationMs, failed = false) {
+    const bucket = runtimePerformance.discord;
+    const duration = Math.max(Number(durationMs) || 0, 0);
+    bucket.interactionCount += 1;
+    bucket.errorCount += failed ? 1 : 0;
+    bucket.maxDurationMs = Math.max(bucket.maxDurationMs, duration);
+    bucket.recentDurations.push(duration);
+    bucket.recentDurations = bucket.recentDurations.slice(-500);
+
+    if (duration >= 1500) {
+        bucket.slowInteractionCount += 1;
+        bucket.recentSlowInteractions.unshift({
+            type: interaction?.isChatInputCommand?.() ? 'command' : (interaction?.isButton?.() ? 'button' : 'interaction'),
+            name: String(interaction?.commandName || interaction?.customId || 'unknown').slice(0, 120),
+            durationMs: Math.round(duration),
+            failed: Boolean(failed),
+            occurredAt: new Date().toISOString()
+        });
+        bucket.recentSlowInteractions.length = Math.min(bucket.recentSlowInteractions.length, 25);
+    }
+}
+
+function percentile(values, ratio) {
+    if (!values.length) {
+        return 0;
+    }
+
+    const sorted = [...values].sort((a, b) => a - b);
+    return Math.round(sorted[Math.min(Math.ceil(sorted.length * ratio) - 1, sorted.length - 1)] * 10) / 10;
+}
+
+function getRuntimePerformanceStatus() {
+    const dashboard = runtimePerformance.dashboard;
+    const discord = runtimePerformance.discord;
+
+    return {
+        startedAt: runtimePerformance.startedAt,
+        dashboard: {
+            requestCount: dashboard.requestCount,
+            errorCount: dashboard.errorCount,
+            slowRequestCount: dashboard.slowRequestCount,
+            p50Ms: percentile(dashboard.recentDurations, 0.5),
+            p95Ms: percentile(dashboard.recentDurations, 0.95),
+            maxDurationMs: Math.round(dashboard.maxDurationMs * 10) / 10,
+            recentSlowRequests: dashboard.recentSlowRequests.map(item => ({ ...item }))
+        },
+        discord: {
+            interactionCount: discord.interactionCount,
+            errorCount: discord.errorCount,
+            slowInteractionCount: discord.slowInteractionCount,
+            p50Ms: percentile(discord.recentDurations, 0.5),
+            p95Ms: percentile(discord.recentDurations, 0.95),
+            maxDurationMs: Math.round(discord.maxDurationMs * 10) / 10,
+            gatewayPingMs: Math.max(Number(client.ws.ping) || 0, 0),
+            recentSlowInteractions: discord.recentSlowInteractions.map(item => ({ ...item }))
+        }
+    };
+}
+
 async function createDatabaseBackup(reason = 'auto') {
     const backup = await createCompressedDatabaseBackup(db, {
         backupDirectory: DATABASE_BACKUP_DIR,
@@ -1544,8 +1664,10 @@ async function createDatabaseBackup(reason = 'auto') {
         compress: DATABASE_BACKUP_COMPRESS,
         compressionLevel: DATABASE_BACKUP_COMPRESSION_LEVEL
     });
-    pruneDatabaseBackups(DATABASE_BACKUP_DIR, {
-        keep: DATABASE_BACKUP_KEEP,
+    pruneDatabaseBackupGenerations(DATABASE_BACKUP_DIR, {
+        daily: DATABASE_BACKUP_DAILY,
+        weekly: DATABASE_BACKUP_WEEKLY,
+        monthly: DATABASE_BACKUP_MONTHLY,
         maxBytes: DATABASE_BACKUP_MAX_BYTES
     });
     lastDatabaseBackup = {
@@ -1555,6 +1677,41 @@ async function createDatabaseBackup(reason = 'auto') {
     };
 
     return backup.fullPath;
+}
+
+async function notifyFounderStorageAlerts(alerts) {
+    const pending = (alerts || []).filter(alert => alert.shouldNotify);
+
+    if (!pending.length || !CREATOR_USER_IDS.size) {
+        return { sent: false, keys: [] };
+    }
+
+    const payload = {
+        embeds: [new EmbedBuilder()
+            .setColor(SENTINEL_COLORS.warning)
+            .setTitle('Sentinel | Alerte de conservation')
+            .setDescription(pending.map(alert => `• ${alert.message}`).join('\n'))
+            .addFields({
+                name: 'Contrôle',
+                value: 'Ouvre la Console fondateur puis le Centre de maintenance pour consulter le relevé et les copies protégées.'
+            })
+            .setTimestamp()]
+    };
+    let sent = false;
+
+    for (const userId of CREATOR_USER_IDS) {
+        const user = await client.users.fetch(userId).catch(() => null);
+
+        if (user && await user.send(payload).then(() => true).catch(() => false)) {
+            sent = true;
+        }
+    }
+
+    if (sent) {
+        markStorageAlertsNotified(db, pending.map(alert => alert.key));
+    }
+
+    return { sent, keys: sent ? pending.map(alert => alert.key) : [] };
 }
 
 function shouldCreateStartupBackup() {
@@ -1578,8 +1735,13 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             )
             : { compressedCount: 0, reclaimedBytes: 0 };
 
-        pruneDatabaseBackups(DATABASE_BACKUP_DIR, {
-            keep: DATABASE_BACKUP_KEEP,
+        fs.mkdirSync(DATABASE_COLD_ARCHIVE_DIR, { recursive: true });
+        fs.mkdirSync(path.join(EMBED_MEDIA_DIR, 'objects'), { recursive: true });
+
+        pruneDatabaseBackupGenerations(DATABASE_BACKUP_DIR, {
+            daily: DATABASE_BACKUP_DAILY,
+            weekly: DATABASE_BACKUP_WEEKLY,
+            monthly: DATABASE_BACKUP_MONTHLY,
             maxBytes: DATABASE_BACKUP_MAX_BYTES
         });
 
@@ -1588,21 +1750,62 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             || reason !== 'startup'
             || shouldCreateStartupBackup()
         );
-        const backupPath = createBackup
-            ? await createDatabaseBackup(reason)
-            : null;
+        let backupPath = null;
+        let verification = null;
+
+        try {
+            backupPath = createBackup
+                ? await createDatabaseBackup(reason)
+                : listDatabaseBackups(DATABASE_BACKUP_DIR)[0]?.fullPath || null;
+
+            if (backupPath) {
+                verification = await verifyDatabaseBackup(backupPath);
+                saveBackupVerification(db, verification);
+
+                if (verification.status !== 'ok') {
+                    throw new Error(verification.errorMessage || 'La verification de la sauvegarde a echoue.');
+                }
+            }
+
+            lastDatabaseBackupFailure = null;
+        } catch (error) {
+            lastDatabaseBackupFailure = {
+                occurredAt: new Date().toISOString(),
+                message: String(error.message || error).slice(0, 500)
+            };
+            console.error('Erreur sauvegarde Sentinel :', error);
+        }
+
         const maintenance = runDatabaseMaintenance(db, {
             automodRetentionDays: DATABASE_AUTOMOD_RETENTION_DAYS,
             auditRetentionDays: DATABASE_AUDIT_RETENTION_DAYS,
+            archiveDirectory: DATABASE_COLD_ARCHIVE_DIR,
             enableIncrementalVacuum: DATABASE_INCREMENTAL_VACUUM_ENABLED
         });
+        const media = await scanCustomEmbedMediaOrphans(reason === 'startup' ? 25 : 100).catch(error => ({
+            error: String(error.message || error).slice(0, 500),
+            checked: 0,
+            orphaned: 0,
+            synchronized: 0,
+            purged: { links: 0, objects: 0, bytes: 0 }
+        }));
 
         lastDatabaseMaintenance = {
             ...maintenance,
             reason,
             compressedBackups: compression.compressedCount,
-            reclaimedBackupBytes: compression.reclaimedBytes
+            reclaimedBackupBytes: compression.reclaimedBytes,
+            backupVerification: verification,
+            media
         };
+
+        const status = getDatabaseBackupStatus();
+        const alerts = evaluateStorageAlerts(db, status, {
+            latestBackupAt: status.latestVerifiedAt || status.latestAt,
+            backupFailure: lastDatabaseBackupFailure?.message || null,
+            backupMaxAgeHours: Math.max(36, Math.round(DATABASE_BACKUP_INTERVAL_MS / 3600000) + 12)
+        });
+        await notifyFounderStorageAlerts(alerts);
 
         const backupLabel = backupPath
             ? path.basename(backupPath)
@@ -1612,15 +1815,20 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             `sauvegarde=${backupLabel}`,
             `anciennes copies compressees=${compression.compressedCount}`,
             `sessions expirees=${maintenance.cleanup.expiredSessions}`,
-            `journaux automod retires=${maintenance.cleanup.automodEvents}`,
-            `journaux dashboard retires=${maintenance.cleanup.dashboardAuditLogs}`,
+            `journaux automod archives=${maintenance.cleanup.automodEvents}`,
+            `journaux dashboard archives=${maintenance.cleanup.dashboardAuditLogs}`,
+            `medias orphelins=${media.orphaned}`,
+            `verification=${verification?.status || 'absente'}`,
             `duree=${maintenance.durationMs}ms`
         ].join(' | '));
 
         return {
             backupPath,
             compression,
-            maintenance
+            verification,
+            maintenance,
+            media,
+            alerts
         };
     })().finally(() => {
         databaseStorageCyclePromise = null;
@@ -1629,17 +1837,39 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
     return databaseStorageCyclePromise;
 }
 
+async function reportDatabaseStorageCycleFailure(error) {
+    lastDatabaseBackupFailure = {
+        occurredAt: new Date().toISOString(),
+        message: String(error?.message || error).slice(0, 500)
+    };
+
+    try {
+        const status = getDatabaseBackupStatus();
+        const alerts = evaluateStorageAlerts(db, status, {
+            latestBackupAt: status.latestVerifiedAt || status.latestAt,
+            backupFailure: lastDatabaseBackupFailure.message
+        });
+        await notifyFounderStorageAlerts(alerts);
+    } catch (alertError) {
+        console.error('Erreur alerte stockage Sentinel :', alertError);
+    }
+}
+
 function startDatabaseBackupSchedule() {
     if (databaseBackupTimer) {
         return;
     }
 
-    runDatabaseStorageCycle('startup')
-        .catch(error => console.error('Erreur entretien stockage au demarrage :', error));
+    runDatabaseStorageCycle('startup').catch(async error => {
+        console.error('Erreur entretien stockage au demarrage :', error);
+        await reportDatabaseStorageCycleFailure(error);
+    });
 
     databaseBackupTimer = setInterval(() => {
-        runDatabaseStorageCycle('auto', { forceBackup: true })
-            .catch(error => console.error('Erreur entretien stockage planifie :', error));
+        runDatabaseStorageCycle('auto', { forceBackup: true }).catch(async error => {
+            console.error('Erreur entretien stockage planifie :', error);
+            await reportDatabaseStorageCycleFailure(error);
+        });
     }, DATABASE_BACKUP_INTERVAL_MS);
     databaseBackupTimer.unref();
 }
@@ -1649,14 +1879,22 @@ function getDatabaseBackupStatus() {
         return getDatabaseStorageStatus(db, {
             databasePath: DATABASE_FILE_PATH,
             backupDirectory: DATABASE_BACKUP_DIR,
+            archiveDirectory: DATABASE_COLD_ARCHIVE_DIR,
+            mediaDirectory: EMBED_MEDIA_DIR,
+            mediaMaxBytes: EMBED_MEDIA_MAX_BYTES,
             backupKeep: DATABASE_BACKUP_KEEP,
+            backupDaily: DATABASE_BACKUP_DAILY,
+            backupWeekly: DATABASE_BACKUP_WEEKLY,
+            backupMonthly: DATABASE_BACKUP_MONTHLY,
             backupMaxBytes: DATABASE_BACKUP_MAX_BYTES,
             automodRetentionDays: DATABASE_AUTOMOD_RETENTION_DAYS,
             auditRetentionDays: DATABASE_AUDIT_RETENTION_DAYS,
             lastBackup: lastDatabaseBackup,
             lastMaintenance: lastDatabaseMaintenance,
+            lastBackupFailure: lastDatabaseBackupFailure,
             backupEnabled: DATABASE_BACKUP_ENABLED,
-            backupIntervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000)
+            backupIntervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000),
+            runtimePerformance: getRuntimePerformanceStatus()
         });
     } catch (error) {
         return {
@@ -1665,6 +1903,81 @@ function getDatabaseBackupStatus() {
             lastMaintenance: lastDatabaseMaintenance
         };
     }
+}
+
+function resolveMaintenanceFile(kind, fileName) {
+    if (kind === 'backup') {
+        const fullPath = resolveManagedStorageFile(DATABASE_BACKUP_DIR, fileName, BACKUP_PATTERN);
+        return fullPath ? {
+            fullPath,
+            fileName: path.basename(fullPath),
+            contentType: fullPath.toLowerCase().endsWith('.gz') ? 'application/gzip' : 'application/x-sqlite3'
+        } : null;
+    }
+
+    if (kind === 'archive') {
+        const fullPath = resolveManagedStorageFile(DATABASE_COLD_ARCHIVE_DIR, fileName, COLD_ARCHIVE_PATTERN);
+        return fullPath ? { fullPath, fileName: path.basename(fullPath), contentType: 'application/gzip' } : null;
+    }
+
+    return null;
+}
+
+async function runManualDatabaseMaintenance() {
+    return runDatabaseStorageCycle('manual', { forceBackup: true });
+}
+
+async function verifyManagedDatabaseBackup(fileName) {
+    const file = resolveMaintenanceFile('backup', fileName);
+
+    if (!file) {
+        throw new Error('Sauvegarde Sentinel introuvable.');
+    }
+
+    const check = await verifyDatabaseBackup(file.fullPath);
+    saveBackupVerification(db, check);
+
+    if (check.status !== 'ok') {
+        lastDatabaseBackupFailure = { occurredAt: check.checkedAt, message: check.errorMessage };
+        throw new Error(check.errorMessage || 'La verification de la sauvegarde a echoue.');
+    }
+
+    lastDatabaseBackupFailure = null;
+    return check;
+}
+
+async function restoreManagedDatabaseBackup(fileName) {
+    if (databaseStorageCyclePromise) {
+        await databaseStorageCyclePromise;
+    }
+
+    const file = resolveMaintenanceFile('backup', fileName);
+
+    if (!file) {
+        throw new Error('Sauvegarde Sentinel introuvable.');
+    }
+
+    const safetyBackup = await createCompressedDatabaseBackup(db, {
+        backupDirectory: DATABASE_BACKUP_DIR,
+        reason: 'pre-restore',
+        compress: true,
+        compressionLevel: DATABASE_BACKUP_COMPRESSION_LEVEL
+    });
+    const safetyCheck = await verifyDatabaseBackup(safetyBackup.fullPath);
+    saveBackupVerification(db, safetyCheck);
+
+    if (safetyCheck.status !== 'ok') {
+        throw new Error('La copie de securite avant restauration a echoue. Restauration annulee.');
+    }
+
+    const staged = await stageDatabaseRestore(file.fullPath, DATABASE_FILE_PATH);
+    setTimeout(() => process.exit(0), 2500).unref();
+
+    return {
+        backupFile: staged.backupFile,
+        safetyBackupFile: safetyBackup.fileName,
+        restartScheduled: true
+    };
 }
 
 function getSentinelSyncStatus() {
@@ -4578,6 +4891,7 @@ function updateCustomEmbedRecord(guildId, messageId, data) {
 }
 
 function deleteCustomEmbedRecord(guildId, messageId) {
+    markCustomEmbedMediaTrash(guildId, messageId);
     return db.prepare(`
         DELETE FROM custom_embeds
         WHERE guild_id = ? AND message_id = ?
@@ -5718,12 +6032,19 @@ function normalizeCustomEmbedUpload(upload, slot, language = 'fr') {
     }
 
     const extension = CUSTOM_EMBED_UPLOAD_MIMES.get(detectedMime);
-    const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 14);
+    const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
+    const hash = contentHash.slice(0, 14);
     const safeSlot = slot === 'thumbnail' ? 'thumbnail' : 'image';
     const name = `sentinel-embed-${safeSlot}-${hash}.${extension}`;
 
     return {
         size: buffer.length,
+        buffer,
+        contentHash,
+        mimeType: detectedMime,
+        extension,
+        slot: safeSlot,
+        name,
         url: `attachment://${name}`,
         file: {
             attachment: buffer,
@@ -5761,6 +6082,292 @@ function prepareCustomEmbedUploads(input, data, language = 'fr') {
     }
 
     return uploads.map(upload => upload.file);
+}
+
+function mediaTrashDate() {
+    return new Date(Date.now() + EMBED_MEDIA_TRASH_DAYS * 86400000).toISOString();
+}
+
+function markCustomEmbedMediaTrash(guildId, messageId, slots = null) {
+    const now = new Date().toISOString();
+    const purgeAfter = mediaTrashDate();
+
+    if (Array.isArray(slots) && slots.length) {
+        const update = db.prepare(`
+            UPDATE embed_media_links
+            SET status = 'trash', updated_at = ?, trashed_at = ?, purge_after = ?
+            WHERE guild_id = ? AND message_id = ? AND slot = ? AND status != 'trash'
+        `);
+
+        return db.transaction(() => slots.reduce((total, slot) => (
+            total + update.run(now, now, purgeAfter, guildId, messageId, slot).changes
+        ), 0))();
+    }
+
+    return db.prepare(`
+        UPDATE embed_media_links
+        SET status = 'trash', updated_at = ?, trashed_at = ?, purge_after = ?
+        WHERE guild_id = ? AND message_id = ? AND status != 'trash'
+    `).run(now, now, purgeAfter, guildId, messageId).changes;
+}
+
+function writeEmbedMediaObject(upload) {
+    const objectsDirectory = path.join(EMBED_MEDIA_DIR, 'objects');
+    const fileName = `${upload.contentHash}.${upload.extension}`;
+    const fullPath = path.join(objectsDirectory, fileName);
+    const temporaryPath = `${fullPath}.${process.pid}.${Date.now()}.tmp`;
+    fs.mkdirSync(objectsDirectory, { recursive: true });
+
+    if (!fs.existsSync(fullPath)) {
+        const storedBytes = Number(db.prepare('SELECT COALESCE(SUM(size_bytes), 0) AS bytes FROM embed_media_objects').get()?.bytes || 0);
+
+        if (storedBytes + upload.size > EMBED_MEDIA_MAX_BYTES) {
+            return { stored: false, fileName: null, fullPath: null };
+        }
+
+        try {
+            fs.writeFileSync(temporaryPath, upload.buffer, { flag: 'wx', mode: 0o600 });
+            fs.renameSync(temporaryPath, fullPath);
+        } finally {
+            fs.rmSync(temporaryPath, { force: true });
+        }
+    }
+
+    if (fs.statSync(fullPath).size !== upload.size) {
+        throw new Error('La copie locale du média ne correspond pas au fichier validé.');
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(`
+        INSERT INTO embed_media_objects (
+            content_hash, file_name, mime_type, size_bytes, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(content_hash) DO UPDATE SET
+            file_name = excluded.file_name,
+            mime_type = excluded.mime_type,
+            size_bytes = excluded.size_bytes,
+            updated_at = excluded.updated_at
+    `).run(upload.contentHash, fileName, upload.mimeType, upload.size, now, now);
+
+    return { stored: true, fileName, fullPath };
+}
+
+function upsertEmbedMediaLink({
+    upload = null,
+    attachment = null,
+    guildId,
+    messageId,
+    slot
+}) {
+    const now = new Date().toISOString();
+    const previous = db.prepare(`
+        SELECT content_hash FROM embed_media_links
+        WHERE message_id = ? AND slot = ?
+    `).get(messageId, slot);
+
+    if (previous?.content_hash && previous.content_hash !== upload?.contentHash) {
+        db.prepare('UPDATE embed_media_objects SET updated_at = ? WHERE content_hash = ?')
+            .run(now, previous.content_hash);
+    }
+
+    db.prepare(`
+        INSERT INTO embed_media_links (
+            content_hash, guild_id, message_id, slot, attachment_name, attachment_url,
+            status, created_at, updated_at, trashed_at, purge_after
+        ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, NULL, NULL)
+        ON CONFLICT(message_id, slot) DO UPDATE SET
+            content_hash = excluded.content_hash,
+            guild_id = excluded.guild_id,
+            attachment_name = excluded.attachment_name,
+            attachment_url = excluded.attachment_url,
+            status = 'active',
+            updated_at = excluded.updated_at,
+            trashed_at = NULL,
+            purge_after = NULL
+    `).run(
+        upload?.contentHash || null,
+        guildId,
+        messageId,
+        slot,
+        attachment?.name || upload?.name || null,
+        attachment?.url || null,
+        now,
+        now
+    );
+}
+
+function attachmentSlot(attachment) {
+    const name = String(attachment?.name || '');
+    if (/^sentinel-embed-thumbnail-/i.test(name)) return 'thumbnail';
+    if (/^sentinel-embed-image-/i.test(name)) return 'image';
+    return null;
+}
+
+function syncCustomEmbedMedia(message, input = null, language = 'fr') {
+    if (!message?.guildId || !message?.id) {
+        return { active: 0, trashed: 0, stored: 0 };
+    }
+
+    const normalizedUploads = input ? [
+        normalizeCustomEmbedUpload(input?.imageUpload, 'image', language),
+        normalizeCustomEmbedUpload(input?.thumbnailUpload, 'thumbnail', language)
+    ].filter(Boolean) : [];
+    const attachments = [...message.attachments.values()];
+    const liveSlots = new Set();
+    let stored = 0;
+
+    for (const upload of normalizedUploads) {
+        const localObject = writeEmbedMediaObject(upload);
+        const attachment = attachments.find(item => item.name === upload.name) || null;
+        upsertEmbedMediaLink({
+            upload: localObject.stored ? upload : null,
+            attachment,
+            guildId: message.guildId,
+            messageId: message.id,
+            slot: upload.slot
+        });
+        liveSlots.add(upload.slot);
+        stored += localObject.stored ? 1 : 0;
+    }
+
+    for (const attachment of attachments) {
+        const slot = attachmentSlot(attachment);
+
+        if (!slot || liveSlots.has(slot)) {
+            continue;
+        }
+
+        const existing = db.prepare(`
+            SELECT content_hash FROM embed_media_links
+            WHERE guild_id = ? AND message_id = ? AND slot = ?
+        `).get(message.guildId, message.id, slot);
+        upsertEmbedMediaLink({
+            upload: existing?.content_hash ? { contentHash: existing.content_hash } : null,
+            attachment,
+            guildId: message.guildId,
+            messageId: message.id,
+            slot
+        });
+        liveSlots.add(slot);
+    }
+
+    const currentLinks = db.prepare(`
+        SELECT slot FROM embed_media_links
+        WHERE guild_id = ? AND message_id = ? AND status = 'active'
+    `).all(message.guildId, message.id);
+    const staleSlots = currentLinks.map(row => row.slot).filter(slot => !liveSlots.has(slot));
+    const trashed = staleSlots.length
+        ? markCustomEmbedMediaTrash(message.guildId, message.id, staleSlots)
+        : 0;
+
+    return { active: liveSlots.size, trashed, stored };
+}
+
+function purgeTrashedEmbedMedia() {
+    const expired = db.prepare(`
+        SELECT id, content_hash
+        FROM embed_media_links
+        WHERE status = 'trash' AND purge_after IS NOT NULL AND purge_after <= ?
+        ORDER BY id ASC
+        LIMIT 1000
+    `).all(new Date().toISOString());
+
+    const hashes = [...new Set(expired.map(row => row.content_hash).filter(Boolean))];
+    const deleteLink = db.prepare('DELETE FROM embed_media_links WHERE id = ?');
+    db.transaction(() => expired.forEach(row => deleteLink.run(row.id)))();
+    const orphanObjects = db.prepare(`
+        SELECT content_hash, file_name, size_bytes
+        FROM embed_media_objects
+        WHERE updated_at <= ?
+          AND NOT EXISTS (
+              SELECT 1 FROM embed_media_links
+              WHERE embed_media_links.content_hash = embed_media_objects.content_hash
+          )
+        LIMIT 1000
+    `).all(new Date(Date.now() - EMBED_MEDIA_TRASH_DAYS * 86400000).toISOString());
+    hashes.push(...orphanObjects.map(item => item.content_hash));
+    let removedObjects = 0;
+    let removedBytes = 0;
+
+    for (const hash of hashes) {
+        const reference = db.prepare('SELECT 1 FROM embed_media_links WHERE content_hash = ? LIMIT 1').get(hash);
+
+        if (reference) {
+            continue;
+        }
+
+        const object = db.prepare('SELECT file_name, size_bytes FROM embed_media_objects WHERE content_hash = ?').get(hash);
+
+        if (object) {
+            fs.rmSync(path.join(EMBED_MEDIA_DIR, 'objects', object.file_name), { force: true });
+            db.prepare('DELETE FROM embed_media_objects WHERE content_hash = ?').run(hash);
+            removedObjects += 1;
+            removedBytes += Number(object.size_bytes || 0);
+        }
+    }
+
+    return { links: expired.length, objects: removedObjects, bytes: removedBytes };
+}
+
+async function performCustomEmbedMediaScan(limit = 100) {
+    const rows = db.prepare(`
+        SELECT message_id, guild_id, channel_id
+        FROM custom_embeds
+        ORDER BY datetime(updated_at) ASC
+        LIMIT ?
+    `).all(Math.max(Math.min(Number(limit) || 100, 250), 1));
+    let checked = 0;
+    let orphaned = 0;
+    let synchronized = 0;
+
+    for (const row of rows) {
+        const guild = client.guilds.cache.get(row.guild_id);
+        const channel = guild?.channels.cache.get(row.channel_id)
+            || await guild?.channels.fetch(row.channel_id).catch(() => null);
+        const message = channel?.isTextBased()
+            ? await channel.messages.fetch(row.message_id).catch(() => null)
+            : null;
+        checked += 1;
+
+        if (!message || message.author?.id !== client.user?.id) {
+            deleteCustomEmbedRecord(row.guild_id, row.message_id);
+            orphaned += 1;
+            continue;
+        }
+
+        syncCustomEmbedMedia(message);
+        db.prepare('UPDATE custom_embeds SET updated_at = ? WHERE guild_id = ? AND message_id = ?')
+            .run(new Date().toISOString(), row.guild_id, row.message_id);
+        synchronized += 1;
+    }
+
+    const now = new Date().toISOString();
+    const missingRecords = db.prepare(`
+        UPDATE embed_media_links
+        SET status = 'trash', updated_at = ?, trashed_at = ?, purge_after = ?
+        WHERE status = 'active'
+          AND NOT EXISTS (
+              SELECT 1 FROM custom_embeds
+              WHERE custom_embeds.message_id = embed_media_links.message_id
+                AND custom_embeds.guild_id = embed_media_links.guild_id
+          )
+    `).run(now, now, mediaTrashDate()).changes;
+    const purged = purgeTrashedEmbedMedia();
+
+    return { checked, orphaned: orphaned + missingRecords, synchronized, purged };
+}
+
+async function scanCustomEmbedMediaOrphans(limit = 100) {
+    if (mediaScanPromise) {
+        return mediaScanPromise;
+    }
+
+    mediaScanPromise = performCustomEmbedMediaScan(limit)
+        .finally(() => {
+            mediaScanPromise = null;
+        });
+
+    return mediaScanPromise;
 }
 
 function normalizeCustomEmbedOptionalText(value, allowClear = false) {
@@ -11454,6 +12061,7 @@ async function fetchManagedCustomEmbedMessage(guildId, fallbackChannel, messageI
     }
 
     addCustomEmbedRecord(guildId, channel.id, message.id, client.user.id, data);
+    syncCustomEmbedMedia(message);
     const record = getCustomEmbedRecord(guildId, message.id);
 
     return { record, message, channel };
@@ -11534,6 +12142,7 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
         }
 
         addCustomEmbedRecord(guildId, channel.id, sentMessage.id, interaction.user.id, data);
+        syncCustomEmbedMedia(sentMessage);
 
         await interaction.reply({
             content: t(language, 'customEmbedCreated', {
@@ -11613,12 +12222,13 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
             return true;
         }
 
-        await message.edit({
+        const editedMessage = await message.edit({
             content: message.content || null,
             embeds: [buildCustomAnnouncementEmbed(nextData, language)],
             allowedMentions: { parse: [] }
         });
         updateCustomEmbedRecord(guildId, messageId, nextData);
+        syncCustomEmbedMedia(editedMessage);
 
         await interaction.reply({
             content: t(language, 'customEmbedEdited', { messageId }),
@@ -11982,6 +12592,7 @@ client.once(Events.ClientReady, async () => {
             parseDurationToMs,
             parseSlowmodeToSeconds,
             prepareCustomEmbedUploads,
+            recordDashboardRequestMetric,
             removeAutomodWord,
             removeDossierRole,
             removeCommandRole,
@@ -11995,6 +12606,7 @@ client.once(Events.ClientReady, async () => {
             setDossierReferent,
             setGuildLanguage,
             setWeeklyPaymentStatus,
+            syncCustomEmbedMedia,
             updateGuildPayRoleSettings,
             updateDossierStatus,
             updateDossierTypeCategory,
@@ -12006,7 +12618,12 @@ client.once(Events.ClientReady, async () => {
             updateSentinelStatusPanel,
             updateModerationCaseReason,
             updateUserTime,
-            upsertTemporaryBan
+            upsertTemporaryBan,
+            resolveMaintenanceFile,
+            restoreManagedDatabaseBackup,
+            runManualDatabaseMaintenance,
+            scanCustomEmbedMediaOrphans,
+            verifyManagedDatabaseBackup
         }
     });
 
@@ -12101,6 +12718,7 @@ client.on(Events.GuildMemberAdd, async member => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    const interactionStartedAt = process.hrtime.bigint();
     saveDiscordUserProfile(interaction.user);
 
     if (DEBUG_INTERACTIONS && interaction.isButton()) {
@@ -13331,10 +13949,19 @@ client.on(Events.InteractionCreate, async interaction => {
             status: auditStatus,
             summary: auditSummary
         });
+        recordDiscordInteractionMetric(
+            interaction,
+            Number(process.hrtime.bigint() - interactionStartedAt) / 1e6,
+            auditStatus === 'failed'
+        );
     }
 });
 
 client.on(Events.MessageDelete, async message => {
+    if (message.guild?.id && message.id && message.author?.id === client.user?.id) {
+        deleteCustomEmbedRecord(message.guild.id, message.id);
+    }
+
     if (!message.guild || message.author?.bot) {
         return;
     }

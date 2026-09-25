@@ -4086,65 +4086,174 @@ function formatStorageBytes(value) {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} Go`;
 }
 
+function backupGenerationLabel(generations = []) {
+  const labels = { daily: 'Quotidienne', weekly: 'Hebdomadaire', monthly: 'Mensuelle', latest: 'Récente' };
+  return generations.map(value => labels[value] || value).join(' · ') || 'Copie supplémentaire';
+}
+
+function founderBackupHistory(storage, canManage) {
+  const backups = storage.backups || [];
+
+  if (!backups.length) {
+    return '<p class="muted">Aucune copie protégée disponible.</p>';
+  }
+
+  return `
+    <div class="maintenance-file-list">
+      ${backups.slice(0, 12).map((backup) => {
+        const verified = backup.verification?.status === 'ok';
+        return `
+          <div class="maintenance-file-row">
+            <span>
+              <strong>${escapeHtml(backupGenerationLabel(backup.generations))}</strong>
+              <small>${escapeHtml(formatAuditDate(backup.createdAt))} · ${escapeHtml(formatStorageBytes(backup.sizeBytes))}</small>
+              <small>${verified ? `Intégrité vérifiée ${escapeHtml(formatAuditDate(backup.verification.checkedAt))}` : 'Contrôle d’intégrité à effectuer'}</small>
+            </span>
+            ${canManage ? `
+              <span class="maintenance-file-actions">
+                <button class="button button-small button-ghost" type="button" data-maintenance-download data-kind="backup" data-file="${escapeHtml(backup.fileName)}">Télécharger</button>
+                <button class="button button-small button-ghost" type="button" data-maintenance-action="verify-backup" data-file="${escapeHtml(backup.fileName)}">Vérifier</button>
+              </span>
+            ` : statusBadge(verified ? 'Vérifiée' : 'En attente', verified)}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function founderColdArchiveHistory(storage, canManage) {
+  const archives = storage.coldArchives || [];
+
+  if (!archives.length) {
+    return '<p class="muted">Aucun journal n’a encore rejoint l’historique froid.</p>';
+  }
+
+  return `
+    <div class="maintenance-file-list">
+      ${archives.slice(0, 10).map((archive) => `
+        <div class="maintenance-file-row">
+          <span>
+            <strong>${archive.table === 'guild_automod_events' ? 'Registre de sûreté' : 'Journal de régie'}</strong>
+            <small>${escapeHtml(archive.rowCount)} entrée(s) · ${escapeHtml(formatStorageBytes(archive.sizeBytes))}</small>
+            <small>${archive.fromAt ? `${escapeHtml(formatAuditDate(archive.fromAt))} → ${escapeHtml(formatAuditDate(archive.toAt))}` : escapeHtml(formatAuditDate(archive.createdAt))}</small>
+          </span>
+          ${canManage ? `<button class="button button-small button-ghost" type="button" data-maintenance-download data-kind="archive" data-file="${escapeHtml(archive.fileName)}">Télécharger</button>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function founderStoragePanel(overview) {
   const storage = overview?.storage;
 
-  if (!storage) {
-    return '';
-  }
+  if (!storage) return '';
 
   if (storage.error) {
-    return `
-      <section class="founder-storage-panel" aria-label="Stockage Sentinel">
-        <div class="founder-console-note">
-          <strong>Stockage Sentinel</strong>
-          <span>Le relevé est momentanément indisponible. L’entretien automatique reste actif et sera relu au prochain passage.</span>
-        </div>
-      </section>
-    `;
+    return `<section class="founder-storage-panel" aria-label="Stockage Sentinel"><div class="founder-console-note"><strong>Stockage Sentinel</strong><span>Le relevé est momentanément indisponible.</span></div></section>`;
   }
 
+  const canManage = canManageFounderPanel();
   const maintenance = storage.lastMaintenance || null;
   const cleanup = maintenance?.cleanup || {};
+  const volume = storage.volume || {};
+  const media = storage.media || {};
+  const performance = storage.performance || {};
+  const databasePerformance = performance.database || {};
+  const runtime = performance.runtime || {};
+  const generations = storage.generations || {};
+  const alerts = storage.alerts || [];
   const allCompressed = storage.count > 0 && storage.compressedCount === storage.count;
+  const usagePercent = Math.max(Math.min(Number(volume.usagePercent) || 0, 100), 0);
 
   return `
-    <section class="founder-storage-panel" aria-label="Stockage Sentinel">
+    <section class="founder-storage-panel" aria-label="Centre de maintenance Sentinel">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Conservation</p>
-          <h3>Stockage Sentinel</h3>
-          <p class="muted">Les archives de paie, heures, dossiers et sanctions restent conservées. Seuls les journaux techniques arrivés à échéance sont retirés.</p>
+          <h3>Centre de maintenance</h3>
+          <p class="muted">Les dossiers, services, sanctions et archives de paie restent dans le registre actif. Les anciens journaux techniques sont conservés sous forme compressée.</p>
         </div>
-        ${statusBadge(allCompressed ? 'Copies compressées' : 'Entretien en cours', allCompressed)}
+        ${statusBadge(alerts.length ? `${alerts.length} alerte(s)` : (allCompressed ? 'Sous contrôle' : 'Entretien en cours'), !alerts.length)}
+      </div>
+      ${alerts.length ? `<div class="maintenance-alerts">${alerts.map(alert => `<p><strong>Seuil ${escapeHtml(alert.level)} :</strong> ${escapeHtml(alert.message)}</p>`).join('')}</div>` : ''}
+      <div class="storage-capacity">
+        <span><strong>Volume utilisé</strong><small>${escapeHtml(formatStorageBytes(volume.usedBytes))} / ${escapeHtml(formatStorageBytes(volume.totalBytes))}</small></span>
+        <div class="storage-capacity-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${escapeHtml(usagePercent)}"><span style="width:${escapeHtml(usagePercent)}%"></span></div>
+        <strong>${escapeHtml(usagePercent)} %</strong>
       </div>
       <div class="dashboard-metrics dashboard-kpis founder-storage-kpis">
-        <article class="dashboard-kpi">
-          <span>Base active</span>
-          <strong>${escapeHtml(formatStorageBytes(storage.databaseBytes))}</strong>
-          <small>données actuellement utilisées</small>
-        </article>
-        <article class="dashboard-kpi">
-          <span>Copies protégées</span>
-          <strong>${escapeHtml(formatStorageBytes(storage.backupBytes))}</strong>
-          <small>${escapeHtml(storage.count)} / ${escapeHtml(storage.keep)} conservées</small>
-        </article>
-        <article class="dashboard-kpi">
-          <span>Total géré</span>
-          <strong>${escapeHtml(formatStorageBytes(storage.managedBytes))}</strong>
-          <small>plafond copies : ${escapeHtml(formatStorageBytes(storage.maxBackupBytes))}</small>
-        </article>
-        <article class="dashboard-kpi">
-          <span>Compression</span>
-          <strong>${escapeHtml(storage.compressedCount)} / ${escapeHtml(storage.count)}</strong>
-          <small>copies allégées</small>
-        </article>
+        <article class="dashboard-kpi"><span>Base active</span><strong>${escapeHtml(formatStorageBytes(storage.databaseBytes))}</strong><small>données opérationnelles</small></article>
+        <article class="dashboard-kpi"><span>Copies protégées</span><strong>${escapeHtml(formatStorageBytes(storage.backupBytes))}</strong><small>${escapeHtml(storage.count)} copie(s)</small></article>
+        <article class="dashboard-kpi"><span>Historique froid</span><strong>${escapeHtml(formatStorageBytes(storage.archiveBytes))}</strong><small>${escapeHtml(storage.coldArchives?.length || 0)} lot(s) consultable(s)</small></article>
+        <article class="dashboard-kpi"><span>Médias locaux</span><strong>${escapeHtml(formatStorageBytes(media.objectBytes))}</strong><small>${escapeHtml(media.objectCount || 0)} objet(s) · plafond ${escapeHtml(formatStorageBytes(media.maxBytes))}</small></article>
       </div>
+      <div class="maintenance-grid">
+        <section class="maintenance-section">
+          <div class="panel-heading row-heading"><div><h4>Répartition de la base</h4><p class="muted">Occupation estimée par registre.</p></div></div>
+          <div class="storage-distribution">
+            ${(storage.distribution || []).map(item => `<div><span>${escapeHtml(item.name)}</span><strong>${escapeHtml(formatStorageBytes(item.sizeBytes))}</strong></div>`).join('') || '<p class="muted">Répartition indisponible.</p>'}
+          </div>
+        </section>
+        <section class="maintenance-section">
+          <div class="panel-heading row-heading"><div><h4>Surveillance</h4><p class="muted">Relevé depuis le dernier démarrage.</p></div></div>
+          <div class="storage-distribution">
+            <div><span>Requêtes SQLite</span><strong>${escapeHtml(databasePerformance.queryCount || 0)}</strong></div>
+            <div><span>Requêtes lentes</span><strong>${escapeHtml(databasePerformance.slowQueryCount || 0)}</strong></div>
+            <div><span>Erreurs SQLite</span><strong>${escapeHtml(databasePerformance.errorCount || 0)}</strong></div>
+            <div><span>Site, réponse p95</span><strong>${escapeHtml(runtime.dashboard?.p95Ms || 0)} ms</strong></div>
+            <div><span>Erreurs du site</span><strong>${escapeHtml(runtime.dashboard?.errorCount || 0)}</strong></div>
+            <div><span>Discord, réponse p95</span><strong>${escapeHtml(runtime.discord?.p95Ms || 0)} ms</strong></div>
+            <div><span>Signal Discord</span><strong>${escapeHtml(runtime.discord?.gatewayPingMs || 0)} ms</strong></div>
+          </div>
+        </section>
+        <section class="maintenance-section">
+          <div class="panel-heading row-heading"><div><h4>Médias d’embeds</h4><p class="muted">Les médias orphelins restent 30 jours en corbeille.</p></div></div>
+          <div class="storage-distribution">
+            <div><span>Liens actifs</span><strong>${escapeHtml(media.activeCount || 0)}</strong></div>
+            <div><span>En corbeille</span><strong>${escapeHtml((media.trashCount || 0) + (media.orphanObjectCount || 0))}</strong></div>
+            <div><span>Hébergés uniquement par Discord</span><strong>${escapeHtml(media.remoteOnlyCount || 0)}</strong></div>
+          </div>
+        </section>
+        <section class="maintenance-section">
+          <div class="panel-heading row-heading"><div><h4>Plan de reprise</h4><p class="muted">${escapeHtml(generations.daily || 0)} quotidiennes · ${escapeHtml(generations.weekly || 0)} hebdomadaires · ${escapeHtml(generations.monthly || 0)} mensuelles</p></div></div>
+          <div class="storage-distribution">
+            <div><span>Dernière copie</span><strong>${storage.latestAt ? escapeHtml(formatAuditDate(storage.latestAt)) : 'Absente'}</strong></div>
+            <div><span>Dernier contrôle</span><strong>${storage.latestVerifiedAt ? escapeHtml(formatAuditDate(storage.latestVerifiedAt)) : 'À effectuer'}</strong></div>
+            <div><span>Copies compressées</span><strong>${escapeHtml(storage.compressedCount)} / ${escapeHtml(storage.count)}</strong></div>
+          </div>
+        </section>
+      </div>
+      ${canManage ? `
+        <div class="maintenance-toolbar">
+          <button class="button button-small" type="button" data-maintenance-action="run-maintenance">Lancer l’entretien</button>
+          <button class="button button-small button-ghost" type="button" data-maintenance-action="scan-media">Contrôler les médias</button>
+        </div>
+      ` : ''}
+      <details class="maintenance-history" open>
+        <summary>Copies protégées</summary>
+        ${founderBackupHistory(storage, canManage)}
+      </details>
+      <details class="maintenance-history">
+        <summary>Historique froid</summary>
+        ${founderColdArchiveHistory(storage, canManage)}
+      </details>
+      ${canManage && storage.backups?.length ? `
+        <details class="maintenance-history maintenance-restore">
+          <summary>Restauration fondatrice</summary>
+          <form data-maintenance-restore-form>
+            <label><span>Copie à restaurer</span><select name="fileName" required>${storage.backups.map(item => `<option value="${escapeHtml(item.fileName)}">${escapeHtml(formatAuditDate(item.createdAt))} · ${escapeHtml(backupGenerationLabel(item.generations))}</option>`).join('')}</select></label>
+            <label><span>Confirmation</span><input name="confirmation" autocomplete="off" placeholder="RESTAURER SENTINEL" required></label>
+            <button class="button button-small" type="submit">Préparer la restauration</button>
+          </form>
+        </details>
+      ` : ''}
       <div class="founder-console-note">
-        <strong>Entretien automatique</strong>
+        <strong>Dernier entretien</strong>
         <span>${maintenance?.completedAt
-          ? `Dernier passage : ${escapeHtml(formatAuditDate(maintenance.completedAt))}. ${escapeHtml((cleanup.expiredSessions || 0) + (cleanup.automodEvents || 0) + (cleanup.dashboardAuditLogs || 0))} ligne(s) technique(s) arrivée(s) à échéance.`
-          : 'Le premier entretien sera lancé automatiquement au démarrage de cette version.'}</span>
+          ? `${escapeHtml(formatAuditDate(maintenance.completedAt))} · ${escapeHtml((cleanup.expiredSessions || 0))} session(s) expirée(s) · ${escapeHtml((cleanup.automodEvents || 0) + (cleanup.dashboardAuditLogs || 0))} entrée(s) archivée(s).`
+          : 'Le premier entretien sera lancé automatiquement au démarrage.'}</span>
       </div>
     </section>
   `;
@@ -5046,6 +5155,65 @@ async function manageCreatorSiteStaffAccess(data, button = null) {
   }
 }
 
+async function manageCreatorMaintenance(data, button = null) {
+  if (!currentSiteAccess?.isFounder) return;
+
+  setLoading(button, true);
+
+  try {
+    const payload = await api('/api/creator/maintenance', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    creatorOverview = payload.overview || creatorOverview;
+    currentSiteAccess = creatorOverview?.access || currentSiteAccess;
+    renderDashboard();
+    toast(payload.message || 'Centre de maintenance actualisé.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function downloadMaintenanceFile(kind, fileName, button = null) {
+  if (!currentSiteAccess?.isFounder || !['backup', 'archive'].includes(kind) || !fileName) return;
+  setLoading(button, true);
+  const url = new URL('/api/creator/maintenance/download', window.location.origin);
+  url.searchParams.set('kind', kind);
+  url.searchParams.set('file', fileName);
+
+  try {
+    const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/gzip, application/json' } });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+
+      if (payload.code === 'REAUTH_REQUIRED' && payload.reauthUrl) {
+        window.location.assign(payload.reauthUrl);
+        return;
+      }
+
+      throw new Error(payload.error || `Erreur ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    toast('Archive téléchargée.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 async function runAction(action, data, button = null) {
   if (!selectedGuildId) return;
   setLoading(button, true);
@@ -5256,6 +5424,29 @@ function attachDashboardHandlers() {
         userId: button.dataset.userId || ''
       }, button);
     });
+  });
+
+  $$('[data-maintenance-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      manageCreatorMaintenance({
+        action: button.dataset.maintenanceAction,
+        fileName: button.dataset.file || ''
+      }, button);
+    });
+  });
+
+  $$('[data-maintenance-download]').forEach((button) => {
+    button.addEventListener('click', () => {
+      downloadMaintenanceFile(button.dataset.kind, button.dataset.file, button);
+    });
+  });
+
+  $('[data-maintenance-restore-form]')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const data = formData(form);
+    manageCreatorMaintenance({ action: 'restore-backup', ...data }, button);
   });
 
   $$('[data-dashboard-plan]').forEach((button) => {
