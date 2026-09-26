@@ -6051,11 +6051,61 @@ code {
   --western-sage-deep: #4f5d51;
   --western-leather: #83553b;
   --western-ink: #17130f;
+  --western-display-font: Cambria, Constantia, Georgia, "Times New Roman", serif;
+  --western-copy-font: Candara, "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: var(--western-copy-font);
   background:
     radial-gradient(ellipse at 8% 4%, rgba(155, 107, 61, 0.13), transparent 34%),
     radial-gradient(ellipse at 92% 14%, rgba(86, 104, 82, 0.11), transparent 32%),
     linear-gradient(112deg, rgba(7, 13, 12, 0.16), transparent 34%, rgba(92, 55, 35, 0.08) 72%, transparent),
     linear-gradient(180deg, #0b0907, #17110c 46%, #090705);
+}
+
+:root[data-theme="western"] .dashboard-body h1,
+:root[data-theme="western"] .dashboard-body h2,
+:root[data-theme="western"] .dashboard-body h3,
+:root[data-theme="western"] .dashboard-body h4,
+:root[data-theme="western"] .dashboard-body .brand,
+:root[data-theme="western"] .dashboard-body .dashboard-metrics strong,
+:root[data-theme="western"] .dashboard-body .dashboard-tab strong,
+:root[data-theme="western"] .dashboard-body .dashboard-plan-switch-label strong,
+:root[data-theme="western"] .dashboard-body .premium-badge,
+:root[data-theme="western"] .dashboard-body .free-badge {
+  font-family: var(--western-display-font);
+  font-style: normal;
+  letter-spacing: 0;
+}
+
+:root[data-theme="western"] .dashboard-body .nav-links,
+:root[data-theme="western"] .dashboard-body .header-actions,
+:root[data-theme="western"] .dashboard-body .button,
+:root[data-theme="western"] .dashboard-body .language-switch,
+:root[data-theme="western"] .dashboard-body .dashboard-user,
+:root[data-theme="western"] .dashboard-body .dashboard-panel input,
+:root[data-theme="western"] .dashboard-body .dashboard-panel select,
+:root[data-theme="western"] .dashboard-body .dashboard-panel textarea,
+:root[data-theme="western"] .dashboard-body .dashboard-table,
+:root[data-theme="western"] .dashboard-body .toast {
+  font-family: var(--western-copy-font);
+}
+
+:root[data-theme="western"] .dashboard-body .eyebrow,
+:root[data-theme="western"] .dashboard-body .dashboard-tab span,
+:root[data-theme="western"] .dashboard-body .dashboard-tab small,
+:root[data-theme="western"] .dashboard-body .dashboard-tab-group-label,
+:root[data-theme="western"] .dashboard-body .dashboard-plan-switch-label small,
+:root[data-theme="western"] .dashboard-body .dashboard-plan-button-copy,
+:root[data-theme="western"] .dashboard-body .western-dashboard-masthead-copy span,
+:root[data-theme="western"] .dashboard-body .western-dashboard-masthead-copy small {
+  font-family: var(--western-copy-font);
+  letter-spacing: 0;
+}
+
+:root[data-theme="western"] .dashboard-body h1,
+:root[data-theme="western"] .dashboard-body h2,
+:root[data-theme="western"] .dashboard-body h3,
+:root[data-theme="western"] .dashboard-body h4 {
+  font-weight: 700;
 }
 
 :root[data-theme="western"] .dashboard-body::before {
@@ -6212,8 +6262,11 @@ code {
 
 :root[data-theme="western"] .western-dashboard-masthead-copy strong {
   color: var(--western-parchment);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--western-display-font);
   font-size: clamp(1.75rem, 3vw, 2.7rem);
+  font-variant-caps: small-caps;
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1;
 }
 
@@ -6279,8 +6332,15 @@ code {
 
 :root[data-theme="western"] .dashboard-plan-switch-label strong {
   color: var(--western-parchment);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--western-display-font);
   font-size: 0.9rem;
+  font-weight: 700;
+}
+
+:root[data-theme="western"] .dashboard-plan-button-copy strong {
+  font-family: var(--western-display-font);
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 :root[data-theme="western"] .dashboard-plan-buttons {
