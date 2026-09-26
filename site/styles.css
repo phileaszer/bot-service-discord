@@ -6045,17 +6045,25 @@ code {
 /* Western dashboard: territorial ledger, dark timber and aged brass. */
 :root[data-theme="western"] .dashboard-body {
   background:
-    linear-gradient(90deg, rgba(6, 13, 12, 0.18), transparent 30%, rgba(113, 57, 28, 0.12)),
-    repeating-linear-gradient(90deg, rgba(240, 208, 148, 0.026) 0 1px, transparent 1px 34px),
-    repeating-linear-gradient(0deg, transparent 0 72px, rgba(91, 50, 24, 0.14) 73px 75px),
-    linear-gradient(180deg, #090704, #171007 44%, #080604);
+    radial-gradient(ellipse at 8% 4%, rgba(183, 126, 61, 0.16), transparent 34%),
+    radial-gradient(ellipse at 92% 14%, rgba(91, 119, 91, 0.13), transparent 32%),
+    linear-gradient(112deg, rgba(7, 13, 12, 0.2), transparent 34%, rgba(104, 53, 27, 0.1) 72%, transparent),
+    linear-gradient(180deg, #090704, #181008 46%, #080604);
+}
+
+:root[data-theme="western"] .dashboard-body::before {
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(235, 188, 111, 0.08), transparent 46%),
+    radial-gradient(ellipse at 0 55%, rgba(80, 103, 80, 0.07), transparent 38%),
+    linear-gradient(122deg, transparent 0 22%, rgba(234, 192, 119, 0.018) 42%, transparent 61%);
+  opacity: 0.82;
 }
 
 :root[data-theme="western"] .dashboard-body .site-header {
   border-bottom: 3px double rgba(225, 177, 98, 0.46);
   background:
     linear-gradient(180deg, rgba(255, 225, 164, 0.07), transparent 56%),
-    repeating-linear-gradient(90deg, rgba(255, 234, 185, 0.026) 0 1px, transparent 1px 24px),
+    radial-gradient(ellipse at 45% 0, rgba(215, 164, 88, 0.07), transparent 44%),
     linear-gradient(90deg, #120b06, #2a190d 48%, #100a06);
 }
 
@@ -6106,7 +6114,7 @@ code {
   border-radius: 4px;
   background:
     radial-gradient(circle at 85% 10%, rgba(105, 130, 98, 0.13), transparent 28%),
-    repeating-linear-gradient(90deg, rgba(255, 232, 183, 0.025) 0 1px, transparent 1px 22px),
+    linear-gradient(102deg, rgba(248, 216, 155, 0.025), transparent 36%, rgba(80, 103, 80, 0.035)),
     linear-gradient(135deg, rgba(48, 30, 16, 0.98), rgba(20, 14, 9, 0.98));
   box-shadow:
     inset 0 0 0 1px rgba(249, 220, 160, 0.06),
@@ -6381,7 +6389,7 @@ code {
   border-radius: 4px;
   background:
     radial-gradient(circle at 100% 0, rgba(91, 119, 91, 0.08), transparent 28%),
-    repeating-linear-gradient(90deg, rgba(249, 222, 168, 0.018) 0 1px, transparent 1px 24px),
+    linear-gradient(108deg, rgba(246, 214, 153, 0.02), transparent 42%, rgba(82, 105, 82, 0.025)),
     linear-gradient(135deg, rgba(39, 27, 16, 0.97), rgba(22, 16, 10, 0.97));
   box-shadow:
     inset 0 0 0 1px rgba(246, 214, 153, 0.045),
