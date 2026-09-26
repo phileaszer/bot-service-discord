@@ -149,7 +149,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-26-object-storage-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-26-object-storage-v2';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -6624,6 +6624,45 @@ async function scanCustomEmbedMediaOrphans(limit = 100) {
     return mediaScanPromise;
 }
 
+async function getPublicEmbedMedia(requestPath) {
+    const match = /^\/media\/sentinel\/embeds\/([a-f0-9]{2})\/([a-f0-9]{64})\.webp$/i.exec(
+        String(requestPath || '')
+    );
+
+    if (!match || match[2].slice(0, 2).toLowerCase() !== match[1].toLowerCase()) {
+        return null;
+    }
+
+    const contentHash = match[2].toLowerCase();
+    const object = db.prepare(`
+        SELECT storage_provider, storage_bucket, storage_key, mime_type, size_bytes
+        FROM embed_media_objects
+        WHERE content_hash = ?
+    `).get(contentHash);
+    const validObject = object
+        && object.storage_provider === embedMediaObjectStorage.provider
+        && object.storage_bucket === embedMediaObjectStorage.bucket
+        && object.storage_key === embedMediaObjectKey(contentHash)
+        && object.mime_type === 'image/webp';
+
+    if (!validObject || !embedMediaObjectStorage.configured) {
+        return null;
+    }
+
+    const remote = await embedMediaObjectStorage.get(object.storage_key);
+
+    if (!remote?.body) {
+        return null;
+    }
+
+    return {
+        ...remote,
+        contentHash,
+        contentLength: remote.contentLength || Number(object.size_bytes || 0),
+        contentType: 'image/webp'
+    };
+}
+
 function normalizeCustomEmbedOptionalText(value, allowClear = false) {
     const rawValue = String(value || '').trim();
 
@@ -12794,6 +12833,7 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbeds,
             getCustomEmbedQuota,
             getCustomEmbedRecord,
+            getPublicEmbedMedia,
             hasCustomEmbedUpload,
             customEmbedUploadRequiresAttachment,
             getDatabaseBackupStatus,

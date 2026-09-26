@@ -56,6 +56,15 @@ async function testObjectStorageClient() {
                 throw error;
             }
 
+            if (command.constructor.name === 'GetObjectCommand') {
+                return {
+                    Body: { pipe() {} },
+                    ContentLength: 4,
+                    ContentType: 'image/webp',
+                    ETag: '"test"'
+                };
+            }
+
             return {};
         }
     };
@@ -77,8 +86,16 @@ async function testObjectStorageClient() {
         contentType: 'image/webp'
     });
     assert.equal(result.url, 'https://media.example.test/sentinel/embeds/ab/file.webp');
+    const fetched = await storage.get('sentinel/embeds/ab/file.webp');
+    assert.equal(fetched.contentLength, 4);
+    assert.equal(fetched.contentType, 'image/webp');
     await storage.delete('sentinel/embeds/ab/file.webp');
-    assert.deepEqual(calls, ['HeadObjectCommand', 'PutObjectCommand', 'DeleteObjectCommand']);
+    assert.deepEqual(calls, [
+        'HeadObjectCommand',
+        'PutObjectCommand',
+        'GetObjectCommand',
+        'DeleteObjectCommand'
+    ]);
 }
 
 function testDatabaseMediaStatus() {

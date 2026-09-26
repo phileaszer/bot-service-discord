@@ -1638,6 +1638,48 @@ function streamPrivateFile(res, file) {
     stream.pipe(res);
 }
 
+function streamPublicEmbedMedia(req, res, media) {
+    const headers = {
+        'Content-Type': 'image/webp',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Disposition': 'inline',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+        'X-Content-Type-Options': 'nosniff'
+    };
+
+    if (media.etag) {
+        headers.ETag = media.etag;
+    }
+
+    if (media.lastModified instanceof Date && !Number.isNaN(media.lastModified.getTime())) {
+        headers['Last-Modified'] = media.lastModified.toUTCString();
+    }
+
+    if (Number.isFinite(media.contentLength) && media.contentLength > 0) {
+        headers['Content-Length'] = media.contentLength;
+    }
+
+    if (media.etag && String(req.headers['if-none-match'] || '').split(',').map(value => value.trim()).includes(media.etag)) {
+        media.body.destroy?.();
+        writeResponse(res, 304, headers);
+        return;
+    }
+
+    res.writeHead(200, responseHeaders(res, headers));
+
+    if (req.method === 'HEAD') {
+        media.body.destroy?.();
+        res.end();
+        return;
+    }
+
+    media.body.on?.('error', error => {
+        console.error('Erreur lecture media embed Sentinel :', error);
+        res.destroy(error);
+    });
+    media.body.pipe(res);
+}
+
 function json(res, status, payload) {
     const req = res.sentinelRequest;
     const headers = {
@@ -4994,6 +5036,17 @@ async function handleRequest(req, res, ctx) {
         url = new URL(req.url, getRequestBaseUrl(req));
         res.sentinelUrl = url;
         applyRequestRateLimits(req, url);
+
+        if (['GET', 'HEAD'].includes(req.method) && url.pathname.startsWith('/media/sentinel/embeds/')) {
+            const media = await ctx.helpers.getPublicEmbedMedia?.(url.pathname);
+
+            if (!media) {
+                throw createHttpError(404, 'Media not found.');
+            }
+
+            streamPublicEmbedMedia(req, res, media);
+            return;
+        }
 
         if (req.method === 'GET' && url.pathname === '/auth/login') {
             if (!process.env.CLIENT_SECRET) {

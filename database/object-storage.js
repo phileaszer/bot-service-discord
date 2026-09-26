@@ -4,6 +4,7 @@ const sharp = require('sharp');
 const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const {
     DeleteObjectCommand,
+    GetObjectCommand,
     HeadObjectCommand,
     PutObjectCommand,
     S3Client
@@ -173,6 +174,28 @@ function createObjectStorageFromEnv(env = process.env, options = {}) {
 
             await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
             return true;
+        },
+        async get(key) {
+            if (!configured || !client || !key) {
+                return null;
+            }
+
+            try {
+                const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+                return {
+                    body: result.Body,
+                    contentLength: Number(result.ContentLength || 0),
+                    contentType: result.ContentType || 'image/webp',
+                    etag: result.ETag || null,
+                    lastModified: result.LastModified || null
+                };
+            } catch (error) {
+                if (isMissingObjectError(error)) {
+                    return null;
+                }
+
+                throw error;
+            }
         },
         status() {
             return {

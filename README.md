@@ -118,6 +118,8 @@ La Console fondateur contient le Centre de maintenance : capacité du volume, r�
 
 Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Les quotas par serveur sont de 32 Mo en gratuit et 512 Mo en Premium par défaut, réglables avec `EMBED_MEDIA_FREE_QUOTA_MB` et `EMBED_MEDIA_PREMIUM_QUOTA_MB`.
 
+Un bucket privé peut utiliser `DASHBOARD_URL/media` comme base publique. Sentinel valide alors l'empreinte demandée dans SQLite et diffuse uniquement l'objet WebP correspondant, avec cache immuable, sans révéler les identifiants S3 ni permettre de parcourir le bucket.
+
 - `npm run backup:db` crée une sauvegarde manuelle compressée et vérifie la politique de rétention.
 - `npm run restore:db` liste les sauvegardes `.db` et `.db.gz` disponibles.
 - `npm run restore:db -- <fichier.db.gz>` vérifie l'intégrité SQLite avant de restaurer la base et crée d'abord une copie de sécurité compressée.
