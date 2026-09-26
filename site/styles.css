@@ -2492,55 +2492,135 @@ code {
   gap: 10px;
 }
 
-.dashboard-plan-switch {
-  display: inline-grid;
-  grid-template-columns: auto auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 5px 6px 5px 10px;
-  border: 1px solid rgba(234, 242, 255, 0.12);
-  background: rgba(5, 7, 12, 0.46);
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+.western-dashboard-masthead {
+  display: none;
 }
 
-.dashboard-plan-switch > span {
+.dashboard-plan-switch {
+  display: inline-grid;
+  grid-template-columns: minmax(108px, auto) minmax(276px, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 500px);
+  min-height: 66px;
+  padding: 8px;
+  border: 1px solid rgba(234, 242, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.08), transparent 46%, rgba(255, 45, 154, 0.07)),
+    rgba(5, 7, 12, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    0 12px 28px rgba(0, 0, 0, 0.2);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+
+.dashboard-plan-switch-label {
+  display: grid;
+  gap: 2px;
+  padding-left: 4px;
+  line-height: 1.1;
+}
+
+.dashboard-plan-switch-label small {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 950;
   text-transform: uppercase;
 }
 
+.dashboard-plan-switch-label strong {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
 .dashboard-plan-buttons {
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(86px, auto));
-  gap: 4px;
+  grid-template-columns: repeat(2, minmax(128px, 1fr));
+  gap: 7px;
 }
 
 .dashboard-plan-button {
-  min-height: 30px;
-  padding: 6px 11px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px 10px;
   color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 950;
-  border: 1px solid transparent;
-  background: transparent;
+  text-align: left;
+  border: 1px solid rgba(234, 242, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
   cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 160ms ease;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
 }
 
-.dashboard-plan-button.is-active {
+.dashboard-plan-button:not(:disabled):hover {
+  color: var(--text);
+  border-color: rgba(234, 242, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.dashboard-plan-button-mark {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px rgba(5, 7, 12, 0.62);
+}
+
+.dashboard-plan-button[data-dashboard-plan="premium"] .dashboard-plan-button-mark {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.dashboard-plan-button-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.dashboard-plan-button-copy strong,
+.dashboard-plan-button-copy small {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-plan-button-copy strong {
+  color: inherit;
+  font-size: 0.83rem;
+  font-weight: 950;
+}
+
+.dashboard-plan-button-copy small {
+  color: inherit;
+  font-size: 0.64rem;
+  font-weight: 800;
+  opacity: 0.76;
+}
+
+.dashboard-plan-button[data-dashboard-plan="free"].is-active {
   color: #041018;
   border-color: rgba(23, 231, 255, 0.42);
   background: linear-gradient(90deg, var(--cyan), var(--mint));
-  box-shadow: 0 0 18px rgba(23, 231, 255, 0.16);
+  box-shadow: 0 0 24px rgba(23, 231, 255, 0.22);
+}
+
+.dashboard-plan-button[data-dashboard-plan="premium"].is-active {
+  color: #fff6fb;
+  border-color: rgba(255, 125, 199, 0.54);
+  background: linear-gradient(120deg, #9d4dff, #f1379b 56%, #ff8757);
+  box-shadow: 0 0 24px rgba(255, 45, 154, 0.24);
 }
 
 .dashboard-plan-button.is-locked,
 .dashboard-plan-button:disabled {
   color: rgba(234, 242, 255, 0.38);
   cursor: not-allowed;
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.018) 0 6px, transparent 6px 12px),
+    rgba(255, 255, 255, 0.025);
 }
 
 .dashboard-tab-groups {
@@ -5959,5 +6039,470 @@ code {
 
   .hero-home h1 {
     font-size: 4.25rem;
+  }
+}
+
+/* Western dashboard: territorial ledger, dark timber and aged brass. */
+:root[data-theme="western"] .dashboard-body {
+  background:
+    linear-gradient(90deg, rgba(6, 13, 12, 0.18), transparent 30%, rgba(113, 57, 28, 0.12)),
+    repeating-linear-gradient(90deg, rgba(240, 208, 148, 0.026) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(0deg, transparent 0 72px, rgba(91, 50, 24, 0.14) 73px 75px),
+    linear-gradient(180deg, #090704, #171007 44%, #080604);
+}
+
+:root[data-theme="western"] .dashboard-body .site-header {
+  border-bottom: 3px double rgba(225, 177, 98, 0.46);
+  background:
+    linear-gradient(180deg, rgba(255, 225, 164, 0.07), transparent 56%),
+    repeating-linear-gradient(90deg, rgba(255, 234, 185, 0.026) 0 1px, transparent 1px 24px),
+    linear-gradient(90deg, #120b06, #2a190d 48%, #100a06);
+}
+
+:root[data-theme="western"] .dashboard-body .nav-links {
+  border: 2px solid rgba(112, 70, 34, 0.86);
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(251, 221, 157, 0.08), transparent 52%),
+    #171008;
+  box-shadow: inset 0 0 0 1px rgba(240, 199, 124, 0.08);
+}
+
+:root[data-theme="western"] .dashboard-body .nav-links a,
+:root[data-theme="western"] .dashboard-body .button {
+  border-radius: 2px;
+}
+
+:root[data-theme="western"] .dashboard-body .nav-links a:hover,
+:root[data-theme="western"] .dashboard-body .nav-links a[aria-current="page"] {
+  color: #171008;
+  background: linear-gradient(135deg, #e4b864, #9bad77);
+}
+
+:root[data-theme="western"] .dashboard-body .button {
+  border: 1px solid rgba(231, 190, 116, 0.54);
+  background:
+    linear-gradient(180deg, rgba(255, 238, 192, 0.22), transparent 46%),
+    linear-gradient(135deg, #cf9149, #98522f 68%, #667855);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 235, 187, 0.12),
+    0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="western"] .dashboard-body .button-ghost {
+  color: #ead7ae;
+  border-color: rgba(190, 142, 75, 0.44);
+  background:
+    linear-gradient(180deg, rgba(249, 221, 164, 0.055), transparent),
+    rgba(19, 13, 8, 0.94);
+}
+
+:root[data-theme="western"] .dashboard-control-panel {
+  overflow: hidden;
+  gap: 18px;
+  padding: 0 18px 18px;
+  border: 3px double rgba(210, 158, 82, 0.58);
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 85% 10%, rgba(105, 130, 98, 0.13), transparent 28%),
+    repeating-linear-gradient(90deg, rgba(255, 232, 183, 0.025) 0 1px, transparent 1px 22px),
+    linear-gradient(135deg, rgba(48, 30, 16, 0.98), rgba(20, 14, 9, 0.98));
+  box-shadow:
+    inset 0 0 0 1px rgba(249, 220, 160, 0.06),
+    0 20px 42px rgba(0, 0, 0, 0.38);
+  clip-path: none;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead {
+  position: relative;
+  isolation: isolate;
+  grid-column: 1 / -1;
+  display: grid;
+  align-items: center;
+  min-height: 182px;
+  margin: 0 -18px 2px;
+  padding: 24px 250px 24px 26px;
+  overflow: hidden;
+  border-bottom: 3px double rgba(222, 174, 94, 0.48);
+  background:
+    linear-gradient(90deg, rgba(8, 6, 4, 0.97) 0%, rgba(12, 9, 6, 0.89) 35%, rgba(11, 9, 6, 0.34) 72%, rgba(7, 6, 4, 0.68) 100%),
+    linear-gradient(180deg, rgba(12, 9, 6, 0.08), rgba(8, 6, 4, 0.66)),
+    url("assets/western-rp-office.png") center 56% / cover no-repeat,
+    #120d08;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead::before {
+  position: absolute;
+  inset: 11px;
+  z-index: -1;
+  content: "";
+  border: 1px solid rgba(239, 200, 128, 0.28);
+  box-shadow: inset 0 0 48px rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead::after {
+  position: absolute;
+  right: 204px;
+  bottom: 22px;
+  width: 110px;
+  height: 2px;
+  content: "";
+  background: linear-gradient(90deg, transparent, #ddb468, #879a72);
+  box-shadow: 0 0 16px rgba(221, 180, 104, 0.24);
+}
+
+:root[data-theme="western"] .western-dashboard-masthead-copy {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: max-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 0 0 0 17px;
+  border-left: 4px double rgba(229, 183, 102, 0.7);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+}
+
+:root[data-theme="western"] .western-dashboard-masthead-copy span,
+:root[data-theme="western"] .western-dashboard-masthead-copy small {
+  color: #d8b575;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead-copy span {
+  font-size: 0.72rem;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead-copy strong {
+  color: #ffedc5;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.75rem, 3vw, 2.7rem);
+  line-height: 1;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead-copy small {
+  color: #aab894;
+  font-size: 0.68rem;
+}
+
+:root[data-theme="western"] .western-dashboard-masthead img {
+  position: absolute;
+  right: 18px;
+  bottom: -7px;
+  z-index: 1;
+  width: 238px;
+  height: auto;
+  filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.66));
+  transform: rotate(2deg);
+}
+
+:root[data-theme="western"] .control-summary {
+  padding-left: 14px;
+  border-left: 3px double rgba(219, 168, 91, 0.46);
+}
+
+:root[data-theme="western"] .control-summary h2 {
+  color: #f5deb1;
+}
+
+:root[data-theme="western"] .control-status {
+  min-width: min(100%, 560px);
+}
+
+:root[data-theme="western"] .control-status .dashboard-plan-switch {
+  order: -1;
+  flex: 1 0 100%;
+}
+
+:root[data-theme="western"] .dashboard-plan-switch {
+  grid-template-columns: minmax(118px, auto) minmax(286px, 1fr);
+  width: 100%;
+  min-height: 76px;
+  padding: 9px;
+  border: 2px solid rgba(210, 158, 82, 0.64);
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 9px 9px, #b88949 0 2px, transparent 3px),
+    radial-gradient(circle at calc(100% - 9px) 9px, #b88949 0 2px, transparent 3px),
+    linear-gradient(180deg, rgba(245, 214, 154, 0.07), transparent 55%),
+    #100c08;
+  box-shadow:
+    inset 0 0 0 1px rgba(247, 219, 162, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.38);
+  clip-path: none;
+}
+
+:root[data-theme="western"] .dashboard-plan-switch-label {
+  padding-left: 7px;
+}
+
+:root[data-theme="western"] .dashboard-plan-switch-label small {
+  color: #d8aa64;
+}
+
+:root[data-theme="western"] .dashboard-plan-switch-label strong {
+  color: #f5dfb6;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.9rem;
+}
+
+:root[data-theme="western"] .dashboard-plan-buttons {
+  gap: 8px;
+}
+
+:root[data-theme="western"] .dashboard-plan-button {
+  min-height: 56px;
+  color: #cbb58b;
+  border: 1px solid rgba(199, 148, 78, 0.32);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(248, 220, 164, 0.045), transparent 58%),
+    rgba(33, 23, 14, 0.92);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+
+:root[data-theme="western"] .dashboard-plan-button:not(:disabled):hover {
+  border-color: rgba(232, 190, 115, 0.68);
+  background:
+    linear-gradient(135deg, rgba(212, 159, 80, 0.16), transparent 58%),
+    #25180e;
+}
+
+:root[data-theme="western"] .dashboard-plan-button-mark {
+  box-shadow: inset 0 0 0 4px rgba(25, 17, 10, 0.5);
+}
+
+:root[data-theme="western"] .dashboard-plan-button[data-dashboard-plan="free"].is-active {
+  color: #0d1713;
+  border-color: #a7bd96;
+  background:
+    linear-gradient(180deg, rgba(238, 246, 218, 0.34), transparent 46%),
+    linear-gradient(135deg, #b1c49b, #789071 70%, #4c675d);
+  box-shadow: 0 0 0 2px rgba(124, 151, 119, 0.12), 0 8px 22px rgba(40, 67, 54, 0.3);
+}
+
+:root[data-theme="western"] .dashboard-plan-button[data-dashboard-plan="premium"].is-active {
+  color: #241307;
+  border-color: #f0cc83;
+  background:
+    linear-gradient(180deg, rgba(255, 245, 211, 0.38), transparent 44%),
+    linear-gradient(135deg, #f0cb7e, #c7843f 62%, #7e4b2d);
+  box-shadow: 0 0 0 2px rgba(232, 181, 92, 0.13), 0 8px 24px rgba(126, 75, 35, 0.4);
+}
+
+:root[data-theme="western"] .dashboard-plan-button.is-locked,
+:root[data-theme="western"] .dashboard-plan-button:disabled {
+  color: #73644d;
+  border-color: rgba(139, 104, 58, 0.2);
+  background:
+    repeating-linear-gradient(135deg, rgba(218, 174, 104, 0.025) 0 6px, transparent 6px 12px),
+    #120e09;
+}
+
+:root[data-theme="western"] .dashboard-tab-groups {
+  padding-top: 4px;
+  border-top: 1px solid rgba(211, 158, 83, 0.22);
+}
+
+:root[data-theme="western"] .dashboard-tab-group {
+  gap: 7px;
+}
+
+:root[data-theme="western"] .dashboard-tab-group-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #d8aa64;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.68rem;
+}
+
+:root[data-theme="western"] .dashboard-tab-group-label::after {
+  flex: 1;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, rgba(216, 170, 100, 0.34), transparent);
+}
+
+:root[data-theme="western"] .dashboard-tabs {
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid rgba(177, 128, 65, 0.4);
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, rgba(83, 107, 89, 0.06), transparent 44%),
+    rgba(12, 10, 7, 0.82);
+  box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="western"] .dashboard-tab {
+  min-height: 82px;
+  border: 1px solid rgba(194, 144, 76, 0.23);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(248, 220, 163, 0.035), transparent 55%),
+    linear-gradient(135deg, rgba(39, 26, 15, 0.96), rgba(18, 14, 9, 0.96));
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+
+:root[data-theme="western"] .dashboard-tab:hover,
+:root[data-theme="western"] .dashboard-tab.is-active {
+  border-color: rgba(231, 186, 108, 0.68);
+  background:
+    linear-gradient(90deg, rgba(127, 151, 116, 0.16), transparent 58%),
+    linear-gradient(135deg, #3a2716, #1d160d);
+  box-shadow: inset 4px 0 0 #839873;
+}
+
+:root[data-theme="western"] .dashboard-tab.is-active::after {
+  right: 10px;
+  bottom: 7px;
+  left: 10px;
+  height: 2px;
+  background: linear-gradient(90deg, #e2b768, #809473, transparent);
+}
+
+:root[data-theme="western"] .dashboard-tab span {
+  color: #dbaf68;
+}
+
+:root[data-theme="western"] .dashboard-tab small {
+  color: #bfa985;
+}
+
+:root[data-theme="western"] .dashboard-tab-stage .dashboard-panel,
+:root[data-theme="western"] .guild-panel,
+:root[data-theme="western"] .empty-state {
+  border: 3px double rgba(164, 116, 57, 0.58);
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(91, 119, 91, 0.08), transparent 28%),
+    repeating-linear-gradient(90deg, rgba(249, 222, 168, 0.018) 0 1px, transparent 1px 24px),
+    linear-gradient(135deg, rgba(39, 27, 16, 0.97), rgba(22, 16, 10, 0.97));
+  box-shadow:
+    inset 0 0 0 1px rgba(246, 214, 153, 0.045),
+    0 16px 34px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="western"] .dashboard-tab-stage .dashboard-panel::after,
+:root[data-theme="western"] .guild-panel::after,
+:root[data-theme="western"] .empty-state::after {
+  inset: 7px;
+  border-color: rgba(228, 184, 108, 0.1);
+  border-radius: 2px;
+}
+
+:root[data-theme="western"] .dashboard-tab-stage .panel-heading {
+  padding-bottom: 13px;
+  border-bottom: 3px double rgba(203, 151, 79, 0.22);
+}
+
+:root[data-theme="western"] .dashboard-table,
+:root[data-theme="western"] .dashboard-alert,
+:root[data-theme="western"] .server-preset-panel,
+:root[data-theme="western"] .server-preset-card,
+:root[data-theme="western"] .server-preset-advice,
+:root[data-theme="western"] .dashboard-path,
+:root[data-theme="western"] .dashboard-path-card,
+:root[data-theme="western"] .global-lookup-panel,
+:root[data-theme="western"] .today-card,
+:root[data-theme="western"] .plan-scope-card,
+:root[data-theme="western"] .demo-dashboard-grid article,
+:root[data-theme="western"] .profile-payroll-card div,
+:root[data-theme="western"] .resolution-item {
+  border-radius: 3px;
+}
+
+:root[data-theme="western"] .dashboard-panel input,
+:root[data-theme="western"] .dashboard-panel select,
+:root[data-theme="western"] .dashboard-panel textarea {
+  border: 1px solid rgba(191, 139, 70, 0.54);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(245, 215, 158, 0.025), transparent),
+    rgba(10, 9, 7, 0.9);
+}
+
+@media (max-width: 1100px) {
+  :root[data-theme="western"] .control-status {
+    min-width: 0;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-switch {
+    grid-template-columns: 1fr;
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead {
+    min-height: 168px;
+  }
+}
+
+@media (max-width: 700px) {
+  :root[data-theme="western"] .dashboard-control-panel {
+    padding: 0 14px 14px;
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead {
+    min-height: 172px;
+    margin: 0 -14px 2px;
+    padding: 22px 42% 22px 19px;
+    background-position: 62% 56%;
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead::after {
+    display: none;
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead-copy {
+    width: 100%;
+    padding-left: 11px;
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead-copy strong {
+    font-size: clamp(1.35rem, 7vw, 2rem);
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead-copy small {
+    line-height: 1.35;
+  }
+
+  :root[data-theme="western"] .western-dashboard-masthead img {
+    right: -42px;
+    bottom: 0;
+    width: 205px;
+    opacity: 0.82;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-switch {
+    min-height: 0;
+    padding: 8px;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-switch-label {
+    padding: 2px 2px 4px;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-button {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 6px;
+    min-height: 58px;
+    padding: 7px;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-button-mark {
+    width: 16px;
+    height: 16px;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-button-copy strong {
+    font-size: 0.77rem;
+  }
+
+  :root[data-theme="western"] .dashboard-plan-button-copy small {
+    font-size: 0.58rem;
   }
 }

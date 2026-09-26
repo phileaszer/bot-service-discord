@@ -5119,25 +5119,40 @@ function ensureDashboardPlanMode(state = currentState) {
 function renderDashboardPlanToggle(state) {
   const premiumUnlocked = canUsePremiumPlan(state);
   const premiumActive = isPremiumPlanVisible(state);
-  const premiumLabel = premiumUnlocked ? 'Premium' : 'Premium verrouillé';
+  const premiumDetail = premiumUnlocked ? 'Outils avancés' : 'Accès verrouillé';
 
   return `
-    <div class="dashboard-plan-switch" aria-label="Mode du dashboard">
-      <span>Mode</span>
+    <div class="dashboard-plan-switch" aria-label="Accès Gratuit ou Premium">
+      <span class="dashboard-plan-switch-label">
+        <small>Accès du registre</small>
+        <strong>Gratuit ou Premium</strong>
+      </span>
       <div class="dashboard-plan-buttons">
         <button
           type="button"
           class="dashboard-plan-button${dashboardPlanMode === 'free' ? ' is-active' : ''}"
           data-dashboard-plan="free"
           aria-pressed="${dashboardPlanMode === 'free' ? 'true' : 'false'}"
-        >Gratuit</button>
+        >
+          <span class="dashboard-plan-button-mark" aria-hidden="true"></span>
+          <span class="dashboard-plan-button-copy">
+            <strong>Gratuit</strong>
+            <small>Outils essentiels</small>
+          </span>
+        </button>
         <button
           type="button"
           class="dashboard-plan-button${premiumActive ? ' is-active' : ''}${premiumUnlocked ? '' : ' is-locked'}"
           data-dashboard-plan="premium"
           aria-pressed="${premiumActive ? 'true' : 'false'}"
           ${premiumUnlocked ? '' : 'disabled'}
-        >${escapeHtml(premiumLabel)}</button>
+        >
+          <span class="dashboard-plan-button-mark" aria-hidden="true"></span>
+          <span class="dashboard-plan-button-copy">
+            <strong>Premium</strong>
+            <small>${escapeHtml(premiumDetail)}</small>
+          </span>
+        </button>
       </div>
     </div>
   `;
@@ -5152,6 +5167,14 @@ function renderDashboardTabs(state, premiumBadge) {
 
   return `
     <section class="dashboard-control-panel">
+      <div class="western-dashboard-masthead">
+        <div class="western-dashboard-masthead-copy">
+          <span>Bureau territorial</span>
+          <strong>Registre Sentinel</strong>
+          <small>Surveillance, service et intendance</small>
+        </div>
+        <img src="assets/western-cowboy-hat.webp" alt="" width="240" height="160">
+      </div>
       <div class="control-summary">
         <p class="eyebrow">Serveur sélectionné</p>
         <h2>${escapeHtml(activeTab.title)}</h2>
