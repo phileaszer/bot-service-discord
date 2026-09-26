@@ -414,6 +414,10 @@ CREATE TABLE IF NOT EXISTS embed_media_objects (
     file_name TEXT NOT NULL UNIQUE,
     mime_type TEXT NOT NULL,
     size_bytes INTEGER NOT NULL DEFAULT 0,
+    storage_provider TEXT NOT NULL DEFAULT 'local',
+    storage_bucket TEXT,
+    storage_key TEXT,
+    public_url TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -627,6 +631,25 @@ if (!dossierColumns.includes('subject')) {
 
 if (!dossierColumns.includes('description')) {
     db.prepare('ALTER TABLE sentinel_dossiers ADD COLUMN description TEXT').run();
+}
+
+const embedMediaObjectColumns = db.prepare('PRAGMA table_info(embed_media_objects)').all()
+    .map(column => column.name);
+
+if (!embedMediaObjectColumns.includes('storage_provider')) {
+    db.prepare("ALTER TABLE embed_media_objects ADD COLUMN storage_provider TEXT NOT NULL DEFAULT 'local'").run();
+}
+
+if (!embedMediaObjectColumns.includes('storage_key')) {
+    db.prepare('ALTER TABLE embed_media_objects ADD COLUMN storage_key TEXT').run();
+}
+
+if (!embedMediaObjectColumns.includes('storage_bucket')) {
+    db.prepare('ALTER TABLE embed_media_objects ADD COLUMN storage_bucket TEXT').run();
+}
+
+if (!embedMediaObjectColumns.includes('public_url')) {
+    db.prepare('ALTER TABLE embed_media_objects ADD COLUMN public_url TEXT').run();
 }
 
 const databasePerformance = {

@@ -39,6 +39,12 @@ const {
     stageDatabaseRestore,
     verifyDatabaseBackup
 } = require('./database/storage');
+const {
+    createObjectStorageFromEnv,
+    embedMediaObjectKey,
+    getImageOptimizationOptions,
+    optimizeEmbedImage
+} = require('./database/object-storage');
 const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
 
@@ -143,7 +149,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-25-maintenance-center-v1';
+const SENTINEL_BUILD = 'community-suite-2026-09-26-object-storage-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -190,6 +196,17 @@ const EMBED_MEDIA_DIR = process.env.EMBED_MEDIA_DIR
 const EMBED_MEDIA_TRASH_DAYS = Math.max(Number.parseInt(process.env.EMBED_MEDIA_TRASH_DAYS || '30', 10), 1);
 const EMBED_MEDIA_MAX_BYTES = Math.max(Number.parseInt(process.env.EMBED_MEDIA_MAX_MB || '128', 10), 16)
     * 1024 * 1024;
+const EMBED_MEDIA_FREE_QUOTA_BYTES = Math.max(
+    Number.parseInt(process.env.EMBED_MEDIA_FREE_QUOTA_MB || '32', 10),
+    8
+) * 1024 * 1024;
+const EMBED_MEDIA_PREMIUM_QUOTA_BYTES = Math.max(
+    Number.parseInt(process.env.EMBED_MEDIA_PREMIUM_QUOTA_MB || '512', 10),
+    32
+) * 1024 * 1024;
+const EMBED_MEDIA_IMAGE_OPTIONS = getImageOptimizationOptions();
+const embedMediaObjectStorage = createObjectStorageFromEnv();
+const preparedCustomEmbedUploads = new WeakMap();
 const DATABASE_BACKUP_COMPRESS = String(process.env.DATABASE_BACKUP_COMPRESS || 'true').toLowerCase() !== 'false';
 const DATABASE_BACKUP_COMPRESSION_LEVEL = Math.min(Math.max(
     Number.parseInt(process.env.DATABASE_BACKUP_COMPRESSION_LEVEL || '9', 10),
@@ -486,6 +503,7 @@ const I18N = {
         customEmbedInvalidUrl: '❌ URL invalide pour {field}. Utilise une URL `https://` ou indique `retirer` pendant une modification.',
         customEmbedInvalidUpload: '❌ Image locale invalide. Utilise une image PNG, JPG, WebP ou GIF.',
         customEmbedUploadTooLarge: '❌ Image locale trop lourde. Garde un total maximum de 8 Mo par embed.',
+        customEmbedMediaQuotaReached: '❌ Quota d’images atteint pour ce serveur ({used} Mo sur {limit} Mo). Supprime un ancien embed ou libère de l’espace avant de réessayer.',
         customEmbedTooLarge: '❌ Cet embed est trop long. Garde le titre sous 256 caractères, le message sous 4000 caractères et le total sous 6000 caractères.',
         customEmbedLimitReached: '⭐ Le gratuit permet **{limit}** embeds Sentinel actifs par serveur. Tu peux modifier tes embeds existants sans limite avec `/embed modifier`, supprimer un embed avec `/embed supprimer`, ou passer Premium pour créer en illimité.',
         customEmbedCreated: '✅ Embed Sentinel envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
@@ -733,6 +751,7 @@ const I18N = {
         customEmbedInvalidUrl: '❌ Invalid URL for {field}. Use an `https://` URL, or enter `remove` while editing.',
         customEmbedInvalidUpload: '❌ Invalid local image. Use a PNG, JPG, WebP, or GIF image.',
         customEmbedUploadTooLarge: '❌ Local image too large. Keep the total under 8 MB per embed.',
+        customEmbedMediaQuotaReached: '❌ This server reached its image quota ({used} MB of {limit} MB). Delete an older embed or free storage before trying again.',
         customEmbedTooLarge: '❌ This embed is too long. Keep the title under 256 characters, the message under 4000 characters, and the total under 6000 characters.',
         customEmbedLimitReached: '⭐ Free servers can keep **{limit}** active Sentinel embeds. You can edit existing embeds without limit with `/embed edit`, delete one with `/embed delete`, or upgrade to Premium for unlimited creation.',
         customEmbedCreated: '✅ Sentinel embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
@@ -1876,7 +1895,7 @@ function startDatabaseBackupSchedule() {
 
 function getDatabaseBackupStatus() {
     try {
-        return getDatabaseStorageStatus(db, {
+        const status = getDatabaseStorageStatus(db, {
             databasePath: DATABASE_FILE_PATH,
             backupDirectory: DATABASE_BACKUP_DIR,
             archiveDirectory: DATABASE_COLD_ARCHIVE_DIR,
@@ -1896,6 +1915,12 @@ function getDatabaseBackupStatus() {
             backupIntervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000),
             runtimePerformance: getRuntimePerformanceStatus()
         });
+
+        status.media.objectStorage = embedMediaObjectStorage.status();
+        status.media.freeQuotaBytes = EMBED_MEDIA_FREE_QUOTA_BYTES;
+        status.media.premiumQuotaBytes = EMBED_MEDIA_PREMIUM_QUOTA_BYTES;
+        status.media.webp = { ...EMBED_MEDIA_IMAGE_OPTIONS };
+        return status;
     } catch (error) {
         return {
             enabled: DATABASE_BACKUP_ENABLED,
@@ -6031,28 +6056,13 @@ function normalizeCustomEmbedUpload(upload, slot, language = 'fr') {
         throw new Error(t(language, 'customEmbedUploadTooLarge'));
     }
 
-    const extension = CUSTOM_EMBED_UPLOAD_MIMES.get(detectedMime);
-    const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
-    const hash = contentHash.slice(0, 14);
     const safeSlot = slot === 'thumbnail' ? 'thumbnail' : 'image';
-    const name = `sentinel-embed-${safeSlot}-${hash}.${extension}`;
 
     return {
         size: buffer.length,
         buffer,
-        contentHash,
         mimeType: detectedMime,
-        extension,
-        slot: safeSlot,
-        name,
-        url: `attachment://${name}`,
-        file: {
-            attachment: buffer,
-            name,
-            description: safeSlot === 'thumbnail'
-                ? 'Miniature embed Sentinel'
-                : 'Image embed Sentinel'
-        }
+        slot: safeSlot
     };
 }
 
@@ -6063,25 +6073,211 @@ function hasCustomEmbedUpload(input = {}) {
     );
 }
 
-function prepareCustomEmbedUploads(input, data, language = 'fr') {
+function customEmbedUploadRequiresAttachment() {
+    return !embedMediaObjectStorage.configured;
+}
+
+function getGuildEmbedMediaUsage(guildId, excludeMessageId = null) {
+    if (!guildId) {
+        return { bytes: 0, hashes: new Set() };
+    }
+
+    const rows = db.prepare(`
+        SELECT DISTINCT objects.content_hash, objects.size_bytes
+        FROM embed_media_objects AS objects
+        INNER JOIN embed_media_links AS links ON links.content_hash = objects.content_hash
+        WHERE links.guild_id = ?
+          AND links.status = 'active'
+          AND (? IS NULL OR links.message_id != ?)
+    `).all(guildId, excludeMessageId, excludeMessageId);
+
+    return {
+        bytes: rows.reduce((total, row) => total + Number(row.size_bytes || 0), 0),
+        hashes: new Set(rows.map(row => row.content_hash))
+    };
+}
+
+function assertGuildEmbedMediaQuota(uploads, language, {
+    guildId = null,
+    messageId = null,
+    premium = false
+} = {}) {
+    if (!guildId || !uploads.length) {
+        return;
+    }
+
+    const usage = getGuildEmbedMediaUsage(guildId, messageId);
+    const newObjects = new Map();
+
+    for (const upload of uploads) {
+        if (!usage.hashes.has(upload.contentHash)) {
+            newObjects.set(upload.contentHash, upload.size);
+        }
+    }
+
+    const projectedBytes = usage.bytes + [...newObjects.values()].reduce((total, size) => total + size, 0);
+    const quotaBytes = premium ? EMBED_MEDIA_PREMIUM_QUOTA_BYTES : EMBED_MEDIA_FREE_QUOTA_BYTES;
+
+    if (projectedBytes > quotaBytes) {
+        throw new Error(t(language, 'customEmbedMediaQuotaReached', {
+            used: Math.ceil(projectedBytes / 1024 / 1024),
+            limit: Math.floor(quotaBytes / 1024 / 1024)
+        }));
+    }
+}
+
+function upsertEmbedMediaObject(upload, {
+    provider = 'local',
+    storageBucket = null,
+    storageKey = null,
+    publicUrl = null,
+    fileName = `${upload.contentHash}.${upload.extension}`
+} = {}) {
+    const now = new Date().toISOString();
+
+    db.prepare(`
+        INSERT INTO embed_media_objects (
+            content_hash, file_name, mime_type, size_bytes,
+            storage_provider, storage_bucket, storage_key, public_url, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(content_hash) DO UPDATE SET
+            file_name = excluded.file_name,
+            mime_type = excluded.mime_type,
+            size_bytes = excluded.size_bytes,
+            storage_provider = excluded.storage_provider,
+            storage_bucket = excluded.storage_bucket,
+            storage_key = excluded.storage_key,
+            public_url = excluded.public_url,
+            updated_at = excluded.updated_at
+    `).run(
+        upload.contentHash,
+        fileName,
+        upload.mimeType,
+        upload.size,
+        provider,
+        storageBucket,
+        storageKey,
+        publicUrl,
+        now,
+        now
+    );
+}
+
+async function prepareCustomEmbedUploads(input, data, language = 'fr', context = {}) {
     const imageUpload = normalizeCustomEmbedUpload(input?.imageUpload, 'image', language);
     const thumbnailUpload = normalizeCustomEmbedUpload(input?.thumbnailUpload, 'thumbnail', language);
-    const uploads = [imageUpload, thumbnailUpload].filter(Boolean);
-    const totalSize = uploads.reduce((total, upload) => total + upload.size, 0);
+    const originalUploads = [imageUpload, thumbnailUpload].filter(Boolean);
+    const totalSize = originalUploads.reduce((total, upload) => total + upload.size, 0);
 
     if (totalSize > CUSTOM_EMBED_UPLOAD_MAX_BYTES) {
         throw new Error(t(language, 'customEmbedUploadTooLarge'));
     }
 
-    if (imageUpload) {
-        data.imageUrl = imageUpload.url;
+    const uploads = await Promise.all(originalUploads.map(async original => {
+        let optimized;
+
+        try {
+            optimized = await optimizeEmbedImage(original.buffer, EMBED_MEDIA_IMAGE_OPTIONS);
+        } catch (error) {
+            console.error('Erreur optimisation image embed Sentinel :', error);
+            throw new Error(t(language, 'customEmbedInvalidUpload'));
+        }
+
+        const name = `sentinel-embed-${original.slot}-${optimized.contentHash.slice(0, 14)}.webp`;
+        return {
+            ...optimized,
+            slot: original.slot,
+            name,
+            provider: 'local',
+            storageKey: null,
+            publicUrl: null,
+            url: `attachment://${name}`,
+            file: {
+                attachment: optimized.buffer,
+                name,
+                description: original.slot === 'thumbnail'
+                    ? 'Miniature embed Sentinel'
+                    : 'Image embed Sentinel'
+            }
+        };
+    }));
+
+    assertGuildEmbedMediaQuota(uploads, language, context);
+
+    for (const upload of uploads) {
+        if (!embedMediaObjectStorage.configured) {
+            continue;
+        }
+
+        const storageKey = embedMediaObjectKey(upload.contentHash);
+        const existingObject = db.prepare(`
+            SELECT file_name, storage_provider, storage_bucket, storage_key, public_url
+            FROM embed_media_objects
+            WHERE content_hash = ?
+        `).get(upload.contentHash);
+        const reusableObject = existingObject
+            && existingObject.storage_provider === embedMediaObjectStorage.provider
+            && existingObject.storage_bucket === embedMediaObjectStorage.bucket
+            && existingObject.storage_key === storageKey
+            && existingObject.public_url;
+
+        if (reusableObject) {
+            upload.provider = embedMediaObjectStorage.provider;
+            upload.storageKey = storageKey;
+            upload.publicUrl = existingObject.public_url;
+            upload.url = existingObject.public_url;
+            upload.file = null;
+            continue;
+        }
+
+        try {
+            const stored = await embedMediaObjectStorage.putIfAbsent({
+                key: storageKey,
+                body: upload.buffer,
+                contentType: upload.mimeType,
+                metadata: {
+                    sha256: upload.contentHash,
+                    width: upload.width,
+                    height: upload.height
+                }
+            });
+            upsertEmbedMediaObject(upload, {
+                provider: embedMediaObjectStorage.provider,
+                storageBucket: embedMediaObjectStorage.bucket,
+                storageKey,
+                publicUrl: stored.url
+            });
+
+            if (existingObject?.storage_provider === 'local' && existingObject.file_name) {
+                fs.rmSync(path.join(EMBED_MEDIA_DIR, 'objects', existingObject.file_name), { force: true });
+            }
+
+            upload.provider = embedMediaObjectStorage.provider;
+            upload.storageKey = storageKey;
+            upload.publicUrl = stored.url;
+            upload.url = stored.url;
+            upload.file = null;
+        } catch (error) {
+            console.error(`Erreur stockage objet embed ${upload.contentHash.slice(0, 12)} :`, error);
+        }
     }
 
-    if (thumbnailUpload) {
-        data.thumbnailUrl = thumbnailUpload.url;
+    const preparedImage = uploads.find(upload => upload.slot === 'image');
+    const preparedThumbnail = uploads.find(upload => upload.slot === 'thumbnail');
+
+    if (preparedImage) {
+        data.imageUrl = preparedImage.url;
     }
 
-    return uploads.map(upload => upload.file);
+    if (preparedThumbnail) {
+        data.thumbnailUrl = preparedThumbnail.url;
+    }
+
+    if (input && typeof input === 'object') {
+        preparedCustomEmbedUploads.set(input, uploads);
+    }
+
+    return uploads.map(upload => upload.file).filter(Boolean);
 }
 
 function mediaTrashDate() {
@@ -6119,7 +6315,11 @@ function writeEmbedMediaObject(upload) {
     fs.mkdirSync(objectsDirectory, { recursive: true });
 
     if (!fs.existsSync(fullPath)) {
-        const storedBytes = Number(db.prepare('SELECT COALESCE(SUM(size_bytes), 0) AS bytes FROM embed_media_objects').get()?.bytes || 0);
+        const storedBytes = Number(db.prepare(`
+            SELECT COALESCE(SUM(size_bytes), 0) AS bytes
+            FROM embed_media_objects
+            WHERE storage_provider = 'local'
+        `).get()?.bytes || 0);
 
         if (storedBytes + upload.size > EMBED_MEDIA_MAX_BYTES) {
             return { stored: false, fileName: null, fullPath: null };
@@ -6137,17 +6337,7 @@ function writeEmbedMediaObject(upload) {
         throw new Error('La copie locale du média ne correspond pas au fichier validé.');
     }
 
-    const now = new Date().toISOString();
-    db.prepare(`
-        INSERT INTO embed_media_objects (
-            content_hash, file_name, mime_type, size_bytes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(content_hash) DO UPDATE SET
-            file_name = excluded.file_name,
-            mime_type = excluded.mime_type,
-            size_bytes = excluded.size_bytes,
-            updated_at = excluded.updated_at
-    `).run(upload.contentHash, fileName, upload.mimeType, upload.size, now, now);
+    upsertEmbedMediaObject(upload, { provider: 'local', fileName });
 
     return { stored: true, fileName, fullPath };
 }
@@ -6190,7 +6380,7 @@ function upsertEmbedMediaLink({
         messageId,
         slot,
         attachment?.name || upload?.name || null,
-        attachment?.url || null,
+        attachment?.url || upload?.publicUrl || null,
         now,
         now
     );
@@ -6203,21 +6393,22 @@ function attachmentSlot(attachment) {
     return null;
 }
 
-function syncCustomEmbedMedia(message, input = null, language = 'fr') {
+async function syncCustomEmbedMedia(message, input = null) {
     if (!message?.guildId || !message?.id) {
         return { active: 0, trashed: 0, stored: 0 };
     }
 
-    const normalizedUploads = input ? [
-        normalizeCustomEmbedUpload(input?.imageUpload, 'image', language),
-        normalizeCustomEmbedUpload(input?.thumbnailUpload, 'thumbnail', language)
-    ].filter(Boolean) : [];
+    const preparedUploads = input && typeof input === 'object'
+        ? preparedCustomEmbedUploads.get(input) || []
+        : [];
     const attachments = [...message.attachments.values()];
     const liveSlots = new Set();
     let stored = 0;
 
-    for (const upload of normalizedUploads) {
-        const localObject = writeEmbedMediaObject(upload);
+    for (const upload of preparedUploads) {
+        const localObject = upload.provider === 'local'
+            ? writeEmbedMediaObject(upload)
+            : { stored: true };
         const attachment = attachments.find(item => item.name === upload.name) || null;
         upsertEmbedMediaLink({
             upload: localObject.stored ? upload : null,
@@ -6228,6 +6419,10 @@ function syncCustomEmbedMedia(message, input = null, language = 'fr') {
         });
         liveSlots.add(upload.slot);
         stored += localObject.stored ? 1 : 0;
+    }
+
+    if (input && typeof input === 'object') {
+        preparedCustomEmbedUploads.delete(input);
     }
 
     for (const attachment of attachments) {
@@ -6251,6 +6446,40 @@ function syncCustomEmbedMedia(message, input = null, language = 'fr') {
         liveSlots.add(slot);
     }
 
+    const embed = message.embeds?.[0] || null;
+    const embedUrls = {
+        image: embed?.image?.url || null,
+        thumbnail: embed?.thumbnail?.url || null
+    };
+
+    for (const [slot, url] of Object.entries(embedUrls)) {
+        if (!url || liveSlots.has(slot)) {
+            continue;
+        }
+
+        const existing = db.prepare(`
+            SELECT links.content_hash, links.attachment_name, links.attachment_url,
+                   objects.public_url
+            FROM embed_media_links AS links
+            LEFT JOIN embed_media_objects AS objects ON objects.content_hash = links.content_hash
+            WHERE links.guild_id = ? AND links.message_id = ? AND links.slot = ?
+        `).get(message.guildId, message.id, slot);
+
+        if (existing?.content_hash && [existing.attachment_url, existing.public_url].includes(url)) {
+            upsertEmbedMediaLink({
+                upload: {
+                    contentHash: existing.content_hash,
+                    name: existing.attachment_name,
+                    publicUrl: url
+                },
+                guildId: message.guildId,
+                messageId: message.id,
+                slot
+            });
+            liveSlots.add(slot);
+        }
+    }
+
     const currentLinks = db.prepare(`
         SELECT slot FROM embed_media_links
         WHERE guild_id = ? AND message_id = ? AND status = 'active'
@@ -6263,7 +6492,7 @@ function syncCustomEmbedMedia(message, input = null, language = 'fr') {
     return { active: liveSlots.size, trashed, stored };
 }
 
-function purgeTrashedEmbedMedia() {
+async function purgeTrashedEmbedMedia() {
     const expired = db.prepare(`
         SELECT id, content_hash
         FROM embed_media_links
@@ -6272,7 +6501,7 @@ function purgeTrashedEmbedMedia() {
         LIMIT 1000
     `).all(new Date().toISOString());
 
-    const hashes = [...new Set(expired.map(row => row.content_hash).filter(Boolean))];
+    const hashes = new Set(expired.map(row => row.content_hash).filter(Boolean));
     const deleteLink = db.prepare('DELETE FROM embed_media_links WHERE id = ?');
     db.transaction(() => expired.forEach(row => deleteLink.run(row.id)))();
     const orphanObjects = db.prepare(`
@@ -6285,9 +6514,10 @@ function purgeTrashedEmbedMedia() {
           )
         LIMIT 1000
     `).all(new Date(Date.now() - EMBED_MEDIA_TRASH_DAYS * 86400000).toISOString());
-    hashes.push(...orphanObjects.map(item => item.content_hash));
+    orphanObjects.forEach(item => hashes.add(item.content_hash));
     let removedObjects = 0;
     let removedBytes = 0;
+    let deferredObjects = 0;
 
     for (const hash of hashes) {
         const reference = db.prepare('SELECT 1 FROM embed_media_links WHERE content_hash = ? LIMIT 1').get(hash);
@@ -6296,17 +6526,41 @@ function purgeTrashedEmbedMedia() {
             continue;
         }
 
-        const object = db.prepare('SELECT file_name, size_bytes FROM embed_media_objects WHERE content_hash = ?').get(hash);
+        const object = db.prepare(`
+            SELECT file_name, size_bytes, storage_provider, storage_bucket, storage_key
+            FROM embed_media_objects
+            WHERE content_hash = ?
+        `).get(hash);
 
         if (object) {
-            fs.rmSync(path.join(EMBED_MEDIA_DIR, 'objects', object.file_name), { force: true });
+            if (object.storage_provider !== 'local') {
+                const matchingStorage = embedMediaObjectStorage.configured
+                    && object.storage_provider === embedMediaObjectStorage.provider
+                    && object.storage_bucket === embedMediaObjectStorage.bucket;
+
+                if (!matchingStorage || !object.storage_key) {
+                    deferredObjects += 1;
+                    continue;
+                }
+
+                try {
+                    await embedMediaObjectStorage.delete(object.storage_key);
+                } catch (error) {
+                    deferredObjects += 1;
+                    console.error(`Erreur suppression objet embed ${hash.slice(0, 12)} :`, error);
+                    continue;
+                }
+            } else {
+                fs.rmSync(path.join(EMBED_MEDIA_DIR, 'objects', object.file_name), { force: true });
+            }
+
             db.prepare('DELETE FROM embed_media_objects WHERE content_hash = ?').run(hash);
             removedObjects += 1;
             removedBytes += Number(object.size_bytes || 0);
         }
     }
 
-    return { links: expired.length, objects: removedObjects, bytes: removedBytes };
+    return { links: expired.length, objects: removedObjects, bytes: removedBytes, deferredObjects };
 }
 
 async function performCustomEmbedMediaScan(limit = 100) {
@@ -6335,7 +6589,7 @@ async function performCustomEmbedMediaScan(limit = 100) {
             continue;
         }
 
-        syncCustomEmbedMedia(message);
+        await syncCustomEmbedMedia(message);
         db.prepare('UPDATE custom_embeds SET updated_at = ? WHERE guild_id = ? AND message_id = ?')
             .run(new Date().toISOString(), row.guild_id, row.message_id);
         synchronized += 1;
@@ -6352,7 +6606,7 @@ async function performCustomEmbedMediaScan(limit = 100) {
                 AND custom_embeds.guild_id = embed_media_links.guild_id
           )
     `).run(now, now, mediaTrashDate()).changes;
-    const purged = purgeTrashedEmbedMedia();
+    const purged = await purgeTrashedEmbedMedia();
 
     return { checked, orphaned: orphaned + missingRecords, synchronized, purged };
 }
@@ -12061,7 +12315,7 @@ async function fetchManagedCustomEmbedMessage(guildId, fallbackChannel, messageI
     }
 
     addCustomEmbedRecord(guildId, channel.id, message.id, client.user.id, data);
-    syncCustomEmbedMedia(message);
+    await syncCustomEmbedMedia(message);
     const record = getCustomEmbedRecord(guildId, message.id);
 
     return { record, message, channel };
@@ -12142,7 +12396,7 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
         }
 
         addCustomEmbedRecord(guildId, channel.id, sentMessage.id, interaction.user.id, data);
-        syncCustomEmbedMedia(sentMessage);
+        await syncCustomEmbedMedia(sentMessage);
 
         await interaction.reply({
             content: t(language, 'customEmbedCreated', {
@@ -12228,7 +12482,7 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
             allowedMentions: { parse: [] }
         });
         updateCustomEmbedRecord(guildId, messageId, nextData);
-        syncCustomEmbedMedia(editedMessage);
+        await syncCustomEmbedMedia(editedMessage);
 
         await interaction.reply({
             content: t(language, 'customEmbedEdited', { messageId }),
@@ -12541,6 +12795,7 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbedQuota,
             getCustomEmbedRecord,
             hasCustomEmbedUpload,
+            customEmbedUploadRequiresAttachment,
             getDatabaseBackupStatus,
             getDossierRoleIds,
             getGuildConfig,

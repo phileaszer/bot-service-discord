@@ -760,7 +760,16 @@ function getMediaStatus(db, mediaDirectory) {
             SUM(CASE WHEN content_hash IS NULL THEN 1 ELSE 0 END) AS remote_only_count
         FROM embed_media_links
     `).get() || {};
-    const objects = db.prepare('SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS bytes FROM embed_media_objects').get();
+    const objects = db.prepare(`
+        SELECT
+            COUNT(*) AS count,
+            COALESCE(SUM(size_bytes), 0) AS bytes,
+            SUM(CASE WHEN storage_provider = 'local' THEN 1 ELSE 0 END) AS local_count,
+            COALESCE(SUM(CASE WHEN storage_provider = 'local' THEN size_bytes ELSE 0 END), 0) AS local_bytes,
+            SUM(CASE WHEN storage_provider != 'local' THEN 1 ELSE 0 END) AS external_count,
+            COALESCE(SUM(CASE WHEN storage_provider != 'local' THEN size_bytes ELSE 0 END), 0) AS external_bytes
+        FROM embed_media_objects
+    `).get();
     const orphanObjects = db.prepare(`
         SELECT COUNT(*) AS count
         FROM embed_media_objects
@@ -776,7 +785,11 @@ function getMediaStatus(db, mediaDirectory) {
         orphanObjectCount: Number(orphanObjects?.count || 0),
         remoteOnlyCount: Number(counts.remote_only_count || 0),
         objectCount: Number(objects?.count || 0),
-        objectBytes: Number(objects?.bytes || 0),
+        logicalObjectBytes: Number(objects?.bytes || 0),
+        localObjectCount: Number(objects?.local_count || 0),
+        objectBytes: Number(objects?.local_bytes || 0),
+        externalObjectCount: Number(objects?.external_count || 0),
+        externalObjectBytes: Number(objects?.external_bytes || 0),
         directoryBytes: directorySize(mediaDirectory)
     };
 }

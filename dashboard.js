@@ -362,6 +362,11 @@ function getConfiguredDashboardOrigin() {
     return configured?.origin || DEFAULT_DASHBOARD_ORIGIN;
 }
 
+function getObjectStoragePublicOrigin() {
+    const configured = safeUrl(process.env.SENTINEL_OBJECT_STORAGE_PUBLIC_BASE_URL || '');
+    return configured?.protocol === 'https:' ? configured.origin : '';
+}
+
 function getTrustedDashboardHostnames() {
     const hostnames = new Set(['localhost', '127.0.0.1', '::1']);
     const defaultOrigin = safeUrl(DEFAULT_DASHBOARD_ORIGIN);
@@ -1521,6 +1526,7 @@ function appendVary(headers, value) {
 }
 
 function buildContentSecurityPolicy(req) {
+    const objectStorageOrigin = getObjectStoragePublicOrigin();
     const directives = [
         "default-src 'self'",
         "base-uri 'self'",
@@ -1528,7 +1534,7 @@ function buildContentSecurityPolicy(req) {
         "frame-ancestors 'none'",
         `script-src 'self' ${TRUSTED_INLINE_THEME_SCRIPT_HASH}`,
         "style-src 'self'",
-        "img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://phileaszer.github.io",
+        `img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://phileaszer.github.io${objectStorageOrigin ? ` ${objectStorageOrigin}` : ''}`,
         "font-src 'self' data:",
         `connect-src 'self' ${DEFAULT_DASHBOARD_ORIGIN} ${getConfiguredDashboardOrigin()}`,
         "form-action 'self' https://discord.com",
@@ -2513,6 +2519,14 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             ...storage,
             latestFile: null,
             lastBackupFailure: storage.lastBackupFailure ? { occurredAt: storage.lastBackupFailure.occurredAt } : null,
+            media: storage.media ? {
+                ...storage.media,
+                objectStorage: storage.media.objectStorage ? {
+                    enabled: storage.media.objectStorage.enabled,
+                    configured: storage.media.objectStorage.configured,
+                    provider: storage.media.objectStorage.provider
+                } : null
+            } : null,
             backups: (storage.backups || []).map(({ fileName, ...backup }) => ({
                 ...backup,
                 verification: backup.verification ? {
@@ -3614,7 +3628,9 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
     if (action === 'custom-embed-create') {
         const channel = getTextChannel(guild, body.channelId, language);
         const hasUploadedFiles = Boolean(ctx.helpers.hasCustomEmbedUpload?.(body));
-        const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language, hasUploadedFiles);
+        const requiresAttachment = hasUploadedFiles
+            && (ctx.helpers.customEmbedUploadRequiresAttachment?.() ?? true);
+        const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, roleToPing, language, requiresAttachment);
 
         if (channelError) {
             throw createHttpError(403, channelError);
@@ -3649,10 +3665,27 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
 
         try {
             files = ctx.helpers.prepareCustomEmbedUploads
-                ? ctx.helpers.prepareCustomEmbedUploads(body, data, language)
+                ? await ctx.helpers.prepareCustomEmbedUploads(body, data, language, {
+                    guildId: guild.id,
+                    premium: advanced
+                })
                 : [];
         } catch (error) {
             throw createHttpError(400, error.message);
+        }
+
+        if (files.length > 0 && !requiresAttachment) {
+            const fallbackPermissionError = ctx.helpers.getCustomEmbedChannelError(
+                guild,
+                channel,
+                roleToPing,
+                language,
+                true
+            );
+
+            if (fallbackPermissionError) {
+                throw createHttpError(403, fallbackPermissionError);
+            }
         }
 
         let sentMessage;
@@ -3670,7 +3703,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, sentMessage.id, actor.id, data);
-        ctx.helpers.syncCustomEmbedMedia?.(sentMessage, body, language);
+        await ctx.helpers.syncCustomEmbedMedia?.(sentMessage, body, language);
 
         return `Embed Sentinel envoye dans #${channel.name}. ID : ${sentMessage.id}. ${formatDashboardCustomEmbedQuota(ctx, guild.id, language, actor, advanced)}`;
     }
@@ -3689,7 +3722,9 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         : null;
 
     const hasUploadedFiles = Boolean(ctx.helpers.hasCustomEmbedUpload?.(body));
-    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, null, language, hasUploadedFiles);
+    const requiresAttachment = hasUploadedFiles
+        && (ctx.helpers.customEmbedUploadRequiresAttachment?.() ?? true);
+    const channelError = ctx.helpers.getCustomEmbedChannelError(guild, channel, null, language, requiresAttachment);
 
     if (channelError) {
         throw createHttpError(403, channelError);
@@ -3714,7 +3749,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, message.id, actor.id, data);
-        ctx.helpers.syncCustomEmbedMedia?.(message, null, language);
+        await ctx.helpers.syncCustomEmbedMedia?.(message, null, language);
         record = ctx.helpers.getCustomEmbedRecord(guild.id, message.id);
     }
 
@@ -3754,16 +3789,35 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         let files = [];
+        const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, actor, session);
 
         try {
             files = ctx.helpers.prepareCustomEmbedUploads
-                ? ctx.helpers.prepareCustomEmbedUploads(body, data, language)
+                ? await ctx.helpers.prepareCustomEmbedUploads(body, data, language, {
+                    guildId: guild.id,
+                    messageId,
+                    premium: advanced
+                })
                 : [];
         } catch (error) {
             throw createHttpError(400, error.message);
         }
 
-        if (files.length > 0) {
+        if (files.length > 0 && !requiresAttachment) {
+            const fallbackPermissionError = ctx.helpers.getCustomEmbedChannelError(
+                guild,
+                channel,
+                null,
+                language,
+                true
+            );
+
+            if (fallbackPermissionError) {
+                throw createHttpError(403, fallbackPermissionError);
+            }
+        }
+
+        if (hasUploadedFiles) {
             changed = true;
         }
 
@@ -3795,7 +3849,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
             }
 
             const editedMessage = await message.edit(editPayload);
-            ctx.helpers.syncCustomEmbedMedia?.(editedMessage, body, language);
+            await ctx.helpers.syncCustomEmbedMedia?.(editedMessage, body, language);
         } catch (error) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }

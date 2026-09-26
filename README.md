@@ -114,13 +114,15 @@ Sentinel conserve sans expiration les archives de paie, les heures de service, l
 
 La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauvegardes sont compressées en `.db.gz` et suivent trois générations par défaut : 7 quotidiennes, 8 hebdomadaires et 12 mensuelles, dans une enveloppe de 96 Mo. Chaque nouvelle copie est restaurée dans une base temporaire et soumise à `PRAGMA integrity_check`. Un redéploiement rapproché ne crée pas de copie identique supplémentaire et les anciennes sauvegardes `.db` sont converties automatiquement.
 
-La Console fondateur contient le Centre de maintenance : capacité du volume, répartition de la base, alertes à 60 %, 75 % et 90 %, croissance anormale, suivi SQLite/site/Discord, copies protégées, archives froides et registre des médias d'embeds. Les images locales sont dédupliquées par SHA-256 ; une référence orpheline passe 30 jours en corbeille avant suppression. Les téléchargements, contrôles manuels et restaurations sont autorisés côté serveur uniquement au fondateur avec une session Discord récente. Une restauration crée d'abord une copie de sécurité vérifiée puis est appliquée au redémarrage.
+La Console fondateur contient le Centre de maintenance : capacité du volume, répartition de la base, alertes à 60 %, 75 % et 90 %, croissance anormale, suivi SQLite/site/Discord, copies protégées, archives froides et registre des médias d'embeds. Les images importées sont validées, redimensionnées et converties en WebP, puis dédupliquées par SHA-256. Une référence orpheline passe 30 jours en corbeille avant suppression locale ou distante. Les téléchargements, contrôles manuels et restaurations sont autorisés côté serveur uniquement au fondateur avec une session Discord récente. Une restauration crée d'abord une copie de sécurité vérifiée puis est appliquée au redémarrage.
+
+Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Les quotas par serveur sont de 32 Mo en gratuit et 512 Mo en Premium par défaut, réglables avec `EMBED_MEDIA_FREE_QUOTA_MB` et `EMBED_MEDIA_PREMIUM_QUOTA_MB`.
 
 - `npm run backup:db` crée une sauvegarde manuelle compressée et vérifie la politique de rétention.
 - `npm run restore:db` liste les sauvegardes `.db` et `.db.gz` disponibles.
 - `npm run restore:db -- <fichier.db.gz>` vérifie l'intégrité SQLite avant de restaurer la base et crée d'abord une copie de sécurité compressée.
 
-Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`, `DATABASE_AUTOMOD_RETENTION_DAYS`, `DATABASE_AUDIT_RETENTION_DAYS`, `DATABASE_SLOW_QUERY_MS`, `EMBED_MEDIA_*` et `DATABASE_INCREMENTAL_VACUUM_ENABLED` décrites dans `.env.example`.
+Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`, `DATABASE_AUTOMOD_RETENTION_DAYS`, `DATABASE_AUDIT_RETENTION_DAYS`, `DATABASE_SLOW_QUERY_MS`, `EMBED_MEDIA_*`, `SENTINEL_OBJECT_STORAGE_*` et `DATABASE_INCREMENTAL_VACUUM_ENABLED` décrites dans `.env.example`.
 
 ## Sécurité et données
 

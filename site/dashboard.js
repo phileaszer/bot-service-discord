@@ -4159,6 +4159,10 @@ function founderStoragePanel(overview) {
   const cleanup = maintenance?.cleanup || {};
   const volume = storage.volume || {};
   const media = storage.media || {};
+  const objectStorage = media.objectStorage || {};
+  const objectStorageLabel = objectStorage.configured
+    ? `${String(objectStorage.provider || 'S3').toUpperCase()} actif`
+    : (objectStorage.enabled ? 'Configuration incomplète' : 'Repli local');
   const performance = storage.performance || {};
   const databasePerformance = performance.database || {};
   const runtime = performance.runtime || {};
@@ -4187,7 +4191,8 @@ function founderStoragePanel(overview) {
         <article class="dashboard-kpi"><span>Base active</span><strong>${escapeHtml(formatStorageBytes(storage.databaseBytes))}</strong><small>données opérationnelles</small></article>
         <article class="dashboard-kpi"><span>Copies protégées</span><strong>${escapeHtml(formatStorageBytes(storage.backupBytes))}</strong><small>${escapeHtml(storage.count)} copie(s)</small></article>
         <article class="dashboard-kpi"><span>Historique froid</span><strong>${escapeHtml(formatStorageBytes(storage.archiveBytes))}</strong><small>${escapeHtml(storage.coldArchives?.length || 0)} lot(s) consultable(s)</small></article>
-        <article class="dashboard-kpi"><span>Médias locaux</span><strong>${escapeHtml(formatStorageBytes(media.objectBytes))}</strong><small>${escapeHtml(media.objectCount || 0)} objet(s) · plafond ${escapeHtml(formatStorageBytes(media.maxBytes))}</small></article>
+        <article class="dashboard-kpi"><span>Médias locaux</span><strong>${escapeHtml(formatStorageBytes(media.objectBytes))}</strong><small>${escapeHtml(media.localObjectCount || 0)} objet(s) · plafond ${escapeHtml(formatStorageBytes(media.maxBytes))}</small></article>
+        <article class="dashboard-kpi"><span>Stockage objet</span><strong>${escapeHtml(formatStorageBytes(media.externalObjectBytes))}</strong><small>${escapeHtml(media.externalObjectCount || 0)} objet(s) · ${escapeHtml(objectStorageLabel)}</small></article>
       </div>
       <div class="maintenance-grid">
         <section class="maintenance-section">
@@ -4209,11 +4214,14 @@ function founderStoragePanel(overview) {
           </div>
         </section>
         <section class="maintenance-section">
-          <div class="panel-heading row-heading"><div><h4>Médias d’embeds</h4><p class="muted">Les médias orphelins restent 30 jours en corbeille.</p></div></div>
+          <div class="panel-heading row-heading"><div><h4>Médias d’embeds</h4><p class="muted">Conversion WebP, détection des doublons et corbeille de 30 jours.</p></div></div>
           <div class="storage-distribution">
+            <div><span>Destination</span><strong>${escapeHtml(objectStorageLabel)}</strong></div>
             <div><span>Liens actifs</span><strong>${escapeHtml(media.activeCount || 0)}</strong></div>
             <div><span>En corbeille</span><strong>${escapeHtml((media.trashCount || 0) + (media.orphanObjectCount || 0))}</strong></div>
             <div><span>Hébergés uniquement par Discord</span><strong>${escapeHtml(media.remoteOnlyCount || 0)}</strong></div>
+            <div><span>Quota gratuit</span><strong>${escapeHtml(formatStorageBytes(media.freeQuotaBytes))}</strong></div>
+            <div><span>Quota Premium</span><strong>${escapeHtml(formatStorageBytes(media.premiumQuotaBytes))}</strong></div>
           </div>
         </section>
         <section class="maintenance-section">
@@ -4807,7 +4815,7 @@ function renderDashboard() {
           ${fileUploadControl('imageFile', 'Photo principale', 'Aucune photo sélectionnée', 'Importer')}
           <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
           ${fileUploadControl('thumbnailFile', 'Miniature', 'Aucune miniature sélectionnée', 'Importer')}
-          <p class="form-hint">Tu peux choisir une image depuis ton PC. PNG, JPG, WebP ou GIF, 8 Mo maximum au total.</p>
+          <p class="form-hint">Tu peux choisir une image depuis ton PC. PNG, JPG, WebP ou GIF, 8 Mo maximum au total. Sentinel l’optimise automatiquement en WebP.</p>
           <input name="footer" placeholder="Footer optionnel">
           <button class="button" type="submit">Envoyer l’embed</button>
         </form>
