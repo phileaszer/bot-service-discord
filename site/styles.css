@@ -6044,11 +6044,18 @@ code {
 
 /* Western dashboard: territorial ledger, dark timber and aged brass. */
 :root[data-theme="western"] .dashboard-body {
+  --western-parchment: #eadfc4;
+  --western-brass: #b8985f;
+  --western-brass-light: #cfb37a;
+  --western-sage: #7c8971;
+  --western-sage-deep: #4f5d51;
+  --western-leather: #83553b;
+  --western-ink: #17130f;
   background:
-    radial-gradient(ellipse at 8% 4%, rgba(183, 126, 61, 0.16), transparent 34%),
-    radial-gradient(ellipse at 92% 14%, rgba(91, 119, 91, 0.13), transparent 32%),
-    linear-gradient(112deg, rgba(7, 13, 12, 0.2), transparent 34%, rgba(104, 53, 27, 0.1) 72%, transparent),
-    linear-gradient(180deg, #090704, #181008 46%, #080604);
+    radial-gradient(ellipse at 8% 4%, rgba(155, 107, 61, 0.13), transparent 34%),
+    radial-gradient(ellipse at 92% 14%, rgba(86, 104, 82, 0.11), transparent 32%),
+    linear-gradient(112deg, rgba(7, 13, 12, 0.16), transparent 34%, rgba(92, 55, 35, 0.08) 72%, transparent),
+    linear-gradient(180deg, #0b0907, #17110c 46%, #090705);
 }
 
 :root[data-theme="western"] .dashboard-body::before {
@@ -6060,15 +6067,15 @@ code {
 }
 
 :root[data-theme="western"] .dashboard-body .site-header {
-  border-bottom: 3px double rgba(225, 177, 98, 0.46);
+  border-bottom: 3px double rgba(184, 152, 95, 0.42);
   background:
-    linear-gradient(180deg, rgba(255, 225, 164, 0.07), transparent 56%),
-    radial-gradient(ellipse at 45% 0, rgba(215, 164, 88, 0.07), transparent 44%),
-    linear-gradient(90deg, #120b06, #2a190d 48%, #100a06);
+    linear-gradient(180deg, rgba(234, 213, 173, 0.055), transparent 56%),
+    radial-gradient(ellipse at 45% 0, rgba(184, 152, 95, 0.06), transparent 44%),
+    linear-gradient(90deg, #15100c, #261b13 48%, #120e0a);
 }
 
 :root[data-theme="western"] .dashboard-body .nav-links {
-  border: 2px solid rgba(112, 70, 34, 0.86);
+  border: 2px solid rgba(139, 105, 61, 0.76);
   border-radius: 3px;
   background:
     linear-gradient(180deg, rgba(251, 221, 157, 0.08), transparent 52%),
@@ -6083,15 +6090,16 @@ code {
 
 :root[data-theme="western"] .dashboard-body .nav-links a:hover,
 :root[data-theme="western"] .dashboard-body .nav-links a[aria-current="page"] {
-  color: #171008;
-  background: linear-gradient(135deg, #e4b864, #9bad77);
+  color: var(--western-ink);
+  background: linear-gradient(135deg, var(--western-brass-light), #9c7d4e);
 }
 
 :root[data-theme="western"] .dashboard-body .button {
-  border: 1px solid rgba(231, 190, 116, 0.54);
+  color: #1d160f;
+  border: 1px solid rgba(207, 179, 122, 0.58);
   background:
-    linear-gradient(180deg, rgba(255, 238, 192, 0.22), transparent 46%),
-    linear-gradient(135deg, #cf9149, #98522f 68%, #667855);
+    linear-gradient(180deg, rgba(245, 227, 190, 0.18), transparent 46%),
+    linear-gradient(135deg, #bc945b, var(--western-leather));
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   box-shadow:
     inset 0 0 0 1px rgba(255, 235, 187, 0.12),
@@ -6099,21 +6107,38 @@ code {
 }
 
 :root[data-theme="western"] .dashboard-body .button-ghost {
-  color: #ead7ae;
-  border-color: rgba(190, 142, 75, 0.44);
+  color: var(--western-parchment);
+  border-color: rgba(184, 152, 95, 0.42);
   background:
-    linear-gradient(180deg, rgba(249, 221, 164, 0.055), transparent),
-    rgba(19, 13, 8, 0.94);
+    linear-gradient(180deg, rgba(234, 215, 177, 0.045), transparent),
+    rgba(24, 18, 13, 0.96);
+}
+
+:root[data-theme="western"] .dashboard-body .language-switch {
+  border-color: rgba(184, 152, 95, 0.34);
+  background:
+    linear-gradient(135deg, rgba(184, 152, 95, 0.08), rgba(79, 93, 81, 0.055)),
+    rgba(24, 18, 13, 0.94);
+}
+
+:root[data-theme="western"] .dashboard-body .language-switch button.is-active {
+  color: var(--western-ink);
+  background: linear-gradient(135deg, var(--western-brass-light), #9c7d4e);
+}
+
+:root[data-theme="western"] .dashboard-body .theme-toggle::before {
+  background: radial-gradient(circle, #d5ba82 0 36%, #a27d49 38% 68%, #596557 70%);
+  box-shadow: 0 0 0 2px rgba(184, 152, 95, 0.16), 0 0 10px rgba(184, 152, 95, 0.16);
 }
 
 :root[data-theme="western"] .dashboard-control-panel {
   overflow: hidden;
   gap: 18px;
   padding: 0 18px 18px;
-  border: 3px double rgba(210, 158, 82, 0.58);
+  border: 3px double rgba(184, 152, 95, 0.52);
   border-radius: 4px;
   background:
-    radial-gradient(circle at 85% 10%, rgba(105, 130, 98, 0.13), transparent 28%),
+    radial-gradient(circle at 85% 10%, rgba(86, 104, 82, 0.1), transparent 28%),
     linear-gradient(102deg, rgba(248, 216, 155, 0.025), transparent 36%, rgba(80, 103, 80, 0.035)),
     linear-gradient(135deg, rgba(48, 30, 16, 0.98), rgba(20, 14, 9, 0.98));
   box-shadow:
@@ -6132,7 +6157,7 @@ code {
   margin: 0 -18px 2px;
   padding: 24px 250px 24px 26px;
   overflow: hidden;
-  border-bottom: 3px double rgba(222, 174, 94, 0.48);
+  border-bottom: 3px double rgba(184, 152, 95, 0.46);
   background:
     linear-gradient(90deg, rgba(8, 6, 4, 0.97) 0%, rgba(12, 9, 6, 0.89) 35%, rgba(11, 9, 6, 0.34) 72%, rgba(7, 6, 4, 0.68) 100%),
     linear-gradient(180deg, rgba(12, 9, 6, 0.08), rgba(8, 6, 4, 0.66)),
@@ -6145,7 +6170,7 @@ code {
   inset: 11px;
   z-index: -1;
   content: "";
-  border: 1px solid rgba(239, 200, 128, 0.28);
+  border: 1px solid rgba(207, 179, 122, 0.26);
   box-shadow: inset 0 0 48px rgba(0, 0, 0, 0.34);
   pointer-events: none;
 }
@@ -6157,8 +6182,8 @@ code {
   width: 110px;
   height: 2px;
   content: "";
-  background: linear-gradient(90deg, transparent, #ddb468, #879a72);
-  box-shadow: 0 0 16px rgba(221, 180, 104, 0.24);
+  background: linear-gradient(90deg, transparent, var(--western-brass), var(--western-sage));
+  box-shadow: 0 0 16px rgba(184, 152, 95, 0.2);
 }
 
 :root[data-theme="western"] .western-dashboard-masthead-copy {
@@ -6169,13 +6194,13 @@ code {
   max-width: 100%;
   gap: 4px;
   padding: 0 0 0 17px;
-  border-left: 4px double rgba(229, 183, 102, 0.7);
+  border-left: 4px double rgba(184, 152, 95, 0.68);
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
 }
 
 :root[data-theme="western"] .western-dashboard-masthead-copy span,
 :root[data-theme="western"] .western-dashboard-masthead-copy small {
-  color: #d8b575;
+  color: var(--western-brass-light);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-weight: 900;
   text-transform: uppercase;
@@ -6186,14 +6211,14 @@ code {
 }
 
 :root[data-theme="western"] .western-dashboard-masthead-copy strong {
-  color: #ffedc5;
+  color: var(--western-parchment);
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(1.75rem, 3vw, 2.7rem);
   line-height: 1;
 }
 
 :root[data-theme="western"] .western-dashboard-masthead-copy small {
-  color: #aab894;
+  color: #aab39f;
   font-size: 0.68rem;
 }
 
@@ -6210,11 +6235,11 @@ code {
 
 :root[data-theme="western"] .control-summary {
   padding-left: 14px;
-  border-left: 3px double rgba(219, 168, 91, 0.46);
+  border-left: 3px double rgba(184, 152, 95, 0.44);
 }
 
 :root[data-theme="western"] .control-summary h2 {
-  color: #f5deb1;
+  color: var(--western-parchment);
 }
 
 :root[data-theme="western"] .control-status {
@@ -6231,11 +6256,11 @@ code {
   width: 100%;
   min-height: 76px;
   padding: 9px;
-  border: 2px solid rgba(210, 158, 82, 0.64);
+  border: 2px solid rgba(184, 152, 95, 0.58);
   border-radius: 3px;
   background:
-    radial-gradient(circle at 9px 9px, #b88949 0 2px, transparent 3px),
-    radial-gradient(circle at calc(100% - 9px) 9px, #b88949 0 2px, transparent 3px),
+    radial-gradient(circle at 9px 9px, var(--western-brass) 0 2px, transparent 3px),
+    radial-gradient(circle at calc(100% - 9px) 9px, var(--western-brass) 0 2px, transparent 3px),
     linear-gradient(180deg, rgba(245, 214, 154, 0.07), transparent 55%),
     #100c08;
   box-shadow:
@@ -6249,11 +6274,11 @@ code {
 }
 
 :root[data-theme="western"] .dashboard-plan-switch-label small {
-  color: #d8aa64;
+  color: var(--western-brass-light);
 }
 
 :root[data-theme="western"] .dashboard-plan-switch-label strong {
-  color: #f5dfb6;
+  color: var(--western-parchment);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 0.9rem;
 }
@@ -6264,8 +6289,8 @@ code {
 
 :root[data-theme="western"] .dashboard-plan-button {
   min-height: 56px;
-  color: #cbb58b;
-  border: 1px solid rgba(199, 148, 78, 0.32);
+  color: #c7b99b;
+  border: 1px solid rgba(184, 152, 95, 0.3);
   border-radius: 2px;
   background:
     linear-gradient(180deg, rgba(248, 220, 164, 0.045), transparent 58%),
@@ -6274,7 +6299,7 @@ code {
 }
 
 :root[data-theme="western"] .dashboard-plan-button:not(:disabled):hover {
-  border-color: rgba(232, 190, 115, 0.68);
+  border-color: rgba(207, 179, 122, 0.64);
   background:
     linear-gradient(135deg, rgba(212, 159, 80, 0.16), transparent 58%),
     #25180e;
@@ -6285,21 +6310,21 @@ code {
 }
 
 :root[data-theme="western"] .dashboard-plan-button[data-dashboard-plan="free"].is-active {
-  color: #0d1713;
-  border-color: #a7bd96;
+  color: #f0eadb;
+  border-color: #8e9b85;
   background:
-    linear-gradient(180deg, rgba(238, 246, 218, 0.34), transparent 46%),
-    linear-gradient(135deg, #b1c49b, #789071 70%, #4c675d);
-  box-shadow: 0 0 0 2px rgba(124, 151, 119, 0.12), 0 8px 22px rgba(40, 67, 54, 0.3);
+    linear-gradient(180deg, rgba(225, 233, 215, 0.12), transparent 46%),
+    linear-gradient(135deg, var(--western-sage), var(--western-sage-deep));
+  box-shadow: 0 0 0 2px rgba(124, 137, 113, 0.1), 0 8px 22px rgba(34, 50, 42, 0.26);
 }
 
 :root[data-theme="western"] .dashboard-plan-button[data-dashboard-plan="premium"].is-active {
-  color: #241307;
-  border-color: #f0cc83;
+  color: var(--western-ink);
+  border-color: var(--western-brass-light);
   background:
-    linear-gradient(180deg, rgba(255, 245, 211, 0.38), transparent 44%),
-    linear-gradient(135deg, #f0cb7e, #c7843f 62%, #7e4b2d);
-  box-shadow: 0 0 0 2px rgba(232, 181, 92, 0.13), 0 8px 24px rgba(126, 75, 35, 0.4);
+    linear-gradient(180deg, rgba(245, 231, 198, 0.24), transparent 44%),
+    linear-gradient(135deg, var(--western-brass-light), #987249 68%, #73513a);
+  box-shadow: 0 0 0 2px rgba(184, 152, 95, 0.11), 0 8px 24px rgba(83, 58, 37, 0.34);
 }
 
 :root[data-theme="western"] .dashboard-plan-button.is-locked,
@@ -6324,7 +6349,7 @@ code {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #d8aa64;
+  color: var(--western-brass-light);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: 0.68rem;
 }
@@ -6359,11 +6384,11 @@ code {
 
 :root[data-theme="western"] .dashboard-tab:hover,
 :root[data-theme="western"] .dashboard-tab.is-active {
-  border-color: rgba(231, 186, 108, 0.68);
+  border-color: rgba(207, 179, 122, 0.62);
   background:
-    linear-gradient(90deg, rgba(127, 151, 116, 0.16), transparent 58%),
+    linear-gradient(90deg, rgba(124, 137, 113, 0.14), transparent 58%),
     linear-gradient(135deg, #3a2716, #1d160d);
-  box-shadow: inset 4px 0 0 #839873;
+  box-shadow: inset 4px 0 0 var(--western-sage);
 }
 
 :root[data-theme="western"] .dashboard-tab.is-active::after {
@@ -6371,11 +6396,11 @@ code {
   bottom: 7px;
   left: 10px;
   height: 2px;
-  background: linear-gradient(90deg, #e2b768, #809473, transparent);
+  background: linear-gradient(90deg, var(--western-brass), var(--western-sage), transparent);
 }
 
 :root[data-theme="western"] .dashboard-tab span {
-  color: #dbaf68;
+  color: var(--western-brass-light);
 }
 
 :root[data-theme="western"] .dashboard-tab small {
@@ -6385,7 +6410,7 @@ code {
 :root[data-theme="western"] .dashboard-tab-stage .dashboard-panel,
 :root[data-theme="western"] .guild-panel,
 :root[data-theme="western"] .empty-state {
-  border: 3px double rgba(164, 116, 57, 0.58);
+  border: 3px double rgba(139, 105, 61, 0.56);
   border-radius: 4px;
   background:
     radial-gradient(circle at 100% 0, rgba(91, 119, 91, 0.08), transparent 28%),
@@ -6428,7 +6453,7 @@ code {
 :root[data-theme="western"] .dashboard-panel input,
 :root[data-theme="western"] .dashboard-panel select,
 :root[data-theme="western"] .dashboard-panel textarea {
-  border: 1px solid rgba(191, 139, 70, 0.54);
+  border: 1px solid rgba(154, 119, 70, 0.5);
   border-radius: 2px;
   background:
     linear-gradient(180deg, rgba(245, 215, 158, 0.025), transparent),
