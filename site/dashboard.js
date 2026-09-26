@@ -1468,22 +1468,12 @@ function todayOverviewCards(state) {
 }
 
 function planScopeCards(state) {
-  const premiumLabel = state.advanced ? 'Premium actif' : 'Premium préparé';
-  const premiumDetail = state.advanced
-    ? 'Historique plus long, options avancées, exports et automatisations selon les modules activés.'
-    : 'Le Premium servira aux gros staffs : exports, historique complet, panneaux illimités et automatisations.';
-
   return `
     <div class="plan-scope-grid">
       <article class="plan-scope-card is-free">
         <span>Gratuit actif</span>
         <strong>Les bases utiles restent accessibles</strong>
         <p>Service, paie simple, modération par ID, tickets, logs, dashboard et embeds limités.</p>
-      </article>
-      <article class="plan-scope-card ${state.advanced ? 'is-premium' : 'is-planned'}">
-        <span>${escapeHtml(premiumLabel)}</span>
-        <strong>Confort avancé pour les staffs</strong>
-        <p>${escapeHtml(premiumDetail)}</p>
       </article>
     </div>
   `;
@@ -1549,6 +1539,99 @@ function renderServerHome(state, premiumBadge) {
           ${recentActions(state)}
         </article>
       </div>
+    </section>
+  `;
+}
+
+function premiumNavigationCards() {
+  const modules = [
+    ['service', 'Service et paie', 'Taux par grade, ajustements, archives longues et synchronisation.'],
+    ['dossiers', 'Dossiers', 'Panneaux illimités, catégories dédiées et suivi étendu.'],
+    ['moderation', 'Sécurité', 'Veille renforcée, sanctions avancées et protection automatique.'],
+    ['embeds', 'Annonces', 'Créations illimitées et gestion complète des médias.'],
+    ['audit', 'Historique', 'Filtres avancés, recherche individuelle et journal étendu.']
+  ];
+
+  return `
+    <div class="premium-module-grid">
+      ${modules.map(([tab, title, description]) => `
+        <article class="premium-module-card">
+          <span>Module Premium</span>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(description)}</p>
+          <button class="button button-small" type="button" data-dashboard-tab="${escapeHtml(tab)}">Ouvrir</button>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderPremiumHome(state, premiumBadge) {
+  const payrollArchives = state.payrollArchives?.totalCount || 0;
+  const managedEmbeds = state.customEmbeds?.items?.length || 0;
+  const openDossiers = state.dossiers?.openCount || 0;
+
+  return `
+    <section class="dashboard-panel premium-view-panel premium-home-panel">
+      <div class="dashboard-command-bar">
+        <div>
+          <p class="eyebrow">Espace Premium</p>
+          <h2>${escapeHtml(state.guild.name)}</h2>
+          <p class="muted">Seuls les outils réservés au Premium sont affichés dans cette vue.</p>
+        </div>
+        <div class="command-bar-status">${premiumBadge}</div>
+      </div>
+      <div class="dashboard-metrics premium-view-metrics">
+        <article><span>Archives de paie</span><strong>${escapeHtml(payrollArchives)}</strong></article>
+        <article><span>Annonces gérées</span><strong>${escapeHtml(managedEmbeds)}</strong></article>
+        <article><span>Dossiers ouverts</span><strong>${escapeHtml(openDossiers)}</strong></article>
+        <article><span>Protection</span><strong>Renforcée</strong></article>
+      </div>
+      ${premiumNavigationCards()}
+    </section>
+  `;
+}
+
+function renderPremiumSetupPanel(state, premiumBadge) {
+  return `
+    <section class="dashboard-panel premium-view-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Mise en place Premium</p>
+          <h2>Préparer les modules avancés</h2>
+          <p class="muted">Cette page ne présente que les espaces réservés au Premium. Les réglages généraux restent dans leur espace dédié.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      ${premiumNavigationCards()}
+    </section>
+  `;
+}
+
+function renderPremiumConfigurationPanel(state, premiumBadge) {
+  const premiumStatus = [
+    ['Accès Premium', state.advanced ? 'Actif' : 'Inactif'],
+    ['Panneaux dossiers', state.dossiers?.panelQuota?.unlimited ? 'Illimités' : 'Non disponible'],
+    ['Annonces Sentinel', state.customEmbeds?.quota?.unlimited ? 'Illimitées' : 'Non disponible'],
+    ['Historique avancé', state.advanced ? 'Disponible' : 'Non disponible']
+  ];
+
+  return `
+    <section class="dashboard-panel premium-view-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Réglages Premium</p>
+          <h2>Modules avancés</h2>
+          <p class="muted">Les configurations Premium sont rangées dans leur module afin de ne pas se mélanger aux réglages gratuits.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      <dl class="config-summary-list premium-config-summary">
+        ${premiumStatus.map(([label, value]) => `
+          <div class="config-summary-row is-ready"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
+        `).join('')}
+      </dl>
+      ${premiumNavigationCards()}
     </section>
   `;
 }
@@ -2562,10 +2645,6 @@ function renderPayrollPanel(state) {
     items: []
   };
   const copy = payrollCopy();
-  const roleOptions = optionList(state.roles || [], null, copy.roleLabel);
-  const premiumDisabled = state.advanced ? '' : ' disabled';
-  const premiumHint = state.advanced ? '' : `<p class="premium-inline-note">${escapeHtml(copy.premiumOnly)}</p>`;
-  const premiumMode = isPremiumPlanVisible(state);
   const payrollArchives = state.payrollArchives || { totalCount: 0, hasMore: false, items: [] };
   const currentArchive = (payrollArchives.items || []).find((archive) => archive.weekStart === payroll.weekStart) || null;
 
@@ -2592,38 +2671,6 @@ function renderPayrollPanel(state) {
           ${payrollSummaryCards(payroll, copy)}
         </article>
       </div>
-      ${premiumRevealHint(state)}
-      ${premiumOnly(`
-      <div class="payroll-grid payroll-premium-grid premium-only-block">
-        <article class="inline-form">
-          ${labelHelp(copy.roleRates, copy.roleRatesHelp, `<span class="premium-tag">${escapeHtml(copy.premiumOnly)}</span>`)}
-          <form data-action-form="set-payroll-role-rate">
-            <select name="roleId"${premiumDisabled}>${roleOptions}</select>
-            <input name="hourlyRate" type="number" min="0" step="0.01" placeholder="${escapeHtml(copy.roleRateLabel)}"${premiumDisabled}>
-            <button class="button" type="submit"${premiumDisabled}>${escapeHtml(copy.setRoleRate)}</button>
-          </form>
-          ${premiumHint}
-          ${payrollRoleRatesList(payroll, copy)}
-        </article>
-        <article class="inline-form">
-          ${labelHelp(copy.adjustments, copy.adjustmentsHelp, `<span class="premium-tag">${escapeHtml(copy.premiumOnly)}</span>`)}
-          <form data-action-form="add-payroll-adjustment">
-            <input name="userId" placeholder="${escapeHtml(copy.userId)}"${premiumDisabled}>
-            <select name="adjustmentType"${premiumDisabled}>
-              <option value="bonus">${escapeHtml(copy.bonus)}</option>
-              <option value="deduction">${escapeHtml(copy.deduction)}</option>
-              <option value="correction">${escapeHtml(copy.correction)}</option>
-            </select>
-            <input name="amount" type="number" min="0.01" step="0.01" placeholder="${escapeHtml(copy.amount)}"${premiumDisabled}>
-            <input name="reason" maxlength="240" placeholder="${escapeHtml(copy.reason)}"${premiumDisabled}>
-            <button class="button" type="submit"${premiumDisabled}>${escapeHtml(copy.addAdjustment)}</button>
-          </form>
-          ${premiumHint}
-          ${payrollAdjustmentList(payroll, copy)}
-        </article>
-      </div>
-      `, state)}
-      ${!premiumMode ? premiumLockedHint(state) : ''}
       <form class="payroll-archive-form" data-action-form="archive-payroll">
         <div>
           ${labelHelp(copy.archive, copy.archiveHelp)}
@@ -2637,7 +2684,60 @@ function renderPayrollPanel(state) {
   `;
 }
 
-function renderServicePanel(state, premiumBadge, premiumTag) {
+function renderPremiumPayrollPanel(state, premiumBadge, premiumTag) {
+  const payroll = state.payroll || {
+    weekStart: '',
+    weekEnd: '',
+    settings: { hourlyRate: 0, currency: '$' },
+    totals: {},
+    items: []
+  };
+  const copy = payrollCopy();
+  const roleOptions = optionList(state.roles || [], null, copy.roleLabel);
+  const payrollArchives = state.payrollArchives || { totalCount: 0, hasMore: false, items: [] };
+
+  return `
+    <section class="dashboard-panel payroll-panel premium-view-panel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Paie Premium</p>
+          <h2>Règles avancées et archives</h2>
+          <p class="muted">Taux propres à chaque grade, corrections individuelles et historique étendu des règlements.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      <div class="payroll-grid payroll-premium-grid">
+        <article class="inline-form">
+          ${labelHelp(copy.roleRates, copy.roleRatesHelp, ` ${premiumTag}`)}
+          <form data-action-form="set-payroll-role-rate">
+            <select name="roleId">${roleOptions}</select>
+            <input name="hourlyRate" type="number" min="0" step="0.01" placeholder="${escapeHtml(copy.roleRateLabel)}">
+            <button class="button" type="submit">${escapeHtml(copy.setRoleRate)}</button>
+          </form>
+          ${payrollRoleRatesList(payroll, copy)}
+        </article>
+        <article class="inline-form">
+          ${labelHelp(copy.adjustments, copy.adjustmentsHelp, ` ${premiumTag}`)}
+          <form data-action-form="add-payroll-adjustment">
+            <input name="userId" placeholder="${escapeHtml(copy.userId)}">
+            <select name="adjustmentType">
+              <option value="bonus">${escapeHtml(copy.bonus)}</option>
+              <option value="deduction">${escapeHtml(copy.deduction)}</option>
+              <option value="correction">${escapeHtml(copy.correction)}</option>
+            </select>
+            <input name="amount" type="number" min="0.01" step="0.01" placeholder="${escapeHtml(copy.amount)}">
+            <input name="reason" maxlength="240" placeholder="${escapeHtml(copy.reason)}">
+            <button class="button" type="submit">${escapeHtml(copy.addAdjustment)}</button>
+          </form>
+          ${payrollAdjustmentList(payroll, copy)}
+        </article>
+      </div>
+      ${payrollArchiveHistory(payrollArchives, copy)}
+    </section>
+  `;
+}
+
+function renderFreeServicePanel(state) {
   return `
     <section class="dashboard-panel service-overview-panel" id="service">
       <div class="panel-heading row-heading">
@@ -2646,7 +2746,7 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
           <h2>Registre de service</h2>
           <p class="muted">Suivi des fiches agent, déploiements actifs, cycles hebdomadaires et paie.</p>
         </div>
-        ${premiumBadge}
+        <span class="free-badge">Vue Gratuit</span>
       </div>
       ${metricCards(state)}
       <div class="service-insights">
@@ -2713,19 +2813,14 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
           <input name="userId" placeholder="ID, même si la personne est partie" required>
           <button class="button" type="submit">Réinitialiser</button>
         </form>
-        ${premiumOnly(`
-        <form data-action-form="sync-service">
-          ${labelHelp('Synchronisation du registre', 'Option Premium : répare les écarts entre agents en service, grades et registre de service.', ` ${premiumTag}`)}
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Synchroniser</button>
-        </form>
-        `, state)}
       </div>
-      ${premiumRevealHint(state)}
-      ${premiumLockedHint(state)}
     </section>
+  `;
+}
 
-    ${premiumOnly(`
-    <section class="dashboard-panel inline-premium-panel">
+function renderPremiumServicePanel(state, premiumBadge, premiumTag) {
+  return `
+    <section class="dashboard-panel inline-premium-panel premium-view-panel" id="service">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Registre Premium</p>
@@ -2734,15 +2829,34 @@ function renderServicePanel(state, premiumBadge, premiumTag) {
         </div>
         ${premiumBadge}
       </div>
+      <div class="form-grid premium-service-actions">
+        <form data-action-form="sync-service">
+          ${labelHelp('Synchronisation du registre', 'Répare les écarts entre agents en service, grades et registre de service.', ` ${premiumTag}`)}
+          <button class="button" type="submit">Synchroniser</button>
+        </form>
+      </div>
       ${premiumServiceRoadmap(state, premiumTag)}
     </section>
-    `, state)}
+
+    ${renderPremiumPayrollPanel(state, premiumBadge, premiumTag)}
   `;
 }
 
-function customEmbedQuota(state) {
+function renderServicePanel(state, premiumBadge, premiumTag) {
+  return isPremiumPlanVisible(state)
+    ? renderPremiumServicePanel(state, premiumBadge, premiumTag)
+    : renderFreeServicePanel(state);
+}
+
+function customEmbedQuota(state, mode = 'free') {
   const quota = state.customEmbeds?.quota;
   const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
+
+  if (mode === 'premium') {
+    return language === 'en'
+      ? 'Premium: unlimited Sentinel embeds, creations, edits, and media.'
+      : 'Premium : embeds Sentinel, créations, modifications et médias sans limite.';
+  }
 
   if (!quota) {
     return language === 'en' ? 'Quota unavailable' : 'Quota indisponible';
@@ -2750,8 +2864,8 @@ function customEmbedQuota(state) {
 
   if (quota.unlimited) {
     return language === 'en'
-      ? 'Premium: unlimited access to Sentinel embeds, with unlimited creation and edits.'
-      : 'Premium : accès illimité aux embeds Sentinel, créations et modifications illimitées.';
+      ? 'Free view: standard creation, editing, and deletion tools.'
+      : 'Vue Gratuit : outils standards de création, modification et suppression.';
   }
 
   return language === 'en'
@@ -2778,6 +2892,87 @@ function customEmbedList(state) {
         `;
       }).join('')}
     </ul>
+  `;
+}
+
+function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge) {
+  const premiumMode = isPremiumPlanVisible(state);
+  const freeEmbedLimit = 2;
+  const displayState = premiumMode ? state : {
+    ...state,
+    customEmbeds: {
+      ...(state.customEmbeds || {}),
+      items: (state.customEmbeds?.items || []).slice(0, freeEmbedLimit),
+      quota: {
+        unlimited: false,
+        limit: freeEmbedLimit,
+        used: Math.min(state.customEmbeds?.items?.length || 0, freeEmbedLimit),
+        remaining: Math.max(freeEmbedLimit - (state.customEmbeds?.items?.length || 0), 0)
+      }
+    }
+  };
+  const modeLabel = premiumMode ? 'Studio Premium' : 'Annonces gratuites';
+  const title = premiumMode ? 'Embeds Sentinel illimités' : 'Embeds Sentinel';
+  const createHelp = premiumMode
+    ? 'Publie une annonce Premium sous l’identité de Sentinel, sans limite d’embeds actifs.'
+    : 'Publie une annonce sous l’identité de Sentinel dans la limite gratuite du serveur.';
+  const deleteHelp = premiumMode
+    ? 'Supprime un embed Premium géré par Sentinel avec son ID de message.'
+    : 'Supprime un embed géré par Sentinel et libère un emplacement gratuit.';
+
+  return `
+    <section class="dashboard-panel module-panel announcements-panel${premiumMode ? ' premium-view-panel' : ''}" id="embeds">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">${escapeHtml(modeLabel)}</p>
+          <h2>${escapeHtml(title)}</h2>
+          <p class="muted">${escapeHtml(customEmbedQuota(displayState, premiumMode ? 'premium' : 'free'))}</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      <div class="form-grid module-form-grid">
+        <form data-action-form="custom-embed-create">
+          ${labelHelp(premiumMode ? 'Créer une annonce Premium' : 'Créer un embed Sentinel', createHelp)}
+          <select name="channelId">${channelOptions}</select>
+          <input name="title" placeholder="Titre" maxlength="256" required>
+          <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
+          <input name="color" placeholder="Couleur : rose, cyan, #ff2d9a">
+          <select name="roleId">${pingRoleOptions}</select>
+          <input name="imageUrl" placeholder="Image URL optionnelle">
+          ${fileUploadControl('imageFile', 'Photo principale', 'Aucune photo sélectionnée', 'Importer')}
+          <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
+          ${fileUploadControl('thumbnailFile', 'Miniature', 'Aucune miniature sélectionnée', 'Importer')}
+          <p class="form-hint">PNG, JPG, WebP ou GIF, 8 Mo maximum au total. Sentinel optimise automatiquement les images en WebP.</p>
+          <input name="footer" placeholder="Footer optionnel">
+          <button class="button" type="submit">${premiumMode ? 'Publier sans limite' : 'Envoyer l’embed'}</button>
+        </form>
+        <form data-action-form="custom-embed-edit">
+          ${labelHelp(premiumMode ? 'Modifier une annonce Premium' : 'Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message.')}
+          <select name="channelId">${channelOptions}</select>
+          <input name="messageId" placeholder="ID du message embed" required>
+          <input name="title" placeholder="Nouveau titre">
+          <textarea name="description" placeholder="Nouveau message"></textarea>
+          <input name="color" placeholder="Nouvelle couleur">
+          <input name="imageUrl" placeholder="Nouvelle image URL, ou retirer">
+          ${fileUploadControl('imageFile', 'Nouvelle photo principale', 'Aucune nouvelle photo', 'Remplacer')}
+          <input name="thumbnailUrl" placeholder="Nouvelle miniature URL, ou retirer">
+          ${fileUploadControl('thumbnailFile', 'Nouvelle miniature', 'Aucune nouvelle miniature', 'Remplacer')}
+          <p class="form-hint">Un fichier choisi ici remplace l’URL indiquée pour l’image ou la miniature.</p>
+          <input name="footer" placeholder="Nouveau footer, ou retirer">
+          <button class="button" type="submit">Modifier</button>
+        </form>
+        <form data-action-form="custom-embed-delete">
+          ${labelHelp('Supprimer un embed Sentinel', deleteHelp)}
+          <select name="channelId">${channelOptions}</select>
+          <input name="messageId" placeholder="ID du message embed" required>
+          <button class="button button-ghost" type="submit">Supprimer</button>
+        </form>
+        <article class="inline-form">
+          ${labelHelp(premiumMode ? 'Embeds Premium gérés' : 'Embeds gratuits gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard.')}
+          ${customEmbedList(displayState)}
+        </article>
+      </div>
+    </section>
   `;
 }
 
@@ -2818,9 +3013,15 @@ function dossierPriorityLabel(priority) {
   return labels[priority] || 'Normal';
 }
 
-function dossierQuotaText(state) {
+function dossierQuotaText(state, mode = 'free') {
   const quota = state.dossiers?.panelQuota;
   const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
+
+  if (mode === 'premium') {
+    return language === 'en'
+      ? 'Premium: unlimited panels, longer history, and advanced settings.'
+      : 'Premium : panneaux illimités, historique long et réglages avancés.';
+  }
 
   if (!quota) {
     return language === 'en' ? 'Quota unavailable' : 'Quota indisponible';
@@ -2828,8 +3029,8 @@ function dossierQuotaText(state) {
 
   if (quota.unlimited) {
     return language === 'en'
-      ? 'Premium: unlimited panels, longer history, and advanced settings.'
-      : 'Premium : panneaux illimités, historique long et réglages avancés.';
+      ? 'Free view: one standard reception panel and essential ticket tracking.'
+      : 'Vue Gratuit : un bureau d’accueil standard et le suivi essentiel des dossiers.';
   }
 
   return language === 'en'
@@ -3086,6 +3287,70 @@ function dossierList(state) {
       </table>
     </div>
     <p class="muted case-limit-note">Affichage limité aux ${escapeHtml(state.dossiers?.historyLimit || 10)} derniers dossiers visibles pour ce serveur.</p>
+  `;
+}
+
+function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumBadge, premiumTag) {
+  const premiumMode = isPremiumPlanVisible(state);
+  const displayState = premiumMode ? state : {
+    ...state,
+    dossiers: {
+      ...(state.dossiers || {}),
+      historyLimit: 10,
+      items: (state.dossiers?.items || []).slice(0, 10)
+    }
+  };
+
+  return `
+    <section class="dashboard-panel module-panel dossiers-panel${premiumMode ? ' premium-view-panel' : ''}" id="dossiers">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">${premiumMode ? 'Dossiers Premium' : 'Dossiers Sentinel'}</p>
+          <h2>${premiumMode ? 'Bureau avancé et suivi étendu' : 'Bureau d’accueil et suivi'}</h2>
+          <p class="muted">${premiumMode
+            ? 'Panneaux illimités, catégories par demande et historique étendu pour les équipes organisées.'
+            : 'Un membre ouvre une demande privée, puis l’équipe autorisée la suit depuis son salon réservé.'}</p>
+        </div>
+        ${premiumMode ? premiumBadge : `<span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>`}
+      </div>
+      ${dossierPermissionAlert(state)}
+      <div class="dashboard-alert is-ready dossier-quota-alert">
+        <strong>${premiumMode ? 'Capacité Premium' : 'Capacité gratuite'}</strong>
+        <p>${escapeHtml(dossierQuotaText(state, premiumMode ? 'premium' : 'free'))}</p>
+      </div>
+      <div class="form-grid module-form-grid">
+        <form data-action-form="publish-dossier-panel">
+          ${labelHelp(
+            premiumMode ? 'Publier un bureau Premium' : 'Publier le bureau d’accueil',
+            premiumMode ? 'Publie un nouveau panneau de dossiers sans limite de panneaux actifs.' : 'Publie le panneau gratuit de demandes privées.'
+          )}
+          <select name="channelId">${channelOptions}</select>
+          <button class="button" type="submit">${premiumMode ? 'Publier sans limite' : 'Publier le bureau'}</button>
+        </form>
+        ${premiumMode ? '' : `
+          <article class="inline-form dossier-explain-card">
+            ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.')}
+            <p>Les responsables peuvent répondre, ajouter des intervenants, prendre le dossier en charge, corriger son statut, générer un compte rendu et le clôturer.</p>
+          </article>
+        `}
+        <article class="inline-form dossier-explain-card">
+          ${labelHelp(premiumMode ? 'Équipe des dossiers Premium' : 'Rôles responsables', 'Ces rôles peuvent voir et administrer les dossiers privés.')}
+          <form data-action-form="add-dossier-role">
+            <select name="roleId">${dossierRoleOptions}</select>
+            <button class="button" type="submit">Ajouter le rôle</button>
+          </form>
+          ${dossierRoleList(state)}
+        </article>
+        ${premiumMode ? dossierPremiumSettings(state, premiumTag) : ''}
+        <article class="inline-form dossier-list-card">
+          ${labelHelp(premiumMode ? 'Historique Premium' : 'Dossiers récents', premiumMode
+            ? 'Retrouve l’historique étendu des dossiers et affine la liste avec les filtres avancés.'
+            : 'Retrouve les dossiers récents de ce serveur et clôture ceux qui sont encore ouverts.')}
+          ${dossierFiltersPanel(displayState)}
+          ${dossierList(displayState)}
+        </article>
+      </div>
+    </section>
   `;
 }
 
@@ -3590,8 +3855,8 @@ function automodSecurityOverview(state, settings, words) {
       </article>
       <article class="automod-security-card">
         <span>Accès</span>
-        <strong>${state.advanced ? 'Premium' : 'Gratuit'}</strong>
-        <small>${state.advanced ? 'Veille renforcée disponible.' : 'Garde essentielle disponible.'}</small>
+        <strong>Gratuit</strong>
+        <small>Garde essentielle disponible.</small>
       </article>
     </div>
   `;
@@ -3599,8 +3864,15 @@ function automodSecurityOverview(state, settings, words) {
 
 function automodFreePanel(state) {
   const settings = automodSettings(state);
-  const words = state.automod?.words || [];
-  const wordLimit = state.advanced ? settings.premiumWordLimit : settings.freeWordLimit;
+  const words = (state.automod?.words || []).slice(0, settings.freeWordLimit);
+  const wordLimit = settings.freeWordLimit;
+  const freeState = {
+    ...state,
+    automod: {
+      ...(state.automod || {}),
+      words
+    }
+  };
 
   return `
     <article class="inline-form automod-card automod-card-wide">
@@ -3643,7 +3915,7 @@ function automodFreePanel(state) {
           </div>
           <div>
             ${labelHelp('Durée de silence', 'Durée du silence automatique en secondes.')}
-            <input name="spamTimeoutSeconds" type="number" min="30" max="${state.advanced ? 2419200 : 3600}" value="${escapeHtml(settings.spamTimeoutSeconds)}">
+            <input name="spamTimeoutSeconds" type="number" min="30" max="3600" value="${escapeHtml(Math.min(Number(settings.spamTimeoutSeconds) || 600, 3600))}">
           </div>
         </div>
         <button class="button" type="submit">Enregistrer la garde</button>
@@ -3660,7 +3932,7 @@ function automodFreePanel(state) {
         <input name="word" maxlength="80" placeholder="Mot ou expression à surveiller" required>
         <button class="button" type="submit">Consigner</button>
       </form>
-      ${automodWordList(state)}
+      ${automodWordList(freeState)}
     </article>
     <article class="inline-form automod-card">
       <h3>Registre des alertes</h3>
@@ -3738,6 +4010,168 @@ function automodPremiumPanel(state, premiumTag) {
       </form>
     </article>
   `;
+}
+
+function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
+  const freeModerationState = {
+    ...state,
+    advanced: false,
+    moderationCases: {
+      ...(state.moderationCases || {}),
+      limit: 10,
+      items: (state.moderationCases?.items || []).slice(0, 10)
+    }
+  };
+
+  return `
+    <section class="dashboard-panel module-panel moderation-panel" id="moderation">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Sécurité gratuite</p>
+          <h2>Centre de sécurité</h2>
+          <p class="muted">Sanctions essentielles, garde automatique et registre récent du serveur.</p>
+        </div>
+        <span class="free-badge">Vue Gratuit</span>
+      </div>
+      ${permissionDiagnosticsPanel(state)}
+      <div class="form-grid module-form-grid">
+        <article class="inline-form moderation-note">
+          ${labelHelp('Grade automatique d’arrivée', 'Donne automatiquement un grade aux nouveaux membres. Sentinel doit être placé au-dessus du grade choisi.')}
+          <p class="muted">Actuel : ${state.config.autoRoleId ? escapeHtml(resolveRole(state, state.config.autoRoleId)?.name || 'rôle supprimé sur Discord') : 'désactivé'}</p>
+          <form data-action-form="set-auto-role">
+            <select name="roleId">${autoRoleOptions}</select>
+            <button class="button" type="submit">Configurer le grade</button>
+          </form>
+          <form data-action-form="disable-auto-role">
+            <button class="button button-ghost" type="submit">Désactiver le grade</button>
+          </form>
+        </article>
+        ${automodFreePanel(state)}
+        <form data-action-form="warn">
+          ${labelHelp('Consigner un avertissement', 'Ajoute un avertissement au dossier disciplinaire d’un utilisateur.')}
+          <input name="userId" placeholder="ID utilisateur" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Avertir</button>
+        </form>
+        <form data-action-form="timeout">
+          ${labelHelp('Mise au silence', 'Rend temporairement muet un membre présent pendant la durée indiquée.')}
+          <input name="userId" placeholder="ID du membre présent" required>
+          <input name="duration" placeholder="10m, 2h, 7d" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Mettre au silence</button>
+        </form>
+        <form data-action-form="untimeout">
+          ${labelHelp('Lever le silence', 'Retire un silence actif et conserve une trace de l’action.')}
+          <input name="userId" placeholder="ID du membre présent" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Retirer</button>
+        </form>
+        <form data-action-form="kick">
+          ${labelHelp('Expulser', 'Retire un membre du serveur sans le bannir.')}
+          <input name="userId" placeholder="ID du membre présent" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Expulser</button>
+        </form>
+        <form data-action-form="ban">
+          ${labelHelp('Bannir par ID', 'Bannit un utilisateur avec son ID, même s’il n’est plus présent.')}
+          <input name="userId" placeholder="ID, même hors serveur" required>
+          <input name="reason" placeholder="Raison">
+          <input name="deleteDays" type="number" min="0" max="7" placeholder="Jours messages">
+          <button class="button" type="submit">Bannir</button>
+        </form>
+        <form data-action-form="purge">
+          ${labelHelp('Nettoyer un salon', 'Supprime un nombre défini de messages récents dans le salon choisi.')}
+          <select name="channelId">${channelOptions}</select>
+          <input name="count" type="number" min="1" max="100" value="10">
+          <button class="button" type="submit">Purger</button>
+        </form>
+        <article class="inline-form moderation-cases-note">
+          ${labelHelp('Registre disciplinaire', 'Affiche les dernières mesures enregistrées sur ce serveur.')}
+          ${moderationCaseFilters(freeModerationState)}
+          ${moderationCaseList(freeModerationState)}
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premiumTag) {
+  return `
+    <section class="dashboard-panel premium-panel module-panel premium-view-panel" id="moderation">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Sécurité Premium</p>
+          <h2>Veille renforcée</h2>
+          <p class="muted">Sanctions avancées, protection automatique renforcée et actions de crise.</p>
+        </div>
+        ${premiumBadge}
+      </div>
+      ${permissionDiagnosticsPanel(state)}
+      <div class="form-grid module-form-grid">
+        <form data-action-form="tempban">
+          ${labelHelp('Bannissement temporaire', 'Bannit un utilisateur pour une durée précise, puis Sentinel lève automatiquement le bannissement.', ` ${premiumTag}`)}
+          <input name="userId" placeholder="ID utilisateur" required>
+          <input name="duration" placeholder="1h, 7d, 30d" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Bannir temporairement</button>
+        </form>
+        <form data-action-form="unban">
+          ${labelHelp('Lever un bannissement', 'Retire le bannissement d’un utilisateur avec son ID.', ` ${premiumTag}`)}
+          <input name="userId" placeholder="ID utilisateur" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Débannir</button>
+        </form>
+        <form data-action-form="lock">
+          ${labelHelp('Verrouiller un salon', 'Bloque l’envoi de messages dans un salon.', ` ${premiumTag}`)}
+          <select name="channelId">${channelOptions}</select>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Verrouiller</button>
+        </form>
+        <form data-action-form="unlock">
+          ${labelHelp('Rouvrir un salon', 'Rétablit l’envoi de messages dans un salon verrouillé.', ` ${premiumTag}`)}
+          <select name="channelId">${channelOptions}</select>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Rouvrir</button>
+        </form>
+        <form data-action-form="slowmode">
+          ${labelHelp('Ralentir un salon', 'Impose un délai entre deux messages.', ` ${premiumTag}`)}
+          <select name="channelId">${channelOptions}</select>
+          <input name="duration" placeholder="10s, 5m, 0">
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Ralentir</button>
+        </form>
+        <form data-action-form="edit-case">
+          ${labelHelp('Corriger un dossier', 'Corrige la raison d’un dossier disciplinaire.', ` ${premiumTag}`)}
+          <input name="caseId" placeholder="ID du cas" required>
+          <input name="reason" placeholder="Nouvelle raison" required>
+          <button class="button" type="submit">Modifier</button>
+        </form>
+        <form data-action-form="delete-case">
+          ${labelHelp('Retirer un dossier', 'Retire un dossier disciplinaire invalide.', ` ${premiumTag}`)}
+          <input name="caseId" placeholder="ID du cas" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Supprimer</button>
+        </form>
+        <form data-action-form="unwarn">
+          ${labelHelp('Retirer un avertissement', 'Annule un avertissement précis sans effacer l’historique.', ` ${premiumTag}`)}
+          <input name="caseId" placeholder="ID du cas avertissement" required>
+          <input name="reason" placeholder="Raison">
+          <button class="button" type="submit">Annuler</button>
+        </form>
+        ${automodPremiumPanel(state, premiumTag)}
+        <form data-action-form="reset-guild">
+          ${labelHelp('Remise à zéro générale', 'Remet à zéro toutes les heures de service du serveur.', ` ${premiumTag}`)}
+          <button class="button" type="submit">Réinitialiser</button>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+function renderModerationPanel(state, channelOptions, autoRoleOptions, premiumBadge, premiumTag) {
+  return isPremiumPlanVisible(state)
+    ? renderPremiumModerationPanel(state, channelOptions, premiumBadge, premiumTag)
+    : renderFreeModerationPanel(state, channelOptions, autoRoleOptions);
 }
 
 function profileDossierList(dossiers) {
@@ -3928,7 +4362,40 @@ function auditLogList(state) {
   `;
 }
 
+function renderFreeAuditPanel(state) {
+  const items = (state.auditLogs?.items || []).slice(0, 10);
+  const freeState = {
+    ...state,
+    auditLogs: {
+      ...(state.auditLogs || {}),
+      items
+    }
+  };
+
+  return `
+    <section class="dashboard-panel" id="audit">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Historique gratuit</p>
+          <h2>Dernières actions</h2>
+          <p class="muted">Les dix dernières actions du serveur, sans les filtres et recherches Premium.</p>
+        </div>
+        <span class="free-badge">Vue Gratuit</span>
+      </div>
+      <div class="audit-scope-note">
+        <span>Journal récent du serveur sélectionné</span>
+        <small>${escapeHtml(items.length)} entrée(s) affichée(s)</small>
+      </div>
+      ${auditLogList(freeState)}
+    </section>
+  `;
+}
+
 function renderAuditPanel(state) {
+  if (!isPremiumPlanVisible(state)) {
+    return renderFreeAuditPanel(state);
+  }
+
   const auditLogs = state.auditLogs || {};
   const canViewGlobal = Boolean(auditLogs.canViewGlobal);
   const currentScope = canViewGlobal ? auditScope : 'server';
@@ -4626,40 +5093,6 @@ function ensureDashboardPlanMode(state = currentState) {
   }
 }
 
-function premiumVisibilityClass(state = currentState) {
-  return isPremiumPlanVisible(state) ? ' is-premium-visible' : ' is-premium-hidden';
-}
-
-function premiumLockedHint(state = currentState) {
-  if (canUsePremiumPlan(state)) {
-    return '';
-  }
-
-  return `
-    <div class="dashboard-alert is-warning premium-locked-hint">
-      <strong>Premium verrouillé</strong>
-      <p>Ce serveur ou ce compte n’a pas encore le Premium. Le bouton Premium se débloquera dès que l’accès sera actif.</p>
-    </div>
-  `;
-}
-
-function premiumRevealHint(state = currentState) {
-  if (!canUsePremiumPlan(state) || isPremiumPlanVisible(state)) {
-    return '';
-  }
-
-  return `
-    <div class="dashboard-alert is-ready premium-reveal-hint">
-      <strong>Vue gratuite</strong>
-      <p>Active le bouton Premium en haut du dashboard pour afficher les outils réservés au Premium dans cet onglet.</p>
-    </div>
-  `;
-}
-
-function premiumOnly(content, state = currentState) {
-  return isPremiumPlanVisible(state) ? content : '';
-}
-
 function renderDashboardPlanToggle(state) {
   const premiumUnlocked = canUsePremiumPlan(state);
   const premiumActive = isPremiumPlanVisible(state);
@@ -4778,284 +5211,51 @@ function renderDashboard() {
   const getPingRoleOptions = () => (optionMarkup.pingRoles ??= optionList(state.roles, null, 'Aucun ping de rôle'));
   const getChannelOptions = () => (optionMarkup.channels ??= optionList(state.channels, state.config.logChannelId, 'Choisir un salon'));
   const getStatusChannelOptions = () => (optionMarkup.statusChannels ??= optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut'));
-  const premiumBadge = state.advanced ? '<span class="premium-badge">Premium actif</span>' : '<span class="free-badge">Gratuit</span>';
+  const premiumMode = isPremiumPlanVisible(state);
+  const premiumBadge = premiumMode ? '<span class="premium-badge">Vue Premium</span>' : '<span class="free-badge">Vue Gratuit</span>';
   const premiumTag = '<span class="premium-tag">Option Premium</span>';
-  const planClass = premiumVisibilityClass(state);
 
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
-    <div class="dashboard-tab-stage${planClass}">
-      ${tabPanel('overview', () => renderServerHome(state, premiumBadge))}
+    <div class="dashboard-tab-stage ${premiumMode ? 'is-plan-premium' : 'is-plan-free'}">
+      ${tabPanel('overview', () => premiumMode ? renderPremiumHome(state, premiumBadge) : renderServerHome(state, premiumBadge))}
 
-      ${tabPanel('setup', () => renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions()))}
+      ${tabPanel('setup', () => premiumMode
+        ? renderPremiumSetupPanel(state, premiumBadge)
+        : renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions()))}
 
-      ${tabPanel('configuration', () => renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions()))}
+      ${tabPanel('configuration', () => premiumMode
+        ? renderPremiumConfigurationPanel(state, premiumBadge)
+        : renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions()))}
 
       ${tabPanel('service', () => renderServicePanel(state, premiumBadge, premiumTag))}
 
-      ${tabPanel('embeds', () => `
-    <section class="dashboard-panel module-panel announcements-panel" id="embeds">
-      <div class="panel-heading row-heading">
-        <div>
-          <p class="eyebrow">Annonces</p>
-          <h2>Embeds Sentinel</h2>
-          <p class="muted">${escapeHtml(customEmbedQuota(state))}</p>
-        </div>
-        ${premiumBadge}
-      </div>
-      <div class="form-grid module-form-grid">
-        <form data-action-form="custom-embed-create">
-          ${labelHelp('Créer un embed Sentinel', 'Publie une annonce propre sous l’identité de Sentinel dans le salon choisi. Le gratuit garde un nombre limité d’embeds actifs.')}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="title" placeholder="Titre" maxlength="256" required>
-          <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
-          <input name="color" placeholder="Couleur : rose, cyan, #ff2d9a">
-          <select name="roleId">${getPingRoleOptions()}</select>
-          <input name="imageUrl" placeholder="Image URL optionnelle">
-          ${fileUploadControl('imageFile', 'Photo principale', 'Aucune photo sélectionnée', 'Importer')}
-          <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
-          ${fileUploadControl('thumbnailFile', 'Miniature', 'Aucune miniature sélectionnée', 'Importer')}
-          <p class="form-hint">Tu peux choisir une image depuis ton PC. PNG, JPG, WebP ou GIF, 8 Mo maximum au total. Sentinel l’optimise automatiquement en WebP.</p>
-          <input name="footer" placeholder="Footer optionnel">
-          <button class="button" type="submit">Envoyer l’embed</button>
-        </form>
-        <form data-action-form="custom-embed-edit">
-          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message. Choisis le salon si l’embed n’apparaît pas encore dans la liste gérée.')}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="messageId" placeholder="ID du message embed" required>
-          <input name="title" placeholder="Nouveau titre">
-          <textarea name="description" placeholder="Nouveau message"></textarea>
-          <input name="color" placeholder="Nouvelle couleur">
-          <input name="imageUrl" placeholder="Nouvelle image URL, ou retirer">
-          ${fileUploadControl('imageFile', 'Nouvelle photo principale', 'Aucune nouvelle photo', 'Remplacer')}
-          <input name="thumbnailUrl" placeholder="Nouvelle miniature URL, ou retirer">
-          ${fileUploadControl('thumbnailFile', 'Nouvelle miniature', 'Aucune nouvelle miniature', 'Remplacer')}
-          <p class="form-hint">Un fichier choisi ici remplace l’URL indiquée pour l’image ou la miniature.</p>
-          <input name="footer" placeholder="Nouveau footer, ou retirer">
-          <button class="button" type="submit">Modifier sans quota</button>
-        </form>
-        <form data-action-form="custom-embed-delete">
-          ${labelHelp('Supprimer un embed Sentinel', 'Supprime un embed géré par Sentinel avec son ID de message et libère son emplacement gratuit si le serveur n’est pas Premium.')}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="messageId" placeholder="ID du message embed" required>
-          <button class="button button-ghost" type="submit">Supprimer</button>
-        </form>
-        <article class="inline-form">
-          ${labelHelp('Embeds gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard. Copie leur ID pour les gérer.')}
-          ${customEmbedList(state)}
-        </article>
-        ${premiumOnly(`
-        <article class="inline-form premium-roadmap premium-only-block">
-          ${labelHelp('Premium annonces', 'Option Premium : les créations d’embeds Sentinel ne sont plus limitées par le quota gratuit.', ` ${premiumTag}`)}
-          <p>Le mode Premium garde les modifications et suppressions illimitées, et retire la limite d’embeds actifs pour les grosses communications.</p>
-        </article>
-        `, state)}
-      </div>
-      ${premiumRevealHint(state)}
-      ${premiumLockedHint(state)}
-    </section>
-      `)}
+      ${tabPanel('embeds', () => renderEmbedsPanel(
+        state,
+        getChannelOptions(),
+        getPingRoleOptions(),
+        premiumBadge
+      ))}
 
-      ${tabPanel('dossiers', () => `
-    <section class="dashboard-panel module-panel dossiers-panel" id="dossiers">
-      <div class="panel-heading row-heading">
-        <div>
-          <p class="eyebrow">Dossiers Sentinel</p>
-          <h2>Bureau d’accueil et suivi</h2>
-          <p class="muted">Dans Sentinel, un dossier est un ticket privé : un membre choisit un type de demande, explique le sujet, puis Sentinel crée un salon réservé avec l’équipe autorisée.</p>
-        </div>
-        <span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>
-      </div>
-      ${dossierPermissionAlert(state)}
-      <div class="dashboard-alert is-ready dossier-quota-alert">
-        <strong>Limites dossiers</strong>
-        <p>${escapeHtml(dossierQuotaText(state))}</p>
-      </div>
-      <div class="form-grid module-form-grid">
-        <form data-action-form="publish-dossier-panel">
-          ${labelHelp('Publier le bureau d’accueil', 'Envoie le panneau de tickets. En gratuit, un serveur garde un seul panneau actif ; en Premium, les panneaux seront illimités.')}
-          <select name="channelId">${getChannelOptions()}</select>
-          <button class="button" type="submit">Publier le bureau</button>
-        </form>
-        <article class="inline-form dossier-explain-card">
-          ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est un ticket privé pour le support, un signalement, un recrutement, un partenariat ou une autre demande.')}
-          <p>En gratuit, les responsables peuvent répondre, ajouter des intervenants, prendre le ticket en charge, corriger son statut, générer un compte rendu et le clôturer.</p>
-        </article>
-        <article class="inline-form dossier-explain-card">
-          ${labelHelp('Rôles responsables', 'Ces rôles peuvent voir les tickets, les prendre en charge, changer leur statut, générer l’archive et clôturer le salon.')}
-          <form data-action-form="add-dossier-role">
-            <select name="roleId">${getDossierRoleOptions()}</select>
-            <button class="button" type="submit">Ajouter le rôle</button>
-          </form>
-          ${dossierRoleList(state)}
-        </article>
-        ${premiumOnly(`
-        <article class="inline-form dossier-explain-card premium-roadmap premium-only-block">
-          ${labelHelp('Premium dossiers', 'Le Premium ajoutera les panneaux illimités, catégories personnalisées, formulaires avancés, priorités, templates, historique complet, statistiques et automatisations.')}
-          <p>Le gratuit reste simple : ouvrir, suivre, clôturer et retrouver les 10 derniers dossiers. Le Premium servira aux gros staffs qui ont besoin de trier et automatiser beaucoup de demandes.</p>
-        </article>
-        `, state)}
-        ${premiumRevealHint(state)}
-        ${premiumLockedHint(state)}
-        ${premiumOnly(`
-        ${dossierPremiumSettings(state, premiumTag)}
-        `, state)}
-        <article class="inline-form dossier-list-card">
-          ${labelHelp('Dossiers récents', 'Retrouve les dossiers ouverts ou clôturés sur ce serveur. Un dossier ouvert peut être clôturé depuis le dashboard.')}
-          ${dossierFiltersPanel(state)}
-          ${dossierList(state)}
-        </article>
-      </div>
-    </section>
-      `)}
+      ${tabPanel('dossiers', () => renderDossiersPanel(
+        state,
+        getChannelOptions(),
+        getDossierRoleOptions(),
+        premiumBadge,
+        premiumTag
+      ))}
 
       ${tabPanel('audit', () => renderAuditPanel(state))}
 
       ${canShowFounderTab(state) ? tabPanel('founder', () => renderFounderPremiumPanel()) : ''}
 
-      ${tabPanel('moderation', () => `
-    <section class="dashboard-panel module-panel moderation-panel" id="moderation">
-      <div class="panel-heading">
-        <p class="eyebrow">Sécurité</p>
-        <h2>Centre de sécurité</h2>
-        <p class="muted">Actions disciplinaires, garde automatique, registres récents et veille Premium pour les équipes qui tiennent plusieurs salons.</p>
-      </div>
-      ${permissionDiagnosticsPanel(state)}
-      <div class="form-grid module-form-grid">
-        <article class="inline-form moderation-note">
-          ${labelHelp('Grade automatique d’arrivée', 'Donne automatiquement un grade aux nouveaux membres qui rejoignent le serveur. Sentinel doit avoir Gérer les rôles et être placé au-dessus du grade choisi.')}
-          <p class="muted">Actuel : ${state.config.autoRoleId ? escapeHtml(resolveRole(state, state.config.autoRoleId)?.name || 'rôle supprimé sur Discord') : 'désactivé'}</p>
-          <form data-action-form="set-auto-role">
-            <select name="roleId">${getAutoRoleOptions()}</select>
-            <button class="button" type="submit">Configurer le grade</button>
-          </form>
-          <form data-action-form="disable-auto-role">
-            <button class="button button-ghost" type="submit">Désactiver le grade</button>
-          </form>
-        </article>
-        ${automodFreePanel(state)}
-        <form data-action-form="warn">
-          ${labelHelp('Consigner un avertissement', 'Ajoute un avertissement au dossier disciplinaire d’un utilisateur et l’enregistre dans le registre.')}
-          <input name="userId" placeholder="ID utilisateur" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit">Avertir</button>
-        </form>
-        <form data-action-form="timeout">
-          ${labelHelp('Mise au silence', 'Rend temporairement muet un membre présent sur le serveur pendant la durée indiquée.')}
-          <input name="userId" placeholder="ID du membre présent" required>
-          <input name="duration" placeholder="10m, 2h, 7d" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit">Mettre au silence</button>
-        </form>
-        <form data-action-form="untimeout">
-          ${labelHelp('Lever le silence', 'Retire un timeout actif sur un membre présent et garde une trace de l’action.')}
-          <input name="userId" placeholder="ID du membre présent" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit">Retirer</button>
-        </form>
-        <form data-action-form="kick">
-          ${labelHelp('Expulser', 'Retire un membre du serveur sans le bannir. Il pourra revenir avec une nouvelle invitation.')}
-          <input name="userId" placeholder="ID du membre présent" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit">Expulser</button>
-        </form>
-        <form data-action-form="ban">
-          ${labelHelp('Bannir par ID', 'Bannit un utilisateur avec son ID, même s’il n’est plus présent sur le serveur.')}
-          <input name="userId" placeholder="ID, même hors serveur" required>
-          <input name="reason" placeholder="Raison">
-          <input name="deleteDays" type="number" min="0" max="7" placeholder="Jours messages">
-          <button class="button" type="submit">Bannir</button>
-        </form>
-        <form data-action-form="purge">
-          ${labelHelp('Nettoyer un salon', 'Supprime rapidement un nombre défini de messages récents dans le salon choisi.')}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="count" type="number" min="1" max="100" value="10">
-          <button class="button" type="submit">Purger</button>
-        </form>
-        <article class="inline-form moderation-cases-note">
-          ${labelHelp('Registre disciplinaire', 'Affiche les dernières mesures enregistrées sur ce serveur. Les ID restent visibles même si la personne a quitté.')}
-          ${moderationCaseFilters(state)}
-          ${moderationCaseList(state)}
-        </article>
-        <article class="inline-form moderation-note">
-          <h3>Garde gratuite</h3>
-          <p>Avertissements, silence temporaire, expulsion, bannissement par ID, purge et consultation simple des 10 derniers dossiers avec <code>/sanctions</code>.</p>
-        </article>
-      </div>
-      ${premiumRevealHint(state)}
-      ${premiumLockedHint(state)}
-    </section>
-
-    ${premiumOnly(`
-    <section class="dashboard-panel premium-panel inline-premium-panel module-panel">
-      <div class="panel-heading row-heading">
-        <div>
-          <p class="eyebrow">Veille Premium</p>
-          <h2>Sécurité avancée</h2>
-          <p class="muted">Ces actions sont pensées pour les équipes qui gèrent beaucoup de salons, de mesures et de dossiers disciplinaires.</p>
-        </div>
-        ${premiumBadge}
-      </div>
-      <div class="form-grid module-form-grid">
-        <form data-action-form="tempban">
-          ${labelHelp('Bannissement temporaire', 'Option Premium : bannit un utilisateur pour une durée précise, puis Sentinel lève automatiquement le bannissement.', ` ${premiumTag}`)}
-          <input name="userId" placeholder="ID utilisateur" required>
-          <input name="duration" placeholder="1h, 7d, 30d" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Bannir temporairement</button>
-        </form>
-        <form data-action-form="unban">
-          ${labelHelp('Lever un bannissement', 'Option Premium : retire le bannissement d’un utilisateur avec son ID, même s’il n’est plus dans le serveur.', ` ${premiumTag}`)}
-          <input name="userId" placeholder="ID utilisateur" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Débannir</button>
-        </form>
-        <form data-action-form="lock">
-          ${labelHelp('Verrouiller salon', 'Option Premium : bloque l’envoi de messages dans un salon pour calmer une situation ou préparer une annonce.', ` ${premiumTag}`)}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Verrouiller</button>
-        </form>
-        <form data-action-form="unlock">
-          ${labelHelp('Rouvrir un salon', 'Option Premium : remet un salon verrouillé en mode normal pour permettre aux membres de reparler.', ` ${premiumTag}`)}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Rouvrir</button>
-        </form>
-        <form data-action-form="slowmode">
-          ${labelHelp('Ralentir un salon', 'Option Premium : impose un délai entre deux messages pour calmer un salon trop actif.', ` ${premiumTag}`)}
-          <select name="channelId">${getChannelOptions()}</select>
-          <input name="duration" placeholder="10s, 5m, 0">
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Ralentir</button>
-        </form>
-        <form data-action-form="edit-case">
-          ${labelHelp('Corriger un dossier', 'Option Premium : corrige ou précise la raison d’un dossier disciplinaire déjà enregistré.', ` ${premiumTag}`)}
-          <input name="caseId" placeholder="ID du cas" required>
-          <input name="reason" placeholder="Nouvelle raison" required>
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Modifier</button>
-        </form>
-        <form data-action-form="delete-case">
-          ${labelHelp('Retirer un dossier', 'Option Premium : retire un dossier disciplinaire créé par erreur ou devenu invalide.', ` ${premiumTag}`)}
-          <input name="caseId" placeholder="ID du cas" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Supprimer</button>
-        </form>
-        <form data-action-form="unwarn">
-          ${labelHelp('Retirer un avertissement', 'Option Premium : annule un avertissement précis sans effacer toute l’histoire de modération du membre.', ` ${premiumTag}`)}
-          <input name="caseId" placeholder="ID du cas avertissement" required>
-          <input name="reason" placeholder="Raison">
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Annuler</button>
-        </form>
-        ${automodPremiumPanel(state, premiumTag)}
-        <form data-action-form="reset-guild">
-          ${labelHelp('Remise à zéro générale', 'Option Premium : remet à zéro toutes les heures de service du serveur avec une action globale réservée aux grands nettoyages.', ` ${premiumTag}`)}
-          <button class="button" type="submit" ${state.advanced ? '' : 'disabled'}>Réinitialiser</button>
-        </form>
-      </div>
-    </section>
-    `, state)}
-      `)}
+      ${tabPanel('moderation', () => renderModerationPanel(
+        state,
+        getChannelOptions(),
+        getAutoRoleOptions(),
+        premiumBadge,
+        premiumTag
+      ))}
     </div>
   `;
 

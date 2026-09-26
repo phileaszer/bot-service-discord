@@ -3358,6 +3358,88 @@ code {
   gap: 12px;
 }
 
+.premium-view-panel {
+  border-color: rgba(23, 231, 255, 0.2);
+  background:
+    linear-gradient(135deg, rgba(23, 231, 255, 0.055), transparent 46%, rgba(255, 45, 154, 0.045)),
+    rgba(7, 10, 17, 0.9);
+}
+
+.premium-home-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.premium-view-metrics {
+  margin: 0;
+}
+
+.premium-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.premium-module-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 188px;
+  padding: 16px;
+  border: 1px solid rgba(234, 242, 255, 0.11);
+  background:
+    linear-gradient(145deg, rgba(23, 231, 255, 0.06), transparent 48%, rgba(255, 45, 154, 0.055)),
+    rgba(5, 7, 12, 0.44);
+  clip-path: var(--cut);
+}
+
+.premium-module-card > span {
+  color: var(--cyan);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.premium-module-card > strong {
+  font-size: 1rem;
+}
+
+.premium-module-card > p {
+  margin: 0 0 4px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.premium-module-card > .button {
+  align-self: end;
+  justify-self: start;
+  margin-top: auto;
+}
+
+.premium-config-summary {
+  margin-bottom: 18px;
+}
+
+.premium-service-actions {
+  margin-bottom: 18px;
+}
+
+.dashboard-tab-stage.is-plan-premium .dashboard-tab-panel {
+  animation: premium-view-enter 180ms ease-out;
+}
+
+@keyframes premium-view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .today-card,
 .plan-scope-card {
   display: grid;
