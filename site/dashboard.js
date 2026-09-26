@@ -313,16 +313,39 @@ function renderDashboardLoadingState(preview = selectedGuildPreview) {
 
 async function api(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
-  const response = await fetch(path, {
-    credentials: 'include',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'X-Sentinel-CSRF': csrfToken } : {}),
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  const timeoutMs = Number(options.timeoutMs) || (method === 'GET' ? 15000 : 45000);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  const {
+    timeoutMs: ignoredTimeout,
+    signal: ignoredSignal,
+    headers: optionHeaders,
+    ...fetchOptions
+  } = options;
+  let response;
+
+  try {
+    response = await fetch(path, {
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'X-Sentinel-CSRF': csrfToken } : {}),
+        ...(optionHeaders || {})
+      },
+      ...fetchOptions,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Sentinel met trop de temps à répondre. Réessaie dans quelques instants.');
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
   const payload = await response.json().catch(() => ({}));
 
   if (payload.csrfToken) {
@@ -5913,17 +5936,19 @@ async function bootstrap() {
   showCachedDashboardPreview();
 
   try {
-    const session = await api('/api/session');
+    const [session, guildPayload] = await Promise.all([
+      api('/api/session'),
+      api('/api/guilds')
+    ]);
     currentUser = session.user;
     csrfToken = session.csrfToken || csrfToken;
     currentSettings = session.settings || null;
     currentSiteAccess = session.siteAccess || currentSiteAccess;
     canViewPremiumOverview = Boolean(session.creator?.canViewPremiumOverview);
+    guilds = guildPayload.guilds || [];
+    selectedGuildPreview = guilds.find((guild) => guild.id === selectedGuildId) || selectedGuildPreview;
     renderUser();
-    if (canViewPremiumOverview) {
-      loadCreatorPremiumOverview(null, { silent: true });
-    }
-    await loadGuilds();
+    renderGuilds();
 
     let restoredGuild = false;
 

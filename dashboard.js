@@ -1991,7 +1991,8 @@ async function getDashboardAccess(ctx, session, guildId) {
         });
     }
 
-    const member = await guild.members.fetch(session.user.id).catch(() => null);
+    const member = guild.members.cache.get(session.user.id)
+        || await guild.members.fetch(session.user.id).catch(() => null);
     const oauthManage = userCanManageOauthGuild(oauthGuild);
     const commandRoleAccess = member ? ctx.helpers.hasCommandRoleAccess(member) : false;
     const siteRoleAccess = siteAccess.canViewSitePanel;
@@ -2425,7 +2426,9 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
     const items = [];
 
     for (const guild of guilds) {
-        await guild.roles.fetch().catch(() => null);
+        if (guild.roles.cache.size <= 1) {
+            await guild.roles.fetch().catch(() => null);
+        }
 
         const isConfiguredPremium = configuredAdvancedGuildIds.has(guild.id);
         const isManualPremium = manualPremiumGuildIds.has(guild.id);
@@ -2446,13 +2449,19 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
         const premiumUsers = [];
 
         for (const row of premiumUserRows) {
-            const member = await guild.members.fetch(row.user_id).catch(() => null);
-            const user = member?.user || await ctx.client.users.fetch(row.user_id).catch(() => null);
+            const profile = getUserProfile(row.user_id);
+            const member = guild.members.cache.get(row.user_id)
+                || await guild.members.fetch(row.user_id).catch(() => null);
+            const user = member?.user || (
+                profile
+                    ? null
+                    : await ctx.client.users.fetch(row.user_id).catch(() => null)
+            );
 
             premiumUsers.push({
                 id: row.user_id,
-                tag: user?.tag || user?.username || null,
-                username: user?.username || null,
+                tag: user?.tag || profile?.username || null,
+                username: user?.username || profile?.username || null,
                 inGuild: Boolean(member),
                 grantedByUserId: row.granted_by_user_id || null,
                 createdAt: row.created_at
@@ -3013,18 +3022,30 @@ async function buildUserDashboardProfile(ctx, guild, userId, session = null) {
     };
 }
 
-async function buildGuildState(ctx, guild, session = null) {
-    await Promise.all([
-        guild.roles.fetch().catch(() => null),
-        guild.channels.fetch().catch(() => null)
-    ]);
+async function buildGuildState(ctx, guild, session = null, options = {}) {
+    const cacheWarmups = [];
+
+    if (guild.roles.cache.size <= 1) {
+        cacheWarmups.push(guild.roles.fetch().catch(() => null));
+    }
+
+    if (guild.channels.cache.size === 0) {
+        cacheWarmups.push(guild.channels.fetch().catch(() => null));
+    }
+
+    if (cacheWarmups.length) {
+        await Promise.all(cacheWarmups);
+    }
 
     const config = ctx.helpers.getGuildConfig(guild.id);
     const summary = ctx.helpers.getServiceSummary(guild.id);
     const viewerUserId = session?.user?.id || null;
-    const viewerMember = viewerUserId
-        ? await guild.members.fetch(viewerUserId).catch(() => null)
-        : null;
+    const viewerMember = Object.prototype.hasOwnProperty.call(options, 'viewerMember')
+        ? options.viewerMember
+        : (viewerUserId
+            ? guild.members.cache.get(viewerUserId)
+                || await guild.members.fetch(viewerUserId).catch(() => null)
+            : null);
     const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, viewerMember, session);
     const viewerData = viewerUserId ? ctx.helpers.getUserData(guild.id, viewerUserId) : null;
     const viewerSessions = viewerUserId && ctx.helpers.getUserSessions
@@ -3041,7 +3062,7 @@ async function buildGuildState(ctx, guild, session = null) {
         ctx.helpers.getCustomEmbedQuota(guild.id, viewerMember),
         advanced
     );
-    const siteAccess = await getSiteAccess(ctx, session?.user?.id);
+    const siteAccess = options.siteAccess || await getSiteAccess(ctx, session?.user?.id);
     const canViewGlobalAudit = siteAccess.isFounder;
     const auditLimit = advanced || canViewGlobalAudit ? 50 : 10;
     const moderationCaseLimit = advanced || canViewGlobalAudit ? 25 : 10;
@@ -4535,18 +4556,25 @@ async function handleApi(req, res, ctx, url) {
 
         for (const oauthGuild of guildCandidates) {
             const installed = ctx.client.guilds.cache.has(oauthGuild.id);
+            const oauthManage = userCanManageOauthGuild(oauthGuild);
             let memberAccess = false;
             let advanced = ctx.helpers.isAdvancedGuild(oauthGuild.id)
                 || hasPremiumSubscription;
 
             if (installed) {
                 const guild = ctx.client.guilds.cache.get(oauthGuild.id);
-                const member = await guild.members.fetch(session.user.id).catch(() => null);
+                let member = guild.members.cache.get(session.user.id) || null;
+
+                if (!member && !oauthManage && !siteAccess.canViewSitePanel) {
+                    member = await guild.members.fetch(session.user.id).catch(() => null);
+                }
+
                 memberAccess = member ? ctx.helpers.hasCommandRoleAccess(member) : false;
-                advanced = await hasDashboardAdvancedAccess(ctx, oauthGuild.id, member, session);
+                advanced = hasDirectAdvancedAccess(ctx, oauthGuild.id, member)
+                    || hasPremiumSubscription;
             }
 
-            if (!userCanManageOauthGuild(oauthGuild) && !memberAccess && !siteAccess.canViewSitePanel) {
+            if (!oauthManage && !memberAccess && !siteAccess.canViewSitePanel) {
                 continue;
             }
 
@@ -4700,9 +4728,15 @@ async function handleApi(req, res, ctx, url) {
 
     const stateMatch = /^\/api\/guilds\/(\d{17,20})\/state$/.exec(url.pathname);
     if (req.method === 'GET' && stateMatch) {
-        const { guild } = await getDashboardAccess(ctx, session, stateMatch[1]);
+        const { guild, member, siteAccess } = await getDashboardAccess(ctx, session, stateMatch[1]);
         updateUserSiteSettings(session.user.id, { lastGuildId: guild.id });
-        json(res, 200, { ok: true, state: await buildGuildState(ctx, guild, session) });
+        json(res, 200, {
+            ok: true,
+            state: await buildGuildState(ctx, guild, session, {
+                viewerMember: member,
+                siteAccess
+            })
+        });
         return;
     }
 
@@ -4817,7 +4851,7 @@ async function handleApi(req, res, ctx, url) {
 
     const actionMatch = /^\/api\/guilds\/(\d{17,20})\/action$/.exec(url.pathname);
     if (req.method === 'POST' && actionMatch) {
-        const { guild, member } = await getDashboardAccess(ctx, session, actionMatch[1]);
+        const { guild, member, siteAccess } = await getDashboardAccess(ctx, session, actionMatch[1]);
 
         if (!member) {
             throw createHttpError(403, 'Site staff must be a member of this Discord server to perform actions.');
@@ -4855,7 +4889,10 @@ async function handleApi(req, res, ctx, url) {
             throw error;
         }
 
-        const state = await buildGuildState(ctx, guild, session);
+        const state = await buildGuildState(ctx, guild, session, {
+            viewerMember: member,
+            siteAccess
+        });
         const payrollArchive = body.action === 'toggle-payroll-paid' && ctx.helpers.getWeeklyPayrollArchive
             ? ctx.helpers.getWeeklyPayrollArchive(guild.id, body.weekStart, {
                 language: ctx.helpers.getGuildLanguage(guild.id),
