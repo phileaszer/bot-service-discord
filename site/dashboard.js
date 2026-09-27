@@ -20,6 +20,9 @@ let expandedPayrollArchiveWeek = null;
 let selectedUserProfile = null;
 let dossierFilters = {};
 let expandedDossierId = null;
+let dossierViewMode = 'board';
+let dossierArchiveMatches = [];
+let dossierArchiveItemIds = [];
 let creatorOverview = null;
 let creatorOverviewLoading = false;
 let canViewPremiumOverview = false;
@@ -3076,6 +3079,50 @@ function dossierSettingForType(state, type) {
   return (state.dossiers?.settings || []).find((setting) => setting.type === type) || null;
 }
 
+function dossierTypeRolesSettings(state, roleOptions) {
+  const types = [
+    ['support', 'Support'],
+    ['report', 'Signalement'],
+    ['recruitment', 'Recrutement'],
+    ['partnership', 'Partenariat'],
+    ['other', 'Autre']
+  ];
+
+  return `
+    <article class="inline-form dossier-type-roles">
+      ${labelHelp('Confidentialité par dossier', 'Lorsqu’un rôle est attribué à une nature de dossier, lui seul et les administrateurs Discord peuvent voir les salons correspondants.')}
+      <div class="dossier-category-grid">
+        ${types.map(([type, label]) => {
+          const assigned = (state.dossiers?.typeRoles || []).filter(item => item.type === type);
+          return `
+            <section class="dossier-setting-block">
+              <strong>${escapeHtml(label)}</strong>
+              <form data-action-form="add-dossier-type-role">
+                <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                <select name="roleId">${roleOptions}</select>
+                <button class="button button-small" type="submit">Affecter</button>
+              </form>
+              <div class="role-chip-row">
+                ${assigned.length ? assigned.map((item) => {
+                  const role = resolveRole(state, item.roleId);
+                  return role ? `
+                    <form data-action-form="remove-dossier-type-role" class="role-chip">
+                      <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                      <input type="hidden" name="roleId" value="${escapeHtml(role.id)}">
+                      <span>@${escapeHtml(role.name)}</span>
+                      <button type="submit">Retirer</button>
+                    </form>
+                  ` : '';
+                }).join('') : '<small class="muted">Rôles généraux utilisés</small>'}
+              </div>
+            </section>
+          `;
+        }).join('')}
+      </div>
+    </article>
+  `;
+}
+
 function dossierPremiumSettings(state, premiumTag) {
   const types = [
     ['support', 'Support'],
@@ -3092,18 +3139,111 @@ function dossierPremiumSettings(state, premiumTag) {
       <div class="dossier-category-grid">
         ${types.map(([type, label]) => {
           const setting = dossierSettingForType(state, type);
+          const questionsText = (setting?.questions || []).map(question => question.label).join('\n');
 
           return `
-            <form data-action-form="set-dossier-category">
-              <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+            <section class="dossier-setting-block">
               <strong>${escapeHtml(label)}</strong>
-              <select name="categoryId"${disabled}>${categoryOptionList(state.categories || [], setting?.categoryId || '')}</select>
-              <button class="button button-small" type="submit"${disabled}>Enregistrer</button>
-            </form>
+              <form data-action-form="set-dossier-category">
+                <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                <select name="categoryId"${disabled}>${categoryOptionList(state.categories || [], setting?.categoryId || '')}</select>
+                <button class="button button-small" type="submit"${disabled}>Catégorie</button>
+              </form>
+              <form data-action-form="set-dossier-questions">
+                <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                <textarea name="questionsText" rows="4" maxlength="300" placeholder="Une question obligatoire par ligne, 3 maximum"${disabled}>${escapeHtml(questionsText)}</textarea>
+                <button class="button button-small" type="submit"${disabled}>Formulaire</button>
+              </form>
+              <form data-action-form="set-dossier-sla" class="dossier-sla-form">
+                <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                <label>Première réponse, min<input type="number" name="slaFirstResponseMinutes" min="5" max="10080" value="${escapeHtml(setting?.slaFirstResponseMinutes || 60)}"${disabled}></label>
+                <label>Résolution, min<input type="number" name="slaResolutionMinutes" min="30" max="43200" value="${escapeHtml(setting?.slaResolutionMinutes || 1440)}"${disabled}></label>
+                <button class="button button-small" type="submit"${disabled}>Délais</button>
+              </form>
+            </section>
           `;
         }).join('')}
       </div>
-      <p class="muted">Plus tard, ce même espace accueillera les formulaires personnalisés, les priorités, les templates, le branding et les automatisations.</p>
+    </article>
+  `;
+}
+
+function dossierTemplatesPanel(state, premiumTag) {
+  const templates = state.dossiers?.templates || [];
+  const typeOptions = [
+    ['', 'Tous les dossiers'],
+    ['support', 'Support'],
+    ['report', 'Signalement'],
+    ['recruitment', 'Recrutement'],
+    ['partnership', 'Partenariat'],
+    ['other', 'Autre']
+  ].map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
+
+  return `
+    <article class="inline-form dossier-templates-panel">
+      ${labelHelp('Réponses préparées', 'Crée des réponses réutilisables, puis envoie-les en un clic depuis un dossier.', ` ${premiumTag}`)}
+      <form data-action-form="create-dossier-template" class="dossier-template-create">
+        <input name="templateName" maxlength="80" placeholder="Nom de la réponse" required>
+        <select name="dossierType">${typeOptions}</select>
+        <select name="templateKind">
+          <option value="reply">Réponse</option>
+          <option value="request_info">Demande de complément</option>
+          <option value="close">Message de clôture</option>
+        </select>
+        <textarea name="templateContent" rows="4" maxlength="1900" placeholder="Texte envoyé dans le dossier" required></textarea>
+        <button class="button" type="submit">Créer la réponse</button>
+      </form>
+      <div class="dossier-template-list">
+        ${templates.length ? templates.map(template => `
+          <div>
+            <span><strong>${escapeHtml(template.name)}</strong><small>${escapeHtml(template.type ? dossierTypeLabel(template.type) : 'Tous les dossiers')}</small></span>
+            <form data-action-form="delete-dossier-template">
+              <input type="hidden" name="templateId" value="${escapeHtml(template.id)}">
+              <button class="button button-small button-ghost" type="submit">Retirer</button>
+            </form>
+          </div>
+        `).join('') : '<p class="muted">Aucune réponse préparée.</p>'}
+      </div>
+    </article>
+  `;
+}
+
+function formatDossierMetric(value) {
+  if (!Number.isFinite(value) || value < 0) return 'Pas encore mesuré';
+  const minutes = Math.round(value / 60000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return `${hours} h${remaining ? ` ${remaining} min` : ''}`;
+}
+
+function dossierStatsPanel(state, premiumTag) {
+  const stats = state.dossiers?.stats;
+  if (!stats) return '';
+  const typeVolumes = Object.entries(stats.byType || {})
+    .sort((a, b) => b[1] - a[1]);
+  const teamLoad = Object.entries(stats.byReferent || {})
+    .sort((a, b) => b[1] - a[1]);
+
+  return `
+    <article class="inline-form dossier-stats-panel">
+      ${labelHelp('Registre de l’équipe', 'Mesure la prise en charge et la résolution des dossiers.', ` ${premiumTag}`)}
+      <div class="dossier-stat-grid">
+        <div><span>Ouverts</span><strong>${escapeHtml(stats.open)}</strong></div>
+        <div><span>Sans référent</span><strong>${escapeHtml(stats.unassigned)}</strong></div>
+        <div><span>Première réponse</span><strong>${escapeHtml(formatDossierMetric(stats.averageFirstResponseMs))}</strong></div>
+        <div><span>Résolution moyenne</span><strong>${escapeHtml(formatDossierMetric(stats.averageResolutionMs))}</strong></div>
+      </div>
+      <div class="dossier-stat-details">
+        <div>
+          <strong>Volume par nature</strong>
+          ${typeVolumes.length ? `<ul>${typeVolumes.map(([type, count]) => `<li><span>${escapeHtml(dossierTypeLabel(type))}</span><strong>${escapeHtml(count)}</strong></li>`).join('')}</ul>` : '<p class="muted">Aucune donnée.</p>'}
+        </div>
+        <div>
+          <strong>Charge par référent</strong>
+          ${teamLoad.length ? `<ul>${teamLoad.map(([userId, count]) => `<li><code>${escapeHtml(userId)}</code><strong>${escapeHtml(count)}</strong></li>`).join('')}</ul>` : '<p class="muted">Aucun dossier attribué.</p>'}
+        </div>
+      </div>
     </article>
   `;
 }
@@ -3162,9 +3302,24 @@ function dossierStatusActionOptions(selectedStatus = 'in_progress') {
 }
 
 function dossierMatchesFilters(item) {
+  const query = String(dossierFilters.query || '').trim().toLocaleLowerCase('fr');
   const userId = String(dossierFilters.userId || '').trim();
   const referentId = String(dossierFilters.referentId || '').trim();
   const status = String(dossierFilters.status || '').trim();
+  const type = String(dossierFilters.type || '').trim();
+  const priority = String(dossierFilters.priority || '').trim();
+  const queue = String(dossierFilters.queue || '').trim();
+  const from = dossierFilters.dateFrom ? new Date(`${dossierFilters.dateFrom}T00:00:00`).getTime() : null;
+  const to = dossierFilters.dateTo ? new Date(`${dossierFilters.dateTo}T23:59:59`).getTime() : null;
+
+  if (query) {
+    const localText = [item.id, item.subject, item.description, item.ownerUserId, item.referentUserId]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('fr');
+    const archiveMatch = dossierArchiveMatches.some(match => String(match.dossierId) === String(item.id));
+    if (!localText.includes(query) && !archiveMatch) return false;
+  }
 
   if (userId && ![item.ownerUserId, item.openerUserId].includes(userId)) {
     return false;
@@ -3178,12 +3333,25 @@ function dossierMatchesFilters(item) {
     return false;
   }
 
+  if (type && item.type !== type) return false;
+  if (priority && item.priority !== priority) return false;
+  if (queue && item.queue !== queue) return false;
+
+  const createdAt = new Date(item.createdAt).getTime();
+  if (from && createdAt < from) return false;
+  if (to && createdAt > to) return false;
+
   return true;
 }
 
-function dossierFiltersPanel() {
+function dossierFiltersPanel(state) {
+  const premium = Boolean(state.advanced);
   return `
     <form class="audit-filters dossier-filters" data-dossier-filter>
+      <div class="audit-field">
+        ${labelHelp('Recherche', premium ? 'Recherche le sujet, un membre et le contenu des archives.' : 'Recherche le sujet ou un membre dans les dossiers visibles.')}
+        <input name="query" placeholder="Sujet, membre, contenu" value="${escapeHtml(dossierFilters.query || '')}">
+      </div>
       <div class="audit-field">
         ${labelHelp('Demandeur', 'Filtre les dossiers ouverts par un ID Discord précis.')}
         <input name="userId" placeholder="ID Discord" value="${escapeHtml(dossierFilters.userId || '')}">
@@ -3196,6 +3364,35 @@ function dossierFiltersPanel() {
         ${labelHelp('Statut', 'Affiche seulement les dossiers ouverts, en cours, en attente, résolus ou fermés.')}
         <select name="status">${dossierStatusOptions(dossierFilters.status || '')}</select>
       </div>
+      <div class="audit-field">
+        <label>Nature</label>
+        <select name="type">
+          <option value="">Toutes</option>
+          ${['support', 'report', 'recruitment', 'partnership', 'other'].map(type => `<option value="${type}"${dossierFilters.type === type ? ' selected' : ''}>${escapeHtml(dossierTypeLabel(type))}</option>`).join('')}
+        </select>
+      </div>
+      <div class="audit-field">
+        <label>Priorité</label>
+        <select name="priority">
+          <option value="">Toutes</option>
+          ${['normal', 'important', 'urgent'].map(priority => `<option value="${priority}"${dossierFilters.priority === priority ? ' selected' : ''}>${escapeHtml(dossierPriorityLabel(priority))}</option>`).join('')}
+        </select>
+      </div>
+      <div class="audit-field">
+        <label>File</label>
+        <select name="queue">
+          <option value="">Toutes</option>
+          <option value="unassigned"${dossierFilters.queue === 'unassigned' ? ' selected' : ''}>Sans référent</option>
+          <option value="waiting_staff"${dossierFilters.queue === 'waiting_staff' ? ' selected' : ''}>Attend l’équipe</option>
+          <option value="waiting_requester"${dossierFilters.queue === 'waiting_requester' ? ' selected' : ''}>Attend le demandeur</option>
+          <option value="overdue"${dossierFilters.queue === 'overdue' ? ' selected' : ''}>Sans réponse depuis 24 h</option>
+          <option value="closed"${dossierFilters.queue === 'closed' ? ' selected' : ''}>Clos</option>
+        </select>
+      </div>
+      ${premium ? `
+        <div class="audit-field"><label>Depuis</label><input type="date" name="dateFrom" value="${escapeHtml(dossierFilters.dateFrom || '')}"></div>
+        <div class="audit-field"><label>Jusqu’au</label><input type="date" name="dateTo" value="${escapeHtml(dossierFilters.dateTo || '')}"></div>
+      ` : ''}
       <div class="audit-actions">
         <button class="button" type="submit">Filtrer les dossiers</button>
         <button class="button button-ghost" type="button" data-dossier-reset>Réinitialiser</button>
@@ -3204,10 +3401,38 @@ function dossierFiltersPanel() {
   `;
 }
 
-function dossierDetailRow(item) {
+function dossierQueueLabel(queue) {
+  return {
+    unassigned: 'Sans référent',
+    waiting_staff: 'Attend l’équipe',
+    waiting_requester: 'Attend le demandeur',
+    overdue: 'Sans réponse depuis 24 h',
+    closed: 'Clos'
+  }[queue] || 'Attend l’équipe';
+}
+
+function dossierTemplateOptions(state, item) {
+  return (state.dossiers?.templates || [])
+    .filter(template => !template.type || template.type === item.type)
+    .map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`)
+    .join('');
+}
+
+function dossierArchiveExcerpt(item) {
+  return item.archiveExcerpt
+    || dossierArchiveMatches.find(match => String(match.dossierId) === String(item.id))?.excerpt
+    || null;
+}
+
+function dossierDetailRow(state, item) {
   if (String(expandedDossierId) !== String(item.id)) {
     return '';
   }
+
+  const isOpen = item.status !== 'closed';
+  const templateOptions = dossierTemplateOptions(state, item);
+  const canReopen = state.advanced && item.reopenUntil && new Date(item.reopenUntil).getTime() > Date.now();
+  const archiveExcerpt = dossierArchiveExcerpt(item);
 
   return `
     <tr class="case-detail-row dossier-detail-row">
@@ -3233,6 +3458,14 @@ function dossierDetailRow(item) {
             <span>Fermé le</span>
             <strong>${escapeHtml(item.closedAt ? formatAuditDate(item.closedAt) : 'Encore ouvert')}</strong>
           </div>
+          <div>
+            <span>Retrait du salon</span>
+            <strong>${escapeHtml(item.deletionScheduledAt ? formatAuditDate(item.deletionScheduledAt) : 'Non planifié')}</strong>
+          </div>
+          <div>
+            <span>File</span>
+            <strong>${escapeHtml(dossierQueueLabel(item.queue))}</strong>
+          </div>
           <div class="case-detail-wide">
             <span>Sujet</span>
             <p>${escapeHtml(item.subject || 'Aucun sujet enregistré.')}</p>
@@ -3241,9 +3474,135 @@ function dossierDetailRow(item) {
             <span>Description</span>
             <p>${escapeHtml(item.description || 'Aucune description enregistrée.')}</p>
           </div>
+          ${(item.formAnswers || []).map(answer => `
+            <div class="case-detail-wide"><span>${escapeHtml(answer.label)}</span><p>${escapeHtml(answer.value)}</p></div>
+          `).join('')}
+          ${item.closedAt ? `
+            <div class="case-detail-wide"><span>Motif de clôture</span><p>${escapeHtml(item.closeReason || 'Non renseigné')}</p></div>
+            <div class="case-detail-wide"><span>Résolution</span><p>${escapeHtml(item.resolutionSummary || 'Non renseignée')}</p></div>
+          ` : ''}
+          ${item.archivedAt ? `
+            <div class="case-detail-wide dossier-archive-summary">
+              <span>Archive confirmée</span>
+              <p>${escapeHtml(item.archiveMessageCount)} messages, ${escapeHtml(item.archiveAttachmentCount)} pièces jointes et ${escapeHtml(item.archiveEmbedCount)} contenus intégrés.</p>
+              <a class="button button-small button-ghost" href="/api/guilds/${encodeURIComponent(state.guild.id)}/dossiers/${encodeURIComponent(item.id)}/archive">Télécharger l’archive</a>
+            </div>
+          ` : ''}
+          ${archiveExcerpt ? `
+            <div class="case-detail-wide"><span>Correspondance dans l’archive</span><p>${escapeHtml(archiveExcerpt)}</p></div>
+          ` : ''}
+        </div>
+        <div class="dossier-detail-actions">
+          ${state.advanced && templateOptions && isOpen ? `
+            <form data-action-form="send-dossier-template">
+              <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+              <select name="templateId">${templateOptions}</select>
+              <button class="button button-small" type="submit">Envoyer la réponse</button>
+            </form>
+          ` : ''}
+          ${isOpen ? `
+            <form data-action-form="dossier-close" class="dossier-close-form">
+              <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+              <input name="closeReason" maxlength="500" placeholder="Motif de clôture" required>
+              <textarea name="resolutionSummary" rows="3" maxlength="1500" placeholder="Résumé de la résolution" required></textarea>
+              <button class="button button-small" type="submit">Archiver et clôturer</button>
+            </form>
+          ` : canReopen ? `
+            <form data-action-form="dossier-reopen">
+              <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+              <button class="button button-small" type="submit">Réouvrir le dossier</button>
+            </form>
+          ` : ''}
         </div>
       </td>
     </tr>
+  `;
+}
+
+function dossierBoard(state, items) {
+  const columns = [
+    ['unassigned', 'Sans référent'],
+    ['waiting_staff', 'Attend l’équipe'],
+    ['waiting_requester', 'Attend le demandeur'],
+    ['overdue', 'Sans réponse depuis 24 h'],
+    ['closed', 'Clos']
+  ];
+
+  return `
+    <div class="dossier-board">
+      ${columns.map(([queue, label]) => {
+        const columnItems = items.filter(item => item.queue === queue);
+        return `
+          <section class="dossier-board-column">
+            <header><strong>${escapeHtml(label)}</strong><span>${columnItems.length}</span></header>
+            <div>
+              ${columnItems.length ? columnItems.map(item => {
+                const discordUrl = `https://discord.com/channels/${state.guild.id}/${item.channelId}`;
+                const templateOptions = dossierTemplateOptions(state, item);
+                const canReopen = state.advanced && item.reopenUntil && new Date(item.reopenUntil).getTime() > Date.now();
+                const archiveExcerpt = dossierArchiveExcerpt(item);
+                return `
+                  <article class="dossier-board-item">
+                    <div class="dossier-board-item-head">
+                      <span>#${escapeHtml(item.id)} · ${escapeHtml(dossierTypeLabel(item.type))}</span>
+                      <strong>${escapeHtml(dossierPriorityLabel(item.priority))}</strong>
+                    </div>
+                    <h4>${escapeHtml(item.subject || 'Sans sujet')}</h4>
+                    <p>${escapeHtml(item.description || 'Aucune description')}</p>
+                    <div class="dossier-board-item-actions">
+                      <a href="${escapeHtml(discordUrl)}" target="_blank" rel="noopener">Ouvrir Discord</a>
+                      <button class="button button-small button-ghost" type="button" data-dossier-detail="${escapeHtml(item.id)}">${String(expandedDossierId) === String(item.id) ? 'Réduire' : 'Détails'}</button>
+                    </div>
+                    ${String(expandedDossierId) === String(item.id) ? `
+                      <div class="dossier-board-expanded">
+                        <p><strong>Demandeur</strong><code>${escapeHtml(item.ownerUserId)}</code></p>
+                        <p><strong>Référent</strong>${item.referentUserId ? `<code>${escapeHtml(item.referentUserId)}</code>` : '<span>Aucun</span>'}</p>
+                        ${archiveExcerpt ? `<p class="dossier-archive-excerpt"><strong>Archive</strong><span>${escapeHtml(archiveExcerpt)}</span></p>` : ''}
+                        ${item.status !== 'closed' ? `
+                          ${state.advanced && templateOptions ? `
+                            <form data-action-form="send-dossier-template">
+                              <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                              <select name="templateId">${templateOptions}</select>
+                              <button class="button button-small" type="submit">Envoyer la réponse</button>
+                            </form>
+                          ` : ''}
+                          <form data-action-form="dossier-claim">
+                            <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                            <button class="button button-small" type="submit">Prendre en charge</button>
+                          </form>
+                          <form data-action-form="dossier-priority">
+                            <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                            <select name="priority">
+                              ${['normal', 'important', 'urgent'].map(priority => `<option value="${priority}"${item.priority === priority ? ' selected' : ''}>${escapeHtml(dossierPriorityLabel(priority))}</option>`).join('')}
+                            </select>
+                            <button class="button button-small button-ghost" type="submit">Modifier la priorité</button>
+                          </form>
+                          <form data-action-form="dossier-close" class="dossier-close-form">
+                            <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                            <input name="closeReason" maxlength="500" placeholder="Motif de clôture" required>
+                            <textarea name="resolutionSummary" rows="3" maxlength="1500" placeholder="Résumé de la résolution" required></textarea>
+                            <button class="button button-small" type="submit">Archiver et clôturer</button>
+                          </form>
+                        ` : `
+                          ${item.archivedAt ? `<a class="button button-small button-ghost" href="/api/guilds/${encodeURIComponent(state.guild.id)}/dossiers/${encodeURIComponent(item.id)}/archive">Télécharger l’archive</a>` : ''}
+                          ${canReopen ? `
+                            <form data-action-form="dossier-reopen">
+                              <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                              <button class="button button-small" type="submit">Réouvrir le dossier</button>
+                            </form>
+                          ` : ''}
+                        `}
+                      </div>
+                    ` : ''}
+                  </article>
+                `;
+              }).join('') : '<p class="muted">Aucun dossier</p>'}
+            </div>
+          </section>
+        `;
+      }).join('')}
+    </div>
+    <p class="muted case-limit-note">Affichage limité aux ${escapeHtml(state.dossiers?.historyLimit || 10)} derniers dossiers visibles pour ce serveur.</p>
   `;
 }
 
@@ -3252,6 +3611,10 @@ function dossierList(state) {
 
   if (items.length === 0) {
     return '<p class="muted">Aucun dossier Sentinel trouvé avec ces filtres.</p>';
+  }
+
+  if (dossierViewMode === 'board') {
+    return dossierBoard(state, items);
   }
 
   return `
@@ -3272,13 +3635,14 @@ function dossierList(state) {
           ${items.map((item) => {
             const channel = resolveChannel(state, item.channelId);
             const isOpen = item.status !== 'closed';
+            const discordUrl = `https://discord.com/channels/${state.guild.id}/${item.channelId}`;
 
             return `
               <tr>
                 <td>
                   <strong>#${escapeHtml(item.id)}</strong>
                   ${item.subject ? `<small>${escapeHtml(item.subject)}</small>` : ''}
-                  <small>${channel ? `#${escapeHtml(channel.name)}` : escapeHtml(item.channelId)}</small>
+                  <small><a href="${escapeHtml(discordUrl)}" target="_blank" rel="noopener">${channel ? `#${escapeHtml(channel.name)}` : escapeHtml(item.channelId)}</a></small>
                 </td>
                 <td>${escapeHtml(dossierTypeLabel(item.type))}</td>
                 <td><code>${escapeHtml(item.ownerUserId)}</code></td>
@@ -3292,18 +3656,21 @@ function dossierList(state) {
                       <select name="dossierStatus">${dossierStatusActionOptions(item.status)}</select>
                       <button class="button button-small button-ghost" type="submit">Statut</button>
                     </form>
+                    <form class="table-action-form dossier-table-actions" data-action-form="dossier-priority">
+                      <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
+                      <select name="priority">
+                        ${['normal', 'important', 'urgent'].map(priority => `<option value="${priority}"${item.priority === priority ? ' selected' : ''}>${escapeHtml(dossierPriorityLabel(priority))}</option>`).join('')}
+                      </select>
+                      <button class="button button-small button-ghost" type="submit">Priorité</button>
+                    </form>
                     <form class="table-action-form dossier-table-actions" data-action-form="dossier-claim">
                       <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
                       <button class="button button-small button-ghost" type="submit">Prendre</button>
                     </form>
-                    <form class="table-action-form dossier-table-actions" data-action-form="dossier-close">
-                      <input type="hidden" name="channelId" value="${escapeHtml(item.channelId)}">
-                      <button class="button button-small button-ghost" type="submit">Clôturer</button>
-                    </form>
                   ` : '<span class="muted">Archivé</span>'}
                 </td>
               </tr>
-              ${dossierDetailRow(item)}
+              ${dossierDetailRow(state, item)}
             `;
           }).join('')}
         </tbody>
@@ -3317,6 +3684,7 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
   const premiumMode = isPremiumPlanVisible(state);
   const displayState = premiumMode ? state : {
     ...state,
+    advanced: false,
     dossiers: {
       ...(state.dossiers || {}),
       historyLimit: 10,
@@ -3350,6 +3718,10 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
           <select name="channelId">${channelOptions}</select>
           <button class="button" type="submit">${premiumMode ? 'Publier sans limite' : 'Publier le bureau'}</button>
         </form>
+        <form data-action-form="repair-dossier-panels" class="inline-form dossier-repair-form">
+          ${labelHelp('Vérifier les bureaux', 'Contrôle les panneaux Discord et libère automatiquement les références qui ont été supprimées.')}
+          <button class="button button-ghost" type="submit">Réparer le registre des panneaux</button>
+        </form>
         ${premiumMode ? '' : `
           <article class="inline-form dossier-explain-card">
             ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.')}
@@ -3364,11 +3736,18 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
           </form>
           ${dossierRoleList(state)}
         </article>
+        ${dossierTypeRolesSettings(state, dossierRoleOptions)}
+        ${premiumMode ? dossierStatsPanel(state, premiumTag) : ''}
         ${premiumMode ? dossierPremiumSettings(state, premiumTag) : ''}
+        ${premiumMode ? dossierTemplatesPanel(state, premiumTag) : ''}
         <article class="inline-form dossier-list-card">
           ${labelHelp(premiumMode ? 'Historique Premium' : 'Dossiers récents', premiumMode
             ? 'Retrouve l’historique étendu des dossiers et affine la liste avec les filtres avancés.'
             : 'Retrouve les dossiers récents de ce serveur et clôture ceux qui sont encore ouverts.')}
+          <div class="dossier-view-switch" role="group" aria-label="Affichage des dossiers">
+            <button class="button button-small${dossierViewMode === 'board' ? '' : ' button-ghost'}" type="button" data-dossier-view="board">Colonnes</button>
+            <button class="button button-small${dossierViewMode === 'table' ? '' : ' button-ghost'}" type="button" data-dossier-view="table">Tableau</button>
+          </div>
           ${dossierFiltersPanel(displayState)}
           ${dossierList(displayState)}
         </article>
@@ -3401,8 +3780,18 @@ const AUDIT_ACTION_LABELS = {
   'configure-dossier-roles': 'Rôles dossiers',
   'dossier-close': 'Dossier clôturé',
   'dossier-status': 'Statut dossier',
+  'dossier-priority': 'Priorité dossier',
   'dossier-claim': 'Dossier pris en charge',
+  'dossier-reopen': 'Dossier réouvert',
+  'repair-dossier-panels': 'Bureaux vérifiés',
+  'add-dossier-type-role': 'Responsable par dossier',
+  'remove-dossier-type-role': 'Responsable retiré',
   'set-dossier-category': 'Catégorie dossier',
+  'set-dossier-questions': 'Formulaire dossier',
+  'set-dossier-sla': 'Délais dossier',
+  'create-dossier-template': 'Réponse préparée créée',
+  'delete-dossier-template': 'Réponse préparée retirée',
+  'send-dossier-template': 'Réponse préparée envoyée',
   'add-dossier-role': 'Rôle ticket ajouté',
   'remove-dossier-role': 'Rôle ticket retiré',
   'dossier-add': 'Intervenant ajouté',
@@ -5603,6 +5992,41 @@ async function loadModerationCases(filters = moderationFilters, button = null) {
   }
 }
 
+async function loadDossierArchiveSearch(filters, button = null) {
+  const query = String(filters.query || '').trim();
+  dossierFilters = { ...filters };
+  dossierArchiveMatches = [];
+
+  if (currentState?.dossiers?.items && dossierArchiveItemIds.length) {
+    const addedIds = new Set(dossierArchiveItemIds.map(String));
+    currentState.dossiers.items = currentState.dossiers.items.filter(item => !addedIds.has(String(item.id)));
+  }
+  dossierArchiveItemIds = [];
+
+  if (currentState?.advanced && query.length >= 3) {
+    setLoading(button, true);
+    try {
+      const payload = await api(`/api/guilds/${selectedGuildId}/dossiers/search?q=${encodeURIComponent(query)}`);
+      dossierArchiveMatches = payload.matches || [];
+      const existingIds = new Set((currentState.dossiers?.items || []).map(item => String(item.id)));
+      for (const item of payload.items || []) {
+        if (!existingIds.has(String(item.id))) {
+          currentState.dossiers.items.push(item);
+          dossierArchiveItemIds.push(item.id);
+          existingIds.add(String(item.id));
+        }
+      }
+    } catch (error) {
+      toast(dashboardErrorMessage(error), 'error');
+    } finally {
+      setLoading(button, false);
+    }
+  }
+
+  expandedDossierId = null;
+  renderDashboard();
+}
+
 async function loadUserProfile(userId, button = null) {
   if (!selectedGuildId || !currentState) return;
 
@@ -5823,17 +6247,29 @@ function attachDashboardHandlers() {
   });
 
   $$('[data-dossier-filter]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      dossierFilters = formData(form);
-      expandedDossierId = null;
-      renderDashboard();
+      await loadDossierArchiveSearch(formData(form), $('button[type="submit"]', form));
     });
   });
 
   $$('[data-dossier-reset]').forEach((button) => {
     button.addEventListener('click', () => {
       dossierFilters = {};
+      dossierArchiveMatches = [];
+      if (currentState?.dossiers?.items && dossierArchiveItemIds.length) {
+        const addedIds = new Set(dossierArchiveItemIds.map(String));
+        currentState.dossiers.items = currentState.dossiers.items.filter(item => !addedIds.has(String(item.id)));
+      }
+      dossierArchiveItemIds = [];
+      expandedDossierId = null;
+      renderDashboard();
+    });
+  });
+
+  $$('[data-dossier-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      dossierViewMode = button.dataset.dossierView === 'table' ? 'table' : 'board';
       expandedDossierId = null;
       renderDashboard();
     });
@@ -5905,6 +6341,8 @@ async function selectGuild(guildId, { restored = false } = {}) {
   expandedPayrollArchiveWeek = null;
   selectedUserProfile = null;
   dossierFilters = {};
+  dossierArchiveMatches = [];
+  dossierArchiveItemIds = [];
   expandedDossierId = null;
   dashboardHydrating = true;
   selectedGuildPreview = guild || readCachedGuildPreview(currentUser?.id, guildId);
@@ -6115,6 +6553,8 @@ $('[data-logout]')?.addEventListener('click', async () => {
   csrfToken = null;
   dashboardHydrating = false;
   dossierFilters = {};
+  dossierArchiveMatches = [];
+  dossierArchiveItemIds = [];
   expandedDossierId = null;
   localStorage.removeItem('sentinel-discord-profile');
   removeCachedGuildPreview(cachedUserId, cachedGuildId);

@@ -266,10 +266,28 @@ CREATE TABLE IF NOT EXISTS sentinel_dossiers (
     priority TEXT NOT NULL DEFAULT 'normal',
     subject TEXT,
     description TEXT,
+    form_answers_json TEXT,
     referent_user_id TEXT,
     created_at TEXT NOT NULL,
     closed_at TEXT,
-    closed_by_user_id TEXT
+    closed_by_user_id TEXT,
+    close_reason TEXT,
+    resolution_summary TEXT,
+    archive_path TEXT,
+    archive_sha256 TEXT,
+    archive_size INTEGER,
+    archived_at TEXT,
+    archive_message_count INTEGER NOT NULL DEFAULT 0,
+    archive_attachment_count INTEGER NOT NULL DEFAULT 0,
+    archive_embed_count INTEGER NOT NULL DEFAULT 0,
+    first_staff_response_at TEXT,
+    last_staff_reply_at TEXT,
+    last_requester_reply_at TEXT,
+    last_activity_at TEXT,
+    deletion_scheduled_at TEXT,
+    reopen_until TEXT,
+    reopened_count INTEGER NOT NULL DEFAULT 0,
+    last_reminder_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sentinel_dossier_panels (
@@ -286,6 +304,8 @@ CREATE TABLE IF NOT EXISTS sentinel_dossier_type_settings (
     type TEXT NOT NULL,
     category_id TEXT,
     questions_json TEXT,
+    sla_first_response_minutes INTEGER,
+    sla_resolution_minutes INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (guild_id, type)
@@ -296,9 +316,19 @@ CREATE TABLE IF NOT EXISTS sentinel_dossier_templates (
     guild_id TEXT NOT NULL,
     name TEXT NOT NULL,
     content TEXT NOT NULL,
+    type TEXT,
+    kind TEXT NOT NULL DEFAULT 'reply',
     created_by_user_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sentinel_dossier_type_roles (
+    guild_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, type, role_id)
 );
 
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -523,6 +553,9 @@ ON sentinel_dossier_panels (guild_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sentinel_dossier_templates_guild
 ON sentinel_dossier_templates (guild_id, name);
 
+CREATE INDEX IF NOT EXISTS idx_sentinel_dossier_type_roles_guild_type
+ON sentinel_dossier_type_roles (guild_id, type);
+
 CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_user
 ON dashboard_sessions (user_id);
 
@@ -632,6 +665,60 @@ if (!dossierColumns.includes('subject')) {
 if (!dossierColumns.includes('description')) {
     db.prepare('ALTER TABLE sentinel_dossiers ADD COLUMN description TEXT').run();
 }
+
+const dossierColumnMigrations = [
+    ['form_answers_json', 'TEXT'],
+    ['close_reason', 'TEXT'],
+    ['resolution_summary', 'TEXT'],
+    ['archive_path', 'TEXT'],
+    ['archive_sha256', 'TEXT'],
+    ['archive_size', 'INTEGER'],
+    ['archived_at', 'TEXT'],
+    ['archive_message_count', 'INTEGER NOT NULL DEFAULT 0'],
+    ['archive_attachment_count', 'INTEGER NOT NULL DEFAULT 0'],
+    ['archive_embed_count', 'INTEGER NOT NULL DEFAULT 0'],
+    ['first_staff_response_at', 'TEXT'],
+    ['last_staff_reply_at', 'TEXT'],
+    ['last_requester_reply_at', 'TEXT'],
+    ['last_activity_at', 'TEXT'],
+    ['deletion_scheduled_at', 'TEXT'],
+    ['reopen_until', 'TEXT'],
+    ['reopened_count', 'INTEGER NOT NULL DEFAULT 0'],
+    ['last_reminder_at', 'TEXT']
+];
+
+for (const [name, definition] of dossierColumnMigrations) {
+    if (!dossierColumns.includes(name)) {
+        db.prepare(`ALTER TABLE sentinel_dossiers ADD COLUMN ${name} ${definition}`).run();
+    }
+}
+
+const dossierTypeSettingColumns = db.prepare('PRAGMA table_info(sentinel_dossier_type_settings)').all()
+    .map(column => column.name);
+
+if (!dossierTypeSettingColumns.includes('sla_first_response_minutes')) {
+    db.prepare('ALTER TABLE sentinel_dossier_type_settings ADD COLUMN sla_first_response_minutes INTEGER').run();
+}
+
+if (!dossierTypeSettingColumns.includes('sla_resolution_minutes')) {
+    db.prepare('ALTER TABLE sentinel_dossier_type_settings ADD COLUMN sla_resolution_minutes INTEGER').run();
+}
+
+const dossierTemplateColumns = db.prepare('PRAGMA table_info(sentinel_dossier_templates)').all()
+    .map(column => column.name);
+
+if (!dossierTemplateColumns.includes('type')) {
+    db.prepare('ALTER TABLE sentinel_dossier_templates ADD COLUMN type TEXT').run();
+}
+
+if (!dossierTemplateColumns.includes('kind')) {
+    db.prepare("ALTER TABLE sentinel_dossier_templates ADD COLUMN kind TEXT NOT NULL DEFAULT 'reply'").run();
+}
+
+db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_sentinel_dossiers_deletion
+    ON sentinel_dossiers (deletion_scheduled_at, status)
+`).run();
 
 const embedMediaObjectColumns = db.prepare('PRAGMA table_info(embed_media_objects)').all()
     .map(column => column.name);

@@ -107,6 +107,10 @@ const RATE_LIMITS = {
         windowMs: 60 * 1000,
         max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_CREATOR || '20', 10), 5)
     },
+    dossierSearch: {
+        windowMs: 60 * 1000,
+        max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_DOSSIER_SEARCH || '20', 10), 5)
+    },
     status: {
         windowMs: 60 * 1000,
         max: Math.max(Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_STATUS || '120', 10), 20)
@@ -2724,6 +2728,25 @@ function mapModerationCase(ctx, item) {
 }
 
 function mapDossier(item) {
+    const requesterReplyAt = item.lastRequesterReplyAt || item.last_requester_reply_at || null;
+    const staffReplyAt = item.lastStaffReplyAt || item.last_staff_reply_at || null;
+    const status = item.status;
+    let queue = 'waiting_staff';
+
+    if (status === 'closed') {
+        queue = 'closed';
+    } else if (!item.referentUserId && !item.referent_user_id) {
+        queue = 'unassigned';
+    } else if (staffReplyAt && (!requesterReplyAt || new Date(staffReplyAt) >= new Date(requesterReplyAt))) {
+        queue = 'waiting_requester';
+    }
+
+    const lastActivityAt = item.lastActivityAt || item.last_activity_at || item.createdAt || item.created_at;
+    if (status !== 'closed' && lastActivityAt
+        && Date.now() - new Date(lastActivityAt).getTime() > 24 * 60 * 60 * 1000) {
+        queue = 'overdue';
+    }
+
     return {
         id: item.id,
         guildId: item.guildId || item.guild_id,
@@ -2731,14 +2754,29 @@ function mapDossier(item) {
         ownerUserId: item.ownerUserId || item.owner_user_id,
         openerUserId: item.openerUserId || item.opener_user_id,
         type: item.type,
-        status: item.status,
+        status,
         priority: item.priority || 'normal',
         subject: item.subject || null,
         description: item.description || null,
+        formAnswers: item.formAnswers || [],
         referentUserId: item.referentUserId || item.referent_user_id,
         createdAt: item.createdAt || item.created_at,
         closedAt: item.closedAt || item.closed_at,
-        closedByUserId: item.closedByUserId || item.closed_by_user_id
+        closedByUserId: item.closedByUserId || item.closed_by_user_id,
+        closeReason: item.closeReason || item.close_reason || null,
+        resolutionSummary: item.resolutionSummary || item.resolution_summary || null,
+        archivedAt: item.archivedAt || item.archived_at || null,
+        archiveMessageCount: Number(item.archiveMessageCount || item.archive_message_count || 0),
+        archiveAttachmentCount: Number(item.archiveAttachmentCount || item.archive_attachment_count || 0),
+        archiveEmbedCount: Number(item.archiveEmbedCount || item.archive_embed_count || 0),
+        firstStaffResponseAt: item.firstStaffResponseAt || item.first_staff_response_at || null,
+        lastStaffReplyAt: staffReplyAt,
+        lastRequesterReplyAt: requesterReplyAt,
+        lastActivityAt,
+        deletionScheduledAt: item.deletionScheduledAt || item.deletion_scheduled_at || null,
+        reopenUntil: item.reopenUntil || item.reopen_until || null,
+        reopenedCount: Number(item.reopenedCount || item.reopened_count || 0),
+        queue
     };
 }
 
@@ -3104,6 +3142,11 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             name: channel.name,
             type: channel.type
         }));
+    const visibleDossiers = (ctx.helpers.getRecentDossiers
+        ? ctx.helpers.getRecentDossiers(guild.id, dossierHistoryLimit)
+        : [])
+        .filter(item => canViewGlobalAudit
+            || ctx.helpers.memberCanManageDossier?.(viewerMember, item.type));
 
     return {
         guild: {
@@ -3200,7 +3243,16 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             settings: ctx.helpers.getDossierTypeSettings
                 ? ctx.helpers.getDossierTypeSettings(guild.id)
                 : [],
-            items: ctx.helpers.getRecentDossiers(guild.id, dossierHistoryLimit).map(mapDossier)
+            typeRoles: ctx.helpers.getAllDossierTypeRoles
+                ? ctx.helpers.getAllDossierTypeRoles(guild.id)
+                : [],
+            templates: advanced && ctx.helpers.getDossierTemplates
+                ? ctx.helpers.getDossierTemplates(guild.id)
+                : [],
+            stats: advanced && ctx.helpers.getDossierStats
+                ? ctx.helpers.getDossierStats(guild.id)
+                : null,
+            items: visibleDossiers.map(mapDossier)
         },
         diagnostics: buildPermissionDiagnostics(ctx, guild, config),
         moderationCases: {
@@ -3928,6 +3980,20 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
 async function dossierAction(ctx, guild, actor, body, session = null) {
     const language = ctx.helpers.getGuildLanguage(guild.id);
     const action = body.action;
+    const dossierTypeIds = new Set(['support', 'report', 'recruitment', 'partnership', 'other']);
+    const requireDossierType = value => {
+        const dossierType = String(value || '').trim();
+        if (!dossierTypeIds.has(dossierType)) {
+            throw createHttpError(400, 'Nature de dossier invalide.');
+        }
+        return dossierType;
+    };
+    const requireRecordAccess = dossier => {
+        if (!dossier || (!isCreatorUser(actor.id)
+            && !ctx.helpers.memberCanManageDossier?.(actor, dossier.type))) {
+            throw createHttpError(403, 'Tu n’es pas responsable de cette nature de dossier.');
+        }
+    };
 
     if (action === 'publish-dossier-panel') {
         requireCommandAccess(ctx, actor);
@@ -3975,7 +4041,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
 
         const role = guild.roles.cache.get(body.roleId);
 
-        if (!role || role.id === guild.id) {
+        if (!role || role.id === guild.id || role.managed) {
             throw createHttpError(400, 'Role not found.');
         }
 
@@ -3988,47 +4054,69 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
         return `Rôle responsable de ticket retiré : ${role.name}.`;
     }
 
-    if (action === 'dossier-close') {
-        requireDossierAccess(ctx, actor);
+    if (action === 'repair-dossier-panels') {
+        requireCommandAccess(ctx, actor);
+        const result = await ctx.helpers.reconcileDossierPanels(guild);
+        return result.removed > 0
+            ? `${result.removed} référence de panneau disparue a été retirée.`
+            : 'Tous les panneaux enregistrés sont encore présents.';
+    }
 
+    if (action === 'add-dossier-type-role' || action === 'remove-dossier-type-role') {
+        requireCommandAccess(ctx, actor);
+        const role = guild.roles.cache.get(String(body.roleId || ''));
+        const dossierType = requireDossierType(body.dossierType);
+
+        if (!role || role.id === guild.id || role.managed) {
+            throw createHttpError(400, 'Rôle ou nature de dossier invalide.');
+        }
+
+        if (action === 'add-dossier-type-role') {
+            ctx.helpers.addDossierTypeRole(guild.id, dossierType, role.id);
+            const updated = await ctx.helpers.syncDossierTypePermissions(guild, dossierType);
+            return `${role.name} est maintenant responsable des dossiers ${dossierType}. ${updated} salon(s) existant(s) ajusté(s).`;
+        }
+
+        ctx.helpers.removeDossierTypeRole(guild.id, dossierType, role.id);
+        const updated = await ctx.helpers.syncDossierTypePermissions(guild, dossierType, [role.id]);
+        return `${role.name} n’accède plus aux dossiers ${dossierType}. ${updated} salon(s) existant(s) ajusté(s).`;
+    }
+
+    if (action === 'dossier-close') {
         const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
 
-        const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id) || {
-            id: channel.id,
-            channelId: channel.id,
-            ownerUserId: null,
-            type: 'support'
-        };
+        const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
 
-        const closedDossier = ctx.helpers.closeDossierRecord(guild.id, channel.id, actor.id) || {
-            ...dossier,
-            status: 'closed',
-            closedAt: new Date().toISOString(),
-            closedByUserId: actor.id
-        };
-
-        await ctx.helpers.sendDossierTranscript(channel, closedDossier, actor.user, language);
-
-        try {
-            await channel.delete('Cloture dossier Sentinel depuis le dashboard');
-        } catch (error) {
-            throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageChannels, language);
+        if (!dossier) {
+            throw createHttpError(404, 'Dossier Sentinel introuvable dans le registre.');
         }
 
-        return `Dossier Sentinel cloture : #${channel.name}.`;
+        requireRecordAccess(dossier);
+
+        const reason = String(body.closeReason || '').trim();
+        const resolution = String(body.resolutionSummary || '').trim();
+
+        if (!reason || !resolution) {
+            throw createHttpError(400, 'Le motif et le résumé de résolution sont obligatoires.');
+        }
+
+        const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, actor, session);
+        await ctx.helpers.closeDossierChannel(channel, actor.user, language, { reason, resolution, advanced });
+
+        return `Dossier Sentinel clôturé, archivé et conservé temporairement : #${channel.name}.`;
     }
 
     if (action === 'dossier-status') {
-        requireDossierAccess(ctx, actor);
-
         const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
 
+        const currentDossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
+        requireRecordAccess(currentDossier);
         const dossier = ctx.helpers.updateDossierStatus(guild.id, channel.id, body.dossierStatus || body.status);
         const nextStatus = dossier?.status || body.dossierStatus || body.status || 'open';
         const nextStatusLabel = getDossierStatusLabel(nextStatus, language);
@@ -4042,14 +4130,21 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
         return `Statut du dossier mis a jour : ${nextStatusLabel}.`;
     }
 
-    if (action === 'dossier-claim') {
-        requireDossierAccess(ctx, actor);
+    if (action === 'dossier-priority') {
+        const channel = getTextChannel(guild, body.channelId, language);
+        const currentDossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
+        requireRecordAccess(currentDossier);
+        const dossier = ctx.helpers.updateDossierPriority(guild.id, channel.id, body.priority);
+        return `Priorité du dossier mise à jour : ${dossier.priority}.`;
+    }
 
+    if (action === 'dossier-claim') {
         const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
             throw createHttpError(400, 'This channel is not a Sentinel dossier.');
         }
 
+        requireRecordAccess(ctx.helpers.getDossierByChannel(guild.id, channel.id));
         const dossier = ctx.helpers.setDossierReferent
             ? ctx.helpers.setDossierReferent(guild.id, channel.id, actor.id)
             : null;
@@ -4063,16 +4158,80 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
         return `Dossier Sentinel pris en charge${dossier?.id ? ` : #${dossier.id}` : ''}.`;
     }
 
+    if (action === 'dossier-reopen') {
+        await requireAdvanced(ctx, guild.id, actor, session);
+        const channel = getTextChannel(guild, body.channelId, language);
+        const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
+        requireRecordAccess(dossier);
+        await ctx.helpers.reopenDossierChannel(guild, channel, actor.user, language, { advanced: true });
+        return `Dossier Sentinel réouvert : #${channel.name}.`;
+    }
+
+    if (action === 'set-dossier-questions' || action === 'set-dossier-sla') {
+        requireCommandAccess(ctx, actor);
+        await requireAdvanced(ctx, guild.id, actor, session);
+        const dossierType = requireDossierType(body.dossierType);
+
+        if (action === 'set-dossier-questions') {
+            const questions = String(body.questionsText || '')
+                .split(/\r?\n/)
+                .map(value => value.trim())
+                .filter(Boolean)
+                .slice(0, 3)
+                .map(label => ({ label, required: true, style: 'paragraph', maxLength: 500 }));
+            ctx.helpers.updateDossierTypeSettings(guild.id, dossierType, { questions });
+            return `Formulaire ${dossierType} mis à jour avec ${questions.length} question(s).`;
+        }
+
+        ctx.helpers.updateDossierTypeSettings(guild.id, dossierType, {
+            slaFirstResponseMinutes: Number(body.slaFirstResponseMinutes),
+            slaResolutionMinutes: Number(body.slaResolutionMinutes)
+        });
+        return `Délais d’intervention mis à jour pour ${dossierType}.`;
+    }
+
+    if (action === 'create-dossier-template' || action === 'delete-dossier-template' || action === 'send-dossier-template') {
+        await requireAdvanced(ctx, guild.id, actor, session);
+
+        if (action === 'create-dossier-template') {
+            requireCommandAccess(ctx, actor);
+            const template = ctx.helpers.createDossierTemplate(guild.id, {
+                name: body.templateName,
+                content: body.templateContent,
+                type: body.dossierType ? requireDossierType(body.dossierType) : null,
+                kind: body.templateKind || 'reply'
+            }, actor.id);
+            return `Réponse préparée créée : ${template.name}.`;
+        }
+
+        if (action === 'delete-dossier-template') {
+            requireCommandAccess(ctx, actor);
+            if (!ctx.helpers.deleteDossierTemplate(guild.id, Number(body.templateId))) {
+                throw createHttpError(404, 'Réponse préparée introuvable.');
+            }
+            return 'Réponse préparée retirée.';
+        }
+
+        const template = ctx.helpers.getDossierTemplate(guild.id, Number(body.templateId));
+        const channel = getTextChannel(guild, body.channelId, language);
+        const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
+        requireRecordAccess(dossier);
+
+        if (!template || (template.type && template.type !== dossier.type)) {
+            throw createHttpError(404, 'Réponse préparée indisponible pour ce dossier.');
+        }
+
+        await channel.send({ content: template.content, allowedMentions: { parse: [] } });
+        ctx.helpers.updateDossierActivity?.(guild.id, channel.id, actor.id, true);
+        return `Réponse préparée envoyée dans #${channel.name}.`;
+    }
+
     if (action === 'set-dossier-category') {
         requireCommandAccess(ctx, actor);
         await requireAdvanced(ctx, guild.id, actor, session);
 
-        const dossierType = String(body.dossierType || '').trim();
+        const dossierType = requireDossierType(body.dossierType);
         const categoryId = String(body.categoryId || '').trim() || null;
-
-        if (!dossierType) {
-            throw createHttpError(400, 'Missing dossier type.');
-        }
 
         if (categoryId) {
             const category = guild.channels.cache.get(categoryId);
@@ -4425,7 +4584,25 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         return customEmbedAction(ctx, guild, member, body, session);
     }
 
-    if (['publish-dossier-panel', 'add-dossier-role', 'remove-dossier-role', 'dossier-close', 'dossier-status', 'dossier-claim', 'set-dossier-category'].includes(action)) {
+    if ([
+        'publish-dossier-panel',
+        'add-dossier-role',
+        'remove-dossier-role',
+        'repair-dossier-panels',
+        'add-dossier-type-role',
+        'remove-dossier-type-role',
+        'dossier-close',
+        'dossier-status',
+        'dossier-priority',
+        'dossier-claim',
+        'dossier-reopen',
+        'set-dossier-category',
+        'set-dossier-questions',
+        'set-dossier-sla',
+        'create-dossier-template',
+        'delete-dossier-template',
+        'send-dossier-template'
+    ].includes(action)) {
         return dossierAction(ctx, guild, member, body, session);
     }
 
@@ -4737,6 +4914,57 @@ async function handleApi(req, res, ctx, url) {
                 viewerMember: member,
                 siteAccess
             })
+        });
+        return;
+    }
+
+    const dossierArchiveMatch = /^\/api\/guilds\/(\d{17,20})\/dossiers\/(\d+)\/archive$/.exec(url.pathname);
+    if (req.method === 'GET' && dossierArchiveMatch) {
+        const { guild, member } = await getDashboardAccess(ctx, session, dossierArchiveMatch[1]);
+        const file = ctx.helpers.getDossierArchiveFile?.(guild.id, Number(dossierArchiveMatch[2]));
+
+        if (!file) {
+            throw createHttpError(404, 'Archive de dossier introuvable ou non vérifiée.');
+        }
+
+        if (!isCreatorUser(session.user.id)
+            && !ctx.helpers.memberCanManageDossier?.(member, file.dossier.type)) {
+            throw createHttpError(403, 'Tu n’es pas responsable de cette nature de dossier.');
+        }
+
+        streamPrivateFile(res, {
+            fullPath: file.path,
+            fileName: file.name,
+            contentType: file.mimeType
+        });
+        return;
+    }
+
+    const dossierSearchMatch = /^\/api\/guilds\/(\d{17,20})\/dossiers\/search$/.exec(url.pathname);
+    if (req.method === 'GET' && dossierSearchMatch) {
+        const { guild, member } = await getDashboardAccess(ctx, session, dossierSearchMatch[1]);
+        checkRateLimit(rateLimitKey(req, 'dossier-search', session.user.id), RATE_LIMITS.dossierSearch);
+        await requireAdvanced(ctx, guild.id, member, session);
+        const query = String(url.searchParams.get('q') || '').trim();
+
+        if (query.length < 3) {
+            throw createHttpError(400, 'La recherche doit contenir au moins 3 caractères.');
+        }
+
+        const matches = (ctx.helpers.searchDossierArchives?.(guild.id, query, 25) || [])
+            .map(match => ({
+                ...match,
+                dossier: ctx.helpers.getDossierById?.(guild.id, match.dossierId)
+            }))
+            .filter(match => match.dossier && (isCreatorUser(session.user.id)
+                || ctx.helpers.memberCanManageDossier?.(member, match.dossier.type)));
+        json(res, 200, {
+            ok: true,
+            matches: matches.map(({ dossier, ...match }) => match),
+            items: matches.map(match => ({
+                ...mapDossier(match.dossier),
+                archiveExcerpt: match.excerpt
+            }))
         });
         return;
     }

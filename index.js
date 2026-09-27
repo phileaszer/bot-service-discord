@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const {
     Client,
@@ -77,6 +78,29 @@ const AUTOMOD_SPAM_BUCKET_MAX = 5000;
 const AUTOMOD_RAID_BUCKET_MAX = 1000;
 const DOSSIER_PANEL_CLICK_COOLDOWN_MS = 8 * 1000;
 const DOSSIER_CREATE_COOLDOWN_MS = 90 * 1000;
+const DOSSIER_ARCHIVE_DIR = process.env.DOSSIER_ARCHIVE_DIR
+    || path.join(path.dirname(process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db')), 'dossier-archives');
+const DOSSIER_ARCHIVE_MAX_ATTACHMENT_BYTES = Math.max(
+    Number.parseInt(process.env.DOSSIER_ARCHIVE_MAX_ATTACHMENT_MB || '25', 10),
+    1
+) * 1024 * 1024;
+const DOSSIER_ARCHIVE_MAX_TOTAL_BYTES = Math.max(
+    Number.parseInt(process.env.DOSSIER_ARCHIVE_MAX_TOTAL_MB || '100', 10),
+    10
+) * 1024 * 1024;
+const DOSSIER_ARCHIVE_FETCH_TIMEOUT_MS = Math.max(
+    Number.parseInt(process.env.DOSSIER_ARCHIVE_FETCH_TIMEOUT_SECONDS || '30', 10),
+    5
+) * 1000;
+const DOSSIER_FREE_RETENTION_HOURS = Math.min(Math.max(
+    Number.parseInt(process.env.DOSSIER_FREE_RETENTION_HOURS || '6', 10),
+    1
+), 72);
+const DOSSIER_PREMIUM_RETENTION_HOURS = Math.min(Math.max(
+    Number.parseInt(process.env.DOSSIER_PREMIUM_RETENTION_HOURS || '24', 10),
+    1
+), 168);
+const DOSSIER_MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000;
 const BUTTON_ACTION_COOLDOWN_MS = 3 * 1000;
 const SENSITIVE_CONFIRM_TIMEOUT_MS = 2 * 60 * 1000;
 const LONG_SERVICE_ALERT_HOURS = Math.max(Number.parseInt(process.env.LONG_SERVICE_ALERT_HOURS || '8', 10), 1);
@@ -126,7 +150,9 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'maj-sentinel',
     'sentinel-update',
     'premium-acces',
-    'premium-access'
+    'premium-access',
+    'dossier-reouvrir',
+    'reopen-ticket'
 ]);
 const ADVANCED_TEXT_COMMANDS = [
     /^!(heures|hours)(?:\s|$)/i,
@@ -149,7 +175,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-26-western-rp-v5';
+const SENTINEL_BUILD = 'community-suite-2026-09-27-dossiers-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -935,6 +961,8 @@ function resolveCommandName(commandName) {
         'ticket-panel': 'dossier-panel',
         'dossier-fermer': 'dossier-fermer',
         'close-ticket': 'dossier-fermer',
+        'dossier-reouvrir': 'dossier-reouvrir',
+        'reopen-ticket': 'dossier-reouvrir',
         'dossier-ajouter': 'dossier-ajouter',
         'ticket-add': 'dossier-ajouter',
         'dossier-retirer': 'dossier-retirer',
@@ -3335,10 +3363,28 @@ function mapDossier(row) {
         priority: row.priority || 'normal',
         subject: row.subject || null,
         description: row.description || null,
+        formAnswers: row.form_answers_json ? safeJsonParse(row.form_answers_json, []) : [],
         referentUserId: row.referent_user_id,
         createdAt: row.created_at,
         closedAt: row.closed_at,
-        closedByUserId: row.closed_by_user_id
+        closedByUserId: row.closed_by_user_id,
+        closeReason: row.close_reason || null,
+        resolutionSummary: row.resolution_summary || null,
+        archivePath: row.archive_path || null,
+        archiveSha256: row.archive_sha256 || null,
+        archiveSize: Number(row.archive_size || 0),
+        archivedAt: row.archived_at || null,
+        archiveMessageCount: Number(row.archive_message_count || 0),
+        archiveAttachmentCount: Number(row.archive_attachment_count || 0),
+        archiveEmbedCount: Number(row.archive_embed_count || 0),
+        firstStaffResponseAt: row.first_staff_response_at || null,
+        lastStaffReplyAt: row.last_staff_reply_at || null,
+        lastRequesterReplyAt: row.last_requester_reply_at || null,
+        lastActivityAt: row.last_activity_at || row.created_at,
+        deletionScheduledAt: row.deletion_scheduled_at || null,
+        reopenUntil: row.reopen_until || null,
+        reopenedCount: Number(row.reopened_count || 0),
+        lastReminderAt: row.last_reminder_at || null
     };
 }
 
@@ -3348,6 +3394,13 @@ function getDossierByChannel(guildId, channelId) {
         FROM sentinel_dossiers
         WHERE guild_id = ? AND channel_id = ?
     `).get(guildId, channelId));
+}
+
+function getDossierById(guildId, dossierId) {
+    return mapDossier(db.prepare(`
+        SELECT * FROM sentinel_dossiers
+        WHERE guild_id = ? AND id = ?
+    `).get(guildId, dossierId));
 }
 
 function getOpenDossierForUser(guildId, userId) {
@@ -3378,10 +3431,26 @@ function createDossierRecord(guildId, channelId, ownerUserId, openerUserId, type
             priority,
             subject,
             description,
+            form_answers_json,
+            last_requester_reply_at,
+            last_activity_at,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)
-    `).run(guildId, channelId, ownerUserId, openerUserId, normalizeDossierType(type), priority, subject, description, createdAt);
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        guildId,
+        channelId,
+        ownerUserId,
+        openerUserId,
+        normalizeDossierType(type),
+        priority,
+        subject,
+        description,
+        JSON.stringify(Array.isArray(details.formAnswers) ? details.formAnswers : []),
+        createdAt,
+        createdAt,
+        createdAt
+    );
 
     return getDossierByChannel(guildId, channelId) || {
         id: info.lastInsertRowid,
@@ -3394,6 +3463,7 @@ function createDossierRecord(guildId, channelId, ownerUserId, openerUserId, type
         priority,
         subject,
         description,
+        formAnswers: Array.isArray(details.formAnswers) ? details.formAnswers : [],
         createdAt
     };
 }
@@ -3421,14 +3491,126 @@ function updateDossierStatus(guildId, channelId, status) {
     return getDossierByChannel(guildId, channelId);
 }
 
-function closeDossierRecord(guildId, channelId, closedByUserId) {
+function updateDossierPriority(guildId, channelId, priority) {
+    const nextPriority = ['normal', 'important', 'urgent'].includes(String(priority || '').toLowerCase())
+        ? String(priority).toLowerCase()
+        : 'normal';
+
+    db.prepare(`
+        UPDATE sentinel_dossiers SET priority = ?
+        WHERE guild_id = ? AND channel_id = ? AND status != 'closed'
+    `).run(nextPriority, guildId, channelId);
+
+    return getDossierByChannel(guildId, channelId);
+}
+
+function closeDossierRecord(guildId, channelId, closedByUserId, details = {}) {
+    const closedAt = new Date().toISOString();
+    const advanced = Boolean(details.advanced) || isAdvancedGuild(guildId);
+    const retentionHours = advanced
+        ? DOSSIER_PREMIUM_RETENTION_HOURS
+        : DOSSIER_FREE_RETENTION_HOURS;
+    const deletionScheduledAt = new Date(Date.now() + retentionHours * 60 * 60 * 1000).toISOString();
+    const reopenUntil = advanced ? deletionScheduledAt : null;
+
     db.prepare(`
         UPDATE sentinel_dossiers
         SET status = 'closed',
             closed_at = ?,
-            closed_by_user_id = ?
+            closed_by_user_id = ?,
+            close_reason = ?,
+            resolution_summary = ?,
+            deletion_scheduled_at = ?,
+            reopen_until = ?
         WHERE guild_id = ? AND channel_id = ?
-    `).run(new Date().toISOString(), closedByUserId, guildId, channelId);
+    `).run(
+        closedAt,
+        closedByUserId,
+        String(details.reason || '').trim().slice(0, 500) || null,
+        String(details.resolution || '').trim().slice(0, 1500) || null,
+        deletionScheduledAt,
+        reopenUntil,
+        guildId,
+        channelId
+    );
+
+    return getDossierByChannel(guildId, channelId);
+}
+
+function saveDossierArchiveMetadata(guildId, channelId, archive) {
+    db.prepare(`
+        UPDATE sentinel_dossiers
+        SET archive_path = ?,
+            archive_sha256 = ?,
+            archive_size = ?,
+            archived_at = ?,
+            archive_message_count = ?,
+            archive_attachment_count = ?,
+            archive_embed_count = ?
+        WHERE guild_id = ? AND channel_id = ?
+    `).run(
+        archive.relativePath,
+        archive.sha256,
+        archive.size,
+        archive.archivedAt,
+        archive.messageCount,
+        archive.attachmentCount,
+        archive.embedCount,
+        guildId,
+        channelId
+    );
+
+    return getDossierByChannel(guildId, channelId);
+}
+
+function updateDossierActivity(guildId, channelId, authorUserId, isStaff, createdAt = new Date().toISOString()) {
+    const dossier = getDossierByChannel(guildId, channelId);
+
+    if (!dossier || dossier.status === 'closed') {
+        return dossier;
+    }
+
+    if (isStaff) {
+        db.prepare(`
+            UPDATE sentinel_dossiers
+            SET first_staff_response_at = COALESCE(first_staff_response_at, ?),
+                last_staff_reply_at = ?,
+                last_activity_at = ?,
+                status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(createdAt, createdAt, createdAt, guildId, channelId);
+    } else if (authorUserId === dossier.ownerUserId) {
+        db.prepare(`
+            UPDATE sentinel_dossiers
+            SET last_requester_reply_at = ?,
+                last_activity_at = ?
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(createdAt, createdAt, guildId, channelId);
+    }
+
+    return getDossierByChannel(guildId, channelId);
+}
+
+function reopenDossierRecord(guildId, channelId) {
+    const dossier = getDossierByChannel(guildId, channelId);
+
+    if (!dossier || dossier.status !== 'closed' || !dossier.reopenUntil || new Date(dossier.reopenUntil).getTime() < Date.now()) {
+        return null;
+    }
+
+    db.prepare(`
+        UPDATE sentinel_dossiers
+        SET status = 'in_progress',
+            closed_at = NULL,
+            closed_by_user_id = NULL,
+            close_reason = NULL,
+            resolution_summary = NULL,
+            deletion_scheduled_at = NULL,
+            reopen_until = NULL,
+            reopened_count = reopened_count + 1,
+            last_activity_at = ?
+        WHERE guild_id = ? AND channel_id = ?
+    `).run(new Date().toISOString(), guildId, channelId);
 
     return getDossierByChannel(guildId, channelId);
 }
@@ -3513,6 +3695,60 @@ function recordDossierPanel(guildId, channelId, messageId, creatorUserId) {
     `).run(guildId, channelId, messageId, creatorUserId || null, new Date().toISOString());
 }
 
+function getDossierPanels(guildId) {
+    return db.prepare(`
+        SELECT id, guild_id, channel_id, message_id, creator_user_id, created_at
+        FROM sentinel_dossier_panels
+        WHERE guild_id = ?
+        ORDER BY datetime(created_at) ASC
+    `).all(guildId);
+}
+
+function deleteDossierPanelRecord(id) {
+    return db.prepare('DELETE FROM sentinel_dossier_panels WHERE id = ?').run(id).changes > 0;
+}
+
+async function reconcileDossierPanels(guild) {
+    let removed = 0;
+
+    for (const panel of getDossierPanels(guild.id)) {
+        let channel;
+        let message;
+
+        try {
+            channel = await guild.channels.fetch(panel.channel_id);
+        } catch (error) {
+            if (error?.code === 10003) {
+                removed += deleteDossierPanelRecord(panel.id) ? 1 : 0;
+            }
+            continue;
+        }
+
+        if (!channel?.isTextBased?.()) {
+            removed += deleteDossierPanelRecord(panel.id) ? 1 : 0;
+            continue;
+        }
+
+        try {
+            message = await channel.messages.fetch(panel.message_id);
+        } catch (error) {
+            if (error?.code === 10008) {
+                removed += deleteDossierPanelRecord(panel.id) ? 1 : 0;
+            }
+            continue;
+        }
+
+        if (!message || !isDossierPanelMessage(message)) {
+            removed += deleteDossierPanelRecord(panel.id) ? 1 : 0;
+        }
+    }
+
+    return {
+        removed,
+        remaining: getDossierPanelCount(guild.id)
+    };
+}
+
 function mapDossierTypeSetting(row) {
     if (!row) {
         return null;
@@ -3523,6 +3759,8 @@ function mapDossierTypeSetting(row) {
         type: normalizeDossierType(row.type),
         categoryId: row.category_id || null,
         questions: row.questions_json ? safeJsonParse(row.questions_json, []) : [],
+        slaFirstResponseMinutes: Number(row.sla_first_response_minutes || 60),
+        slaResolutionMinutes: Number(row.sla_resolution_minutes || 1440),
         createdAt: row.created_at,
         updatedAt: row.updated_at
     };
@@ -3538,7 +3776,7 @@ function safeJsonParse(value, fallback) {
 
 function getDossierTypeSettings(guildId) {
     return db.prepare(`
-        SELECT guild_id, type, category_id, questions_json, created_at, updated_at
+        SELECT *
         FROM sentinel_dossier_type_settings
         WHERE guild_id = ?
     `).all(guildId).map(mapDossierTypeSetting);
@@ -3546,10 +3784,421 @@ function getDossierTypeSettings(guildId) {
 
 function getDossierTypeSetting(guildId, type) {
     return mapDossierTypeSetting(db.prepare(`
-        SELECT guild_id, type, category_id, questions_json, created_at, updated_at
+        SELECT *
         FROM sentinel_dossier_type_settings
         WHERE guild_id = ? AND type = ?
     `).get(guildId, normalizeDossierType(type)));
+}
+
+function updateDossierTypeSettings(guildId, type, patch = {}) {
+    const dossierType = normalizeDossierType(type);
+    const current = getDossierTypeSetting(guildId, dossierType);
+    const timestamp = new Date().toISOString();
+    const questions = Array.isArray(patch.questions)
+        ? patch.questions.slice(0, 3).map((question, index) => ({
+            id: `question_${index}`,
+            label: String(question.label || question || '').trim().slice(0, 45),
+            required: question.required !== false,
+            style: question.style === 'short' ? 'short' : 'paragraph',
+            maxLength: clampNumber(question.maxLength || 500, 20, 1000)
+        })).filter(question => question.label)
+        : (current?.questions || []);
+    const firstResponse = clampNumber(
+        patch.slaFirstResponseMinutes ?? current?.slaFirstResponseMinutes ?? 60,
+        5,
+        10080
+    );
+    const resolution = clampNumber(
+        patch.slaResolutionMinutes ?? current?.slaResolutionMinutes ?? 1440,
+        30,
+        43200
+    );
+
+    db.prepare(`
+        INSERT INTO sentinel_dossier_type_settings (
+            guild_id, type, category_id, questions_json,
+            sla_first_response_minutes, sla_resolution_minutes, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(guild_id, type) DO UPDATE SET
+            category_id = excluded.category_id,
+            questions_json = excluded.questions_json,
+            sla_first_response_minutes = excluded.sla_first_response_minutes,
+            sla_resolution_minutes = excluded.sla_resolution_minutes,
+            updated_at = excluded.updated_at
+    `).run(
+        guildId,
+        dossierType,
+        patch.categoryId !== undefined ? (patch.categoryId || null) : (current?.categoryId || null),
+        JSON.stringify(questions),
+        firstResponse,
+        resolution,
+        current?.createdAt || timestamp,
+        timestamp
+    );
+
+    return getDossierTypeSetting(guildId, dossierType);
+}
+
+function getDossierTypeRoleIds(guildId, type) {
+    return db.prepare(`
+        SELECT role_id
+        FROM sentinel_dossier_type_roles
+        WHERE guild_id = ? AND type = ?
+        ORDER BY datetime(created_at) ASC
+    `).all(guildId, normalizeDossierType(type)).map(row => row.role_id);
+}
+
+function getAllDossierTypeRoles(guildId) {
+    return db.prepare(`
+        SELECT type, role_id
+        FROM sentinel_dossier_type_roles
+        WHERE guild_id = ?
+        ORDER BY type, datetime(created_at) ASC
+    `).all(guildId).map(row => ({ type: normalizeDossierType(row.type), roleId: row.role_id }));
+}
+
+function addDossierTypeRole(guildId, type, roleId) {
+    db.prepare(`
+        INSERT OR IGNORE INTO sentinel_dossier_type_roles (guild_id, type, role_id, created_at)
+        VALUES (?, ?, ?, ?)
+    `).run(guildId, normalizeDossierType(type), roleId, new Date().toISOString());
+}
+
+function removeDossierTypeRole(guildId, type, roleId) {
+    db.prepare(`
+        DELETE FROM sentinel_dossier_type_roles
+        WHERE guild_id = ? AND type = ? AND role_id = ?
+    `).run(guildId, normalizeDossierType(type), roleId);
+}
+
+function getDossierTemplates(guildId) {
+    return db.prepare(`
+        SELECT * FROM sentinel_dossier_templates
+        WHERE guild_id = ?
+        ORDER BY name COLLATE NOCASE ASC
+    `).all(guildId).map(row => ({
+        id: row.id,
+        guildId: row.guild_id,
+        name: row.name,
+        content: row.content,
+        type: row.type ? normalizeDossierType(row.type) : null,
+        kind: row.kind || 'reply',
+        createdByUserId: row.created_by_user_id,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+    }));
+}
+
+function createDossierTemplate(guildId, data, actorUserId) {
+    const timestamp = new Date().toISOString();
+    const name = String(data.name || '').trim().slice(0, 80);
+    const content = String(data.content || '').trim().slice(0, 1900);
+    const type = data.type ? normalizeDossierType(data.type) : null;
+    const kind = ['reply', 'request_info', 'close'].includes(data.kind) ? data.kind : 'reply';
+
+    if (!name || !content) {
+        throw new Error('Le nom et le contenu de la réponse sont obligatoires.');
+    }
+
+    const info = db.prepare(`
+        INSERT INTO sentinel_dossier_templates (
+            guild_id, name, content, type, kind, created_by_user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(guildId, name, content, type, kind, actorUserId || null, timestamp, timestamp);
+
+    return getDossierTemplates(guildId).find(item => Number(item.id) === Number(info.lastInsertRowid));
+}
+
+function deleteDossierTemplate(guildId, templateId) {
+    return db.prepare(`DELETE FROM sentinel_dossier_templates WHERE guild_id = ? AND id = ?`)
+        .run(guildId, templateId).changes > 0;
+}
+
+function getDossierTemplate(guildId, templateId) {
+    return getDossierTemplates(guildId).find(item => Number(item.id) === Number(templateId)) || null;
+}
+
+function getDossierStats(guildId) {
+    const totals = db.prepare(`
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN status != 'closed' THEN 1 ELSE 0 END) AS open,
+            SUM(CASE WHEN status != 'closed' AND referent_user_id IS NULL THEN 1 ELSE 0 END) AS unassigned,
+            AVG(CASE
+                WHEN first_staff_response_at IS NOT NULL
+                THEN (julianday(first_staff_response_at) - julianday(created_at)) * 86400000
+            END) AS average_first_response_ms,
+            AVG(CASE
+                WHEN closed_at IS NOT NULL
+                THEN (julianday(closed_at) - julianday(created_at)) * 86400000
+            END) AS average_resolution_ms
+        FROM sentinel_dossiers
+        WHERE guild_id = ?
+    `).get(guildId);
+    const byType = Object.fromEntries(db.prepare(`
+        SELECT type, COUNT(*) AS count
+        FROM sentinel_dossiers
+        WHERE guild_id = ?
+        GROUP BY type
+    `).all(guildId).map(row => [row.type, Number(row.count || 0)]));
+    const byReferent = Object.fromEntries(db.prepare(`
+        SELECT referent_user_id AS user_id, COUNT(*) AS count
+        FROM sentinel_dossiers
+        WHERE guild_id = ? AND referent_user_id IS NOT NULL
+        GROUP BY referent_user_id
+        ORDER BY count DESC
+        LIMIT 100
+    `).all(guildId).map(row => [row.user_id, Number(row.count || 0)]));
+
+    return {
+        total: Number(totals?.total || 0),
+        open: Number(totals?.open || 0),
+        unassigned: Number(totals?.unassigned || 0),
+        averageFirstResponseMs: totals?.average_first_response_ms == null
+            ? null
+            : Math.max(0, Math.round(totals.average_first_response_ms)),
+        averageResolutionMs: totals?.average_resolution_ms == null
+            ? null
+            : Math.max(0, Math.round(totals.average_resolution_ms)),
+        byType,
+        byReferent
+    };
+}
+
+function resolveDossierArchivePath(relativePath) {
+    const root = path.resolve(DOSSIER_ARCHIVE_DIR);
+    const resolved = path.resolve(root, String(relativePath || ''));
+
+    if (!relativePath || (resolved !== root && !resolved.startsWith(`${root}${path.sep}`))) {
+        return null;
+    }
+
+    return resolved;
+}
+
+function getDossierArchiveFile(guildId, dossierId) {
+    const dossier = mapDossier(db.prepare(`
+        SELECT * FROM sentinel_dossiers WHERE guild_id = ? AND id = ?
+    `).get(guildId, dossierId));
+    const filePath = resolveDossierArchivePath(dossier?.archivePath);
+
+    if (!dossier || !filePath || !fs.existsSync(filePath)) {
+        return null;
+    }
+
+    const buffer = fs.readFileSync(filePath);
+    const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+
+    if (!dossier.archiveSha256 || sha256 !== dossier.archiveSha256) {
+        return null;
+    }
+
+    return {
+        path: filePath,
+        name: `dossier-sentinel-${dossier.id}.tar.gz`,
+        mimeType: 'application/gzip',
+        size: buffer.length,
+        dossier
+    };
+}
+
+function searchDossierArchives(guildId, query, limit = 25) {
+    const needle = String(query || '').trim().toLocaleLowerCase('fr').slice(0, 120);
+
+    if (needle.length < 3) {
+        return [];
+    }
+
+    const rows = db.prepare(`
+        SELECT id, archive_path
+        FROM sentinel_dossiers
+        WHERE guild_id = ? AND archive_path IS NOT NULL
+        ORDER BY datetime(archived_at) DESC
+    `).all(guildId);
+    const matches = [];
+
+    for (const row of rows) {
+        const filePath = resolveDossierArchivePath(row.archive_path);
+
+        if (!filePath || !fs.existsSync(filePath)) {
+            continue;
+        }
+
+        try {
+            const searchPath = path.join(path.dirname(filePath), 'recherche.txt.gz');
+            let searchable;
+
+            if (fs.existsSync(searchPath)) {
+                searchable = zlib.gunzipSync(fs.readFileSync(searchPath)).toString('utf8');
+            } else {
+                const tarBuffer = zlib.gunzipSync(fs.readFileSync(filePath));
+                const manifestBuffer = readTarEntry(tarBuffer, 'manifest.json');
+
+                if (!manifestBuffer) {
+                    throw new Error('Manifest absent de l’archive.');
+                }
+
+                const manifest = JSON.parse(manifestBuffer.toString('utf8'));
+                searchable = [
+                    JSON.stringify(manifest.dossier || {}),
+                    ...manifest.messages.map(message => `${message.author?.tag || ''} ${message.content || ''} ${JSON.stringify(message.embeds || [])}`)
+                ].join('\n');
+            }
+            const normalized = searchable.toLocaleLowerCase('fr');
+            const index = normalized.indexOf(needle);
+
+            if (index === -1) {
+                continue;
+            }
+
+            matches.push({
+                dossierId: row.id,
+                excerpt: searchable.slice(Math.max(0, index - 80), index + needle.length + 140).replace(/\s+/g, ' ').trim()
+            });
+
+            if (matches.length >= clampNumber(limit, 1, 50)) {
+                break;
+            }
+        } catch (error) {
+            console.error(`Recherche archive dossier #${row.id} :`, error);
+        }
+    }
+
+    return matches;
+}
+
+function getPendingDossierDeletions(limit = 50) {
+    return db.prepare(`
+        SELECT * FROM sentinel_dossiers
+        WHERE status = 'closed'
+          AND deletion_scheduled_at IS NOT NULL
+          AND datetime(deletion_scheduled_at) <= datetime('now')
+        ORDER BY datetime(deletion_scheduled_at) ASC
+        LIMIT ?
+    `).all(clampNumber(limit, 1, 200)).map(mapDossier);
+}
+
+function clearDossierDeletionSchedule(guildId, channelId) {
+    db.prepare(`
+        UPDATE sentinel_dossiers
+        SET deletion_scheduled_at = NULL
+        WHERE guild_id = ? AND channel_id = ?
+    `).run(guildId, channelId);
+}
+
+function markDossierReminder(guildId, channelId) {
+    db.prepare(`
+        UPDATE sentinel_dossiers SET last_reminder_at = ?
+        WHERE guild_id = ? AND channel_id = ?
+    `).run(new Date().toISOString(), guildId, channelId);
+}
+
+async function reopenDossierChannel(guild, channel, actor, language = 'fr', options = {}) {
+    if (!isAdvancedGuild(guild.id) && !options.advanced) {
+        throw new Error(language === 'en'
+            ? 'Dossier reopening is reserved for Premium servers.'
+            : 'La réouverture des dossiers est réservée aux serveurs Premium.');
+    }
+
+    const dossier = reopenDossierRecord(guild.id, channel.id);
+
+    if (!dossier) {
+        throw new Error(language === 'en'
+            ? 'This dossier can no longer be reopened.'
+            : 'Ce dossier ne peut plus être réouvert.');
+    }
+
+    await channel.permissionOverwrites.edit(dossier.ownerUserId, {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true,
+        AttachFiles: true,
+        EmbedLinks: true
+    }, { reason: `Réouverture du dossier Sentinel par ${actor.id}` });
+    await channel.send(language === 'en'
+        ? `The dossier has been reopened by ${actor}.`
+        : `Le dossier a été réouvert par ${actor}.`);
+
+    return dossier;
+}
+
+async function processDossierMaintenance() {
+    for (const dossier of getPendingDossierDeletions()) {
+        const archive = getDossierArchiveFile(dossier.guildId, dossier.id);
+
+        if (!archive) {
+            console.error(`Suppression dossier refusée : archive absente ou invalide pour #${dossier.id}.`);
+            continue;
+        }
+
+        const guild = client.guilds.cache.get(dossier.guildId);
+        const channel = guild ? await guild.channels.fetch(dossier.channelId).catch(() => null) : null;
+
+        if (channel) {
+            const deleted = await channel.delete('Dossier Sentinel archivé et délai de conservation écoulé')
+                .then(() => true)
+                .catch(error => {
+                    console.error(`Suppression différée dossier #${dossier.id} :`, error);
+                    return false;
+                });
+
+            if (!deleted) {
+                continue;
+            }
+        }
+
+        clearDossierDeletionSchedule(dossier.guildId, dossier.channelId);
+    }
+
+    for (const guild of client.guilds.cache.values()) {
+        await reconcileDossierPanels(guild).catch(error => {
+            console.error(`Réparation panneaux dossiers ${guild.id} :`, error);
+        });
+
+        const dossierSettings = getDossierTypeSettings(guild.id);
+        const premiumDossierConfigured = dossierSettings.length > 0 || getDossierTemplates(guild.id).length > 0;
+
+        if (!isAdvancedGuild(guild.id) && !premiumDossierConfigured) {
+            continue;
+        }
+
+        const dossiers = getRecentDossiers(guild.id, 100).filter(item => item.status !== 'closed');
+
+        for (const dossier of dossiers) {
+            const settings = getDossierTypeSetting(guild.id, dossier.type);
+            const firstDeadline = new Date(dossier.createdAt).getTime()
+                + (settings?.slaFirstResponseMinutes || 60) * 60 * 1000;
+            const resolutionDeadline = new Date(dossier.createdAt).getTime()
+                + (settings?.slaResolutionMinutes || 1440) * 60 * 1000;
+            const overdue = (!dossier.firstStaffResponseAt && Date.now() > firstDeadline)
+                || Date.now() > resolutionDeadline;
+            const remindedRecently = dossier.lastReminderAt
+                && Date.now() - new Date(dossier.lastReminderAt).getTime() < 60 * 60 * 1000;
+
+            if (!overdue || remindedRecently) {
+                continue;
+            }
+
+            const channel = await guild.channels.fetch(dossier.channelId).catch(() => null);
+
+            if (!channel?.isTextBased?.()) {
+                continue;
+            }
+
+            const roleMentions = getDossierTypeRoleIds(guild.id, dossier.type)
+                .map(roleId => `<@&${roleId}>`)
+                .join(' ');
+            const fallbackRoleMentions = getDossierRoleIds(guild.id)
+                .map(roleId => `<@&${roleId}>`)
+                .join(' ');
+            const recipients = dossier.referentUserId
+                ? `<@${dossier.referentUserId}>`
+                : (roleMentions || fallbackRoleMentions);
+            await channel.send(`${recipients ? `${recipients} ` : ''}Ce dossier demande une intervention : le délai prévu est dépassé.`)
+                .catch(() => {});
+            markDossierReminder(guild.id, dossier.channelId);
+        }
+    }
 }
 
 function getDossierTypeCategoryId(guildId, type) {
@@ -7224,32 +7873,100 @@ async function checkLongServiceAlerts() {
     }
 }
 
-async function closeDossierChannelFromInteraction(interaction, channel, language) {
+async function closeDossierChannel(channel, actor, language = 'fr', details = {}) {
+    const reason = String(details.reason || '').trim().slice(0, 500);
+    const resolution = String(details.resolution || '').trim().slice(0, 1500);
+
+    if (!reason || !resolution) {
+        throw new Error(language === 'en'
+            ? 'A closing reason and resolution summary are required.'
+            : 'Le motif de clôture et le résumé de résolution sont obligatoires.');
+    }
+
     const topic = parseDossierChannelTopic(channel.topic);
-    const dossier = getDossierByChannel(interaction.guild.id, channel.id) || topic;
-    const closedDossier = closeDossierRecord(interaction.guild.id, channel.id, interaction.user.id) || {
+    const dossier = getDossierByChannel(channel.guild.id, channel.id) || (topic
+        ? createDossierRecord(
+            channel.guild.id,
+            channel.id,
+            topic.ownerUserId,
+            topic.ownerUserId,
+            topic.type,
+            { subject: channel.name, description: 'Dossier repris dans le registre avant sa clôture.' }
+        )
+        : null);
+
+    if (!dossier) {
+        throw new Error(language === 'en'
+            ? 'This channel is not a Sentinel dossier.'
+            : 'Ce salon n’est pas un dossier Sentinel.');
+    }
+    const actorUser = actor.user || actor;
+    const actorId = actorUser.id;
+    const closureDraft = {
         ...dossier,
         status: 'closed',
         closedAt: new Date().toISOString(),
-        closedByUserId: interaction.user.id
+        closedByUserId: actorId,
+        closeReason: reason,
+        resolutionSummary: resolution
     };
+    const archive = await sendDossierTranscript(channel, closureDraft, actorUser, language);
 
-    await sendDossierTranscript(channel, closedDossier, interaction.user, language);
+    if (!archive?.archived) {
+        throw new Error(language === 'en'
+            ? 'The complete archive could not be confirmed. The dossier remains open.'
+            : 'L’archive complète n’a pas pu être confirmée. Le dossier reste ouvert.');
+    }
+
+    const closedDossier = closeDossierRecord(channel.guild.id, channel.id, actorId, {
+        reason,
+        resolution,
+        advanced: Boolean(details.advanced)
+    }) || closureDraft;
+
+    if (closedDossier.ownerUserId) {
+        await channel.permissionOverwrites.edit(closedDossier.ownerUserId, {
+            SendMessages: false
+        }, { reason: 'Dossier Sentinel scellé après archivage confirmé' }).catch(() => {});
+
+        const owner = await client.users.fetch(closedDossier.ownerUserId).catch(() => null);
+        await owner?.send({
+            embeds: [new EmbedBuilder()
+                .setColor(SENTINEL_COLORS.neutral)
+                .setTitle(language === 'en' ? 'Sentinel | Dossier closed' : 'Sentinel | Dossier clôturé')
+                .setDescription(language === 'en'
+                    ? `Your dossier #${closedDossier.id || channel.id} has been closed and safely archived.`
+                    : `Ton dossier #${closedDossier.id || channel.id} a été clôturé et archivé.`)
+                .addFields(
+                    { name: language === 'en' ? 'Reason' : 'Motif', value: reason },
+                    { name: language === 'en' ? 'Resolution' : 'Résolution', value: resolution }
+                )
+                .setTimestamp()]
+        }).catch(() => {});
+    }
+
     await sendSentinelStaffLog(
-        interaction.guild,
+        channel.guild,
         language === 'en'
-            ? `Sentinel dossier #${closedDossier?.id || channel.id} closed: **${channel.name}** by ${interaction.user}.`
-            : `Dossier Sentinel #${closedDossier?.id || channel.id} clôturé : **${channel.name}** par ${interaction.user}.`,
+            ? `Sentinel dossier #${closedDossier?.id || channel.id} closed and archived: **${channel.name}** by ${actorUser}.`
+            : `Dossier Sentinel #${closedDossier?.id || channel.id} clôturé et archivé : **${channel.name}** par ${actorUser}.`,
         {
             color: SENTINEL_COLORS.warning,
-            requester: interaction.user,
+            requester: actorUser,
             language
         }
     );
 
-    setTimeout(() => {
-        channel?.delete('Cloture dossier Sentinel').catch(() => {});
-    }, 5000);
+    await channel.send(language === 'en'
+        ? `This dossier is sealed. Its complete archive is confirmed. This space will be withdrawn ${closedDossier.deletionScheduledAt ? `<t:${Math.floor(new Date(closedDossier.deletionScheduledAt).getTime() / 1000)}:R>` : 'later'}.`
+        : `Ce dossier est scellé. Son archive complète est confirmée. Cet espace sera retiré ${closedDossier.deletionScheduledAt ? `<t:${Math.floor(new Date(closedDossier.deletionScheduledAt).getTime() / 1000)}:R>` : 'ultérieurement'}.`
+    ).catch(() => {});
+
+    return closedDossier;
+}
+
+async function closeDossierChannelFromInteraction(interaction, channel, language, details = {}) {
+    await closeDossierChannel(channel, interaction.user, language, details);
 
     return t(language, 'dossierClosed');
 }
@@ -9443,7 +10160,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/dossier-roles action:ajouter role:@rôle` donne accès à la gestion des dossiers.',
                             '`/dossier-prendre` te marque comme référent du dossier.',
                             '`/dossier-statut statut:...` corrige le statut visible si le demandeur s’est trompé ou si la situation change.',
-                            '`/dossier-fermer` clôture le dossier actuel.',
+                            '`/dossier-fermer` demande le motif et la résolution, archive tout le dossier puis le scelle.',
+                            '`/dossier-reouvrir` rouvre un dossier Premium encore conservé.',
                             '`/dossier-ajouter membre:@membre` ajoute un intervenant.',
                             '`/dossier-retirer membre:@membre` retire un intervenant.',
                             '`/dossier-compte-rendu` envoie le compte rendu dans le salon de logs quand c’est possible.'
@@ -9453,7 +10171,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Gratuit / Premium',
                         value: [
                             `Serveur gratuit : ${FREE_DOSSIER_PANEL_LIMIT} panneau, ${FREE_OPEN_DOSSIER_LIMIT} dossiers ouverts, ${FREE_DOSSIER_HISTORY_LIMIT} derniers dossiers visibles.`,
-                            'Premium plus tard : panneaux illimités, catégories personnalisées, formulaires avancés, priorités, templates, historique complet, statistiques et automatisations.'
+                            'Premium : panneaux illimités, routage, formulaires avancés, réponses préparées, recherche d’archives, réouverture, délais et statistiques.'
                         ].join('\n')
                     }
                 ]
@@ -9968,6 +10686,7 @@ function mapDiscordAuditAction(interaction) {
         'dossier-prendre': 'dossier-claim',
         'dossier-statut': 'dossier-status',
         'dossier-fermer': 'dossier-close',
+        'dossier-reouvrir': 'dossier-reopen',
         'dossier-ajouter': 'dossier-add',
         'dossier-retirer': 'dossier-remove',
         'dossier-compte-rendu': 'dossier-transcript'
@@ -10321,7 +11040,7 @@ function sanitizeTicketName(value) {
         .slice(0, 40) || 'membre';
 }
 
-function buildTicketOverwrites(guild, member) {
+function buildTicketOverwrites(guild, member, dossierType = 'support') {
     const allowedRoleIds = new Set();
     const overwrites = [
         {
@@ -10339,6 +11058,21 @@ function buildTicketOverwrites(guild, member) {
             ]
         }
     ];
+
+    if (client.user?.id && client.user.id !== member.id) {
+        overwrites.push({
+            id: client.user.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageChannels,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.AttachFiles,
+                PermissionsBitField.Flags.EmbedLinks
+            ]
+        });
+    }
 
     const pushAllowedRole = role => {
         if (!role || allowedRoleIds.has(role.id)) {
@@ -10359,19 +11093,81 @@ function buildTicketOverwrites(guild, member) {
         });
     };
 
-    for (const roleId of getCommandRoleIds(guild.id)) {
-        pushAllowedRole(guild.roles.cache.get(roleId));
-    }
+    const typeRoleIds = getDossierTypeRoleIds(guild.id, dossierType);
 
-    for (const roleId of getDossierRoleIds(guild.id)) {
-        pushAllowedRole(guild.roles.cache.get(roleId));
-    }
+    if (typeRoleIds.length > 0) {
+        for (const roleId of typeRoleIds) {
+            pushAllowedRole(guild.roles.cache.get(roleId));
+        }
+    } else {
+        for (const roleId of getCommandRoleIds(guild.id)) {
+            pushAllowedRole(guild.roles.cache.get(roleId));
+        }
 
-    for (const roleName of SENTINEL_STAFF_ROLES) {
-        pushAllowedRole(findRoleByName(guild, roleName));
+        for (const roleId of getDossierRoleIds(guild.id)) {
+            pushAllowedRole(guild.roles.cache.get(roleId));
+        }
+
+        for (const roleName of SENTINEL_STAFF_ROLES) {
+            pushAllowedRole(findRoleByName(guild, roleName));
+        }
     }
 
     return overwrites;
+}
+
+async function syncDossierTypePermissions(guild, dossierType, extraRoleIds = []) {
+    const type = normalizeDossierType(dossierType);
+    const configuredTypeRoleIds = getDossierTypeRoleIds(guild.id, type);
+    const fallbackRoleIds = new Set([
+        ...getCommandRoleIds(guild.id),
+        ...getDossierRoleIds(guild.id),
+        ...SENTINEL_STAFF_ROLES.map(name => findRoleByName(guild, name)?.id).filter(Boolean)
+    ]);
+    const managedRoleIds = new Set([
+        ...fallbackRoleIds,
+        ...getAllDossierTypeRoles(guild.id).map(item => item.roleId),
+        ...extraRoleIds
+    ]);
+    const allowedRoleIds = new Set(configuredTypeRoleIds.length > 0
+        ? configuredTypeRoleIds
+        : fallbackRoleIds);
+    const dossiers = db.prepare(`
+        SELECT channel_id FROM sentinel_dossiers
+        WHERE guild_id = ? AND type = ? AND status != 'closed'
+    `).all(guild.id, type);
+    let updated = 0;
+
+    for (const dossier of dossiers) {
+        const channel = await guild.channels.fetch(dossier.channel_id).catch(() => null);
+
+        if (!channel?.isTextBased?.()) {
+            continue;
+        }
+
+        for (const roleId of managedRoleIds) {
+            if (!guild.roles.cache.has(roleId)) {
+                continue;
+            }
+
+            if (allowedRoleIds.has(roleId)) {
+                await channel.permissionOverwrites.edit(roleId, {
+                    ViewChannel: true,
+                    SendMessages: true,
+                    ReadMessageHistory: true,
+                    ManageMessages: true,
+                    AttachFiles: true,
+                    EmbedLinks: true
+                }, { reason: `Responsables dossiers Sentinel ${type}` });
+            } else {
+                await channel.permissionOverwrites.delete(roleId, `Cloisonnement dossiers Sentinel ${type}`).catch(() => {});
+            }
+        }
+
+        updated += 1;
+    }
+
+    return updated;
 }
 
 function buildDossierPanelEmbed(guild, requester, language = 'fr') {
@@ -10481,6 +11277,7 @@ async function publishOrUpdateDossierPanel(channel, requester, language = 'fr', 
         }
     }
 
+    await reconcileDossierPanels(channel.guild);
     assertDossierPanelQuota(channel.guild.id, language, member);
 
     const message = await channel.send(payload);
@@ -10576,10 +11373,9 @@ async function publishDossierPanel(channel, requester, language = 'fr', member =
     return publishOrUpdateDossierPanel(channel, requester, language, member);
 }
 
-function buildDossierOpenModal(dossierType, language = 'fr') {
+function buildDossierOpenModal(dossierType, language = 'fr', questions = []) {
     const meta = getDossierTypeMeta(dossierType, language);
-
-    return new ModalBuilder()
+    const modal = new ModalBuilder()
         .setCustomId(`sentinel_dossier_open:${meta.key}`)
         .setTitle(`${t(language, 'dossierModalTitle')} - ${meta.label}`.slice(0, 45))
         .addComponents(
@@ -10597,6 +11393,45 @@ function buildDossierOpenModal(dossierType, language = 'fr') {
                     .setCustomId('description')
                     .setLabel(t(language, 'dossierModalDescription'))
                     .setPlaceholder(t(language, 'dossierModalDescriptionPlaceholder'))
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setMaxLength(1500)
+                    .setRequired(true)
+            )
+        );
+
+    for (const [index, question] of questions.slice(0, 3).entries()) {
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId(`question_${index}`)
+                    .setLabel(String(question.label || `Question ${index + 1}`).slice(0, 45))
+                    .setStyle(question.style === 'short' ? TextInputStyle.Short : TextInputStyle.Paragraph)
+                    .setMaxLength(clampNumber(question.maxLength || 500, 20, 1000))
+                    .setRequired(question.required !== false)
+            )
+        );
+    }
+
+    return modal;
+}
+
+function buildDossierCloseModal(channelId, language = 'fr') {
+    return new ModalBuilder()
+        .setCustomId(`sentinel_dossier_close:${channelId}`)
+        .setTitle(language === 'en' ? 'Close the dossier' : 'Clôturer le dossier')
+        .addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('close_reason')
+                    .setLabel(language === 'en' ? 'Closing reason' : 'Motif de clôture')
+                    .setStyle(TextInputStyle.Short)
+                    .setMaxLength(500)
+                    .setRequired(true)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('resolution_summary')
+                    .setLabel(language === 'en' ? 'Resolution summary' : 'Résumé de la résolution')
                     .setStyle(TextInputStyle.Paragraph)
                     .setMaxLength(1500)
                     .setRequired(true)
@@ -10657,13 +11492,25 @@ function isDossierChannel(channel) {
     return Boolean(parseDossierChannelTopic(channel?.topic));
 }
 
-function memberCanManageDossier(member) {
-    return Boolean(member && (
-        hasDossierRoleAccess(member)
-        || hasCommandRoleAccess(member)
-        || member.permissions.has(PermissionsBitField.Flags.ManageChannels)
-        || member.permissions.has(PermissionsBitField.Flags.Administrator)
-    ));
+function memberCanManageDossier(member, dossierType = null) {
+    if (!member) {
+        return false;
+    }
+
+    if (member.permissions.has(PermissionsBitField.Flags.ManageChannels)
+        || member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return true;
+    }
+
+    const typeRoleIds = dossierType
+        ? getDossierTypeRoleIds(member.guild.id, dossierType)
+        : [];
+
+    if (typeRoleIds.length > 0) {
+        return typeRoleIds.some(roleId => member.roles.cache.has(roleId));
+    }
+
+    return hasDossierRoleAccess(member) || hasCommandRoleAccess(member);
 }
 
 function getDossierChannelFromInteraction(interaction) {
@@ -10674,11 +11521,189 @@ function getDossierChannelFromInteraction(interaction) {
     return interaction.channel;
 }
 
-async function buildDossierTranscript(channel, dossier, language = 'fr') {
-    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
-    const sortedMessages = messages
-        ? Array.from(messages.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp)
-        : [];
+async function fetchAllDossierMessages(channel) {
+    const collected = [];
+    let before;
+
+    while (true) {
+        const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+
+        if (batch.size === 0) {
+            break;
+        }
+
+        collected.push(...batch.values());
+        before = batch.last()?.id;
+
+        if (batch.size < 100 || !before) {
+            break;
+        }
+    }
+
+    return collected.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+}
+
+function safeArchiveFileName(value, fallback = 'piece-jointe') {
+    return String(value || fallback)
+        .normalize('NFKD')
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 64) || fallback;
+}
+
+async function downloadDossierAttachment(attachment, currentTotalBytes) {
+    const declaredSize = Number(attachment.size || 0);
+
+    if (declaredSize > DOSSIER_ARCHIVE_MAX_ATTACHMENT_BYTES) {
+        throw new Error(`La pièce jointe ${attachment.name || attachment.id} dépasse la limite d'archivage.`);
+    }
+
+    if (currentTotalBytes + declaredSize > DOSSIER_ARCHIVE_MAX_TOTAL_BYTES) {
+        throw new Error('Les pièces jointes du dossier dépassent la capacité d’archivage autorisée.');
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DOSSIER_ARCHIVE_FETCH_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(attachment.url, { signal: controller.signal });
+
+        if (!response.ok) {
+            throw new Error(`Téléchargement refusé (${response.status}).`);
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        if (buffer.length > DOSSIER_ARCHIVE_MAX_ATTACHMENT_BYTES
+            || currentTotalBytes + buffer.length > DOSSIER_ARCHIVE_MAX_TOTAL_BYTES) {
+            throw new Error('La pièce jointe dépasse la capacité d’archivage autorisée.');
+        }
+
+        return {
+            bytes: buffer.length,
+            sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+            buffer
+        };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function writeTarText(buffer, offset, length, value) {
+    Buffer.from(String(value || ''), 'utf8').copy(buffer, offset, 0, length);
+}
+
+function writeTarOctal(buffer, offset, length, value) {
+    const octal = Math.max(0, Number(value) || 0).toString(8).padStart(length - 1, '0');
+    writeTarText(buffer, offset, length, `${octal}\0`);
+}
+
+function createTarBuffer(files) {
+    const parts = [];
+
+    for (const file of files) {
+        const data = Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data);
+        const header = Buffer.alloc(512, 0);
+        writeTarText(header, 0, 100, file.name);
+        writeTarOctal(header, 100, 8, 0o644);
+        writeTarOctal(header, 108, 8, 0);
+        writeTarOctal(header, 116, 8, 0);
+        writeTarOctal(header, 124, 12, data.length);
+        writeTarOctal(header, 136, 12, Math.floor(Date.now() / 1000));
+        header.fill(0x20, 148, 156);
+        header[156] = '0'.charCodeAt(0);
+        writeTarText(header, 257, 6, 'ustar');
+        writeTarText(header, 263, 2, '00');
+        const checksum = header.reduce((sum, byte) => sum + byte, 0);
+        const checksumText = checksum.toString(8).padStart(6, '0');
+        writeTarText(header, 148, 8, `${checksumText}\0 `);
+        parts.push(header, data);
+
+        const padding = (512 - (data.length % 512)) % 512;
+        if (padding) {
+            parts.push(Buffer.alloc(padding, 0));
+        }
+    }
+
+    parts.push(Buffer.alloc(1024, 0));
+    return Buffer.concat(parts);
+}
+
+function readTarEntry(tarBuffer, requestedName) {
+    let offset = 0;
+
+    while (offset + 512 <= tarBuffer.length) {
+        const header = tarBuffer.subarray(offset, offset + 512);
+        const name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/, '');
+
+        if (!name) {
+            break;
+        }
+
+        const sizeText = header.subarray(124, 136).toString('ascii').replace(/\0.*$/, '').trim();
+        const size = Number.parseInt(sizeText || '0', 8);
+        const dataStart = offset + 512;
+
+        if (name === requestedName) {
+            return tarBuffer.subarray(dataStart, dataStart + size);
+        }
+
+        offset = dataStart + Math.ceil(size / 512) * 512;
+    }
+
+    return null;
+}
+
+function dossierMessageToArchive(message) {
+    return {
+        id: message.id,
+        createdAt: new Date(message.createdTimestamp).toISOString(),
+        editedAt: message.editedTimestamp ? new Date(message.editedTimestamp).toISOString() : null,
+        author: {
+            id: message.author?.id || null,
+            username: message.author?.username || null,
+            tag: message.author?.tag || null,
+            bot: Boolean(message.author?.bot)
+        },
+        content: message.content || '',
+        reference: message.reference ? {
+            messageId: message.reference.messageId || null,
+            channelId: message.reference.channelId || null,
+            guildId: message.reference.guildId || null
+        } : null,
+        mentions: {
+            users: Array.from(message.mentions.users.keys()),
+            roles: Array.from(message.mentions.roles.keys()),
+            channels: Array.from(message.mentions.channels.keys())
+        },
+        embeds: message.embeds.map(embed => embed.toJSON()),
+        components: message.components.map(component => component.toJSON()),
+        stickers: Array.from(message.stickers.values()).map(sticker => ({
+            id: sticker.id,
+            name: sticker.name,
+            description: sticker.description || null,
+            format: sticker.format
+        })),
+        attachments: Array.from(message.attachments.values()).map(attachment => ({
+            id: attachment.id,
+            name: attachment.name,
+            description: attachment.description || null,
+            contentType: attachment.contentType || null,
+            size: attachment.size,
+            width: attachment.width || null,
+            height: attachment.height || null,
+            url: attachment.url,
+            proxyUrl: attachment.proxyURL || null
+        })),
+        reactions: Array.from(message.reactions.cache.values()).map(reaction => ({
+            emoji: reaction.emoji?.toString() || null,
+            count: reaction.count
+        }))
+    };
+}
+
+function buildDossierTranscriptFromMessages(channel, dossier, messages, language = 'fr') {
     const createdAt = dossier?.createdAt || dossier?.created_at || null;
     const closedAt = dossier?.closedAt || dossier?.closed_at || null;
     const duration = createdAt
@@ -10694,6 +11719,8 @@ async function buildDossierTranscript(channel, dossier, language = 'fr') {
             `Referent: ${dossier?.referentUserId || 'none'}`,
             `Subject: ${dossier?.subject || 'none'}`,
             `Description: ${dossier?.description || 'none'}`,
+            `Closing reason: ${dossier?.closeReason || 'none'}`,
+            `Resolution: ${dossier?.resolutionSummary || 'none'}`,
             `Duration: ${duration || 'unknown'}`,
             `Generated: ${new Date().toISOString()}`
         ]
@@ -10706,21 +11733,130 @@ async function buildDossierTranscript(channel, dossier, language = 'fr') {
             `Référent : ${dossier?.referentUserId || 'aucun'}`,
             `Sujet : ${dossier?.subject || 'aucun'}`,
             `Description : ${dossier?.description || 'aucune'}`,
+            `Motif de clôture : ${dossier?.closeReason || 'aucun'}`,
+            `Résolution : ${dossier?.resolutionSummary || 'aucune'}`,
             `Durée : ${duration || 'inconnue'}`,
             `Généré : ${new Date().toISOString()}`
         ];
-    const lines = sortedMessages.map(message => {
-        const content = message.content || '[embed/fichier/bouton]';
-        return `[${new Date(message.createdTimestamp).toISOString()}] ${message.author?.tag || message.author?.id || 'inconnu'}: ${content.replace(/\s+/g, ' ').slice(0, 1800)}`;
+    const lines = messages.map(message => {
+        const additions = [
+            ...(message.attachments || []).map(file => `[pièce jointe: ${file.name || file.id}]`),
+            ...((message.embeds || []).length ? [`[${message.embeds.length} contenu(s) intégré(s)]`] : [])
+        ];
+        const content = [message.content, ...additions].filter(Boolean).join(' ') || '[message sans texte]';
+        return `[${message.createdAt}] ${message.author?.tag || message.author?.id || 'inconnu'}: ${content.replace(/\s+/g, ' ')}`;
     });
 
     return [...header, '', ...lines].join('\n');
 }
 
+async function archiveDossierChannel(channel, dossier, language = 'fr') {
+    const discordMessages = await fetchAllDossierMessages(channel);
+    const messages = discordMessages.map(dossierMessageToArchive);
+    const archivedAt = new Date().toISOString();
+    const archiveId = `${String(dossier?.id || channel.id)}-${Date.now()}`;
+    const relativeDirectory = path.join(String(channel.guild.id), archiveId);
+    const finalDirectory = path.resolve(DOSSIER_ARCHIVE_DIR, relativeDirectory);
+    const stagingDirectory = `${finalDirectory}.staging-${crypto.randomBytes(6).toString('hex')}`;
+    const tarFiles = [];
+    let totalAttachmentBytes = 0;
+    let attachmentCount = 0;
+
+    await fs.promises.mkdir(stagingDirectory, { recursive: true });
+
+    try {
+        for (const message of messages) {
+            for (const attachment of message.attachments) {
+                const fileName = `${attachment.id}-${safeArchiveFileName(attachment.name)}`;
+                const result = await downloadDossierAttachment(attachment, totalAttachmentBytes);
+                totalAttachmentBytes += result.bytes;
+                attachmentCount += 1;
+                attachment.archiveFile = path.posix.join('pieces-jointes', fileName);
+                attachment.sha256 = result.sha256;
+                attachment.archivedSize = result.bytes;
+                tarFiles.push({ name: attachment.archiveFile, data: result.buffer });
+            }
+        }
+
+        const manifest = {
+            version: 1,
+            archivedAt,
+            guild: { id: channel.guild.id, name: channel.guild.name },
+            channel: { id: channel.id, name: channel.name, topic: channel.topic || null },
+            dossier: {
+                ...dossier,
+                archivePath: undefined,
+                archiveSha256: undefined
+            },
+            counts: {
+                messages: messages.length,
+                attachments: attachmentCount,
+                embeds: messages.reduce((sum, message) => sum + message.embeds.length, 0)
+            },
+            messages
+        };
+        const transcript = buildDossierTranscriptFromMessages(channel, dossier, messages, language);
+        const archiveName = 'dossier.tar.gz';
+        const tarBuffer = createTarBuffer([
+            { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
+            { name: 'compte-rendu.txt', data: Buffer.from(transcript, 'utf8') },
+            ...tarFiles
+        ]);
+        const compressedArchive = zlib.gzipSync(tarBuffer, { level: 9 });
+        const searchable = [
+            JSON.stringify(manifest.dossier),
+            ...messages.map(message => `${message.author?.tag || ''} ${message.content || ''} ${JSON.stringify(message.embeds || [])} ${(message.attachments || []).map(file => file.name || '').join(' ')}`)
+        ].join('\n');
+
+        await fs.promises.writeFile(path.join(stagingDirectory, archiveName), compressedArchive, { flag: 'wx' });
+        await fs.promises.writeFile(
+            path.join(stagingDirectory, 'recherche.txt.gz'),
+            zlib.gzipSync(Buffer.from(searchable, 'utf8'), { level: 9 }),
+            { flag: 'wx' }
+        );
+        await fs.promises.mkdir(path.dirname(finalDirectory), { recursive: true });
+        await fs.promises.rename(stagingDirectory, finalDirectory);
+
+        const archivePath = path.join(finalDirectory, archiveName);
+        const savedArchive = await fs.promises.readFile(archivePath);
+        const sha256 = crypto.createHash('sha256').update(savedArchive).digest('hex');
+        const verifiedTar = zlib.gunzipSync(savedArchive);
+        const verifiedManifest = readTarEntry(verifiedTar, 'manifest.json');
+
+        if (!verifiedManifest) {
+            throw new Error('L’archive créée ne contient pas son manifeste.');
+        }
+
+        JSON.parse(verifiedManifest.toString('utf8'));
+        const relativePath = path.relative(DOSSIER_ARCHIVE_DIR, archivePath);
+        const result = {
+            relativePath,
+            sha256,
+            size: savedArchive.length,
+            archivedAt,
+            messageCount: messages.length,
+            attachmentCount,
+            embedCount: manifest.counts.embeds,
+            transcript
+        };
+
+        saveDossierArchiveMetadata(channel.guild.id, channel.id, result);
+        return result;
+    } catch (error) {
+        await fs.promises.rm(stagingDirectory, { recursive: true, force: true }).catch(() => {});
+        throw error;
+    }
+}
+
 async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
-    const transcript = await buildDossierTranscript(channel, dossier, language);
-    const fileName = `dossier-sentinel-${dossier?.id || channel.id}.txt`;
-    const attachment = new AttachmentBuilder(Buffer.from(transcript, 'utf8'), { name: fileName });
+    const archive = await archiveDossierChannel(channel, dossier, language);
+    const transcriptBuffer = Buffer.from(archive.transcript, 'utf8');
+    const compressed = transcriptBuffer.length > 7 * 1024 * 1024;
+    const fileName = `dossier-sentinel-${dossier?.id || channel.id}.txt${compressed ? '.gz' : ''}`;
+    const attachment = new AttachmentBuilder(
+        compressed ? zlib.gzipSync(transcriptBuffer, { level: 9 }) : transcriptBuffer,
+        { name: fileName }
+    );
     const logChannel = getLogChannel(channel.guild);
     const createdAt = dossier?.createdAt || dossier?.created_at || null;
     const closedAt = dossier?.closedAt || dossier?.closed_at || new Date().toISOString();
@@ -10787,6 +11923,8 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
         }).catch(() => null);
 
         return {
+            archived: true,
+            ...archive,
             sentToLogChannel: Boolean(sent),
             logChannelId: logChannel.id
         };
@@ -10798,6 +11936,8 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     }).catch(() => null);
 
     return {
+        archived: true,
+        ...archive,
         sentToLogChannel: false,
         logChannelId: null,
         sentInDossier: Boolean(sent)
@@ -11048,7 +12188,11 @@ async function handleSentinelTicketButton(interaction) {
 
     setCooldown(dossierPanelClickCooldowns, interaction.guild.id, interaction.user.id, DOSSIER_PANEL_CLICK_COOLDOWN_MS);
 
-    return interaction.showModal(buildDossierOpenModal(dossierType, language));
+    const questions = hasAdvancedAccess(interaction.member)
+        ? (getDossierTypeSetting(interaction.guild.id, dossierType)?.questions || [])
+        : [];
+
+    return interaction.showModal(buildDossierOpenModal(dossierType, language, questions));
 }
 
 async function createDossierFromInteraction(interaction, dossierType, details = {}) {
@@ -11083,7 +12227,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
             ? configuredCategory.id
             : (supportCategory?.id || interaction.channel?.parentId || null),
         topic: `sentinel-dossier:${interaction.user.id}:${dossierType}`,
-        permissionOverwrites: buildTicketOverwrites(interaction.guild, interaction.member),
+        permissionOverwrites: buildTicketOverwrites(interaction.guild, interaction.member, dossierType),
         reason: `Creation dossier Sentinel ${dossierType}`
     });
     const dossier = createDossierRecord(
@@ -11095,7 +12239,8 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
         {
             subject,
             description: descriptionText,
-            priority: details.priority || 'normal'
+            priority: details.priority || 'normal',
+            formAnswers: details.formAnswers || []
         }
     );
     await ticketChannel.setTopic(`sentinel-dossier:${interaction.user.id}:${dossierType}:${dossier.id}`).catch(() => {});
@@ -11110,6 +12255,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
         descriptionText
             ? (language === 'en' ? `**Description:** ${descriptionText}` : `**Description :** ${descriptionText}`)
             : null,
+        ...(details.formAnswers || []).map(answer => `**${answer.label} :** ${answer.value}`),
         '',
         ...meta.intro
     ].filter(line => line !== null);
@@ -11151,14 +12297,59 @@ async function handleDossierOpenModal(interaction) {
     const dossierType = normalizeDossierType(match[1]);
     const subject = interaction.fields.getTextInputValue('subject');
     const description = interaction.fields.getTextInputValue('description');
+    const questions = hasAdvancedAccess(interaction.member)
+        ? (getDossierTypeSetting(interaction.guild.id, dossierType)?.questions || [])
+        : [];
+    const formAnswers = questions.slice(0, 3).map((question, index) => ({
+        label: question.label,
+        value: interaction.fields.getTextInputValue(`question_${index}`)
+    })).filter(answer => String(answer.value || '').trim());
 
     try {
-        await createDossierFromInteraction(interaction, dossierType, { subject, description });
+        await createDossierFromInteraction(interaction, dossierType, { subject, description, formAnswers });
     } catch (error) {
         await interaction.reply({
             content: error.message || t(language, 'serviceError'),
             flags: MessageFlags.Ephemeral
         }).catch(() => {});
+    }
+
+    return true;
+}
+
+async function handleDossierCloseModal(interaction) {
+    const match = /^sentinel_dossier_close:(\d{17,20})$/.exec(interaction.customId);
+
+    if (!match) {
+        return false;
+    }
+
+    const language = getGuildLanguage(interaction.guild.id);
+    const channel = await interaction.guild.channels.fetch(match[1]).catch(() => null);
+    const topic = parseDossierChannelTopic(channel?.topic);
+
+    if (!channel?.isTextBased?.() || !topic) {
+        await interaction.reply({ content: t(language, 'dossierNotInDossier'), flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (!memberCanManageDossier(interaction.member, topic.type) && topic.ownerUserId !== interaction.user.id) {
+        await interaction.reply({ content: t(language, 'dossierCloseDenied'), flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    try {
+        await closeDossierChannelFromInteraction(interaction, channel, language, {
+            reason: interaction.fields.getTextInputValue('close_reason'),
+            resolution: interaction.fields.getTextInputValue('resolution_summary'),
+            advanced: hasAdvancedAccess(interaction.member)
+        });
+        await interaction.editReply(t(language, 'dossierClosed'));
+    } catch (error) {
+        console.error('Erreur clôture dossier :', error);
+        await interaction.editReply(error.message || t(language, 'serviceError'));
     }
 
     return true;
@@ -11175,7 +12366,9 @@ async function handleSentinelDossierClaimButton(interaction) {
         });
     }
 
-    if (!memberCanManageDossier(interaction.member)) {
+    const topic = parseDossierChannelTopic(channel.topic);
+
+    if (!memberCanManageDossier(interaction.member, topic?.type)) {
         return interaction.reply({
             content: t(language, 'dossierClaimDenied'),
             flags: MessageFlags.Ephemeral
@@ -11207,7 +12400,9 @@ async function handleDossierStatusSelect(interaction) {
         return true;
     }
 
-    if (!memberCanManageDossier(interaction.member)) {
+    const dossierTopic = parseDossierChannelTopic(channel.topic);
+
+    if (!memberCanManageDossier(interaction.member, dossierTopic?.type)) {
         await interaction.reply({
             content: t(language, 'dossierStatusDenied'),
             flags: MessageFlags.Ephemeral
@@ -11249,7 +12444,9 @@ async function handleSentinelDossierTranscriptButton(interaction) {
         });
     }
 
-    if (!memberCanManageDossier(interaction.member)) {
+    const topic = parseDossierChannelTopic(channel.topic);
+
+    if (!memberCanManageDossier(interaction.member, topic?.type)) {
         return interaction.reply({
             content: t(language, 'dossierClaimDenied'),
             flags: MessageFlags.Ephemeral
@@ -11267,6 +12464,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
     const dossierCommands = new Set([
         'dossier-panel',
         'dossier-fermer',
+        'dossier-reouvrir',
         'dossier-ajouter',
         'dossier-retirer',
         'dossier-compte-rendu',
@@ -11380,7 +12578,9 @@ async function handleDossierInteraction(interaction, commandName, language) {
         return true;
     }
 
-    if (!memberCanManageDossier(interaction.member)) {
+    const dossierTopic = parseDossierChannelTopic(channel.topic);
+
+    if (!memberCanManageDossier(interaction.member, dossierTopic?.type)) {
         await interaction.reply({
             content: getCommandRoleAccessDeniedMessage(language),
             flags: MessageFlags.Ephemeral
@@ -11437,20 +12637,21 @@ async function handleDossierInteraction(interaction, commandName, language) {
     }
 
     if (commandName === 'dossier-fermer') {
-        await requestSensitiveConfirmation(interaction, {
-            action: 'dossier-close',
-            actionLabel: t(language, 'confirmDossierClose'),
-            targetLabel: `#${channel.name}`,
-            details: [
-                language === 'en'
-                    ? 'Sentinel will send the written record, then seal this space.'
-                    : 'Sentinel transmettra le compte rendu, puis scellera cet espace.'
-            ],
-            payload: {
-                channelId: channel.id
-            },
-            language
-        });
+        await interaction.showModal(buildDossierCloseModal(channel.id, language));
+        return true;
+    }
+
+    if (commandName === 'dossier-reouvrir') {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        try {
+            await reopenDossierChannel(interaction.guild, channel, interaction.user, language, {
+                advanced: hasAdvancedAccess(interaction.member)
+            });
+            await interaction.editReply(language === 'en' ? 'The dossier is open again.' : 'Le dossier est de nouveau ouvert.');
+        } catch (error) {
+            await interaction.editReply(error.message || t(language, 'serviceError'));
+        }
         return true;
     }
 
@@ -11524,7 +12725,7 @@ async function handleSentinelTicketCloseButton(interaction) {
     }
 
     if (
-        !memberCanManageDossier(interaction.member)
+        !memberCanManageDossier(interaction.member, topic.type)
         && topic.ownerUserId !== interaction.user.id
     ) {
         return interaction.reply({
@@ -11533,20 +12734,7 @@ async function handleSentinelTicketCloseButton(interaction) {
         });
     }
 
-    return requestSensitiveConfirmation(interaction, {
-        action: 'dossier-close',
-        actionLabel: t(language, 'confirmDossierClose'),
-        targetLabel: `#${channel.name}`,
-        details: [
-            language === 'en'
-                ? 'Sentinel will send the written record, then seal this space.'
-                : 'Sentinel transmettra le compte rendu, puis scellera cet espace.'
-        ],
-        payload: {
-            channelId: channel.id
-        },
-        language
-    });
+    return interaction.showModal(buildDossierCloseModal(channel.id, language));
 }
 
 async function handleSentinelVoteButton(interaction) {
@@ -12805,6 +13993,7 @@ client.once(Events.ClientReady, async () => {
             addCommandRole,
             addCustomEmbedRecord,
             addDossierRole,
+            addDossierTypeRole,
             addModerationCase,
             addSession,
             addWeeklyPayAdjustment,
@@ -12820,7 +14009,9 @@ client.once(Events.ClientReady, async () => {
             publishOrUpdateServicePanel,
             clearLongServiceAlert,
             clearLongServiceAlertsForGuild,
+            closeDossierChannel,
             closeDossierRecord,
+            createDossierTemplate,
             createUserIfMissing,
             deleteCustomEmbedRecord,
             deleteModerationCase,
@@ -12837,13 +14028,19 @@ client.once(Events.ClientReady, async () => {
             hasCustomEmbedUpload,
             customEmbedUploadRequiresAttachment,
             getDatabaseBackupStatus,
+            getAllDossierTypeRoles,
+            getDossierArchiveFile,
             getDossierRoleIds,
+            getDossierStats,
+            getDossierTemplate,
+            getDossierTemplates,
             getGuildConfig,
             getGuildLanguage,
             getGuildPayRoleSettings,
             getAutoRole,
             getAssignableRoleError,
             getDossierByChannel,
+            getDossierById,
             getDossierPanelQuota,
             getDossierTypeSettings,
             getDashboardAutomodSettings,
@@ -12887,9 +14084,12 @@ client.once(Events.ClientReady, async () => {
             parseDurationToMs,
             parseSlowmodeToSeconds,
             prepareCustomEmbedUploads,
+            reconcileDossierPanels,
             recordDashboardRequestMetric,
             removeAutomodWord,
             removeDossierRole,
+            removeDossierTypeRole,
+            deleteDossierTemplate,
             removeCommandRole,
             removeGuildPayRoleSettings,
             recordDossierPanel,
@@ -12902,9 +14102,14 @@ client.once(Events.ClientReady, async () => {
             setGuildLanguage,
             setWeeklyPaymentStatus,
             syncCustomEmbedMedia,
+            syncDossierTypePermissions,
             updateGuildPayRoleSettings,
+            updateDossierActivity,
             updateDossierStatus,
+            updateDossierPriority,
             updateDossierTypeCategory,
+            updateDossierTypeSettings,
+            reopenDossierChannel,
             syncServiceState,
             updateGuildPaySettings,
             updateAutomodSettings,
@@ -12918,6 +14123,7 @@ client.once(Events.ClientReady, async () => {
             restoreManagedDatabaseBackup,
             runManualDatabaseMaintenance,
             scanCustomEmbedMediaOrphans,
+            searchDossierArchives,
             verifyManagedDatabaseBackup
         }
     });
@@ -12959,7 +14165,11 @@ client.once(Events.ClientReady, async () => {
     setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
     setInterval(processExpiredTemporaryBans, 60 * 1000);
     setInterval(checkLongServiceAlerts, LONG_SERVICE_ALERT_INTERVAL_MS);
+    setInterval(processDossierMaintenance, DOSSIER_MAINTENANCE_INTERVAL_MS);
     setTimeout(checkLongServiceAlerts, 60 * 1000);
+    setTimeout(() => processDossierMaintenance().catch(error => {
+        console.error('Entretien dossiers Sentinel :', error);
+    }), 30 * 1000);
 });
 
 client.on(Events.Error, error => {
@@ -13044,6 +14254,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
     try {
     if (interaction.isModalSubmit()) {
+        if (await handleDossierCloseModal(interaction)) {
+            return;
+        }
+
         if (await handleDossierOpenModal(interaction)) {
             return;
         }
@@ -14286,6 +15500,18 @@ client.on(Events.MessageCreate, async message => {
     let auditStatus = 'success';
     let auditSummary = null;
 
+    const dossierTopic = parseDossierChannelTopic(message.channel?.topic);
+    if (dossierTopic) {
+        updateDossierActivity(
+            guildId,
+            message.channel.id,
+            message.author.id,
+            message.author.id !== dossierTopic.ownerUserId
+                && memberCanManageDossier(message.member, dossierTopic.type),
+            message.createdAt.toISOString()
+        );
+    }
+
     try {
     if (await handleAutomodMessage(message)) {
         return;
@@ -14774,5 +16000,16 @@ client.on(Events.MessageCreate, async message => {
     }
 });
 
-client.login(process.env.TOKEN);
+module.exports = {
+    __test: {
+        createTarBuffer,
+        readTarEntry,
+        resolveDossierArchivePath,
+        safeArchiveFileName
+    }
+};
+
+if (require.main === module) {
+    client.login(process.env.TOKEN);
+}
 

@@ -38,9 +38,9 @@ Sentinel Gratuit reste utilisable sans abonnement :
 - 1 panneau de dossiers ;
 - 5 dossiers ouverts en même temps ;
 - 10 derniers dossiers visibles ;
-- rôles responsables capables de prendre en charge, corriger le statut, archiver et clôturer un ticket.
+- rôles responsables par nature de dossier, file d’attente, filtres essentiels, archivage complet vérifié et clôture motivée.
 
-## Premium prévu
+## Premium
 
 Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion plus avancée :
 
@@ -51,10 +51,10 @@ Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion pl
 - rapports automatiques ;
 - accès illimité aux embeds ;
 - panneaux de dossiers illimités ;
-- catégories et formulaires personnalisés ;
-- priorités, templates et branding des dossiers ;
-- transcriptions complètes ;
-- historique complet et recherche avancée ;
+- catégories, routage et formulaires personnalisés ;
+- priorités, réponses préparées et délais d’intervention ;
+- recherche dans les archives complètes ;
+- réouverture temporaire, rappels et statistiques d’équipe ;
 - automatisations de modération et de dossiers.
 
 Le gratuit reste volontairement simple. Le Premium apportera surtout du confort, du volume et des outils de gestion pour les grosses communautés.
@@ -104,6 +104,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/sanctions` | `/mod-cases` | Voir les sanctions récentes |
 | `/embed` | `/embed` | Gérer les annonces Sentinel |
 | `/dossier-panel` | `/ticket-panel` | Publier le panneau de tickets |
+| `/dossier-reouvrir` | `/reopen-ticket` | Premium : réouvrir un dossier encore conservé |
 | `/paie-ajustement` | `/payroll-adjustment` | Premium : ajouter une prime, une retenue ou une correction |
 
 La liste complète et les explications détaillées sont disponibles sur le site.

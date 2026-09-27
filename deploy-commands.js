@@ -662,6 +662,8 @@ const publicCommands = [
 
     command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the current Sentinel dossier.'),
 
+    command('dossier-reouvrir', 'reopen-ticket', 'Reouvre un dossier Sentinel Premium encore conserve.', 'Reopens a retained Premium Sentinel dossier.'),
+
     command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel dossier.')
         .addUserOption(option =>
             option
