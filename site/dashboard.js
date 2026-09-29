@@ -3087,35 +3087,32 @@ function dossierTypeRolesSettings(state) {
     ['partnership', 'Partenariat'],
     ['other', 'Autre']
   ];
-  const generalRoleIds = new Set([
-    ...(state.dossiers?.roleIds || []),
-    ...(state.config?.commandRoleIds || [])
-  ]);
-  const generalRoles = [...generalRoleIds]
-    .map(roleId => resolveRole(state, roleId))
-    .filter(Boolean);
-  const generalRoleNames = generalRoles.length
-    ? `${generalRoles.map(role => `@${role.name}`).join(', ')} et les autres responsables Sentinel`
-    : 'les responsables Sentinel et les administrateurs Discord';
 
   return `
     <article class="inline-form dossier-type-roles">
       <div class="dossier-access-heading">
         <div>
-          <p class="eyebrow">Visibilité des salons privés</p>
-          <h3>Qui peut voir chaque type de dossier ?</h3>
-          <p>Sans restriction particulière, les dossiers sont confiés à l’équipe générale. Tu peux réserver une nature de dossier à un ou plusieurs rôles spécialisés.</p>
+          <p class="eyebrow">Accès par catégorie</p>
+          <h3>Une règle simple</h3>
         </div>
-        <div class="dossier-access-legend" aria-label="Fonctionnement des accès">
-          <div>
-            <span class="dossier-access-badge is-general">Équipe générale</span>
-            <small>Accès pour ${escapeHtml(generalRoleNames)}.</small>
+        <div class="dossier-access-rules" aria-label="Fonctionnement des accès">
+          <div class="dossier-access-rule">
+            <span class="dossier-access-rule-number">1</span>
+            <div>
+              <strong>Aucun rôle choisi dans une catégorie</strong>
+              <p>Tous les responsables Sentinel peuvent voir et traiter ses dossiers.</p>
+            </div>
           </div>
-          <div>
-            <span class="dossier-access-badge is-restricted">Accès réservé</span>
-            <small>Seuls les rôles choisis, le demandeur, les personnes invitées et les administrateurs Discord voient le salon.</small>
+          <div class="dossier-access-rule is-restricted">
+            <span class="dossier-access-rule-number">2</span>
+            <div>
+              <strong>Au moins un rôle choisi</strong>
+              <p>Seuls les rôles affichés sur cette catégorie y accèdent côté équipe.</p>
+            </div>
           </div>
         </div>
+        <p class="dossier-access-constant"><strong>Toujours autorisés :</strong> le demandeur, les personnes invitées et les administrateurs Discord.</p>
+        <p class="dossier-access-example"><strong>Exemple :</strong> ajoute le rôle Recruteur dans “Recrutement”. Les autres responsables ne verront plus les dossiers de recrutement.</p>
       </div>
       <div class="dossier-category-grid dossier-access-grid">
         ${types.map(([type, label]) => {
@@ -3131,11 +3128,11 @@ function dossierTypeRolesSettings(state) {
             <section class="dossier-setting-block dossier-access-card${restricted ? ' is-restricted' : ' is-general'}">
               <header>
                 <strong>${escapeHtml(label)}</strong>
-                <span class="dossier-access-badge ${restricted ? 'is-restricted' : 'is-general'}">${restricted ? 'Accès réservé' : 'Équipe générale'}</span>
+                <span class="dossier-access-badge ${restricted ? 'is-restricted' : 'is-general'}">${restricted ? 'Seulement ces rôles' : 'Tous les responsables'}</span>
               </header>
               <p class="dossier-access-summary">${restricted
-                ? 'Côté équipe, seuls les rôles affichés ci-dessous peuvent ouvrir ces dossiers.'
-                : 'Aucune restriction spéciale. Toute l’équipe générale peut traiter ces dossiers.'}</p>
+                ? 'Cette catégorie est limitée. Les autres responsables Sentinel n’y ont pas accès.'
+                : 'Aucun rôle spécifique : tous les responsables Sentinel ont accès à cette catégorie.'}</p>
               <div class="role-chip-row dossier-access-role-list">
                 ${restricted ? assigned.map((role) => `
                   <form data-action-form="remove-dossier-type-role" class="role-chip">
@@ -3144,17 +3141,17 @@ function dossierTypeRolesSettings(state) {
                     <span>@${escapeHtml(role.name)}</span>
                     <button type="submit" aria-label="Retirer le rôle ${escapeHtml(role.name)} de la catégorie ${escapeHtml(label)}">Retirer</button>
                   </form>
-                `).join('') : `<div class="dossier-general-access-note"><strong>Accès actuel</strong><span>${escapeHtml(generalRoleNames)}</span></div>`}
+                `).join('') : '<div class="dossier-general-access-note"><strong>Accès actuel</strong><span>Tous les responsables Sentinel</span></div>'}
               </div>
               <form data-action-form="add-dossier-type-role" class="dossier-type-access-form">
                 <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
                 <label>
-                  <span>${restricted ? 'Ajouter un autre rôle autorisé' : 'Réserver cette catégorie à un rôle'}</span>
+                  <span>${restricted ? 'Autoriser un rôle supplémentaire' : 'Limiter cette catégorie à un rôle'}</span>
                   <select name="roleId" required${availableRoles.length ? '' : ' disabled'}>${roleOptions}</select>
                 </label>
-                <button class="button button-small" type="submit"${availableRoles.length ? '' : ' disabled'}>${restricted ? 'Ajouter aux accès' : 'Réserver l’accès'}</button>
+                <button class="button button-small" type="submit"${availableRoles.length ? '' : ' disabled'}>${restricted ? 'Autoriser ce rôle aussi' : 'Limiter à ce rôle'}</button>
               </form>
-              ${restricted ? '<small class="dossier-access-footnote">Retire tous les rôles spécialisés pour rendre cette catégorie à l’équipe générale.</small>' : ''}
+              ${restricted ? '<small class="dossier-access-footnote">En retirant le dernier rôle, tous les responsables Sentinel retrouveront automatiquement l’accès.</small>' : ''}
             </section>
           `;
         }).join('')}
@@ -3298,7 +3295,7 @@ function dossierRoleList(state) {
   const roles = dossierRoles(state);
 
   if (roles.length === 0) {
-    return '<p class="muted">Aucun rôle responsable n’est configuré. Les rôles autorisés, le propriétaire et les membres avec les permissions Discord nécessaires peuvent encore gérer les tickets.</p>';
+    return '<p class="muted">Aucun rôle supplémentaire n’est ajouté ici. Les responsables déjà autorisés dans Sentinel et les administrateurs Discord conservent l’accès général.</p>';
   }
 
   return `
@@ -3769,10 +3766,11 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
           </article>
         `}
         <article class="inline-form dossier-explain-card">
-          ${labelHelp(premiumMode ? 'Équipe des dossiers Premium' : 'Rôles responsables', 'Ces rôles peuvent voir et administrer les dossiers privés.')}
+          ${labelHelp('Accès général aux dossiers', 'Ces rôles voient toutes les catégories, sauf celles que tu limites à des rôles précis plus bas.')}
+          <p class="form-hint">Les rôles ajoutés ici voient tous les dossiers qui ne possèdent pas de restriction particulière.</p>
           <form data-action-form="add-dossier-role">
             <select name="roleId">${dossierRoleOptions}</select>
-            <button class="button" type="submit">Ajouter le rôle</button>
+            <button class="button" type="submit">Ajouter à l’accès général</button>
           </form>
           ${dossierRoleList(state)}
         </article>
