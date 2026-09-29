@@ -4070,6 +4070,81 @@ code {
   grid-column: 1 / -1;
 }
 
+.dossier-type-roles {
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  clip-path: none;
+}
+
+.dossier-access-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+  gap: 18px;
+  align-items: stretch;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 84%, transparent);
+}
+
+.dossier-access-heading h3 {
+  margin: 4px 0 8px;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.dossier-access-heading p:not(.eyebrow) {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.dossier-access-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dossier-access-legend > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px;
+  border-left: 3px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.dossier-access-legend > div:last-child {
+  border-left-color: var(--cyan);
+}
+
+.dossier-access-legend small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.dossier-access-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.dossier-access-badge.is-restricted {
+  border-color: color-mix(in srgb, var(--cyan) 52%, var(--line));
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+}
+
 .dossier-setting-block {
   display: grid;
   align-content: start;
@@ -4077,6 +4152,84 @@ code {
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
   background: color-mix(in srgb, var(--surface-strong) 78%, transparent);
+}
+
+.dossier-access-card {
+  grid-template-rows: auto auto minmax(48px, auto) auto auto;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px;
+}
+
+.dossier-access-card.is-restricted {
+  border-color: color-mix(in srgb, var(--cyan) 36%, var(--line));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--cyan) 72%, transparent);
+}
+
+.dossier-access-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dossier-access-card > header > strong {
+  font-size: 1rem;
+}
+
+.dossier-access-summary {
+  min-height: 42px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.dossier-access-role-list {
+  align-content: start;
+  min-height: 48px;
+  margin: 0;
+}
+
+.dossier-general-access-note {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 10px;
+  border-left: 3px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.dossier-general-access-note strong {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.dossier-general-access-note span {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.dossier-type-access-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.dossier-type-access-form select,
+.dossier-type-access-form .button {
+  width: 100%;
+}
+
+.dossier-access-footnote {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .dossier-setting-block form,
@@ -4322,6 +4475,10 @@ code {
   gap: 10px;
 }
 
+.dossier-access-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .dossier-category-grid form {
   display: grid;
   gap: 8px;
@@ -4333,6 +4490,34 @@ code {
 
 .dossier-category-grid strong {
   color: var(--text);
+}
+
+@media (max-width: 1100px) {
+  .dossier-access-heading,
+  .dossier-access-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dossier-access-heading > div {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .dossier-access-heading,
+  .dossier-access-grid,
+  .dossier-access-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .dossier-access-heading > div:first-child {
+    grid-column: auto;
+  }
+
+  .dossier-access-card > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .panel-mini-heading {

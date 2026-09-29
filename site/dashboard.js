@@ -3079,7 +3079,7 @@ function dossierSettingForType(state, type) {
   return (state.dossiers?.settings || []).find((setting) => setting.type === type) || null;
 }
 
-function dossierTypeRolesSettings(state, roleOptions) {
+function dossierTypeRolesSettings(state) {
   const types = [
     ['support', 'Support'],
     ['report', 'Signalement'],
@@ -3087,34 +3087,74 @@ function dossierTypeRolesSettings(state, roleOptions) {
     ['partnership', 'Partenariat'],
     ['other', 'Autre']
   ];
+  const generalRoleIds = new Set([
+    ...(state.dossiers?.roleIds || []),
+    ...(state.config?.commandRoleIds || [])
+  ]);
+  const generalRoles = [...generalRoleIds]
+    .map(roleId => resolveRole(state, roleId))
+    .filter(Boolean);
+  const generalRoleNames = generalRoles.length
+    ? `${generalRoles.map(role => `@${role.name}`).join(', ')} et les autres responsables Sentinel`
+    : 'les responsables Sentinel et les administrateurs Discord';
 
   return `
     <article class="inline-form dossier-type-roles">
-      ${labelHelp('Confidentialité par dossier', 'Lorsqu’un rôle est attribué à une nature de dossier, lui seul et les administrateurs Discord peuvent voir les salons correspondants.')}
-      <div class="dossier-category-grid">
+      <div class="dossier-access-heading">
+        <div>
+          <p class="eyebrow">Visibilité des salons privés</p>
+          <h3>Qui peut voir chaque type de dossier ?</h3>
+          <p>Sans restriction particulière, les dossiers sont confiés à l’équipe générale. Tu peux réserver une nature de dossier à un ou plusieurs rôles spécialisés.</p>
+        </div>
+        <div class="dossier-access-legend" aria-label="Fonctionnement des accès">
+          <div>
+            <span class="dossier-access-badge is-general">Équipe générale</span>
+            <small>Accès pour ${escapeHtml(generalRoleNames)}.</small>
+          </div>
+          <div>
+            <span class="dossier-access-badge is-restricted">Accès réservé</span>
+            <small>Seuls les rôles choisis, le demandeur, les personnes invitées et les administrateurs Discord voient le salon.</small>
+          </div>
+        </div>
+      </div>
+      <div class="dossier-category-grid dossier-access-grid">
         ${types.map(([type, label]) => {
-          const assigned = (state.dossiers?.typeRoles || []).filter(item => item.type === type);
+          const assigned = (state.dossiers?.typeRoles || [])
+            .filter(item => item.type === type)
+            .map(item => resolveRole(state, item.roleId))
+            .filter(Boolean);
+          const assignedRoleIds = new Set(assigned.map(role => role.id));
+          const availableRoles = (state.roles || []).filter(role => !assignedRoleIds.has(role.id));
+          const roleOptions = optionList(availableRoles, null, 'Sélectionner un rôle Discord');
+          const restricted = assigned.length > 0;
           return `
-            <section class="dossier-setting-block">
-              <strong>${escapeHtml(label)}</strong>
-              <form data-action-form="add-dossier-type-role">
-                <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
-                <select name="roleId">${roleOptions}</select>
-                <button class="button button-small" type="submit">Affecter</button>
-              </form>
-              <div class="role-chip-row">
-                ${assigned.length ? assigned.map((item) => {
-                  const role = resolveRole(state, item.roleId);
-                  return role ? `
-                    <form data-action-form="remove-dossier-type-role" class="role-chip">
-                      <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
-                      <input type="hidden" name="roleId" value="${escapeHtml(role.id)}">
-                      <span>@${escapeHtml(role.name)}</span>
-                      <button type="submit">Retirer</button>
-                    </form>
-                  ` : '';
-                }).join('') : '<small class="muted">Rôles généraux utilisés</small>'}
+            <section class="dossier-setting-block dossier-access-card${restricted ? ' is-restricted' : ' is-general'}">
+              <header>
+                <strong>${escapeHtml(label)}</strong>
+                <span class="dossier-access-badge ${restricted ? 'is-restricted' : 'is-general'}">${restricted ? 'Accès réservé' : 'Équipe générale'}</span>
+              </header>
+              <p class="dossier-access-summary">${restricted
+                ? 'Côté équipe, seuls les rôles affichés ci-dessous peuvent ouvrir ces dossiers.'
+                : 'Aucune restriction spéciale. Toute l’équipe générale peut traiter ces dossiers.'}</p>
+              <div class="role-chip-row dossier-access-role-list">
+                ${restricted ? assigned.map((role) => `
+                  <form data-action-form="remove-dossier-type-role" class="role-chip">
+                    <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                    <input type="hidden" name="roleId" value="${escapeHtml(role.id)}">
+                    <span>@${escapeHtml(role.name)}</span>
+                    <button type="submit" aria-label="Retirer le rôle ${escapeHtml(role.name)} de la catégorie ${escapeHtml(label)}">Retirer</button>
+                  </form>
+                `).join('') : `<div class="dossier-general-access-note"><strong>Accès actuel</strong><span>${escapeHtml(generalRoleNames)}</span></div>`}
               </div>
+              <form data-action-form="add-dossier-type-role" class="dossier-type-access-form">
+                <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
+                <label>
+                  <span>${restricted ? 'Ajouter un autre rôle autorisé' : 'Réserver cette catégorie à un rôle'}</span>
+                  <select name="roleId" required${availableRoles.length ? '' : ' disabled'}>${roleOptions}</select>
+                </label>
+                <button class="button button-small" type="submit"${availableRoles.length ? '' : ' disabled'}>${restricted ? 'Ajouter aux accès' : 'Réserver l’accès'}</button>
+              </form>
+              ${restricted ? '<small class="dossier-access-footnote">Retire tous les rôles spécialisés pour rendre cette catégorie à l’équipe générale.</small>' : ''}
             </section>
           `;
         }).join('')}
@@ -3736,7 +3776,7 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
           </form>
           ${dossierRoleList(state)}
         </article>
-        ${dossierTypeRolesSettings(state, dossierRoleOptions)}
+        ${dossierTypeRolesSettings(state)}
         ${premiumMode ? dossierStatsPanel(state, premiumTag) : ''}
         ${premiumMode ? dossierPremiumSettings(state, premiumTag) : ''}
         ${premiumMode ? dossierTemplatesPanel(state, premiumTag) : ''}
