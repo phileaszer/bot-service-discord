@@ -208,6 +208,7 @@ async function postStatusSubscriberUpdates(client, rows, payloadData, usedChanne
 async function main() {
     const args = readArgs(process.argv.slice(2));
     const type = String(args.type || 'announcement').trim();
+    const subscribersOnly = Boolean(args['subscribers-only']);
     const guildId = String(
         args.guild
         || process.env.SENTINEL_REFERENCE_GUILD_ID
@@ -237,13 +238,14 @@ async function main() {
             dryRun: true,
             guildId,
             type,
-            channels: target,
-            pingRole: args['no-ping']
+            channels: subscribersOnly ? null : target,
+            pingRole: subscribersOnly || args['no-ping']
                 ? null
                 : (args['ping-role-id'] || args['ping-role'] || process.env.ANNOUNCE_ROLE_ID || process.env.ANNOUNCE_ROLE_NAME || DEFAULT_PING_ROLE_NAME),
             fr: { title: titleFr, body: bodyFr },
             en: titleEn && bodyEn ? { title: titleEn, body: bodyEn } : null,
             statusSubscribers: shouldBroadcastToStatusSubscribers(args),
+            subscribersOnly,
             source
         }, null, 2));
         return;
@@ -258,41 +260,42 @@ async function main() {
 
     client.once('clientReady', async () => {
         try {
-            const guild = await client.guilds.fetch(guildId);
-            await guild.channels.fetch();
-            const pingRole = await resolvePingRole(guild, args);
-
             const posted = [];
             const usedChannelIds = new Set();
-            const frChannel = guild.channels.cache.find(channel => channel.name === target.fr);
+            if (!subscribersOnly) {
+                const guild = await client.guilds.fetch(guildId);
+                await guild.channels.fetch();
+                const pingRole = await resolvePingRole(guild, args);
+                const frChannel = guild.channels.cache.find(channel => channel.name === target.fr);
 
-            if (!frChannel) {
-                throw new Error(`Salon FR introuvable : ${target.fr}`);
-            }
+                if (!frChannel) {
+                    throw new Error(`Salon FR introuvable : ${target.fr}`);
+                }
 
-            await frChannel.send(buildPayload({
+                await frChannel.send(buildPayload({
                     type,
                     title: titleFr,
                     body: bodyFr,
                     source,
                     pingRole
-            }));
-            usedChannelIds.add(frChannel.id);
-            posted.push({ language: 'fr', channel: target.fr, id: frChannel.id, pingedRole: pingRole?.id || null });
+                }));
+                usedChannelIds.add(frChannel.id);
+                posted.push({ language: 'fr', channel: target.fr, id: frChannel.id, pingedRole: pingRole?.id || null });
 
-            if (titleEn && bodyEn && !args['fr-only']) {
-                const enChannel = guild.channels.cache.find(channel => channel.name === target.en);
+                if (titleEn && bodyEn && !args['fr-only']) {
+                    const enChannel = guild.channels.cache.find(channel => channel.name === target.en);
 
-                if (enChannel) {
-                    await enChannel.send(buildPayload({
+                    if (enChannel) {
+                        await enChannel.send(buildPayload({
                             type,
                             title: titleEn,
                             body: bodyEn,
                             source,
                             pingRole
-                    }));
-                    usedChannelIds.add(enChannel.id);
-                    posted.push({ language: 'en', channel: target.en, id: enChannel.id, pingedRole: pingRole?.id || null });
+                        }));
+                        usedChannelIds.add(enChannel.id);
+                        posted.push({ language: 'en', channel: target.en, id: enChannel.id, pingedRole: pingRole?.id || null });
+                    }
                 }
             }
 
