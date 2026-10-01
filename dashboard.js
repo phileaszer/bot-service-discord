@@ -2833,8 +2833,9 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         logPermissions?.has(PermissionsBitField.Flags.ViewChannel)
         && logPermissions?.has(PermissionsBitField.Flags.SendMessages)
     );
-    const statusChannelWritable = !config.statusChannelId || Boolean(
-        statusChannel
+    const statusChannelWritable = Boolean(
+        config.statusChannelId
+        && statusChannel
         && statusPermissions?.has(PermissionsBitField.Flags.ViewChannel)
         && statusPermissions?.has(PermissionsBitField.Flags.SendMessages)
         && statusPermissions?.has(PermissionsBitField.Flags.EmbedLinks)
@@ -2929,8 +2930,8 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             statusChannel
                 ? `Autorise Sentinel à voir, écrire et intégrer des liens dans #${statusChannel.name}.`
                 : (config.statusChannelId
-                    ? 'Choisis un autre salon statut ou désactive cette option.'
-                    : 'Le salon statut est optionnel.')
+                    ? 'Choisis un autre salon statut accessible.'
+                    : 'Choisis le salon obligatoire qui recevra l’état et les nouveautés Sentinel.')
         )
     ];
 
@@ -4331,9 +4332,12 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             PermissionsBitField.Flags.SendMessages,
             PermissionsBitField.Flags.EmbedLinks
         ], language);
-        ctx.helpers.updateGuildConfig(guild.id, { statusChannelId: channel.id });
+        ctx.helpers.updateGuildConfig(guild.id, {
+            statusChannelId: channel.id,
+            statusUpdatesEnabled: true
+        });
         await ctx.helpers.updateSentinelStatusPanel?.(guild);
-        return `Salon statut Sentinel configuré : #${channel.name}.`;
+        return `Salon statut et nouveautés configuré : #${channel.name}. Les annonces officielles sont activées.`;
     }
 
     if (action === 'disable-status-channel') {

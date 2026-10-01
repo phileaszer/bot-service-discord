@@ -638,7 +638,9 @@
     'Pour les heures d’un membre, utilise `/reset-heures`. Pour une demande concernant les données d’un serveur, contacte le support Sentinel avec l’ID du serveur concerné.': 'For a member hours, use `/reset-hours`. For a request about server data, contact Sentinel support with the relevant server ID.',
     'Pour les heures d’un membre, utilise': 'For a member hours, use',
     '. Pour une demande concernant les données d’un serveur, contacte le support Sentinel avec l’ID du serveur concerné.': '. For a request about server data, contact Sentinel support with the relevant server ID.',
-    'Six étapes simples pour démarrer proprement.': 'Six simple steps to get started cleanly.',
+    'Sept étapes simples pour démarrer proprement.': 'Seven simple steps to get started cleanly.',
+    'Choisis le salon des nouveautés': 'Choose the updates channel',
+    'Étape obligatoire : utilise `/config-statut`, choisis « Définir le salon » puis indique le salon qui recevra l’état et les annonces Sentinel.': 'Required step: use `/status-channel`, choose “Set channel”, then select the channel that will receive Sentinel status and announcements.',
     'Fais ces actions dans l’ordre. Le dashboard peut t’aider, et les commandes Discord restent disponibles si tu préfères tout faire depuis le serveur.': 'Follow these actions in order. The dashboard can help, and Discord commands remain available if you prefer doing everything from the server.',
     'Publie le panneau de tickets': 'Publish the ticket panel',
     'Envoie `/dossier-panel` si ton serveur veut utiliser les tickets privés.': 'Run `/ticket-panel` if your server wants to use private tickets.',
@@ -752,13 +754,18 @@
     'Rôle ajouté automatiquement quand un membre prend son service, puis retiré quand il termine.': 'Role automatically added when a member clocks in, then removed when they clock out.',
     'Salon où Sentinel publie les prises de service, fins de service, durées et actions importantes.': 'Channel where Sentinel posts clock-ins, clock-outs, durations, and important actions.',
     'Salon statut': 'Status channel',
+    'Salon statut et nouveautés': 'Status and updates channel',
+    'Salon des nouveautés': 'Updates channel',
+    'Obligatoire': 'Required',
     'Optionnel': 'Optional',
     'Nouveautés': 'Updates',
     'Nouveautés statut': 'Status updates',
     'Mises à jour officielles': 'Official updates',
-    'Ce salon affiche l’état automatique de Sentinel. Les nouveautés officielles ne sont envoyées que si tu les actives.': 'This channel displays Sentinel automatic status. Official updates are only sent if you enable them.',
-    'Sentinel y maintient un panneau d’état : bot en ligne, latence, données internes et dernière synchronisation.': 'Sentinel keeps a status panel there: bot online, latency, internal data, and latest synchronization.',
+    'Ce salon obligatoire affiche l’état de Sentinel et reçoit les nouveautés officielles. Les annonces sont activées automatiquement quand tu le choisis.': 'This required channel displays Sentinel status and receives official updates. Announcements are enabled automatically when you select it.',
+    'Sentinel y maintient son panneau d’état et publie les annonces importantes du bot.': 'Sentinel keeps its status panel there and publishes important bot announcements.',
     'Le salon statut configuré n’existe plus ou n’est plus textuel.': 'The configured status channel no longer exists or is no longer a text channel.',
+    'Choisis le salon qui recevra l’état et les nouveautés officielles de Sentinel.': 'Choose the channel that will receive Sentinel status and official updates.',
+    'Active les nouveautés officielles dans le salon Sentinel pour terminer l’installation.': 'Enable official updates in the Sentinel channel to complete setup.',
     'Choisis un salon statut avant d’activer les nouveautés officielles.': 'Choose a status channel before enabling official updates.',
     'Publier le statut': 'Publish status',
     'Recevoir les nouveautés': 'Receive updates',
@@ -843,7 +850,7 @@
     'Profil du serveur': 'Server profile',
     'Profil': 'Profile',
     'Adapte Sentinel à ton usage': 'Adapt Sentinel to your use',
-    'Choisis le profil le plus proche de ton Discord. Ça ne remplace pas les 4 étapes : ça t’aide à configurer le serveur dans le bon sens.': 'Choose the profile closest to your Discord. It does not replace the 4 steps: it helps you configure the server in the right direction.',
+    'Choisis le profil le plus proche de ton Discord. Ça ne remplace pas les 5 étapes : ça t’aide à configurer le serveur dans le bon sens.': 'Choose the profile closest to your Discord. It does not replace the 5 steps: it helps you configure the server in the right direction.',
     'Personnaliser les conseils': 'Customize the advice',
     'Optionnel : choisis le profil le plus proche de ton Discord pour afficher des conseils adaptés, sans remplacer les réglages de base.': 'Optional: choose the profile closest to your Discord to show tailored advice without replacing the basic settings.',
     'Actif': 'Active',
@@ -906,8 +913,8 @@
     'Contrôler': 'Control',
     'Parcours conseillé': 'Suggested path',
     'Finaliser les bases': 'Finish the basics',
-    'Langue, service, logs et accès staff sont en place.': 'Language, duty tracking, logs, and staff access are ready.',
-    'Commence par l’assistant pour régler la langue, le rôle de service, les logs et les accès staff.': 'Start with the assistant to set language, duty role, logs, and staff access.',
+    'Langue, service, logs, accès staff et salon des nouveautés sont en place.': 'Language, duty tracking, logs, staff access, and the updates channel are ready.',
+    'Commence par l’assistant pour régler la langue, le rôle de service, les logs, les accès staff et le salon des nouveautés.': 'Start with the assistant to set language, duty role, logs, staff access, and the updates channel.',
     'Relire': 'Review',
     'Commencer': 'Start',
     'Gérer les services': 'Manage duty tracking',
@@ -1050,7 +1057,7 @@
     'Autorise Sentinel à voir et écrire dans le salon de logs.': 'Allow Sentinel to view and write in the log channel.',
     'Actions récentes': 'Recent actions',
     'Aucune action récente depuis le dashboard.': 'No recent dashboard action.',
-    'Configurer Sentinel en 4 étapes': 'Configure Sentinel in 4 steps',
+    'Configurer Sentinel en 5 étapes': 'Configure Sentinel in 5 steps',
     'Suis ces étapes dans l’ordre. Chaque validation met directement à jour ce serveur Discord.': 'Follow these steps in order. Each validation directly updates this Discord server.',
     'Choisir la langue': 'Choose the language',
     'Définit la langue utilisée par Sentinel sur ce serveur.': 'Sets the language used by Sentinel on this server.',
@@ -1064,13 +1071,22 @@
     'Ajouter les rôles autorisés': 'Add allowed roles',
     'Ces rôles pourront gérer Sentinel depuis Discord et depuis le dashboard.': 'These roles will be able to manage Sentinel from Discord and from the dashboard.',
     'Autoriser ce rôle': 'Allow this role',
+    'Étape obligatoire : Sentinel y affiche son état et les annonces importantes du bot.': 'Required step: Sentinel displays its status and important bot announcements there.',
+    'Valider ce salon': 'Confirm this channel',
+    'Actualités': 'Updates',
+    'Choisir le salon des nouveautés': 'Choose the updates channel',
+    'Cette étape permet à ton serveur de recevoir les annonces officielles de Sentinel.': 'This step allows your server to receive official Sentinel announcements.',
+    'Remplacer le salon des nouveautés': 'Replace the updates channel',
+    'Le salon enregistré n’est plus accessible. Choisis un salon textuel valide.': 'The saved channel is no longer accessible. Choose a valid text channel.',
+    'Réactiver les nouveautés Sentinel': 'Re-enable Sentinel updates',
+    'Valide à nouveau le salon dans l’assistant pour recevoir les annonces officielles.': 'Confirm the channel again in the assistant to receive official announcements.',
     'Prêt': 'Ready',
     'À configurer': 'To configure',
     'Aucun rôle choisi': 'No role selected',
     'Aucun salon choisi': 'No channel selected',
     'Aucun rôle staff autorisé': 'No allowed staff role',
     'Configuration complète. Tu peux publier le panneau de service ou gérer le serveur depuis les autres onglets.': 'Configuration complete. You can publish the duty panel or manage the server from the other tabs.',
-    'Quand les 4 étapes sont prêtes, Sentinel peut être utilisé proprement par le staff et les membres.': 'When all 4 steps are ready, Sentinel can be used cleanly by staff and members.',
+    'Quand les 5 étapes sont prêtes, Sentinel peut être utilisé proprement par le staff et les membres.': 'When all 5 steps are ready, Sentinel can be used cleanly by staff and members.',
     'Voir les réglages avancés': 'View advanced settings',
     'Réglages avancés': 'Advanced settings',
     'Ici, tu retrouves les actions utiles après la première installation. Les réglages de base restent dans l’assistant pour garder un parcours simple.': 'Here you will find useful actions after the first setup. Basic settings stay in the assistant to keep the flow simple.',
@@ -1614,11 +1630,11 @@
     match = /^Actuel : (.+)$/.exec(normalizedValue);
     if (match) return `Current: ${match[1]}`;
 
-    match = /^(\d+)\/4 etapes pretes$/.exec(normalizedValue);
-    if (match) return `${match[1]}/4 steps ready`;
+    match = /^(\d+)\/5 etapes pretes$/.exec(normalizedValue);
+    if (match) return `${match[1]}/5 steps ready`;
 
-    match = /^(\d+)\/4 a finaliser$/.exec(normalizedValue);
-    if (match) return `${match[1]}/4 to finish`;
+    match = /^(\d+)\/5 a finaliser$/.exec(normalizedValue);
+    if (match) return `${match[1]}/5 to finish`;
 
     return value;
   }

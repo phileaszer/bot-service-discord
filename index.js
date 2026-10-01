@@ -175,7 +175,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-09-27-dossiers-v1';
+const SENTINEL_BUILD = 'community-suite-2026-10-02-updates-channel-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -369,7 +369,7 @@ const I18N = {
         channelNotText: '❌ Choisis un salon texte encore présent et visible par Sentinel.',
         logChannelSet: '✅ Le salon de logs a été configuré sur {channel}.',
         statusChannelCurrent: 'Salon statut Sentinel : {channel}\nMises à jour officielles : **{updates}**.',
-        statusChannelSet: '✅ Le salon statut Sentinel a été configuré sur {channel}. Le panneau d’état va s’y mettre à jour automatiquement.',
+        statusChannelSet: '✅ Le salon statut et nouveautés Sentinel a été configuré sur {channel}. Le panneau d’état et les annonces officielles y sont maintenant activés.',
         statusChannelDisabled: '✅ Le salon statut Sentinel est désactivé sur ce serveur.',
         statusUpdatesEnabled: '✅ Les nouveautés officielles Sentinel seront publiées dans le salon statut quand la créatrice les rend publiques.',
         statusUpdatesDisabled: '✅ Les nouveautés officielles Sentinel ne seront plus publiées dans le salon statut de ce serveur.',
@@ -617,7 +617,7 @@ const I18N = {
         channelNotText: '❌ Choose a text channel that still exists and is visible to Sentinel.',
         logChannelSet: '✅ The log channel has been set to {channel}.',
         statusChannelCurrent: 'Sentinel status channel: {channel}\nOfficial updates: **{updates}**.',
-        statusChannelSet: '✅ The Sentinel status channel has been set to {channel}. The status panel will update there automatically.',
+        statusChannelSet: '✅ The Sentinel status and updates channel has been set to {channel}. The status panel and official announcements are now enabled there.',
         statusChannelDisabled: '✅ The Sentinel status channel is disabled on this server.',
         statusUpdatesEnabled: '✅ Official Sentinel updates will be posted in the status channel when the creator marks them as public.',
         statusUpdatesDisabled: '✅ Official Sentinel updates will no longer be posted in this server status channel.',
@@ -8760,6 +8760,12 @@ async function buildDiagnosticEmbed(guild, requester) {
     const logPermissions = logChannel && botMember
         ? logChannel.permissionsFor(botMember)
         : null;
+    const statusChannel = guildConfig.statusChannelId
+        ? await guild.channels.fetch(guildConfig.statusChannelId).catch(() => null)
+        : null;
+    const statusPermissions = statusChannel && botMember
+        ? statusChannel.permissionsFor(botMember)
+        : null;
     const serviceConsistency = await getServiceConsistencyStats(guild);
 
     let databaseOk = true;
@@ -8792,6 +8798,15 @@ async function buildDiagnosticEmbed(guild, requester) {
         && logPermissions?.has(PermissionsBitField.Flags.SendMessages)
     );
     const hasLogIssue = Boolean(guildConfig.logChannelId) && (!logChannelOk || !logCanSend);
+    const statusChannelOk = Boolean(statusChannel?.isTextBased());
+    const statusCanSend = Boolean(
+        statusChannelOk
+        && statusPermissions?.has(PermissionsBitField.Flags.ViewChannel)
+        && statusPermissions?.has(PermissionsBitField.Flags.SendMessages)
+        && statusPermissions?.has(PermissionsBitField.Flags.EmbedLinks)
+    );
+    const statusUpdatesReady = Boolean(guildConfig.statusUpdatesEnabled);
+    const hasStatusIssue = !guildConfig.statusChannelId || !statusCanSend || !statusUpdatesReady;
     const hasConsistencyIssue = serviceConsistency.activeWithoutRole > 0
         || serviceConsistency.roleWithoutActiveSession > 0;
     const diagnosticOk = databaseOk
@@ -8805,6 +8820,7 @@ async function buildDiagnosticEmbed(guild, requester) {
         && rolePositionOk
         && autoRoleOk
         && !hasLogIssue
+        && !hasStatusIssue
         && !hasConsistencyIssue;
     const fixes = [];
 
@@ -8846,6 +8862,14 @@ async function buildDiagnosticEmbed(guild, requester) {
 
     if (hasLogIssue) {
         fixes.push('Vérifie le salon de logs : Sentinel doit le voir et y écrire.');
+    }
+
+    if (!guildConfig.statusChannelId) {
+        fixes.push('Choisis le salon obligatoire des nouveautés avec `/config-statut`.');
+    } else if (!statusCanSend) {
+        fixes.push('Vérifie le salon statut : Sentinel doit le voir, y écrire et intégrer des liens.');
+    } else if (!statusUpdatesReady) {
+        fixes.push('Réactive les nouveautés avec `/config-statut action:Recevoir les mises à jour`.');
     }
 
     if (hasConsistencyIssue) {
@@ -8893,6 +8917,15 @@ async function buildDiagnosticEmbed(guild, requester) {
                     diagnosticLine(Boolean(guildConfig.logChannelId), 'Salon configuré', guildConfig.logChannelId ? `<#${guildConfig.logChannelId}>` : 'optionnel'),
                     diagnosticLine(logChannelOk || !guildConfig.logChannelId, 'Salon textuel accessible'),
                     diagnosticLine(logCanSend || !guildConfig.logChannelId, 'Le bot peut envoyer les logs')
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Salon statut et nouveautés',
+                value: [
+                    diagnosticLine(Boolean(guildConfig.statusChannelId), 'Salon obligatoire configuré', guildConfig.statusChannelId ? `<#${guildConfig.statusChannelId}>` : 'à choisir avec `/config-statut`'),
+                    diagnosticLine(statusCanSend, 'Salon accessible à Sentinel'),
+                    diagnosticLine(statusUpdatesReady, 'Annonces officielles activées')
                 ].join('\n'),
                 inline: false
             },
@@ -9340,9 +9373,9 @@ function buildServerOnboardingEmbed(guild, requester) {
             '`2.` Configure le grade de service avec `/config-role role:@role`.',
             '`3.` Configure le salon de registre avec `/config-logs salon_id:ID`.',
             '`4.` Ajoute les grades autorisés avec `/config-permissions action:ajouter role:@role`.',
-            '`5.` Publie le Bureau de service dans le bon salon avec `!service-panel`.',
-            '`6.` Si tu veux les dossiers privés, publie le bureau avec `/dossier-panel`.',
-            '`7.` Optionnel : ajoute un salon statut avec `/config-statut`.',
+            '`5.` Choisis obligatoirement le salon des nouveautés avec `/config-statut action:Définir le salon salon:#salon`.',
+            '`6.` Publie le Bureau de service dans le bon salon avec `!service-panel`.',
+            '`7.` Si tu veux les dossiers privés, publie le bureau avec `/dossier-panel`.',
             '',
             'Besoin d’un guide plus simple ? Utilise `/aide` ou ouvre la console.'
         ].join('\n'),
@@ -9415,7 +9448,7 @@ function buildLegacyHelpEmbed(guild, requester) {
                     '`/config-role role:@role` sets the service role.',
                     '`/autorole-config` sets or disables the role given automatically when a member joins.',
                     '`/config-channel channel_id:ID` sets the log channel.',
-                    '`/status-channel` publishes an optional status channel with bot health and official updates.',
+                    '`/status-channel` sets the required channel for bot health and official Sentinel updates.',
                     '`/config-view` shows the current configuration.',
                     '`/payroll-config hourly_rate:500 currency:$` sets the weekly RP payroll amount.',
                     '`/weekly-payroll` shows the current week paid/unpaid summary.',
@@ -9504,8 +9537,8 @@ function buildLegacyHelpEmbed(guild, requester) {
         '**3. Rôle automatique d’arrivée**',
         '`/config-autorole action:definir role:@role` donne un rôle aux nouveaux membres. Utilise `action:desactiver` pour le couper.',
         '',
-        '**4. Salon statut optionnel**',
-        '`/config-statut` publie un panneau d’état automatique et peut recevoir les nouveautés officielles si tu l’actives.',
+        '**4. Salon statut et nouveautés obligatoire**',
+        '`/config-statut action:definir salon:#salon` publie le panneau d’état et active automatiquement les annonces officielles Sentinel.',
         '',
         '**5. Verification**',
         '`/config-voir` affiche le rôle, les salons configurés et les rôles autorisés.'
@@ -14640,7 +14673,8 @@ client.on(Events.InteractionCreate, async interaction => {
             }
 
             updateGuildConfig(guildId, {
-                statusChannelId: channel.id
+                statusChannelId: channel.id,
+                statusUpdatesEnabled: true
             });
             await updateSentinelStatusPanel(interaction.guild);
 

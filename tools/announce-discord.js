@@ -209,6 +209,7 @@ async function main() {
     const args = readArgs(process.argv.slice(2));
     const type = String(args.type || 'announcement').trim();
     const subscribersOnly = Boolean(args['subscribers-only']);
+    const editLatest = Boolean(args['edit-latest']);
     const guildId = String(
         args.guild
         || process.env.SENTINEL_REFERENCE_GUILD_ID
@@ -246,6 +247,7 @@ async function main() {
             en: titleEn && bodyEn ? { title: titleEn, body: bodyEn } : null,
             statusSubscribers: shouldBroadcastToStatusSubscribers(args),
             subscribersOnly,
+            editLatest,
             source
         }, null, 2));
         return;
@@ -272,29 +274,62 @@ async function main() {
                     throw new Error(`Salon FR introuvable : ${target.fr}`);
                 }
 
-                await frChannel.send(buildPayload({
+                const publishReferenceMessage = async (channel, payload, title) => {
+                    if (!editLatest) {
+                        return channel.send(payload);
+                    }
+
+                    const messages = await channel.messages.fetch({ limit: 50 });
+                    const existing = messages.find(message => (
+                        message.author?.id === client.user.id
+                        && message.embeds.some(embed => embed.title === title)
+                    ));
+
+                    if (!existing) {
+                        throw new Error(`Annonce existante introuvable dans #${channel.name} : ${title}`);
+                    }
+
+                    return existing.edit(payload);
+                };
+                const frPayload = buildPayload({
                     type,
                     title: titleFr,
                     body: bodyFr,
                     source,
                     pingRole
-                }));
+                });
+                const frMessage = await publishReferenceMessage(frChannel, frPayload, titleFr);
                 usedChannelIds.add(frChannel.id);
-                posted.push({ language: 'fr', channel: target.fr, id: frChannel.id, pingedRole: pingRole?.id || null });
+                posted.push({
+                    language: 'fr',
+                    channel: target.fr,
+                    id: frChannel.id,
+                    messageId: frMessage.id,
+                    pingedRole: pingRole?.id || null,
+                    edited: editLatest
+                });
 
                 if (titleEn && bodyEn && !args['fr-only']) {
                     const enChannel = guild.channels.cache.find(channel => channel.name === target.en);
 
                     if (enChannel) {
-                        await enChannel.send(buildPayload({
+                        const enPayload = buildPayload({
                             type,
                             title: titleEn,
                             body: bodyEn,
                             source,
                             pingRole
-                        }));
+                        });
+                        const enMessage = await publishReferenceMessage(enChannel, enPayload, titleEn);
                         usedChannelIds.add(enChannel.id);
-                        posted.push({ language: 'en', channel: target.en, id: enChannel.id, pingedRole: pingRole?.id || null });
+                        posted.push({
+                            language: 'en',
+                            channel: target.en,
+                            id: enChannel.id,
+                            messageId: enMessage.id,
+                            pingedRole: pingRole?.id || null,
+                            edited: editLatest
+                        });
                     }
                 }
             }
