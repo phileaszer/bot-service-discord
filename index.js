@@ -175,7 +175,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-10-02-updates-center-v2';
+const SENTINEL_BUILD = 'community-suite-2026-10-02-updates-center-v3';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -8192,14 +8192,14 @@ function getSentinelOfficialUpdateChannels(guild) {
         seenChannelIds.add(channel.id);
         channels.push({ channel, language });
     };
-    const config = getGuildConfig(guild.id);
-
-    if (config.updatesChannelId) {
-        addTarget(guild.channels.cache.get(config.updatesChannelId), config.language);
-    }
-
     for (const target of SENTINEL_OFFICIAL_UPDATE_CHANNELS) {
         addTarget(findGuildTextChannel(guild, target.name), target.language);
+    }
+
+    const config = getGuildConfig(guild.id);
+
+    if (config.updatesChannelId && config.updatesChannelId !== config.statusChannelId) {
+        addTarget(guild.channels.cache.get(config.updatesChannelId), config.language);
     }
 
     return channels;
@@ -9455,7 +9455,12 @@ async function attemptOfficialUpdateDelivery(deliveryId) {
 
         const title = language === 'en' && delivery.title_en ? delivery.title_en : delivery.title_fr;
         const body = language === 'en' && delivery.body_en ? delivery.body_en : delivery.body_fr;
-        const message = await channel.send(getOfficialStatusUpdatePayload({
+        const recentMessages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+        const existingMessage = recentMessages?.find(message => (
+            message.author?.id === client.user.id
+            && message.embeds?.some(embed => embed.title === title && embed.description === body)
+        ));
+        const message = existingMessage || await channel.send(getOfficialStatusUpdatePayload({
             title,
             body,
             requester: client.user,
@@ -9510,6 +9515,57 @@ async function processOfficialUpdateRetries() {
     }
 
     return due.length;
+}
+
+async function distributeLatestPublicOfficialUpdate() {
+    const update = db.prepare(`
+        SELECT *
+        FROM official_updates
+        WHERE is_public = 1
+        ORDER BY published_at DESC, id DESC
+        LIMIT 1
+    `).get();
+
+    if (!update) {
+        return { queued: 0, delivered: 0 };
+    }
+
+    let queued = 0;
+    let delivered = 0;
+
+    for (const guild of client.guilds.cache.values()) {
+        let targets = [];
+
+        if (guild.id === SENTINEL_REFERENCE_GUILD_ID) {
+            await guild.channels.fetch().catch(() => null);
+            const pingRoleId = getGuildConfig(guild.id).updatesPingRoleId || null;
+            targets = getSentinelOfficialUpdateChannels(guild)
+                .map(target => ({ guild, ...target, pingRoleId }));
+        } else {
+            const target = await getConfiguredStatusUpdateTarget(guild).catch(() => null);
+            targets = target ? [target] : [];
+        }
+
+        for (const target of targets) {
+            const deliveryId = queueOfficialUpdateDelivery(update.id, target);
+            if (!deliveryId) {
+                continue;
+            }
+
+            const current = db.prepare('SELECT status FROM official_update_deliveries WHERE id = ?').get(deliveryId);
+            if (current?.status === 'delivered') {
+                continue;
+            }
+
+            queued += 1;
+            const result = await attemptOfficialUpdateDelivery(deliveryId);
+            if (result.ok) {
+                delivered += 1;
+            }
+        }
+    }
+
+    return { queued, delivered };
 }
 
 async function getConfiguredStatusUpdateTarget(guild) {
@@ -14573,6 +14629,8 @@ client.once(Events.ClientReady, async () => {
                 console.error(`Réparation des salons d'annonces ${guild.id} :`, error);
             });
         }
+        const officialDistribution = await distributeLatestPublicOfficialUpdate();
+        console.log(`Bulletin public Sentinel vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
         await processExpiredTemporaryBans();
     } catch (error) {
         console.error('Erreur synchronisation serveur Sentinel :', error);
