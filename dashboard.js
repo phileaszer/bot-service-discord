@@ -70,7 +70,9 @@ const ALLOWED_RETURN_PATHS = new Set([
     '/pourquoi',
     '/pourquoi.html',
     '/statut',
-    '/statut.html'
+    '/statut.html',
+    '/nouveautes',
+    '/nouveautes.html'
 ]);
 const DEFAULT_DASHBOARD_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
 const PUBLIC_SITE_ORIGIN = 'https://phileaszer.github.io';
@@ -1579,7 +1581,7 @@ function securityHeaders(req, headers = {}) {
 function corsHeaders(req, url) {
     const origin = firstHeaderValue(req.headers.origin);
 
-    if (!origin || url?.pathname !== '/api/status') {
+    if (!origin || !['/api/status', '/api/updates'].includes(url?.pathname)) {
         return {};
     }
 
@@ -2814,9 +2816,11 @@ function buildPermissionDiagnostics(ctx, guild, config) {
     const autoRole = config.autoRoleId ? guild.roles.cache.get(config.autoRoleId) : null;
     const logChannel = config.logChannelId ? guild.channels.cache.get(config.logChannelId) : null;
     const statusChannel = config.statusChannelId ? guild.channels.cache.get(config.statusChannelId) : null;
+    const updatesChannel = config.updatesChannelId ? guild.channels.cache.get(config.updatesChannelId) : null;
     const botPermissions = botMember?.permissions;
     const logPermissions = logChannel && botMember ? logChannel.permissionsFor(botMember) : null;
     const statusPermissions = statusChannel && botMember ? statusChannel.permissionsFor(botMember) : null;
+    const updatesPermissions = updatesChannel && botMember ? updatesChannel.permissionsFor(botMember) : null;
     const has = permission => Boolean(botPermissions?.has(permission));
     const canManageRoles = has(PermissionsBitField.Flags.ManageRoles);
     const serviceRoleTooHigh = Boolean(
@@ -2833,12 +2837,18 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         logPermissions?.has(PermissionsBitField.Flags.ViewChannel)
         && logPermissions?.has(PermissionsBitField.Flags.SendMessages)
     );
-    const statusChannelWritable = Boolean(
-        config.statusChannelId
-        && statusChannel
+    const statusChannelWritable = !config.statusChannelId || Boolean(
+        statusChannel
         && statusPermissions?.has(PermissionsBitField.Flags.ViewChannel)
         && statusPermissions?.has(PermissionsBitField.Flags.SendMessages)
         && statusPermissions?.has(PermissionsBitField.Flags.EmbedLinks)
+    );
+    const updatesChannelWritable = Boolean(
+        config.updatesChannelId
+        && updatesChannel
+        && updatesPermissions?.has(PermissionsBitField.Flags.ViewChannel)
+        && updatesPermissions?.has(PermissionsBitField.Flags.SendMessages)
+        && updatesPermissions?.has(PermissionsBitField.Flags.EmbedLinks)
     );
     const checks = [
         permissionCheck(
@@ -2925,13 +2935,23 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         ),
         permissionCheck(
             'statusChannel',
-            'Salon statut accessible',
+            'État technique accessible',
             statusChannelWritable,
             statusChannel
                 ? `Autorise Sentinel à voir, écrire et intégrer des liens dans #${statusChannel.name}.`
                 : (config.statusChannelId
                     ? 'Choisis un autre salon statut accessible.'
-                    : 'Choisis le salon obligatoire qui recevra l’état et les nouveautés Sentinel.')
+                    : 'Le panneau d’état technique est optionnel.')
+        ),
+        permissionCheck(
+            'updatesChannel',
+            'Salon des nouveautés accessible',
+            updatesChannelWritable,
+            updatesChannel
+                ? `Autorise Sentinel à voir, écrire et intégrer des liens dans #${updatesChannel.name}.`
+                : (config.updatesChannelId
+                    ? 'Choisis un autre salon des nouveautés accessible.'
+                    : 'Choisis le salon obligatoire qui recevra les annonces officielles Sentinel.')
         )
     ];
 
@@ -2949,6 +2969,7 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         canManageAutoRole: Boolean(autoRole && canManageRoles && !autoRoleTooHigh),
         logChannelWritable,
         statusChannelWritable,
+        updatesChannelWritable,
         checks,
         fixes: checks.filter(item => !item.ok).map(item => item.fix)
     };
@@ -3168,6 +3189,9 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             ...config,
             commandRoleIds
         },
+        officialUpdates: ctx.helpers.getGuildOfficialUpdateHistory
+            ? ctx.helpers.getGuildOfficialUpdateHistory(guild.id, 20)
+            : [],
         roles,
         channels,
         categories,
@@ -4333,20 +4357,62 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             PermissionsBitField.Flags.EmbedLinks
         ], language);
         ctx.helpers.updateGuildConfig(guild.id, {
-            statusChannelId: channel.id,
-            statusUpdatesEnabled: true
+            statusChannelId: channel.id
         });
         await ctx.helpers.updateSentinelStatusPanel?.(guild);
-        return `Salon statut et nouveautés configuré : #${channel.name}. Les annonces officielles sont activées.`;
+        return `État technique Sentinel configuré dans #${channel.name}.`;
     }
 
     if (action === 'disable-status-channel') {
         requireCommandAccess(ctx, member);
         ctx.helpers.updateGuildConfig(guild.id, {
-            statusChannelId: null,
-            statusUpdatesEnabled: false
+            statusChannelId: null
         });
         return 'Salon statut Sentinel désactivé sur ce serveur.';
+    }
+
+    if (action === 'set-updates-channel') {
+        requireCommandAccess(ctx, member);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.EmbedLinks
+        ], language);
+        ctx.helpers.updateGuildConfig(guild.id, {
+            updatesChannelId: channel.id,
+            statusUpdatesEnabled: true
+        });
+        return `Salon des nouveautés configuré : #${channel.name}. La diffusion officielle est activée.`;
+    }
+
+    if (action === 'test-status-updates') {
+        requireCommandAccess(ctx, member);
+
+        try {
+            const channel = await ctx.helpers.sendOfficialUpdateTest(guild, member?.user || ctx.client.user);
+            return `Message de test envoyé dans #${channel.name}.`;
+        } catch (error) {
+            throw createHttpError(400, String(error?.message || error));
+        }
+    }
+
+    if (action === 'set-updates-role') {
+        requireCommandAccess(ctx, member);
+        const role = guild.roles.cache.get(body.roleId);
+
+        if (!role || role.id === guild.id) {
+            throw createHttpError(400, 'Choisis un rôle valide différent de @everyone.');
+        }
+
+        ctx.helpers.updateGuildConfig(guild.id, { updatesPingRoleId: role.id });
+        return `Le rôle ${role.name} sera mentionné lors des annonces officielles.`;
+    }
+
+    if (action === 'clear-updates-role') {
+        requireCommandAccess(ctx, member);
+        ctx.helpers.updateGuildConfig(guild.id, { updatesPingRoleId: null });
+        return 'Aucun rôle ne sera mentionné lors des annonces officielles.';
     }
 
     if (action === 'set-status-updates') {
@@ -4354,15 +4420,14 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         const enabled = ['true', '1', 'yes', 'on'].includes(String(body.enabled || '').toLowerCase());
         const config = ctx.helpers.getGuildConfig(guild.id);
 
-        if (enabled && !config.statusChannelId) {
-            throw createHttpError(400, 'Choisis d’abord un salon statut Sentinel.');
+        if (enabled && !config.updatesChannelId) {
+            throw createHttpError(400, 'Choisis d’abord un salon des nouveautés Sentinel.');
         }
 
         ctx.helpers.updateGuildConfig(guild.id, { statusUpdatesEnabled: enabled });
-        await ctx.helpers.updateSentinelStatusPanel?.(guild);
         return enabled
-            ? 'Les nouveautés officielles Sentinel pourront être envoyées dans le salon statut.'
-            : 'Les nouveautés officielles Sentinel ne seront plus envoyées dans le salon statut.';
+            ? 'Les nouveautés officielles Sentinel pourront être envoyées dans le salon prévu.'
+            : 'Les nouveautés officielles Sentinel ne seront plus envoyées sur ce serveur.';
     }
 
     if (action === 'add-command-role' || action === 'remove-command-role') {
@@ -4619,7 +4684,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
 
 async function handleApi(req, res, ctx, url) {
     if (req.method === 'OPTIONS') {
-        if (url.pathname === '/api/status' && corsHeaders(req, url)['Access-Control-Allow-Origin']) {
+        if (['/api/status', '/api/updates'].includes(url.pathname) && corsHeaders(req, url)['Access-Control-Allow-Origin']) {
             writeResponse(res, 204, {
                 'Cache-Control': 'no-store'
             });
@@ -4646,6 +4711,16 @@ async function handleApi(req, res, ctx, url) {
                 incidents,
                 maintenance
             }
+        });
+        return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/updates') {
+        json(res, 200, {
+            ok: true,
+            updates: ctx.helpers.getPublicOfficialUpdates
+                ? ctx.helpers.getPublicOfficialUpdates(20)
+                : []
         });
         return;
     }
@@ -5228,7 +5303,8 @@ function serveStatic(req, res, url) {
         securite: 'securite.html',
         installation: 'installation.html',
         pourquoi: 'pourquoi.html',
-        statut: 'statut.html'
+        statut: 'statut.html',
+        nouveautes: 'nouveautes.html'
     };
     const relativePath = routeMap[cleanPath] || cleanPath;
     const filePath = path.resolve(siteDir, relativePath);

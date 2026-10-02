@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS guild_configs (
     role_id TEXT,
     log_channel_id TEXT,
     status_channel_id TEXT,
+    updates_channel_id TEXT,
+    updates_ping_role_id TEXT,
     status_updates_enabled INTEGER NOT NULL DEFAULT 0,
     auto_role_id TEXT,
     language TEXT NOT NULL DEFAULT 'fr',
@@ -385,6 +387,38 @@ CREATE TABLE IF NOT EXISTS dashboard_audit_logs (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS official_updates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    public_key TEXT UNIQUE,
+    title_fr TEXT NOT NULL,
+    body_fr TEXT NOT NULL,
+    title_en TEXT,
+    body_en TEXT,
+    source TEXT,
+    created_by_user_id TEXT,
+    is_public INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    published_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS official_update_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    update_id INTEGER NOT NULL,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'fr',
+    ping_role_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    message_id TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    next_attempt_at TEXT,
+    delivered_at TEXT,
+    updated_at TEXT NOT NULL,
+    UNIQUE(update_id, guild_id, channel_id),
+    FOREIGN KEY (update_id) REFERENCES official_updates(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS storage_metrics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     captured_at TEXT NOT NULL,
@@ -577,6 +611,15 @@ ON dashboard_audit_logs (target_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_dashboard_audit_action_created
 ON dashboard_audit_logs (action, created_at);
 
+CREATE INDEX IF NOT EXISTS idx_official_updates_published
+ON official_updates (is_public, published_at);
+
+CREATE INDEX IF NOT EXISTS idx_official_deliveries_guild_updated
+ON official_update_deliveries (guild_id, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_official_deliveries_retry
+ON official_update_deliveries (status, next_attempt_at);
+
 CREATE INDEX IF NOT EXISTS idx_storage_metrics_captured
 ON storage_metrics (captured_at);
 
@@ -617,6 +660,14 @@ if (!guildConfigColumns.includes('status_channel_id')) {
     db.prepare('ALTER TABLE guild_configs ADD COLUMN status_channel_id TEXT').run();
 }
 
+if (!guildConfigColumns.includes('updates_channel_id')) {
+    db.prepare('ALTER TABLE guild_configs ADD COLUMN updates_channel_id TEXT').run();
+}
+
+if (!guildConfigColumns.includes('updates_ping_role_id')) {
+    db.prepare('ALTER TABLE guild_configs ADD COLUMN updates_ping_role_id TEXT').run();
+}
+
 if (!guildConfigColumns.includes('status_updates_enabled')) {
     db.prepare('ALTER TABLE guild_configs ADD COLUMN status_updates_enabled INTEGER NOT NULL DEFAULT 0').run();
 }
@@ -624,6 +675,55 @@ if (!guildConfigColumns.includes('status_updates_enabled')) {
 if (!guildConfigColumns.includes('server_preset')) {
     db.prepare("ALTER TABLE guild_configs ADD COLUMN server_preset TEXT NOT NULL DEFAULT 'standard'").run();
 }
+
+db.prepare(`
+    UPDATE guild_configs
+    SET updates_channel_id = status_channel_id
+    WHERE updates_channel_id IS NULL
+      AND status_updates_enabled = 1
+      AND status_channel_id IS NOT NULL
+`).run();
+
+db.prepare(`
+    INSERT OR IGNORE INTO official_updates (
+        public_key,
+        title_fr,
+        body_fr,
+        title_en,
+        body_en,
+        source,
+        created_by_user_id,
+        is_public,
+        created_at,
+        published_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
+`).run(
+    'sentinel-major-update-2026-10-02',
+    'Sentinel | Mise à jour majeure',
+    [
+        'Le dashboard est plus rapide, plus clair et mieux adapté aux appareils mobiles.',
+        'Les vues Gratuit et Premium sont séparées, avec des accès Premium liés aux utilisateurs, serveurs ou rôles Discord.',
+        'Le service, la paie RP, les dossiers privés et le Centre de sûreté disposent de nouveaux outils de suivi.',
+        'Les images peuvent être importées directement depuis un ordinateur pour les annonces Discord.',
+        'Chaque serveur peut désormais recevoir les annonces officielles Sentinel dans un salon séparé du statut technique.',
+        'Le salon peut être testé depuis le dashboard, prévenir un rôle choisi et afficher le suivi des livraisons.',
+        'Les annonces manquées sont retentées automatiquement et restent consultables sur la nouvelle page publique Nouveautés.'
+    ].join('\n'),
+    'Sentinel | Major update',
+    [
+        'The dashboard is faster, clearer, and better suited to mobile devices.',
+        'Free and Premium views are separated, with Premium access linked to Discord users, servers, or roles.',
+        'Duty tracking, RP payroll, private cases, and the Safety Center now provide improved follow-up tools.',
+        'Images can be uploaded directly from a computer for Discord announcements.',
+        'Every server can now receive official Sentinel announcements in a channel separate from technical status.',
+        'The channel can be tested from the dashboard, notify a selected role, and display delivery tracking.',
+        'Missed announcements are retried automatically and remain available on the new public Updates page.'
+    ].join('\n'),
+    'mise à jour officielle',
+    '2026-10-02T00:00:00.000Z',
+    '2026-10-02T00:00:00.000Z'
+);
 
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
     .map(column => column.name);

@@ -7053,3 +7053,73 @@ code {
     font-size: 0.58rem;
   }
 }
+
+.updates-hero {
+  min-height: 360px;
+}
+
+.updates-layout {
+  display: grid;
+  gap: 28px;
+}
+
+.updates-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.official-updates {
+  border-top: 1px solid var(--line);
+}
+
+.official-update-entry {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.28fr) minmax(0, 0.72fr);
+  gap: 16px 34px;
+  padding: 30px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.official-update-meta {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.official-update-meta span {
+  color: var(--cyan);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.official-update-entry h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.2vw, 2rem);
+}
+
+.official-update-body {
+  grid-column: 2;
+  margin: -4px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+@media (max-width: 700px) {
+  .updates-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .official-update-entry {
+    grid-template-columns: 1fr;
+  }
+
+  .official-update-body {
+    grid-column: 1;
+  }
+}

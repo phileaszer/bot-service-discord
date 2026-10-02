@@ -66,7 +66,7 @@ Le gratuit reste volontairement simple. Le Premium apportera surtout du confort,
 3. Choisis la langue du serveur avec `/config-langue` ou `/language`.
 4. Configure le rôle de service avec `/config-role`.
 5. Configure le salon de logs avec `/config-logs`.
-6. Ajoute un salon statut optionnel avec `/config-statut`.
+6. Choisis le salon obligatoire des nouveautés avec `/config-statut`. Le panneau d’état technique reste optionnel.
 7. Ajoute les rôles autorisés avec `/config-permissions`.
 8. Publie le panneau de service avec `!service-panel`.
 9. Publie le panneau de dossiers avec `/dossier-panel` si tu veux utiliser les tickets.
@@ -82,7 +82,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-role` | `/config-role` | Définir le rôle de service |
 | `/config-autorole` | `/autorole-config` | Définir le rôle automatique d'arrivée |
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
-| `/config-statut` | `/status-channel` | Publier le statut du bot et activer les nouveautés officielles |
+| `/config-statut` | `/status-channel` | Séparer l’état technique, les nouveautés et le rôle à prévenir |
 | `/config-paie` | `/payroll-config` | Définir le montant horaire global de la paie RP |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |

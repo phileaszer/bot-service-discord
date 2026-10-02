@@ -110,7 +110,7 @@ const publicCommands = [
                 .setRequired(true)
         ),
 
-    command('config-statut', 'status-channel', 'Configure le salon qui affiche l etat de Sentinel.', 'Configures the channel that displays Sentinel status.')
+    command('config-statut', 'status-channel', 'Configure l etat technique et les annonces officielles.', 'Configures technical status and official updates.')
         .addStringOption(option =>
             option
                 .setName('action')
@@ -118,20 +118,31 @@ const publicCommands = [
                 .setDescriptionLocalizations(en('Action to perform'))
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Definir le salon', name_localizations: en('Set channel'), value: 'definir' },
+                    { name: 'Definir le salon de statut', name_localizations: en('Set status channel'), value: 'definir' },
                     { name: 'Voir le reglage', name_localizations: en('View setting'), value: 'voir' },
                     { name: 'Desactiver le statut', name_localizations: en('Disable status'), value: 'desactiver' },
+                    { name: 'Definir le salon des nouveautes', name_localizations: en('Set updates channel'), value: 'maj-salon' },
+                    { name: 'Tester le salon des nouveautes', name_localizations: en('Test updates channel'), value: 'maj-test' },
                     { name: 'Recevoir les mises a jour', name_localizations: en('Enable updates'), value: 'maj-on' },
-                    { name: 'Ne plus recevoir les mises a jour', name_localizations: en('Disable updates'), value: 'maj-off' }
+                    { name: 'Ne plus recevoir les mises a jour', name_localizations: en('Disable updates'), value: 'maj-off' },
+                    { name: 'Choisir le role a mentionner', name_localizations: en('Set update mention role'), value: 'maj-role' },
+                    { name: 'Retirer la mention de role', name_localizations: en('Clear update mention role'), value: 'maj-role-off' }
                 )
         )
         .addChannelOption(option =>
             option
                 .setName('salon')
                 .setNameLocalizations(en('channel'))
-                .setDescription('Salon ou Sentinel affiche son statut')
-                .setDescriptionLocalizations(en('Channel where Sentinel displays its status'))
+                .setDescription('Salon de statut ou salon des nouveautes selon l action')
+                .setDescriptionLocalizations(en('Status or updates channel depending on the action'))
                 .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(false)
+        )
+        .addRoleOption(option =>
+            option
+                .setName('role')
+                .setDescription('Role a mentionner lors des annonces officielles')
+                .setDescriptionLocalizations(en('Role to mention for official updates'))
                 .setRequired(false)
         ),
 

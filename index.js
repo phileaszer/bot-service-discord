@@ -175,7 +175,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-10-02-updates-channel-v1';
+const SENTINEL_BUILD = 'community-suite-2026-10-02-updates-center-v2';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -368,15 +368,20 @@ const I18N = {
         invalidChannelId: '❌ ID de salon invalide.',
         channelNotText: '❌ Choisis un salon texte encore présent et visible par Sentinel.',
         logChannelSet: '✅ Le salon de logs a été configuré sur {channel}.',
-        statusChannelCurrent: 'Salon statut Sentinel : {channel}\nMises à jour officielles : **{updates}**.',
-        statusChannelSet: '✅ Le salon statut et nouveautés Sentinel a été configuré sur {channel}. Le panneau d’état et les annonces officielles y sont maintenant activés.',
+        statusChannelCurrent: 'État technique : {channel}\nSalon des nouveautés : {updatesChannel}\nDiffusion officielle : **{updates}**\nRôle mentionné : {pingRole}.',
+        statusChannelSet: '✅ Le panneau d’état Sentinel sera maintenu dans {channel}.',
         statusChannelDisabled: '✅ Le salon statut Sentinel est désactivé sur ce serveur.',
-        statusUpdatesEnabled: '✅ Les nouveautés officielles Sentinel seront publiées dans le salon statut quand la créatrice les rend publiques.',
-        statusUpdatesDisabled: '✅ Les nouveautés officielles Sentinel ne seront plus publiées dans le salon statut de ce serveur.',
-        statusChannelRequired: '❌ Choisis d’abord un salon statut avec `/config-statut action:definir`.',
+        statusUpdatesChannelSet: '✅ Les annonces officielles Sentinel seront publiées dans {channel}.',
+        statusUpdatesTested: '✅ Message de test envoyé dans {channel}.',
+        statusUpdatesEnabled: '✅ Les nouveautés officielles Sentinel seront publiées dans le salon prévu à cet effet.',
+        statusUpdatesDisabled: '✅ Les nouveautés officielles Sentinel ne seront plus publiées sur ce serveur.',
+        statusUpdatesRoleSet: '✅ {role} sera mentionné lors des prochaines annonces officielles.',
+        statusUpdatesRoleDisabled: '✅ Aucun rôle ne sera mentionné lors des annonces officielles.',
+        statusChannelRequired: '❌ Choisis un salon pour cette action.',
+        statusUpdatesChannelRequired: '❌ Choisis d’abord le salon des nouveautés avec `/config-statut action:Définir le salon des nouveautés salon:#salon`.',
         officialUpdateDenied: '❌ Cette commande est réservée à la créatrice de Sentinel.',
         officialUpdateSent: '✅ Mise à jour officielle publiée. Serveur Sentinel : **{referenceCount}** salon(s). Serveurs abonnés : **{subscriberCount}** salon(s).',
-        officialUpdateNoTarget: '❌ Aucun salon statut disponible pour publier cette mise à jour.',
+        officialUpdateNoTarget: '❌ Aucun salon de nouveautés disponible pour publier cette mise à jour.',
         premiumAccessDenied: '❌ Cette commande est réservée à la créatrice de Sentinel.',
         premiumAccessRoleRequired: '❌ Choisis un rôle pour gérer l’accès Premium par rôle.',
         premiumAccessUserRequired: '❌ Indique l’ID Discord complet de la personne.',
@@ -616,15 +621,20 @@ const I18N = {
         invalidChannelId: '❌ Invalid channel ID.',
         channelNotText: '❌ Choose a text channel that still exists and is visible to Sentinel.',
         logChannelSet: '✅ The log channel has been set to {channel}.',
-        statusChannelCurrent: 'Sentinel status channel: {channel}\nOfficial updates: **{updates}**.',
-        statusChannelSet: '✅ The Sentinel status and updates channel has been set to {channel}. The status panel and official announcements are now enabled there.',
+        statusChannelCurrent: 'Technical status: {channel}\nUpdates channel: {updatesChannel}\nOfficial delivery: **{updates}**\nMentioned role: {pingRole}.',
+        statusChannelSet: '✅ The Sentinel status panel will be maintained in {channel}.',
         statusChannelDisabled: '✅ The Sentinel status channel is disabled on this server.',
-        statusUpdatesEnabled: '✅ Official Sentinel updates will be posted in the status channel when the creator marks them as public.',
-        statusUpdatesDisabled: '✅ Official Sentinel updates will no longer be posted in this server status channel.',
-        statusChannelRequired: '❌ Choose a status channel first with `/status-channel`, then select “Set channel”.',
+        statusUpdatesChannelSet: '✅ Official Sentinel announcements will be posted in {channel}.',
+        statusUpdatesTested: '✅ Test message sent in {channel}.',
+        statusUpdatesEnabled: '✅ Official Sentinel updates will be posted in the dedicated updates channel.',
+        statusUpdatesDisabled: '✅ Official Sentinel updates will no longer be posted on this server.',
+        statusUpdatesRoleSet: '✅ {role} will be mentioned for future official announcements.',
+        statusUpdatesRoleDisabled: '✅ No role will be mentioned for official announcements.',
+        statusChannelRequired: '❌ Choose a channel for this action.',
+        statusUpdatesChannelRequired: '❌ First choose an updates channel with `/status-channel`, then select “Set updates channel”.',
         officialUpdateDenied: '❌ This command is reserved for the Sentinel creator.',
         officialUpdateSent: '✅ Official update published. Sentinel server: **{referenceCount}** channel(s). Subscribed servers: **{subscriberCount}** channel(s).',
-        officialUpdateNoTarget: '❌ No status channel is available for this update.',
+        officialUpdateNoTarget: '❌ No updates channel is available for this announcement.',
         premiumAccessDenied: '❌ This command is reserved for the Sentinel creator.',
         premiumAccessRoleRequired: '❌ Choose a role to manage Premium access by role.',
         premiumAccessUserRequired: '❌ Provide the full numeric Discord user ID.',
@@ -2275,6 +2285,8 @@ function mapGuildConfig(row) {
         serviceRoleId: row?.role_id || null,
         logChannelId: row?.log_channel_id || null,
         statusChannelId: row?.status_channel_id || null,
+        updatesChannelId: row?.updates_channel_id || null,
+        updatesPingRoleId: row?.updates_ping_role_id || null,
         statusUpdatesEnabled: Boolean(row?.status_updates_enabled),
         autoRoleId: row?.auto_role_id || null,
         language: normalizeLanguage(row?.language),
@@ -2332,21 +2344,27 @@ function saveDiscordUserProfile(user, options = {}) {
 
 function getGuildConfig(guildId) {
     let row = db.prepare(`
-        SELECT role_id, log_channel_id, status_channel_id, status_updates_enabled, auto_role_id, language, server_preset
+        SELECT role_id, log_channel_id, status_channel_id, updates_channel_id, updates_ping_role_id,
+               status_updates_enabled, auto_role_id, language, server_preset
         FROM guild_configs
         WHERE guild_id = ?
     `).get(guildId);
 
     if (!row) {
         db.prepare(`
-            INSERT INTO guild_configs (guild_id, role_id, log_channel_id, status_channel_id, status_updates_enabled, auto_role_id, language, server_preset)
-            VALUES (?, NULL, NULL, NULL, 0, NULL, 'fr', 'standard')
+            INSERT INTO guild_configs (
+                guild_id, role_id, log_channel_id, status_channel_id, updates_channel_id,
+                updates_ping_role_id, status_updates_enabled, auto_role_id, language, server_preset
+            )
+            VALUES (?, NULL, NULL, NULL, NULL, NULL, 0, NULL, 'fr', 'standard')
         `).run(guildId);
 
         row = {
             role_id: null,
             log_channel_id: null,
             status_channel_id: null,
+            updates_channel_id: null,
+            updates_ping_role_id: null,
             status_updates_enabled: 0,
             auto_role_id: null,
             language: 'fr',
@@ -2369,6 +2387,12 @@ function updateGuildConfig(guildId, newConfig) {
         statusChannelId: Object.prototype.hasOwnProperty.call(newConfig, 'statusChannelId')
             ? newConfig.statusChannelId
             : currentConfig.statusChannelId,
+        updatesChannelId: Object.prototype.hasOwnProperty.call(newConfig, 'updatesChannelId')
+            ? newConfig.updatesChannelId
+            : currentConfig.updatesChannelId,
+        updatesPingRoleId: Object.prototype.hasOwnProperty.call(newConfig, 'updatesPingRoleId')
+            ? newConfig.updatesPingRoleId
+            : currentConfig.updatesPingRoleId,
         statusUpdatesEnabled: Object.prototype.hasOwnProperty.call(newConfig, 'statusUpdatesEnabled')
             ? Boolean(newConfig.statusUpdatesEnabled)
             : currentConfig.statusUpdatesEnabled,
@@ -2385,12 +2409,15 @@ function updateGuildConfig(guildId, newConfig) {
 
     db.prepare(`
         UPDATE guild_configs
-        SET role_id = ?, log_channel_id = ?, status_channel_id = ?, status_updates_enabled = ?, auto_role_id = ?, language = ?, server_preset = ?
+        SET role_id = ?, log_channel_id = ?, status_channel_id = ?, updates_channel_id = ?,
+            updates_ping_role_id = ?, status_updates_enabled = ?, auto_role_id = ?, language = ?, server_preset = ?
         WHERE guild_id = ?
     `).run(
         nextConfig.serviceRoleId,
         nextConfig.logChannelId,
         nextConfig.statusChannelId,
+        nextConfig.updatesChannelId,
+        nextConfig.updatesPingRoleId,
         nextConfig.statusUpdatesEnabled ? 1 : 0,
         nextConfig.autoRoleId,
         nextConfig.language,
@@ -8154,6 +8181,30 @@ function getSentinelStatusChannels(guild) {
     return channels;
 }
 
+function getSentinelOfficialUpdateChannels(guild) {
+    const channels = [];
+    const seenChannelIds = new Set();
+    const addTarget = (channel, language) => {
+        if (!channel?.isTextBased?.() || seenChannelIds.has(channel.id)) {
+            return;
+        }
+
+        seenChannelIds.add(channel.id);
+        channels.push({ channel, language });
+    };
+    const config = getGuildConfig(guild.id);
+
+    if (config.updatesChannelId) {
+        addTarget(guild.channels.cache.get(config.updatesChannelId), config.language);
+    }
+
+    for (const target of SENTINEL_OFFICIAL_UPDATE_CHANNELS) {
+        addTarget(findGuildTextChannel(guild, target.name), target.language);
+    }
+
+    return channels;
+}
+
 function getServiceRole(guild) {
     const guildConfig = getGuildConfig(guild.id);
 
@@ -8401,6 +8452,8 @@ function buildConfigEmbed(guild, requester) {
     const roleValue = guildConfig.serviceRoleId ? `<@&${guildConfig.serviceRoleId}>` : 'Non configuré';
     const logChannelValue = guildConfig.logChannelId ? `<#${guildConfig.logChannelId}>` : 'Non configuré';
     const statusChannelValue = guildConfig.statusChannelId ? `<#${guildConfig.statusChannelId}>` : 'Non configuré';
+    const updatesChannelValue = guildConfig.updatesChannelId ? `<#${guildConfig.updatesChannelId}>` : 'Non configuré';
+    const updatesPingRoleValue = guildConfig.updatesPingRoleId ? `<@&${guildConfig.updatesPingRoleId}>` : 'Aucun';
     const statusUpdatesValue = guildConfig.statusUpdatesEnabled ? 'Activées' : 'Désactivées';
     const autoRoleValue = guildConfig.autoRoleId ? `<@&${guildConfig.autoRoleId}>` : 'Désactivé';
     const commandRolesValue = formatCommandRoleList(guild.id);
@@ -8423,8 +8476,13 @@ function buildConfigEmbed(guild, requester) {
                 inline: true
             },
             {
-                name: 'Salon statut',
-                value: `${statusChannelValue}\nMises à jour : **${statusUpdatesValue}**`,
+                name: 'État technique',
+                value: statusChannelValue,
+                inline: true
+            },
+            {
+                name: 'Nouveautés officielles',
+                value: `${updatesChannelValue}\nDiffusion : **${statusUpdatesValue}**\nMention : ${updatesPingRoleValue}`,
                 inline: true
             },
             {
@@ -8766,6 +8824,12 @@ async function buildDiagnosticEmbed(guild, requester) {
     const statusPermissions = statusChannel && botMember
         ? statusChannel.permissionsFor(botMember)
         : null;
+    const updatesChannel = guildConfig.updatesChannelId
+        ? await guild.channels.fetch(guildConfig.updatesChannelId).catch(() => null)
+        : null;
+    const updatesPermissions = updatesChannel && botMember
+        ? updatesChannel.permissionsFor(botMember)
+        : null;
     const serviceConsistency = await getServiceConsistencyStats(guild);
 
     let databaseOk = true;
@@ -8800,13 +8864,21 @@ async function buildDiagnosticEmbed(guild, requester) {
     const hasLogIssue = Boolean(guildConfig.logChannelId) && (!logChannelOk || !logCanSend);
     const statusChannelOk = Boolean(statusChannel?.isTextBased());
     const statusCanSend = Boolean(
-        statusChannelOk
+        !guildConfig.statusChannelId
+        || (statusChannelOk
         && statusPermissions?.has(PermissionsBitField.Flags.ViewChannel)
         && statusPermissions?.has(PermissionsBitField.Flags.SendMessages)
-        && statusPermissions?.has(PermissionsBitField.Flags.EmbedLinks)
+        && statusPermissions?.has(PermissionsBitField.Flags.EmbedLinks))
     );
-    const statusUpdatesReady = Boolean(guildConfig.statusUpdatesEnabled);
-    const hasStatusIssue = !guildConfig.statusChannelId || !statusCanSend || !statusUpdatesReady;
+    const updatesChannelOk = Boolean(updatesChannel?.isTextBased());
+    const updatesCanSend = Boolean(
+        updatesChannelOk
+        && updatesPermissions?.has(PermissionsBitField.Flags.ViewChannel)
+        && updatesPermissions?.has(PermissionsBitField.Flags.SendMessages)
+        && updatesPermissions?.has(PermissionsBitField.Flags.EmbedLinks)
+    );
+    const statusUpdatesReady = Boolean(guildConfig.statusUpdatesEnabled && updatesCanSend);
+    const hasStatusIssue = !statusCanSend || !guildConfig.updatesChannelId || !statusUpdatesReady;
     const hasConsistencyIssue = serviceConsistency.activeWithoutRole > 0
         || serviceConsistency.roleWithoutActiveSession > 0;
     const diagnosticOk = databaseOk
@@ -8864,10 +8936,10 @@ async function buildDiagnosticEmbed(guild, requester) {
         fixes.push('Vérifie le salon de logs : Sentinel doit le voir et y écrire.');
     }
 
-    if (!guildConfig.statusChannelId) {
+    if (!guildConfig.updatesChannelId) {
         fixes.push('Choisis le salon obligatoire des nouveautés avec `/config-statut`.');
-    } else if (!statusCanSend) {
-        fixes.push('Vérifie le salon statut : Sentinel doit le voir, y écrire et intégrer des liens.');
+    } else if (!updatesCanSend) {
+        fixes.push('Vérifie le salon des nouveautés : Sentinel doit le voir, y écrire et intégrer des liens.');
     } else if (!statusUpdatesReady) {
         fixes.push('Réactive les nouveautés avec `/config-statut action:Recevoir les mises à jour`.');
     }
@@ -8921,10 +8993,17 @@ async function buildDiagnosticEmbed(guild, requester) {
                 inline: false
             },
             {
-                name: 'Salon statut et nouveautés',
+                name: 'État technique',
                 value: [
-                    diagnosticLine(Boolean(guildConfig.statusChannelId), 'Salon obligatoire configuré', guildConfig.statusChannelId ? `<#${guildConfig.statusChannelId}>` : 'à choisir avec `/config-statut`'),
-                    diagnosticLine(statusCanSend, 'Salon accessible à Sentinel'),
+                    diagnosticLine(statusCanSend, 'Salon accessible à Sentinel', guildConfig.statusChannelId ? `<#${guildConfig.statusChannelId}>` : 'optionnel')
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Nouveautés officielles',
+                value: [
+                    diagnosticLine(Boolean(guildConfig.updatesChannelId), 'Salon obligatoire configuré', guildConfig.updatesChannelId ? `<#${guildConfig.updatesChannelId}>` : 'à choisir avec `/config-statut`'),
+                    diagnosticLine(updatesCanSend, 'Salon accessible à Sentinel'),
                     diagnosticLine(statusUpdatesReady, 'Annonces officielles activées')
                 ].join('\n'),
                 inline: false
@@ -9107,14 +9186,10 @@ function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr
             inline: true
         },
         {
-            name: isEnglish ? 'Sentinel bulletins' : 'Bulletins Sentinel',
-            value: guildConfig.statusUpdatesEnabled
-                ? (isEnglish
-                    ? 'Open. Validated bulletins can be posted here.'
-                    : 'Ouverts. Les bulletins validés peuvent être publiés ici.')
-                : (isEnglish
-                    ? 'Closed for this outpost.'
-                    : 'Fermés pour ce poste.'),
+            name: isEnglish ? 'Technical watch' : 'Veille technique',
+            value: isEnglish
+                ? 'This panel is reserved for Sentinel operational status.'
+                : 'Ce panneau est réservé à l’état opérationnel de Sentinel.',
             inline: false
         }
     );
@@ -9167,33 +9242,285 @@ function buildOfficialStatusUpdateEmbed({ title, body, requester, language = 'fr
     }).addFields({
         name: language === 'en' ? 'Sentinel update' : 'Mise à jour Sentinel',
         value: language === 'en'
-            ? 'This message was selected for public status channels by the Sentinel creator.'
-            : 'Ce message a été choisi par la créatrice pour les salons statut publics.',
+            ? 'This message was selected for public update channels by the Sentinel creator.'
+            : 'Ce message a été choisi par la créatrice pour les salons publics de nouveautés.',
         inline: false
     });
 }
 
-function getOfficialStatusUpdatePayload({ title, body, requester, language }) {
-    return {
+function getOfficialStatusUpdatePayload({ title, body, requester, language, pingRoleId = null }) {
+    const payload = {
         embeds: [buildOfficialStatusUpdateEmbed({
             title,
             body,
             requester,
             language
         })],
-        allowedMentions: { parse: [] }
+        allowedMentions: pingRoleId ? { roles: [pingRoleId] } : { parse: [] }
     };
+
+    if (pingRoleId) {
+        payload.content = `<@&${pingRoleId}>`;
+    }
+
+    return payload;
+}
+
+function mapOfficialUpdate(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        id: row.id,
+        publicKey: row.public_key || null,
+        titleFr: row.title_fr,
+        bodyFr: row.body_fr,
+        titleEn: row.title_en || null,
+        bodyEn: row.body_en || null,
+        source: row.source || null,
+        createdByUserId: row.created_by_user_id || null,
+        createdAt: row.created_at,
+        publishedAt: row.published_at
+    };
+}
+
+function createOfficialUpdateRecord({ titleFr, bodyFr, titleEn, bodyEn, source, requester }) {
+    const timestamp = new Date().toISOString();
+    const result = db.prepare(`
+        INSERT INTO official_updates (
+            public_key, title_fr, body_fr, title_en, body_en, source,
+            created_by_user_id, is_public, created_at, published_at
+        )
+        VALUES (NULL, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(
+        titleFr,
+        bodyFr,
+        titleEn || null,
+        bodyEn || null,
+        source || 'mise à jour officielle',
+        requester?.id || null,
+        timestamp,
+        timestamp
+    );
+
+    return mapOfficialUpdate(db.prepare('SELECT * FROM official_updates WHERE id = ?').get(result.lastInsertRowid));
+}
+
+function getPublicOfficialUpdates(limit = 20) {
+    const safeLimit = clampNumber(limit, 1, 50);
+    return db.prepare(`
+        SELECT *
+        FROM official_updates
+        WHERE is_public = 1
+        ORDER BY published_at DESC, id DESC
+        LIMIT ?
+    `).all(safeLimit).map(mapOfficialUpdate);
+}
+
+function getGuildOfficialUpdateHistory(guildId, limit = 20) {
+    const safeLimit = clampNumber(limit, 1, 50);
+    return db.prepare(`
+        SELECT
+            d.id,
+            d.update_id,
+            d.channel_id,
+            d.language,
+            d.ping_role_id,
+            d.status,
+            d.message_id,
+            d.attempt_count,
+            d.last_error,
+            d.next_attempt_at,
+            d.delivered_at,
+            d.updated_at,
+            u.title_fr,
+            u.title_en,
+            u.published_at
+        FROM official_update_deliveries d
+        JOIN official_updates u ON u.id = d.update_id
+        WHERE d.guild_id = ?
+        ORDER BY d.updated_at DESC, d.id DESC
+        LIMIT ?
+    `).all(guildId, safeLimit).map(row => ({
+        id: row.id,
+        updateId: row.update_id,
+        channelId: row.channel_id,
+        language: row.language,
+        pingRoleId: row.ping_role_id || null,
+        status: row.status,
+        messageId: row.message_id || null,
+        attemptCount: row.attempt_count || 0,
+        lastError: row.last_error || null,
+        nextAttemptAt: row.next_attempt_at || null,
+        deliveredAt: row.delivered_at || null,
+        updatedAt: row.updated_at,
+        publishedAt: row.published_at,
+        title: row.language === 'en' && row.title_en ? row.title_en : row.title_fr
+    }));
+}
+
+function queueOfficialUpdateDelivery(updateId, target) {
+    const timestamp = new Date().toISOString();
+    db.prepare(`
+        INSERT INTO official_update_deliveries (
+            update_id, guild_id, channel_id, language, ping_role_id,
+            status, attempt_count, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)
+        ON CONFLICT(update_id, guild_id, channel_id) DO UPDATE SET
+            language = excluded.language,
+            ping_role_id = excluded.ping_role_id,
+            updated_at = excluded.updated_at
+    `).run(
+        updateId,
+        target.guild.id,
+        target.channel.id,
+        target.language === 'en' ? 'en' : 'fr',
+        target.pingRoleId || null,
+        timestamp
+    );
+
+    return db.prepare(`
+        SELECT id
+        FROM official_update_deliveries
+        WHERE update_id = ? AND guild_id = ? AND channel_id = ?
+    `).get(updateId, target.guild.id, target.channel.id)?.id || null;
+}
+
+const OFFICIAL_UPDATE_MAX_ATTEMPTS = 5;
+const OFFICIAL_UPDATE_RETRY_DELAYS_MS = [5 * 60 * 1000, 30 * 60 * 1000, 2 * 60 * 60 * 1000, 6 * 60 * 60 * 1000, 24 * 60 * 60 * 1000];
+
+function officialUpdateRetryAt(attemptCount) {
+    const delay = OFFICIAL_UPDATE_RETRY_DELAYS_MS[Math.min(Math.max(attemptCount - 1, 0), OFFICIAL_UPDATE_RETRY_DELAYS_MS.length - 1)];
+    return new Date(Date.now() + delay).toISOString();
+}
+
+function officialUpdateErrorMessage(error) {
+    return String(error?.message || error || 'Échec de livraison inconnu.').replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+async function attemptOfficialUpdateDelivery(deliveryId) {
+    const delivery = db.prepare(`
+        SELECT d.*, u.title_fr, u.body_fr, u.title_en, u.body_en
+        FROM official_update_deliveries d
+        JOIN official_updates u ON u.id = d.update_id
+        WHERE d.id = ?
+    `).get(deliveryId);
+
+    if (!delivery || delivery.status === 'delivered' || delivery.status === 'cancelled' || delivery.status === 'failed') {
+        return { ok: delivery?.status === 'delivered', skipped: true };
+    }
+
+    const attemptCount = (delivery.attempt_count || 0) + 1;
+    const timestamp = new Date().toISOString();
+    const staleSendingBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const claimed = db.prepare(`
+        UPDATE official_update_deliveries
+        SET status = 'sending', updated_at = ?
+        WHERE id = ?
+          AND (
+            status IN ('pending', 'retrying')
+            OR (status = 'sending' AND updated_at <= ?)
+          )
+    `).run(timestamp, deliveryId, staleSendingBefore);
+
+    if (claimed.changes !== 1) {
+        return { ok: false, skipped: true };
+    }
+
+    try {
+        const guild = client.guilds.cache.get(delivery.guild_id)
+            || await client.guilds.fetch(delivery.guild_id);
+        const channel = guild.channels.cache.get(delivery.channel_id)
+            || await guild.channels.fetch(delivery.channel_id);
+
+        if (!channel?.isTextBased?.()) {
+            throw new Error('Le salon des nouveautés est introuvable ou non textuel.');
+        }
+
+        const language = delivery.language === 'en' ? 'en' : 'fr';
+        const channelError = getCustomEmbedChannelError(guild, channel, null, language);
+
+        if (channelError) {
+            throw new Error(channelError);
+        }
+
+        let pingRoleId = delivery.ping_role_id || null;
+        if (pingRoleId) {
+            const pingRole = guild.roles.cache.get(pingRoleId)
+                || await guild.roles.fetch(pingRoleId).catch(() => null);
+            pingRoleId = pingRole ? pingRole.id : null;
+        }
+
+        const title = language === 'en' && delivery.title_en ? delivery.title_en : delivery.title_fr;
+        const body = language === 'en' && delivery.body_en ? delivery.body_en : delivery.body_fr;
+        const message = await channel.send(getOfficialStatusUpdatePayload({
+            title,
+            body,
+            requester: client.user,
+            language,
+            pingRoleId
+        }));
+
+        db.prepare(`
+            UPDATE official_update_deliveries
+            SET status = 'delivered', message_id = ?, attempt_count = ?, last_error = NULL,
+                next_attempt_at = NULL, delivered_at = ?, updated_at = ?
+            WHERE id = ?
+        `).run(message.id, attemptCount, timestamp, timestamp, deliveryId);
+
+        return { ok: true, messageId: message.id, guildId: guild.id, channelId: channel.id };
+    } catch (error) {
+        const terminal = attemptCount >= OFFICIAL_UPDATE_MAX_ATTEMPTS;
+        const nextAttemptAt = terminal ? null : officialUpdateRetryAt(attemptCount);
+        db.prepare(`
+            UPDATE official_update_deliveries
+            SET status = ?, attempt_count = ?, last_error = ?, next_attempt_at = ?, updated_at = ?
+            WHERE id = ?
+        `).run(
+            terminal ? 'failed' : 'retrying',
+            attemptCount,
+            officialUpdateErrorMessage(error),
+            nextAttemptAt,
+            timestamp,
+            deliveryId
+        );
+
+        return { ok: false, retrying: !terminal, error: officialUpdateErrorMessage(error) };
+    }
+}
+
+async function processOfficialUpdateRetries() {
+    const staleSendingBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const due = db.prepare(`
+        SELECT id
+        FROM official_update_deliveries
+        WHERE (
+            status IN ('pending', 'retrying')
+            AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+          )
+          OR (status = 'sending' AND updated_at <= ?)
+        ORDER BY updated_at ASC
+        LIMIT 20
+    `).all(new Date().toISOString(), staleSendingBefore);
+
+    for (const item of due) {
+        await attemptOfficialUpdateDelivery(item.id);
+    }
+
+    return due.length;
 }
 
 async function getConfiguredStatusUpdateTarget(guild) {
     const config = getGuildConfig(guild.id);
 
-    if (!config.statusChannelId || !config.statusUpdatesEnabled) {
+    if (!config.updatesChannelId || !config.statusUpdatesEnabled) {
         return null;
     }
 
     await guild.channels.fetch().catch(() => null);
-    const channel = guild.channels.cache.get(config.statusChannelId);
+    const channel = guild.channels.cache.get(config.updatesChannelId);
 
     if (!channel || !channel.isTextBased?.()) {
         return null;
@@ -9202,8 +9529,41 @@ async function getConfiguredStatusUpdateTarget(guild) {
     return {
         guild,
         channel,
-        language: config.language
+        language: config.language,
+        pingRoleId: config.updatesPingRoleId || null
     };
+}
+
+async function sendOfficialUpdateTest(guild, requester = client.user) {
+    const config = getGuildConfig(guild.id);
+
+    if (!config.updatesChannelId) {
+        throw new Error('Choisis d’abord un salon des nouveautés Sentinel.');
+    }
+
+    const channel = guild.channels.cache.get(config.updatesChannelId)
+        || await guild.channels.fetch(config.updatesChannelId).catch(() => null);
+    const language = config.language === 'en' ? 'en' : 'fr';
+
+    if (!channel?.isTextBased?.()) {
+        throw new Error('Le salon des nouveautés est introuvable ou non textuel.');
+    }
+
+    const channelError = getCustomEmbedChannelError(guild, channel, null, language);
+    if (channelError) {
+        throw new Error(channelError);
+    }
+
+    await channel.send(getOfficialStatusUpdatePayload({
+        title: language === 'en' ? 'Sentinel | Update channel ready' : 'Sentinel | Salon des nouveautés prêt',
+        body: language === 'en'
+            ? 'The channel is configured correctly. Future official Sentinel announcements will appear here.'
+            : 'Le salon est correctement configuré. Les prochaines annonces officielles Sentinel apparaîtront ici.',
+        requester,
+        language
+    }));
+
+    return channel;
 }
 
 async function publishOfficialStatusUpdate({
@@ -9214,6 +9574,14 @@ async function publishOfficialStatusUpdate({
     requester = client.user,
     includeSubscribers = false
 }) {
+    const update = createOfficialUpdateRecord({
+        titleFr,
+        bodyFr,
+        titleEn,
+        bodyEn,
+        source: 'mise à jour officielle',
+        requester
+    });
     const referenceGuild = client.guilds.cache.get(SENTINEL_REFERENCE_GUILD_ID)
         || await client.guilds.fetch(SENTINEL_REFERENCE_GUILD_ID).catch(() => null);
     const referenceTargets = [];
@@ -9223,7 +9591,7 @@ async function publishOfficialStatusUpdate({
     if (referenceGuild) {
         await referenceGuild.channels.fetch().catch(() => null);
 
-        for (const target of getSentinelStatusChannels(referenceGuild)) {
+        for (const target of getSentinelOfficialUpdateChannels(referenceGuild)) {
             referenceTargets.push({
                 guild: referenceGuild,
                 ...target
@@ -9250,28 +9618,15 @@ async function publishOfficialStatusUpdate({
             return;
         }
 
-        const language = target.language === 'en' ? 'en' : 'fr';
-        const title = language === 'en' && titleEn ? titleEn : titleFr;
-        const body = language === 'en' && bodyEn ? bodyEn : bodyFr;
-        const channelError = getCustomEmbedChannelError(target.guild, target.channel, null, language);
+        const deliveryId = queueOfficialUpdateDelivery(update.id, target);
+        const result = deliveryId ? await attemptOfficialUpdateDelivery(deliveryId) : { ok: false };
 
-        if (channelError) {
-            return;
-        }
-
-        const message = await target.channel.send(getOfficialStatusUpdatePayload({
-            title,
-            body,
-            requester,
-            language
-        })).catch(() => null);
-
-        if (message) {
+        if (result.ok) {
             usedChannelIds.add(target.channel.id);
             posted.push({
                 guildId: target.guild.id,
                 channelId: target.channel.id,
-                messageId: message.id
+                messageId: result.messageId
             });
         }
     };
@@ -9373,7 +9728,7 @@ function buildServerOnboardingEmbed(guild, requester) {
             '`2.` Configure le grade de service avec `/config-role role:@role`.',
             '`3.` Configure le salon de registre avec `/config-logs salon_id:ID`.',
             '`4.` Ajoute les grades autorisés avec `/config-permissions action:ajouter role:@role`.',
-            '`5.` Choisis obligatoirement le salon des nouveautés avec `/config-statut action:Définir le salon salon:#salon`.',
+            '`5.` Choisis obligatoirement le salon des nouveautés avec `/config-statut action:Définir le salon des nouveautés salon:#salon`.',
             '`6.` Publie le Bureau de service dans le bon salon avec `!service-panel`.',
             '`7.` Si tu veux les dossiers privés, publie le bureau avec `/dossier-panel`.',
             '',
@@ -9448,7 +9803,7 @@ function buildLegacyHelpEmbed(guild, requester) {
                     '`/config-role role:@role` sets the service role.',
                     '`/autorole-config` sets or disables the role given automatically when a member joins.',
                     '`/config-channel channel_id:ID` sets the log channel.',
-                    '`/status-channel` sets the required channel for bot health and official Sentinel updates.',
+                    '`/status-channel` lets you separate the optional technical status panel from the required official updates channel.',
                     '`/config-view` shows the current configuration.',
                     '`/payroll-config hourly_rate:500 currency:$` sets the weekly RP payroll amount.',
                     '`/weekly-payroll` shows the current week paid/unpaid summary.',
@@ -9537,8 +9892,9 @@ function buildLegacyHelpEmbed(guild, requester) {
         '**3. Rôle automatique d’arrivée**',
         '`/config-autorole action:definir role:@role` donne un rôle aux nouveaux membres. Utilise `action:desactiver` pour le couper.',
         '',
-        '**4. Salon statut et nouveautés obligatoire**',
-        '`/config-statut action:definir salon:#salon` publie le panneau d’état et active automatiquement les annonces officielles Sentinel.',
+        '**4. Salon des nouveautés obligatoire**',
+        '`/config-statut action:Définir le salon des nouveautés salon:#salon` active les annonces officielles Sentinel dans un salon dédié.',
+        'Le panneau d’état technique reste optionnel et se configure séparément avec `action:Définir le salon de statut`.',
         '',
         '**5. Verification**',
         '`/config-voir` affiche le rôle, les salons configurés et les rôles autorisés.'
@@ -10105,7 +10461,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/config-role role:@role` choisit le grade donné pendant le service.',
                         '`/config-autorole action:definir role:@role` remet un grade aux nouveaux arrivants.',
                         '`/config-logs salon_id:ID` choisit le salon de registre.',
-                        '`/config-statut` publie le centre de contrôle et peut recevoir les bulletins officiels.',
+                        '`/config-statut` sépare le centre de contrôle optionnel du salon obligatoire des bulletins officiels.',
                         '`/config-voir` affiche ce qui est configuré.'
                     ].join('\n')
                 },
@@ -10646,6 +11002,22 @@ function mapDiscordAuditAction(interaction) {
             return 'disable-status-updates';
         }
 
+        if (action === 'maj-salon' || action === 'updates-channel') {
+            return 'set-updates-channel';
+        }
+
+        if (action === 'maj-test' || action === 'updates-test') {
+            return 'test-status-updates';
+        }
+
+        if (action === 'maj-role' || action === 'updates-role') {
+            return 'set-updates-role';
+        }
+
+        if (action === 'maj-role-off' || action === 'updates-role-off') {
+            return 'clear-updates-role';
+        }
+
         return action === 'voir' || action === 'view' ? null : 'set-status-channel';
     }
 
@@ -10746,7 +11118,7 @@ function getDiscordAuditTarget(interaction, action) {
     }
 
     const roleActions = new Set(['set-service-role', 'add-command-role', 'remove-command-role', 'configure-dossier-roles']);
-    const channelActions = new Set(['set-log-channel', 'set-status-channel', 'publish-service-panel', 'publish-dossier-panel', 'dossier-claim', 'dossier-status', 'dossier-close', 'dossier-transcript', 'purge', 'lock', 'unlock', 'slowmode']);
+    const channelActions = new Set(['set-log-channel', 'set-status-channel', 'set-updates-channel', 'test-status-updates', 'publish-service-panel', 'publish-dossier-panel', 'dossier-claim', 'dossier-status', 'dossier-close', 'dossier-transcript', 'purge', 'lock', 'unlock', 'slowmode']);
     const messageActions = new Set(['custom-embed-edit', 'custom-embed-delete']);
     const caseActions = new Set(['edit-case', 'delete-case', 'unwarn']);
     const guildActions = new Set(['disable-status-channel', 'enable-status-updates', 'disable-status-updates', 'official-status-update']);
@@ -11042,6 +11414,10 @@ const SENTINEL_GENERAL_CHANNELS = {
 const SENTINEL_STATUS_CHANNELS = [
     { name: '📌｜statut-sentinel', language: 'fr' },
     { name: '📌｜sentinel-status', language: 'en' }
+];
+const SENTINEL_OFFICIAL_UPDATE_CHANNELS = [
+    { name: '📡｜annonces', language: 'fr' },
+    { name: '📡｜announcements', language: 'en' }
 ];
 const SENTINEL_STAFF_LOG_CHANNELS = ['📂｜logs'];
 
@@ -14058,6 +14434,7 @@ client.once(Events.ClientReady, async () => {
             getCustomEmbedQuota,
             getCustomEmbedRecord,
             getPublicEmbedMedia,
+            getPublicOfficialUpdates,
             hasCustomEmbedUpload,
             customEmbedUploadRequiresAttachment,
             getDatabaseBackupStatus,
@@ -14069,6 +14446,7 @@ client.once(Events.ClientReady, async () => {
             getDossierTemplates,
             getGuildConfig,
             getGuildLanguage,
+            getGuildOfficialUpdateHistory,
             getGuildPayRoleSettings,
             getAutoRole,
             getAssignableRoleError,
@@ -14129,6 +14507,7 @@ client.once(Events.ClientReady, async () => {
             resetGuild,
             resetUser,
             sendModerationLog,
+            sendOfficialUpdateTest,
             sendDossierTranscript,
             sendServiceLog,
             setDossierReferent,
@@ -14189,6 +14568,11 @@ client.once(Events.ClientReady, async () => {
         }
 
         await updateAllSentinelStatusPanels();
+        for (const guild of client.guilds.cache.values()) {
+            await repairGuildOfficialUpdateReferences(guild, true).catch(error => {
+                console.error(`Réparation des salons d'annonces ${guild.id} :`, error);
+            });
+        }
         await processExpiredTemporaryBans();
     } catch (error) {
         console.error('Erreur synchronisation serveur Sentinel :', error);
@@ -14197,12 +14581,18 @@ client.once(Events.ClientReady, async () => {
     setInterval(refreshSlashCommandStatus, 6 * 60 * 60 * 1000);
     setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
     setInterval(processExpiredTemporaryBans, 60 * 1000);
+    setInterval(() => processOfficialUpdateRetries().catch(error => {
+        console.error('Nouvelle tentative des annonces officielles Sentinel :', error);
+    }), 5 * 60 * 1000);
     setInterval(checkLongServiceAlerts, LONG_SERVICE_ALERT_INTERVAL_MS);
     setInterval(processDossierMaintenance, DOSSIER_MAINTENANCE_INTERVAL_MS);
     setTimeout(checkLongServiceAlerts, 60 * 1000);
     setTimeout(() => processDossierMaintenance().catch(error => {
         console.error('Entretien dossiers Sentinel :', error);
     }), 30 * 1000);
+    setTimeout(() => processOfficialUpdateRetries().catch(error => {
+        console.error('Première reprise des annonces officielles Sentinel :', error);
+    }), 60 * 1000);
 });
 
 client.on(Events.Error, error => {
@@ -14246,6 +14636,143 @@ client.on(Events.GuildCreate, async guild => {
 
     const owner = await guild.fetchOwner().catch(() => null);
     await owner?.send(payload).catch(() => {});
+});
+
+async function notifyGuildConfigurationRepair(guild, description) {
+    const language = getGuildLanguage(guild.id);
+    const payload = {
+        embeds: [createSentinelEmbed({
+            color: SENTINEL_COLORS.warning,
+            title: language === 'en' ? 'Sentinel | Configuration repaired' : 'Sentinel | Configuration réparée',
+            description,
+            requester: client.user,
+            language
+        })]
+    };
+    const logChannel = getLogChannel(guild);
+
+    if (logChannel && await logChannel.send(payload).then(() => true).catch(() => false)) {
+        return;
+    }
+
+    const owner = await guild.fetchOwner().catch(() => null);
+    await owner?.send(payload).catch(() => {});
+}
+
+async function repairGuildOfficialUpdateReferences(guild, notify = false) {
+    await Promise.all([
+        guild.channels.fetch().catch(() => null),
+        guild.roles.fetch().catch(() => null)
+    ]);
+
+    const config = getGuildConfig(guild.id);
+    const statusMissing = Boolean(config.statusChannelId && !guild.channels.cache.has(config.statusChannelId));
+    const updatesMissing = Boolean(config.updatesChannelId && !guild.channels.cache.has(config.updatesChannelId));
+    const pingRoleMissing = Boolean(config.updatesPingRoleId && !guild.roles.cache.has(config.updatesPingRoleId));
+
+    if (!statusMissing && !updatesMissing && !pingRoleMissing) {
+        return false;
+    }
+
+    updateGuildConfig(guild.id, {
+        ...(statusMissing ? { statusChannelId: null } : {}),
+        ...(updatesMissing ? { updatesChannelId: null, statusUpdatesEnabled: false } : {}),
+        ...(pingRoleMissing ? { updatesPingRoleId: null } : {})
+    });
+
+    if (updatesMissing) {
+        db.prepare(`
+            UPDATE official_update_deliveries
+            SET status = 'cancelled', last_error = ?, next_attempt_at = NULL, updated_at = ?
+            WHERE guild_id = ? AND status IN ('pending', 'retrying')
+        `).run(
+            'Le salon des nouveautés est introuvable.',
+            new Date().toISOString(),
+            guild.id
+        );
+    }
+
+    if (notify) {
+        const repaired = [
+            statusMissing ? 'le salon d’état technique' : null,
+            updatesMissing ? 'le salon des nouveautés' : null,
+            pingRoleMissing ? 'le rôle de mention' : null
+        ].filter(Boolean).join(', ');
+        const repairedEn = [
+            statusMissing ? 'the technical status channel' : null,
+            updatesMissing ? 'the updates channel' : null,
+            pingRoleMissing ? 'the mention role' : null
+        ].filter(Boolean).join(', ');
+        await notifyGuildConfigurationRepair(
+            guild,
+            getGuildLanguage(guild.id) === 'en'
+                ? `Sentinel removed an invalid Discord reference: ${repairedEn}. Open the dashboard to choose a new item.`
+                : `Sentinel a retiré une référence Discord devenue invalide : ${repaired}. Ouvre la console pour choisir un nouvel élément.`
+        );
+    }
+
+    return true;
+}
+
+client.on(Events.ChannelDelete, async channel => {
+    const guild = channel.guild;
+
+    if (!guild) {
+        return;
+    }
+
+    const config = getGuildConfig(guild.id);
+    const removedStatus = config.statusChannelId === channel.id;
+    const removedUpdates = config.updatesChannelId === channel.id;
+
+    if (!removedStatus && !removedUpdates) {
+        return;
+    }
+
+    updateGuildConfig(guild.id, {
+        ...(removedStatus ? { statusChannelId: null } : {}),
+        ...(removedUpdates ? { updatesChannelId: null, statusUpdatesEnabled: false } : {})
+    });
+
+    if (removedUpdates) {
+        db.prepare(`
+            UPDATE official_update_deliveries
+            SET status = 'cancelled', last_error = ?, next_attempt_at = NULL, updated_at = ?
+            WHERE guild_id = ? AND channel_id = ? AND status IN ('pending', 'retrying')
+        `).run(
+            'Le salon des nouveautés a été supprimé.',
+            new Date().toISOString(),
+            guild.id,
+            channel.id
+        );
+    }
+
+    const english = getGuildLanguage(guild.id) === 'en';
+    const description = removedUpdates
+        ? (english
+            ? 'The updates channel was deleted. Official delivery has been paused to prevent lost announcements. Choose a new channel in the dashboard or with `/status-channel`.'
+            : 'Le salon des nouveautés a été supprimé. La diffusion officielle a été suspendue pour éviter des envois perdus. Choisis un nouveau salon dans la console ou avec `/config-statut`.')
+        : (english
+            ? 'The technical status channel was deleted. Its reference was removed automatically. You can choose a new one in the dashboard or with `/status-channel`.'
+            : 'Le salon d’état technique a été supprimé. Sa référence a été retirée automatiquement. Tu peux en choisir un nouveau dans la console ou avec `/config-statut`.');
+
+    await notifyGuildConfigurationRepair(guild, description);
+});
+
+client.on(Events.GuildRoleDelete, async role => {
+    const config = getGuildConfig(role.guild.id);
+
+    if (config.updatesPingRoleId !== role.id) {
+        return;
+    }
+
+    updateGuildConfig(role.guild.id, { updatesPingRoleId: null });
+    await notifyGuildConfigurationRepair(
+        role.guild,
+        getGuildLanguage(role.guild.id) === 'en'
+            ? 'The role mentioned for updates was deleted. Future announcements will remain visible without a role mention.'
+            : 'Le rôle mentionné pour les nouveautés a été supprimé. Les prochaines annonces resteront visibles, sans mention de rôle.'
+    );
 });
 
 client.on(Events.GuildMemberAdd, async member => {
@@ -14600,12 +15127,16 @@ client.on(Events.InteractionCreate, async interaction => {
 
             if (['voir', 'view'].includes(action)) {
                 const currentChannel = config.statusChannelId ? `<#${config.statusChannelId}>` : (language === 'en' ? 'Not configured' : 'Non configuré');
+                const updatesChannel = config.updatesChannelId ? `<#${config.updatesChannelId}>` : (language === 'en' ? 'Not configured' : 'Non configuré');
                 const updates = config.statusUpdatesEnabled ? (language === 'en' ? 'Enabled' : 'Activées') : (language === 'en' ? 'Disabled' : 'Désactivées');
+                const pingRole = config.updatesPingRoleId ? `<@&${config.updatesPingRoleId}>` : (language === 'en' ? 'None' : 'Aucun');
 
                 return interaction.reply({
                     content: t(language, 'statusChannelCurrent', {
                         channel: currentChannel,
-                        updates
+                        updatesChannel,
+                        updates,
+                        pingRole
                     }),
                     flags: MessageFlags.Ephemeral
                 });
@@ -14613,8 +15144,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
             if (['desactiver', 'disable'].includes(action)) {
                 updateGuildConfig(guildId, {
-                    statusChannelId: null,
-                    statusUpdatesEnabled: false
+                    statusChannelId: null
                 });
 
                 return interaction.reply({
@@ -14624,9 +15154,9 @@ client.on(Events.InteractionCreate, async interaction => {
             }
 
             if (['maj-on', 'updates-on'].includes(action)) {
-                if (!config.statusChannelId) {
+                if (!config.updatesChannelId) {
                     return interaction.reply({
-                        content: t(language, 'statusChannelRequired'),
+                        content: t(language, 'statusUpdatesChannelRequired'),
                         flags: MessageFlags.Ephemeral
                     });
                 }
@@ -14634,7 +15164,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 updateGuildConfig(guildId, {
                     statusUpdatesEnabled: true
                 });
-                await updateSentinelStatusPanel(interaction.guild);
 
                 return interaction.reply({
                     content: t(language, 'statusUpdatesEnabled'),
@@ -14646,10 +15175,56 @@ client.on(Events.InteractionCreate, async interaction => {
                 updateGuildConfig(guildId, {
                     statusUpdatesEnabled: false
                 });
-                await updateSentinelStatusPanel(interaction.guild);
 
                 return interaction.reply({
                     content: t(language, 'statusUpdatesDisabled'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            if (['maj-test', 'updates-test'].includes(action)) {
+                try {
+                    const channel = await sendOfficialUpdateTest(interaction.guild, interaction.user);
+                    return interaction.reply({
+                        content: t(language, 'statusUpdatesTested', { channel }),
+                        flags: MessageFlags.Ephemeral
+                    });
+                } catch (error) {
+                    return interaction.reply({
+                        content: `❌ ${officialUpdateErrorMessage(error)}`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                }
+            }
+
+            if (['maj-role-off', 'updates-role-off'].includes(action)) {
+                updateGuildConfig(guildId, { updatesPingRoleId: null });
+                return interaction.reply({
+                    content: t(language, 'statusUpdatesRoleDisabled'),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            if (['maj-role', 'updates-role'].includes(action)) {
+                const role = interaction.options.getRole('role');
+
+                if (!role) {
+                    return interaction.reply({
+                        content: t(language, 'adminRoleRequired'),
+                        flags: MessageFlags.Ephemeral
+                    });
+                }
+
+                if (role.id === interaction.guild.id) {
+                    return interaction.reply({
+                        content: t(language, 'everyoneDenied'),
+                        flags: MessageFlags.Ephemeral
+                    });
+                }
+
+                updateGuildConfig(guildId, { updatesPingRoleId: role.id });
+                return interaction.reply({
+                    content: t(language, 'statusUpdatesRoleSet', { role }),
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -14672,14 +15247,20 @@ client.on(Events.InteractionCreate, async interaction => {
                 });
             }
 
-            updateGuildConfig(guildId, {
-                statusChannelId: channel.id,
-                statusUpdatesEnabled: true
-            });
-            await updateSentinelStatusPanel(interaction.guild);
+            const configPatch = ['maj-salon', 'updates-channel'].includes(action)
+                ? { updatesChannelId: channel.id, statusUpdatesEnabled: true }
+                : { statusChannelId: channel.id };
+
+            updateGuildConfig(guildId, configPatch);
+
+            if (!['maj-salon', 'updates-channel'].includes(action)) {
+                await updateSentinelStatusPanel(interaction.guild);
+            }
 
             return interaction.reply({
-                content: t(language, 'statusChannelSet', { channel }),
+                content: t(language, ['maj-salon', 'updates-channel'].includes(action)
+                    ? 'statusUpdatesChannelSet'
+                    : 'statusChannelSet', { channel }),
                 flags: MessageFlags.Ephemeral
             });
         }

@@ -1027,6 +1027,7 @@ function dashboardConfigStatus(state) {
   const autoRole = resolveRole(state, state.config.autoRoleId);
   const logChannel = resolveChannel(state, state.config.logChannelId);
   const statusChannel = resolveChannel(state, state.config.statusChannelId);
+  const updatesChannel = resolveChannel(state, state.config.updatesChannelId);
   const allowedRoles = commandRoles(state);
   const alerts = [];
 
@@ -1046,14 +1047,14 @@ function dashboardConfigStatus(state) {
     alerts.push('Le salon de logs configuré n’existe plus ou n’est plus textuel.');
   }
 
-  if (!state.config.statusChannelId) {
-    alerts.push('Choisis le salon qui recevra l’état et les nouveautés officielles de Sentinel.');
-  } else if (!statusChannel) {
-    alerts.push('Le salon statut configuré n’existe plus ou n’est plus textuel.');
+  if (!state.config.updatesChannelId) {
+    alerts.push('Choisis le salon qui recevra les nouveautés officielles de Sentinel.');
+  } else if (!updatesChannel) {
+    alerts.push('Le salon des nouveautés configuré n’existe plus ou n’est plus textuel.');
   }
 
-  if (statusChannel && !state.config.statusUpdatesEnabled) {
-    alerts.push('Active les nouveautés officielles dans le salon Sentinel pour terminer l’installation.');
+  if (updatesChannel && !state.config.statusUpdatesEnabled) {
+    alerts.push('Active les nouveautés officielles pour terminer l’installation.');
   }
 
   if (allowedRoles.length === 0) {
@@ -1065,6 +1066,7 @@ function dashboardConfigStatus(state) {
     autoRole,
     logChannel,
     statusChannel,
+    updatesChannel,
     allowedRoles,
     alerts,
     ready: alerts.length === 0,
@@ -1073,7 +1075,7 @@ function dashboardConfigStatus(state) {
       Boolean(serviceRole),
       Boolean(logChannel),
       allowedRoles.length > 0,
-      Boolean(statusChannel && state.config.statusUpdatesEnabled)
+      Boolean(updatesChannel && state.config.statusUpdatesEnabled)
     ].filter(Boolean).length
   };
 }
@@ -1116,9 +1118,14 @@ function configStatusCards(state) {
       ready: Boolean(status.logChannel)
     },
     {
+      label: 'État technique',
+      value: status.statusChannel ? `#${status.statusChannel.name}` : 'Optionnel',
+      ready: true
+    },
+    {
       label: 'Salon des nouveautés',
-      value: status.statusChannel ? `#${status.statusChannel.name}` : 'Non configuré',
-      ready: Boolean(status.statusChannel && state.config.statusUpdatesEnabled)
+      value: status.updatesChannel ? `#${status.updatesChannel.name}` : 'Non configuré',
+      ready: Boolean(status.updatesChannel && state.config.statusUpdatesEnabled)
     },
     {
       label: 'Rôles autorisés',
@@ -1345,16 +1352,16 @@ function dashboardResolutionItems(state) {
     });
   }
 
-  if (!state.config.statusChannelId) {
-    coveredChecks.add('statusChannel');
+  if (!state.config.updatesChannelId) {
+    coveredChecks.add('updatesChannel');
     addResolutionItem(items, {
       area: 'Actualités',
       title: 'Choisir le salon des nouveautés',
       detail: 'Cette étape permet à ton serveur de recevoir les annonces officielles de Sentinel.',
       tab: 'setup'
     });
-  } else if (!status.statusChannel) {
-    coveredChecks.add('statusChannel');
+  } else if (!status.updatesChannel) {
+    coveredChecks.add('updatesChannel');
     addResolutionItem(items, {
       area: 'Actualités',
       title: 'Remplacer le salon des nouveautés',
@@ -1809,12 +1816,12 @@ function serverPresetSelector(state) {
   `;
 }
 
-function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions, statusChannelOptions) {
+function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions, updatesChannelOptions) {
   const status = dashboardConfigStatus(state);
   const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
   const serviceRoleLabel = status.serviceRole ? `@${status.serviceRole.name}` : 'Aucun rôle choisi';
   const logChannelLabel = status.logChannel ? `#${status.logChannel.name}` : 'Aucun salon choisi';
-  const statusChannelLabel = status.statusChannel ? `#${status.statusChannel.name}` : 'Aucun salon choisi';
+  const updatesChannelLabel = status.updatesChannel ? `#${status.updatesChannel.name}` : 'Aucun salon choisi';
   const commandRolesLabel = status.allowedRoles.length > 0
     ? status.allowedRoles.map((role) => `@${role.name}`).join(', ')
     : 'Aucun rôle staff autorisé';
@@ -1888,12 +1895,12 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         ${setupStep({
           index: '05',
           title: 'Choisir le salon des nouveautés',
-          description: 'Étape obligatoire : Sentinel y affiche son état et les annonces importantes du bot.',
-          done: Boolean(status.statusChannel && state.config.statusUpdatesEnabled),
-          current: `Actuel : ${statusChannelLabel}`,
+          description: 'Étape obligatoire : Sentinel y publie les annonces importantes du bot.',
+          done: Boolean(status.updatesChannel && state.config.statusUpdatesEnabled),
+          current: `Actuel : ${updatesChannelLabel}`,
           content: `
-            <form data-action-form="set-status-channel">
-              <select name="channelId">${statusChannelOptions}</select>
+            <form data-action-form="set-updates-channel">
+              <select name="channelId">${updatesChannelOptions}</select>
               <button class="button" type="submit">Valider ce salon</button>
             </form>
           `
@@ -1936,14 +1943,19 @@ function configSummaryList(state) {
       ready: Boolean(status.logChannel)
     },
     {
-      label: 'Salon statut',
-      value: status.statusChannel ? `#${status.statusChannel.name}` : 'Obligatoire',
-      ready: Boolean(status.statusChannel)
+      label: 'État technique',
+      value: status.statusChannel ? `#${status.statusChannel.name}` : 'Optionnel',
+      ready: true
+    },
+    {
+      label: 'Salon des nouveautés',
+      value: status.updatesChannel ? `#${status.updatesChannel.name}` : 'Obligatoire',
+      ready: Boolean(status.updatesChannel)
     },
     {
       label: 'Nouveautés',
       value: state.config.statusUpdatesEnabled ? 'Activées' : 'Désactivées',
-      ready: Boolean(state.config.statusUpdatesEnabled && status.statusChannel)
+      ready: Boolean(state.config.statusUpdatesEnabled && status.updatesChannel)
     },
     {
       label: 'Rôles staff',
@@ -1966,11 +1978,54 @@ function configSummaryList(state) {
   `;
 }
 
-function renderConfigurationHub(state, channelOptions, statusChannelOptions) {
+function officialUpdateHistory(state) {
+  const items = state.officialUpdates || [];
+  const labels = {
+    delivered: 'Livrée',
+    pending: 'En attente',
+    retrying: 'Nouvel essai prévu',
+    failed: 'Échec',
+    cancelled: 'Annulée'
+  };
+
+  if (items.length === 0) {
+    return '<p class="muted">Aucune annonce n’a encore été envoyée sur ce serveur.</p>';
+  }
+
+  return `
+    <div class="table-shell">
+      <table class="dashboard-table">
+        <thead><tr><th>Annonce</th><th>État</th><th>Essais</th><th>Dernière activité</th></tr></thead>
+        <tbody>
+          ${items.map((item) => {
+            const messageUrl = item.messageId && item.channelId
+              ? `https://discord.com/channels/${state.guild.id}/${item.channelId}/${item.messageId}`
+              : null;
+            const title = messageUrl
+              ? `<a href="${escapeHtml(messageUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a>`
+              : escapeHtml(item.title);
+            return `
+              <tr>
+                <td><strong>${title}</strong>${item.lastError ? `<small>${escapeHtml(item.lastError)}</small>` : ''}</td>
+                <td>${statusBadge(labels[item.status] || item.status, item.status === 'delivered')}</td>
+                <td>${escapeHtml(item.attemptCount || 0)}</td>
+                <td>${escapeHtml(formatAuditDate(item.deliveredAt || item.updatedAt || item.publishedAt))}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderConfigurationHub(state, channelOptions, statusChannelOptions, updatesChannelOptions, updatesRoleOptions) {
   const status = dashboardConfigStatus(state);
   const statusChannelLabel = status.statusChannel ? `#${status.statusChannel.name}` : 'Aucun salon statut choisi';
+  const updatesChannelLabel = status.updatesChannel ? `#${status.updatesChannel.name}` : 'Aucun salon des nouveautés choisi';
   const statusUpdatesLabel = state.config.statusUpdatesEnabled ? 'activées' : 'désactivées';
   const statusUpdatesNextEnabled = state.config.statusUpdatesEnabled ? 'false' : 'true';
+  const updatesRole = resolveRole(state, state.config.updatesPingRoleId);
 
   return `
     <section class="dashboard-panel config-hub" id="configuration">
@@ -1996,26 +2051,51 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions) {
           </form>
         </article>
         <article class="config-hub-card">
-          <h3>Salon statut</h3>
-          <p>Ce salon obligatoire affiche l’état de Sentinel et reçoit les nouveautés officielles. Les annonces sont activées automatiquement quand tu le choisis.</p>
-          <p class="muted">Actuel : ${escapeHtml(statusChannelLabel)}. Mises à jour officielles : ${escapeHtml(statusUpdatesLabel)}.</p>
+          <h3>État technique</h3>
+          <p>Optionnel : Sentinel maintient dans ce salon un panneau séparé sur son fonctionnement.</p>
+          <p class="muted">Actuel : ${escapeHtml(statusChannelLabel)}.</p>
           <form data-action-form="set-status-channel">
-            ${labelHelp('Salon statut et nouveautés', 'Sentinel y maintient son panneau d’état et publie les annonces importantes du bot.')}
+            ${labelHelp('Salon de statut', 'Sentinel y maintient uniquement son panneau d’état technique.')}
             <select name="channelId">${statusChannelOptions}</select>
-            <button class="button" type="submit">Publier le statut</button>
+            <button class="button" type="submit">Publier l’état technique</button>
+          </form>
+          <form data-action-form="disable-status-channel">
+            <button class="button button-ghost" type="submit" ${state.config.statusChannelId ? '' : 'disabled'}>Retirer le panneau technique</button>
+          </form>
+        </article>
+        <article class="config-hub-card config-updates-card">
+          <h3>Annonces officielles</h3>
+          <p>Ce salon reçoit uniquement les nouveautés publiques de Sentinel. Il reste indépendant du panneau technique.</p>
+          <p class="muted">Actuel : ${escapeHtml(updatesChannelLabel)}. Diffusion : ${escapeHtml(statusUpdatesLabel)}.</p>
+          <form data-action-form="set-updates-channel">
+            ${labelHelp('Salon des nouveautés', 'Sentinel y publie les annonces destinées à tous les serveurs abonnés.')}
+            <select name="channelId">${updatesChannelOptions}</select>
+            <button class="button" type="submit">Choisir ce salon</button>
+          </form>
+          <form data-action-form="set-updates-role">
+            ${labelHelp('Rôle à prévenir', 'Optionnel : ce rôle sera mentionné pour chaque nouvelle annonce officielle.')}
+            <select name="roleId">${updatesRoleOptions}</select>
+            <button class="button button-ghost" type="submit">Enregistrer la mention</button>
           </form>
           <div class="split-actions">
+            <form data-action-form="test-status-updates">
+              <button class="button button-ghost" type="submit" ${state.config.updatesChannelId ? '' : 'disabled'}>Tester le salon</button>
+            </form>
             <form data-action-form="set-status-updates">
               <input type="hidden" name="enabled" value="${statusUpdatesNextEnabled}">
-              <button class="button button-ghost" type="submit" ${state.config.statusChannelId ? '' : 'disabled'}>
-                ${state.config.statusUpdatesEnabled ? 'Couper les nouveautés' : 'Recevoir les nouveautés'}
+              <button class="button button-ghost" type="submit" ${state.config.updatesChannelId ? '' : 'disabled'}>
+                ${state.config.statusUpdatesEnabled ? 'Suspendre la diffusion' : 'Réactiver la diffusion'}
               </button>
             </form>
-            <form data-action-form="disable-status-channel">
-              <button class="button button-ghost" type="submit" ${state.config.statusChannelId ? '' : 'disabled'}>Désactiver</button>
+            <form data-action-form="clear-updates-role">
+              <button class="button button-ghost" type="submit" ${updatesRole ? '' : 'disabled'}>Retirer la mention</button>
             </form>
           </div>
         </article>
+      </div>
+      <div class="command-roles official-update-history">
+        <h3>Suivi des annonces ${helpTip('Chaque envoi affiche son état, le nombre d’essais et son dernier résultat.')}</h3>
+        ${officialUpdateHistory(state)}
       </div>
       <div class="command-roles">
         <h3>Permissions staff ${helpTip('Liste des rôles qui peuvent gérer Sentinel. Pour ajouter un rôle, utilise l’étape 4 de l’assistant.')}</h3>
@@ -3850,6 +3930,10 @@ const AUDIT_ACTION_LABELS = {
   'set-log-channel': 'Salon de logs',
   'set-status-channel': 'Salon statut',
   'disable-status-channel': 'Salon statut',
+  'set-updates-channel': 'Salon des nouveautés',
+  'test-status-updates': 'Test des nouveautés',
+  'set-updates-role': 'Mention des nouveautés',
+  'clear-updates-role': 'Mention des nouveautés',
   'set-status-updates': 'Nouveautés statut',
   'enable-status-updates': 'Nouveautés statut',
   'disable-status-updates': 'Nouveautés statut',
@@ -5731,6 +5815,8 @@ function renderDashboard() {
   const getPingRoleOptions = () => (optionMarkup.pingRoles ??= optionList(state.roles, null, 'Aucun ping de rôle'));
   const getChannelOptions = () => (optionMarkup.channels ??= optionList(state.channels, state.config.logChannelId, 'Choisir un salon'));
   const getStatusChannelOptions = () => (optionMarkup.statusChannels ??= optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut'));
+  const getUpdatesChannelOptions = () => (optionMarkup.updatesChannels ??= optionList(state.channels, state.config.updatesChannelId, 'Choisir le salon des nouveautés'));
+  const getUpdatesRoleOptions = () => (optionMarkup.updatesRoles ??= optionList(state.roles, state.config.updatesPingRoleId, 'Choisir un rôle à prévenir'));
   const premiumMode = isPremiumPlanVisible(state);
   const premiumBadge = premiumMode ? '<span class="premium-badge">Vue Premium</span>' : '<span class="free-badge">Vue Gratuit</span>';
   const premiumTag = '<span class="premium-tag">Option Premium</span>';
@@ -5742,11 +5828,11 @@ function renderDashboard() {
 
       ${tabPanel('setup', () => premiumMode
         ? renderPremiumSetupPanel(state, premiumBadge)
-        : renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions(), getStatusChannelOptions()))}
+        : renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions(), getUpdatesChannelOptions()))}
 
       ${tabPanel('configuration', () => premiumMode
         ? renderPremiumConfigurationPanel(state, premiumBadge)
-        : renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions()))}
+        : renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions(), getUpdatesChannelOptions(), getUpdatesRoleOptions()))}
 
       ${tabPanel('service', () => renderServicePanel(state, premiumBadge, premiumTag))}
 

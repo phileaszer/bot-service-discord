@@ -152,11 +152,14 @@ function shouldBroadcastToStatusSubscribers(args) {
 
 function getStatusSubscriberRows(referenceGuildId) {
     return db.prepare(`
-        SELECT guild_id, status_channel_id, language
+        SELECT guild_id,
+               COALESCE(updates_channel_id, status_channel_id) AS updates_channel_id,
+               updates_ping_role_id,
+               language
         FROM guild_configs
         WHERE status_updates_enabled = 1
-          AND status_channel_id IS NOT NULL
-          AND status_channel_id != ''
+          AND COALESCE(updates_channel_id, status_channel_id) IS NOT NULL
+          AND COALESCE(updates_channel_id, status_channel_id) != ''
           AND guild_id != ?
     `).all(referenceGuildId);
 }
@@ -172,7 +175,7 @@ async function postStatusSubscriberUpdates(client, rows, payloadData, usedChanne
         }
 
         await guild.channels.fetch().catch(() => null);
-        const channel = guild.channels.cache.get(row.status_channel_id);
+        const channel = guild.channels.cache.get(row.updates_channel_id);
 
         if (!channel || !channel.isTextBased?.() || usedChannelIds.has(channel.id)) {
             continue;
@@ -181,12 +184,15 @@ async function postStatusSubscriberUpdates(client, rows, payloadData, usedChanne
         const language = row.language === 'en' ? 'en' : 'fr';
         const title = language === 'en' && payloadData.titleEn ? payloadData.titleEn : payloadData.titleFr;
         const body = language === 'en' && payloadData.bodyEn ? payloadData.bodyEn : payloadData.bodyFr;
+        const pingRole = row.updates_ping_role_id
+            ? await guild.roles.fetch(row.updates_ping_role_id).catch(() => null)
+            : null;
         const message = await channel.send(buildPayload({
             type: 'status',
             title,
             body,
             source: payloadData.source,
-            pingRole: null
+            pingRole
         })).catch(() => null);
 
         if (message) {

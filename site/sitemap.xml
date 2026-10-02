@@ -44,8 +44,14 @@
   </url>
   <url>
     <loc>https://phileaszer.github.io/bot-service-discord/statut.html</loc>
-    <lastmod>2026-07-16</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://phileaszer.github.io/bot-service-discord/nouveautes.html</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>
