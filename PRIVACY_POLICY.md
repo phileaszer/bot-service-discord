@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-Dernière mise à jour : 9 août 2026
+Dernière mise à jour : 3 octobre 2026
 
 Cette politique explique quelles données Sentinel collecte, pourquoi elles sont utilisées et comment elles sont conservées.
 
@@ -16,9 +16,10 @@ Sentinel collecte uniquement les données nécessaires à son fonctionnement :
 - sanctions de modération, raisons, durées, modérateurs et utilisateurs concernés ;
 - dossiers/tickets : type, sujet, description, statut, priorité, salon associé, demandeur, intervenants et dates ;
 - comptes rendus ou transcriptions générés volontairement dans les dossiers/tickets ;
-- annonces créées avec les embeds Sentinel ;
+- annonces créées, brouillons et programmations d’envoi avec les embeds Sentinel ;
 - profil Discord utilisé pour le dashboard : identifiant, nom, avatar et serveurs accessibles ;
-- préférences du site, comme la langue choisie ;
+- préférences du site et de notification, comme la langue choisie et les catégories activées ;
+- résultats des essais de configuration et contrôles automatiques, sans exécution réelle sur les membres ;
 - sessions dashboard, jetons OAuth nécessaires à la connexion, date d'expiration, empreinte d'adresse IP et navigateur ;
 - journal d'audit indiquant qui a fait quoi, quand, sur quel serveur et depuis quelle interface.
 
@@ -42,7 +43,9 @@ Les données sont utilisées pour :
 - gérer les rôles, logs et permissions du bot ;
 - appliquer et consulter les sanctions ;
 - créer et suivre les dossiers/tickets ;
-- publier ou modifier des annonces Sentinel ;
+- publier, modifier ou programmer des annonces Sentinel ;
+- produire des exports et rapports demandés par les responsables autorisés ;
+- présenter à chaque membre connecté son propre espace personnel ;
 - permettre la connexion au dashboard ;
 - afficher les serveurs administrables par l'utilisateur connecté ;
 - sécuriser les sessions du dashboard ;

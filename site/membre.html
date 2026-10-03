@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentinel | Mon espace</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#05070c">
+  <link rel="icon" href="assets/sentinel-mark.png" type="image/png">
+  <script>
+    (() => {
+      try { document.documentElement.dataset.theme = localStorage.getItem('sentinel-site-theme') === 'western' ? 'western' : 'sentinel'; }
+      catch (error) { document.documentElement.dataset.theme = 'sentinel'; }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css?v=20261003-1">
+</head>
+<body class="dashboard-body member-body">
+  <header class="site-header dashboard-header">
+    <a class="brand" href="index.html" aria-label="Sentinel"><img src="assets/sentinel-mark.png" alt="" width="38" height="38"><span>Sentinel</span></a>
+    <nav class="nav-links" aria-label="Navigation">
+      <a href="dashboard.html">Dashboard serveur</a>
+      <a href="nouveautes.html">Nouveautés</a>
+      <a href="statut.html">Statut</a>
+    </nav>
+    <div class="header-actions">
+      <button class="theme-toggle button button-small button-ghost" type="button" data-theme-toggle aria-label="Changer de style">Western</button>
+      <a class="button button-small" href="/auth/login" data-discord-login>Connexion Discord</a>
+    </div>
+  </header>
+
+  <main class="dashboard-shell member-shell">
+    <section class="dashboard-hero member-hero">
+      <div><p class="eyebrow">Espace personnel</p><h1>Mon registre Sentinel</h1><p>Heures, paie, dossiers et avertissements visibles uniquement depuis ton compte Discord.</p></div>
+      <div class="dashboard-user" data-member-user><span>Vérification de la session</span></div>
+    </section>
+    <section class="member-content" data-member-content>
+      <div class="empty-state dashboard-loading-state"><img src="assets/sentinel-mark.png" alt=""><h2>Ouverture du registre</h2><p>Sentinel rassemble tes informations personnelles.</p><div class="dashboard-loading-bar" aria-hidden="true"><span></span></div></div>
+    </section>
+  </main>
+
+  <div class="toast-stack" data-toasts></div>
+  <script src="theme.js?v=20260822-5"></script>
+  <script src="auth.js?v=20260924-4"></script>
+  <script src="membre.js?v=20261003-1"></script>
+</body>
+</html>

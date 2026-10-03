@@ -6,6 +6,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { ChannelType, PermissionsBitField } = require('discord.js');
 const db = require('./database/database');
+const { SITE_ACCESS_ROLES, siteCapabilities } = require('./access-policy');
 
 const sessions = new Map();
 const oauthStates = new Map();
@@ -47,16 +48,13 @@ const CREATOR_USER_IDS = new Set(
         .map(value => value.trim())
         .filter(value => /^\d{17,20}$/.test(value))
 );
-const SITE_ACCESS_ROLES = {
-    FOUNDER: 'founder',
-    STAFF: 'staff',
-    USER: 'user'
-};
 const ALLOWED_RETURN_PATHS = new Set([
     '/',
     '/index.html',
     '/dashboard',
     '/dashboard.html',
+    '/membre',
+    '/membre.html',
     '/fonctionnalites',
     '/fonctionnalites.html',
     '/commandes',
@@ -850,17 +848,7 @@ function getSiteAccessRole(userId) {
 
 function getStoredSiteAccess(userId) {
     const role = getSiteAccessRole(userId);
-
-    return {
-        role,
-        isFounder: role === SITE_ACCESS_ROLES.FOUNDER,
-        isStaff: role === SITE_ACCESS_ROLES.STAFF,
-        canViewSitePanel: role === SITE_ACCESS_ROLES.FOUNDER || role === SITE_ACCESS_ROLES.STAFF,
-        canManagePremium: role === SITE_ACCESS_ROLES.FOUNDER,
-        canManageSiteStaff: role === SITE_ACCESS_ROLES.FOUNDER,
-        staffAssignment: role === SITE_ACCESS_ROLES.STAFF,
-        discordStaffRole: role === SITE_ACCESS_ROLES.FOUNDER
-    };
+    return siteCapabilities(role);
 }
 
 async function getReferenceStaffRoleState(ctx, userId) {
@@ -3169,6 +3157,9 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
         : [])
         .filter(item => canViewGlobalAudit
             || ctx.helpers.memberCanManageDossier?.(viewerMember, item.type));
+    const payroll = ctx.helpers.getWeeklyPayroll
+        ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language, guild })
+        : null;
 
     return {
         guild: {
@@ -3215,9 +3206,7 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             ...user,
             totalTimeLabel: ctx.helpers.formatDuration(user.totalTime)
         })),
-        payroll: ctx.helpers.getWeeklyPayroll
-            ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language, guild })
-            : null,
+        payroll,
         payrollArchives: ctx.helpers.getWeeklyPayrollArchives
             ? ctx.helpers.getWeeklyPayrollArchives(guild.id, {
                 language: config.language,
@@ -3289,6 +3278,31 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             words: automodWords,
             events: automodEvents
         },
+        warningEscalation: {
+            settings: ctx.helpers.getWarningEscalationSettings?.(guild.id) || null,
+            events: advanced && ctx.helpers.getWarningEscalationEvents
+                ? ctx.helpers.getWarningEscalationEvents(guild.id, 25)
+                : []
+        },
+        notifications: viewerUserId && ctx.helpers.buildDashboardNotifications
+            ? ctx.helpers.buildDashboardNotifications(guild.id, viewerUserId, {
+                payroll,
+                dossiers: visibleDossiers,
+                includeSystemAlerts: siteAccess.canViewSitePanel
+            })
+            : [],
+        scheduledAnnouncements: advanced && ctx.helpers.getScheduledAnnouncements
+            ? ctx.helpers.getScheduledAnnouncements(guild.id, 50)
+            : [],
+        reportSchedules: advanced && ctx.helpers.getReportSchedules
+            ? ctx.helpers.getReportSchedules(guild.id)
+            : [],
+        simulations: advanced && ctx.helpers.getSimulationRuns
+            ? ctx.helpers.getSimulationRuns(guild.id, 10)
+            : [],
+        validationRuns: advanced && ctx.helpers.getValidationRuns
+            ? ctx.helpers.getValidationRuns(guild.id, 10)
+            : [],
         recentActions: getDashboardAuditLogs({
             guildId: guild.id,
             limit: 5
@@ -3519,9 +3533,18 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
     if (action === 'warn') {
         requireModerationAccess(ctx, actor, PermissionsBitField.Flags.ModerateMembers, language);
         const target = await resolveTarget(ctx, guild, normalizeUserId(ctx, body.userId, language));
-        const caseData = ctx.helpers.addModerationCase(guild.id, target.userId, actor.id, 'warn', reason, null);
-        await ctx.helpers.sendModerationLog(guild, actor.user, caseData, target.label, language);
-        return `Avertissement ajoute. Cas #${caseData.id}.`;
+        const { caseData, escalation } = await ctx.helpers.addWarningWithEscalation(
+            guild,
+            actor.user,
+            target.member,
+            target.userId,
+            reason,
+            language
+        );
+        const escalationLabel = escalation?.status === 'applied'
+            ? ` Sanction automatique appliquée : ${escalation.action}.`
+            : (escalation?.status === 'failed' ? ' La sanction automatique a échoué et a été journalisée.' : '');
+        return `Avertissement ajouté. Cas #${caseData.id}.${escalationLabel}`;
     }
 
     if (action === 'timeout' || action === 'untimeout' || action === 'kick') {
@@ -4679,6 +4702,94 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         return automodAction(ctx, guild, member, body, session);
     }
 
+    if (action === 'set-warning-escalation') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const ignoredRoleIds = (Array.isArray(body.ignoredRoleIds)
+            ? body.ignoredRoleIds
+            : String(body.ignoredRoleIds || '').match(/\d{17,20}/g) || [])
+            .map(String);
+        if (ignoredRoleIds.some(roleId => !guild.roles.cache.has(roleId))) {
+            throw createHttpError(400, 'Un rôle exempté est introuvable sur ce serveur.');
+        }
+        ctx.helpers.updateWarningEscalationSettings(guild.id, { ...body, ignoredRoleIds }, member.id);
+        return 'Escalade des avertissements mise à jour.';
+    }
+
+    if (action === 'notification-state') {
+        ctx.helpers.setNotificationState(guild.id, member.id, body.notificationKey, body.notificationAction);
+        return body.notificationAction === 'dismiss' ? 'Notification retirée.' : 'Notification mise à jour.';
+    }
+
+    if (action === 'save-scheduled-announcement') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.EmbedLinks
+        ], language);
+        const saved = ctx.helpers.saveScheduledAnnouncement(guild.id, member.id, body);
+        if (saved.status === 'scheduled') return `Annonce #${saved.id} programmée.`;
+        if (saved.status === 'pending_approval') return `Annonce #${saved.id} soumise à un autre responsable.`;
+        return `Brouillon #${saved.id} enregistré.`;
+    }
+
+    if (action === 'approve-scheduled-announcement') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const approved = ctx.helpers.approveScheduledAnnouncement(guild.id, Number(body.announcementId), member.id);
+        return `Annonce #${approved.id} validée et programmée.`;
+    }
+
+    if (action === 'cancel-scheduled-announcement') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        if (!ctx.helpers.cancelScheduledAnnouncement(guild.id, Number(body.announcementId))) {
+            throw createHttpError(404, 'Annonce programmée introuvable.');
+        }
+        return 'Annonce programmée annulée.';
+    }
+
+    if (action === 'save-report-schedule') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const channel = getTextChannel(guild, body.channelId, language);
+        requireBotChannelPermissions(guild, channel, [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.AttachFiles
+        ], language);
+        ctx.helpers.saveReportSchedule(guild.id, member.id, body);
+        return 'Rapport automatique programmé.';
+    }
+
+    if (action === 'remove-report-schedule') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        if (!ctx.helpers.removeReportSchedule(guild.id, Number(body.scheduleId))) {
+            throw createHttpError(404, 'Rapport automatique introuvable.');
+        }
+        return 'Rapport automatique retiré.';
+    }
+
+    if (action === 'run-simulation') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const simulation = ctx.helpers.simulateGuildOperation(guild, member.id, String(body.kind || ''), body);
+        return `Essai #${simulation.id} terminé sans action réelle sur Discord.`;
+    }
+
+    if (action === 'run-validation') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const validation = ctx.helpers.runSentinelGuildValidation(guild, 'dashboard');
+        return validation.status === 'passed'
+            ? `Validation #${validation.id} réussie.`
+            : `Validation #${validation.id} terminée avec des points à corriger.`;
+    }
+
     return moderationAction(ctx, guild, member, body, session);
 }
 
@@ -4788,6 +4899,29 @@ async function handleApi(req, res, ctx, url) {
         const settings = updateUserSiteSettings(session.user.id, settingsPatch);
 
         json(res, 200, { ok: true, settings });
+        return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/me/portal') {
+        json(res, 200, {
+            ok: true,
+            portal: await ctx.helpers.getMemberPortal(session.user.id)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/me/preferences') {
+        const body = await parseBody(req);
+        const guildId = String(body.guildId || '');
+        const guild = ctx.client.guilds.cache.get(guildId);
+        const member = guild
+            ? guild.members.cache.get(session.user.id) || await guild.members.fetch(session.user.id).catch(() => null)
+            : null;
+        if (!guild || !member) {
+            throw createHttpError(403, 'Tu dois être membre de ce serveur pour modifier ces préférences.');
+        }
+        const preferences = ctx.helpers.updateUserNotificationPreferences(guild.id, session.user.id, body);
+        json(res, 200, { ok: true, preferences });
         return;
     }
 
@@ -5095,6 +5229,25 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    const reportMatch = /^\/api\/guilds\/(\d{17,20})\/reports\/(service|payroll|dossiers|moderation)$/.exec(url.pathname);
+    if (req.method === 'GET' && reportMatch) {
+        const { guild, member } = await getDashboardAccess(ctx, session, reportMatch[1]);
+        await requireAdvanced(ctx, guild.id, member, session);
+        const format = String(url.searchParams.get('format') || 'csv').toLowerCase();
+        if (!['csv', 'xls', 'pdf'].includes(format)) {
+            throw createHttpError(400, 'Format de rapport invalide.');
+        }
+        const report = ctx.helpers.createGuildReport(guild, reportMatch[2], format);
+        writeResponse(res, 200, {
+            'Content-Type': report.contentType,
+            'Content-Disposition': `attachment; filename="${report.fileName}"`,
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Length': report.buffer.length
+        }, report.buffer);
+        return;
+    }
+
     const userMatch = /^\/api\/guilds\/(\d{17,20})\/users\/([^/]+)$/.exec(url.pathname);
     if (req.method === 'GET' && userMatch) {
         const { guild } = await getDashboardAccess(ctx, session, userMatch[1]);
@@ -5297,6 +5450,7 @@ function serveStatic(req, res, url) {
     const routeMap = {
         '': 'index.html',
         dashboard: 'dashboard.html',
+        membre: 'membre.html',
         fonctionnalites: 'fonctionnalites.html',
         commandes: 'commandes.html',
         premium: 'premium.html',

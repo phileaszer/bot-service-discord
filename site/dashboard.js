@@ -703,6 +703,13 @@ async function customEmbedUploadFromInput(input, label) {
 async function actionFormData(form, action) {
   const data = formData(form);
 
+  if (action === 'save-scheduled-announcement' && data.nextRunAt) {
+    const localDate = new Date(data.nextRunAt);
+    if (!Number.isNaN(localDate.getTime())) {
+      data.nextRunAt = localDate.toISOString();
+    }
+  }
+
   if (action === 'custom-embed-create' || action === 'custom-embed-edit') {
     const imageUpload = await customEmbedUploadFromInput(form.elements.imageFile, 'Image principale');
     const thumbnailUpload = await customEmbedUploadFromInput(form.elements.thumbnailFile, 'Miniature');
@@ -1567,6 +1574,39 @@ function globalLookupPanel(state) {
   `;
 }
 
+function notificationCenter(state, compact = false) {
+  const items = state.notifications || [];
+  const unread = items.filter(item => !item.read).length;
+
+  return `
+    <article class="notification-center${compact ? ' is-compact' : ''}">
+      <div class="home-block-heading">
+        <div>
+          <p class="eyebrow">Centre de notifications</p>
+          <h3>${unread ? `${escapeHtml(unread)} point(s) à consulter` : 'Aucun point urgent'}</h3>
+        </div>
+        ${compact ? '<button class="button button-small button-ghost" type="button" data-dashboard-tab="operations">Tout voir</button>' : ''}
+      </div>
+      ${items.length ? `
+        <div class="notification-list">
+          ${items.slice(0, compact ? 4 : 20).map(item => `
+            <div class="notification-item is-${escapeHtml(item.severity || 'info')}${item.read ? ' is-read' : ''}">
+              <button type="button" class="notification-main" data-dashboard-tab="${escapeHtml(item.tab || 'overview')}">
+                <strong>${escapeHtml(item.title)}</strong>
+                <span>${escapeHtml(item.detail)}</span>
+              </button>
+              <div class="notification-actions">
+                ${item.read ? '' : `<button class="button button-small button-ghost" type="button" data-notification-key="${escapeHtml(item.key)}" data-notification-action="read">Lu</button>`}
+                <button class="button button-small button-ghost" type="button" data-notification-key="${escapeHtml(item.key)}" data-notification-action="dismiss" aria-label="Retirer cette notification">X</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<p class="muted">Les dossiers en attente, paiements, incidents, sauvegardes et échecs d’envoi apparaîtront ici.</p>'}
+    </article>
+  `;
+}
+
 function renderServerHome(state, premiumBadge) {
   const status = dashboardConfigStatus(state);
 
@@ -1583,6 +1623,7 @@ function renderServerHome(state, premiumBadge) {
         </div>
       </div>
       ${todayOverviewCards(state)}
+      ${notificationCenter(state, true)}
       ${dashboardPath(state)}
       ${planScopeCards(state)}
       <div class="server-home-grid pro-home-grid">
@@ -1615,7 +1656,8 @@ function premiumNavigationCards() {
     ['dossiers', 'Dossiers', 'Panneaux illimités, catégories dédiées et suivi étendu.'],
     ['moderation', 'Sécurité', 'Veille renforcée, sanctions avancées et protection automatique.'],
     ['embeds', 'Annonces', 'Créations illimitées et gestion complète des médias.'],
-    ['audit', 'Historique', 'Filtres avancés, recherche individuelle et journal étendu.']
+    ['audit', 'Historique', 'Filtres avancés, recherche individuelle et journal étendu.'],
+    ['operations', 'Pilotage', 'Exports, rapports automatiques, essais sans effet et validations.']
   ];
 
   return `
@@ -1653,6 +1695,7 @@ function renderPremiumHome(state, premiumBadge) {
         <article><span>Dossiers ouverts</span><strong>${escapeHtml(openDossiers)}</strong></article>
         <article><span>Protection</span><strong>Renforcée</strong></article>
       </div>
+      ${notificationCenter(state, true)}
       ${premiumNavigationCards()}
     </section>
   `;
@@ -3971,6 +4014,15 @@ const AUDIT_ACTION_LABELS = {
   'set-automod-settings': 'Garde réglée',
   'add-automod-word': 'Mot surveillé ajouté',
   'remove-automod-word': 'Mot surveillé retiré',
+  'set-warning-escalation': 'Paliers d’avertissements',
+  'notification-state': 'Notification mise à jour',
+  'save-scheduled-announcement': 'Annonce programmée',
+  'approve-scheduled-announcement': 'Annonce validée',
+  'cancel-scheduled-announcement': 'Annonce annulée',
+  'save-report-schedule': 'Rapport automatique',
+  'remove-report-schedule': 'Rapport automatique retiré',
+  'run-simulation': 'Essai sans effet',
+  'run-validation': 'Validation Sentinel',
   'toggle-service': 'Bouton service',
   'start-service': 'Prise de service',
   'end-service': 'Fin de service',
@@ -4676,6 +4728,38 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
   `;
 }
 
+function warningEscalationPanel(state, premiumTag) {
+  const settings = state.warningEscalation?.settings || {};
+  const events = state.warningEscalation?.events || [];
+  const actionLabels = { timeout: 'Mise au silence', kick: 'Expulsion', ban: 'Bannissement' };
+
+  return `
+    <article class="inline-form automod-card automod-card-wide warning-escalation-card">
+      <div class="panel-mini-heading">
+        <div><p class="eyebrow">Discipline automatique</p><h3>Paliers d’avertissements ${premiumTag}</h3><p class="muted">Compte seulement les avertissements encore actifs dans la période choisie. Les retraits sont pris en compte immédiatement.</p></div>
+      </div>
+      <form data-action-form="set-warning-escalation" class="automod-settings-form">
+        <input type="hidden" name="enabled" value="false">
+        <label class="automod-toggle"><input type="checkbox" name="enabled" value="true" ${settings.enabled ? 'checked' : ''}><span><strong>Activer les sanctions par paliers</strong><small>Sentinel vérifie le total après chaque nouvel avertissement.</small></span></label>
+        <div class="automod-control-grid">
+          <div>${labelHelp('Expiration des avertissements', 'Nombre de jours pendant lesquels un avertissement compte dans les paliers.')}<input name="windowDays" type="number" min="1" max="3650" value="${escapeHtml(settings.windowDays || 30)}"></div>
+          <div>${labelHelp('Palier mise au silence', 'Premier nombre d’avertissements déclenchant une mesure.')}<input name="timeoutThreshold" type="number" min="1" max="50" value="${escapeHtml(settings.timeoutThreshold || 3)}"></div>
+          <div>${labelHelp('Durée du silence', 'Durée en secondes, de 60 secondes à 28 jours.')}<input name="timeoutSeconds" type="number" min="60" max="2419200" value="${escapeHtml(settings.timeoutSeconds || 3600)}"></div>
+          <div>${labelHelp('Palier expulsion', 'Utilise 0 pour désactiver ce palier.')}<input name="kickThreshold" type="number" min="0" max="50" value="${escapeHtml(settings.kickThreshold || 5)}"></div>
+          <div>${labelHelp('Palier bannissement', 'Utilise 0 pour désactiver ce palier.')}<input name="banThreshold" type="number" min="0" max="50" value="${escapeHtml(settings.banThreshold || 7)}"></div>
+          <div>${labelHelp('Grades exemptés', 'IDs des rôles qui ne subiront jamais une sanction automatique.')}<input name="ignoredRoleIds" value="${escapeHtml((settings.ignoredRoleIds || []).join(' '))}" placeholder="ID rôle ID rôle"></div>
+        </div>
+        <button class="button" type="submit">Enregistrer les paliers</button>
+      </form>
+      <div class="operation-list">
+        ${events.length ? events.map(item => `
+          <div class="operation-row"><div><span>${escapeHtml(formatAuditDate(item.createdAt))} · ${escapeHtml(item.status)}</span><strong>${escapeHtml(actionLabels[item.action] || item.action)} au ${escapeHtml(item.warningCount)}e avertissement</strong><small>ID ${escapeHtml(item.userId)}${item.errorMessage ? ` · ${escapeHtml(item.errorMessage)}` : ''}</small></div></div>
+        `).join('') : '<p class="muted">Aucune sanction par palier enregistrée.</p>'}
+      </div>
+    </article>
+  `;
+}
+
 function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premiumTag) {
   return `
     <section class="dashboard-panel premium-panel module-panel premium-view-panel" id="moderation">
@@ -4740,6 +4824,7 @@ function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premi
           <button class="button" type="submit">Annuler</button>
         </form>
         ${automodPremiumPanel(state, premiumTag)}
+        ${warningEscalationPanel(state, premiumTag)}
         <form data-action-form="reset-guild">
           ${labelHelp('Remise à zéro générale', 'Remet à zéro toutes les heures de service du serveur.', ` ${premiumTag}`)}
           <button class="button" type="submit">Réinitialiser</button>
@@ -4968,6 +5053,190 @@ function renderFreeAuditPanel(state) {
         <small>${escapeHtml(items.length)} entrée(s) affichée(s)</small>
       </div>
       ${auditLogList(freeState)}
+    </section>
+  `;
+}
+
+function scheduledAnnouncementList(state) {
+  const items = state.scheduledAnnouncements || [];
+  if (!items.length) return '<p class="muted">Aucun brouillon ni envoi programmé.</p>';
+
+  const statusLabels = {
+    pending_approval: 'Validation attendue',
+    scheduled: 'Programmé',
+    draft: 'Brouillon',
+    sent: 'Envoyé',
+    failed: 'Échec',
+    cancelled: 'Annulé'
+  };
+
+  return `
+    <div class="operation-list">
+      ${items.map(item => `
+        <article class="operation-row">
+          <div>
+            <span>${escapeHtml(statusLabels[item.status] || item.status)}</span>
+            <strong>${escapeHtml(item.title)}</strong>
+            <small>${item.nextRunAt ? escapeHtml(formatAuditDate(item.nextRunAt)) : 'Aucune date'} · ${escapeHtml(item.recurrence || 'none')}</small>
+            ${item.status === 'pending_approval' ? `<small>Créée par ${escapeHtml(item.createdByUserId)} · un autre responsable doit la valider</small>` : ''}
+            ${item.approvedByUserId ? `<small>Validée par ${escapeHtml(item.approvedByUserId)} le ${escapeHtml(formatAuditDate(item.approvedAt))}</small>` : ''}
+            ${item.lastError ? `<small class="operation-error">${escapeHtml(item.lastError)}</small>` : ''}
+          </div>
+          <div class="operation-row-actions">
+            ${item.status === 'pending_approval' ? `<button class="button button-small" type="button" data-operation-action="approve-scheduled-announcement" data-announcement-id="${escapeHtml(item.id)}">Valider</button>` : ''}
+            ${['scheduled', 'pending_approval', 'draft', 'failed'].includes(item.status) ? `<button class="button button-small button-ghost" type="button" data-operation-action="cancel-scheduled-announcement" data-announcement-id="${escapeHtml(item.id)}">Annuler</button>` : ''}
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function reportScheduleList(state) {
+  const labels = { service: 'Services', payroll: 'Paie RP', dossiers: 'Dossiers', moderation: 'Modération' };
+  const items = state.reportSchedules || [];
+  if (!items.length) return '<p class="muted">Aucun rapport automatique configuré.</p>';
+
+  return `
+    <div class="operation-list">
+      ${items.map(item => `
+        <article class="operation-row">
+          <div>
+            <span>${escapeHtml(item.frequency === 'weekly' ? 'Chaque semaine' : 'Chaque mois')}</span>
+            <strong>${escapeHtml(labels[item.reportKind] || item.reportKind)} · ${escapeHtml(item.format.toUpperCase())}</strong>
+            <small>Prochain envoi : ${escapeHtml(formatAuditDate(item.nextRunAt))}</small>
+            ${item.lastError ? `<small class="operation-error">${escapeHtml(item.lastError)}</small>` : ''}
+          </div>
+          <button class="button button-small button-ghost" type="button" data-operation-action="remove-report-schedule" data-schedule-id="${escapeHtml(item.id)}">Retirer</button>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function simulationHistory(state) {
+  const items = state.simulations || [];
+  if (!items.length) return '<p class="muted">Aucun essai enregistré.</p>';
+  return `
+    <div class="operation-list">
+      ${items.map(item => `
+        <article class="operation-row">
+          <div>
+            <span>Essai #${escapeHtml(item.id)} · ${escapeHtml(item.kind)}</span>
+            <strong>${escapeHtml(item.result?.detail || item.result?.action || (item.result?.valid ? 'Configuration valide' : 'Résultat enregistré'))}</strong>
+            <small>${escapeHtml(formatAuditDate(item.createdAt))} · aucune action réelle</small>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function validationHistory(state) {
+  const runs = state.validationRuns || [];
+  if (!runs.length) return '<p class="muted">Aucun contrôle automatique enregistré.</p>';
+  const run = runs[0];
+  return `
+    <div class="validation-summary ${run.status === 'passed' ? 'is-ready' : 'is-warning'}">
+      <div class="panel-mini-heading">
+        <div><span>Contrôle #${escapeHtml(run.id)}</span><strong>${run.status === 'passed' ? 'Validation réussie' : 'Points à corriger'}</strong></div>
+        <small>${escapeHtml(formatAuditDate(run.createdAt))}</small>
+      </div>
+      <div class="validation-checks">
+        ${(run.checks || []).map(check => `
+          <div class="${check.ok ? 'is-ready' : 'is-warning'}">
+            <span>${escapeHtml(check.label)}</span>
+            <strong>${check.ok ? 'Conforme' : 'À corriger'}</strong>
+            ${check.detail ? `<small>${escapeHtml(check.detail)}</small>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) {
+  const premiumMode = isPremiumPlanVisible(state);
+
+  if (!premiumMode) {
+    return `
+      <section class="dashboard-panel module-panel operations-panel">
+        <div class="panel-heading row-heading">
+          <div><p class="eyebrow">Suivi gratuit</p><h2>Centre de notifications</h2><p class="muted">Les urgences du serveur restent visibles sans abonnement.</p></div>
+          <span class="free-badge">Vue Gratuit</span>
+        </div>
+        ${notificationCenter(state)}
+      </section>
+    `;
+  }
+
+  return `
+    <section class="dashboard-panel module-panel operations-panel premium-view-panel">
+      <div class="panel-heading row-heading">
+        <div><p class="eyebrow">Pilotage Premium</p><h2>Rapports, programmation et banc d’essai</h2><p class="muted">Prépare, vérifie et automatise sans mélanger ces outils avec les fonctions gratuites.</p></div>
+        ${premiumBadge}
+      </div>
+      ${notificationCenter(state)}
+      <div class="operations-grid">
+        <article class="inline-form operation-card">
+          <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Télécharge un registre complet dans le format voulu.</p></div></div>
+          <div class="report-download-grid">
+            ${['service', 'payroll', 'dossiers', 'moderation'].map(kind => `
+              <div><strong>${escapeHtml({ service: 'Services', payroll: 'Paie RP', dossiers: 'Dossiers', moderation: 'Modération' }[kind])}</strong>
+                <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="csv">CSV</button>
+                <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls">Excel</button>
+                <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="pdf">PDF</button>
+              </div>
+            `).join('')}
+          </div>
+        </article>
+
+        <article class="inline-form operation-card">
+          <div class="panel-mini-heading"><div><h3>Rapports automatiques ${premiumTag}</h3><p class="muted">Envoi hebdomadaire ou mensuel dans un salon Discord.</p></div></div>
+          <form data-action-form="save-report-schedule" class="operation-form-grid">
+            <select name="reportKind"><option value="service">Services</option><option value="payroll">Paie RP</option><option value="dossiers">Dossiers</option><option value="moderation">Modération</option></select>
+            <select name="frequency"><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select>
+            <select name="format"><option value="csv">CSV</option><option value="xls">Excel</option><option value="pdf">PDF</option></select>
+            <select name="channelId" required>${channelOptions}</select>
+            <button class="button" type="submit">Programmer</button>
+          </form>
+          ${reportScheduleList(state)}
+        </article>
+
+        <article class="inline-form operation-card operation-card-wide">
+          <div class="panel-mini-heading"><div><h3>Annonces programmées ${premiumTag}</h3><p class="muted">Enregistre un brouillon, contrôle son aperçu et choisis une répétition.</p></div></div>
+          <div class="scheduled-announcement-editor">
+            <form data-action-form="save-scheduled-announcement" data-scheduled-editor class="operation-form-grid">
+              <input name="title" maxlength="256" placeholder="Titre de l’annonce" required>
+              <textarea name="description" maxlength="4000" placeholder="Message" required></textarea>
+              <input name="color" type="color" value="#2dd4bf" aria-label="Couleur">
+              <select name="channelId" required>${channelOptions}</select>
+              <input name="nextRunAt" type="datetime-local">
+              <select name="recurrence"><option value="none">Une fois</option><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select>
+              <select name="status"><option value="draft">Enregistrer en brouillon</option><option value="pending_approval">Soumettre à validation</option><option value="scheduled">Programmer directement</option></select>
+              <button class="button" type="submit">Enregistrer</button>
+            </form>
+            <aside class="announcement-preview" data-scheduled-preview><span>Aperçu Discord</span><strong>Titre de l’annonce</strong><p>Le message apparaîtra ici sans être envoyé.</p></aside>
+          </div>
+          ${scheduledAnnouncementList(state)}
+        </article>
+
+        <article class="inline-form operation-card operation-card-wide">
+          <div class="panel-mini-heading"><div><h3>Mode d’essai ${premiumTag}</h3><p class="muted">Chaque test est journalisé et ne modifie aucun membre, salon ou paiement.</p></div></div>
+          <div class="simulation-grid">
+            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="automod"><textarea name="content" placeholder="Message à tester" required></textarea><button class="button" type="submit">Tester la garde</button></form>
+            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="dossier"><select name="type"><option value="support">Support</option><option value="report">Signalement</option><option value="recruitment">Recrutement</option><option value="partnership">Partenariat</option><option value="other">Autre</option></select><button class="button" type="submit">Tester le routage</button></form>
+            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="payroll"><input name="userId" placeholder="ID Discord" required><button class="button" type="submit">Tester une paie</button></form>
+            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="announcement"><input name="title" placeholder="Titre" required><textarea name="description" placeholder="Message" required></textarea><input name="color" type="color" value="#2dd4bf"><button class="button" type="submit">Valider l’annonce</button></form>
+          </div>
+          ${simulationHistory(state)}
+        </article>
+
+        <article class="inline-form operation-card operation-card-wide">
+          <div class="panel-mini-heading"><div><h3>Validation Sentinel ${premiumTag}</h3><p class="muted">Contrôle l’intégrité, les permissions, les rôles supprimés et l’isolation des accès.</p></div><button class="button" type="button" data-operation-action="run-validation">Lancer le contrôle</button></div>
+          ${validationHistory(state)}
+        </article>
+      </div>
     </section>
   `;
 }
@@ -5602,6 +5871,13 @@ const DASHBOARD_TABS = [
     description: 'Retrouver qui a fait quoi'
   },
   {
+    id: 'operations',
+    label: 'Pilotage',
+    eyebrow: 'Suivi',
+    title: 'Pilotage et rapports',
+    description: 'Alertes, exports, essais et contrôles'
+  },
+  {
     id: 'founder',
     label: 'Régie',
     eyebrow: 'Accès site',
@@ -5621,7 +5897,7 @@ const DASHBOARD_TAB_GROUPS = [
   },
   {
     label: 'Contrôler',
-    tabs: ['audit']
+    tabs: ['audit', 'operations']
   },
   {
     label: 'Régie',
@@ -5852,6 +6128,8 @@ function renderDashboard() {
       ))}
 
       ${tabPanel('audit', () => renderAuditPanel(state))}
+
+      ${tabPanel('operations', () => renderOperationsPanel(state, getChannelOptions(), premiumBadge, premiumTag))}
 
       ${canShowFounderTab(state) ? tabPanel('founder', () => renderFounderPremiumPanel()) : ''}
 
@@ -6310,6 +6588,52 @@ function attachDashboardHandlers() {
       dashboardPlanMode = nextPlan;
       renderDashboard();
     });
+  });
+
+  $$('[data-notification-key]').forEach((button) => {
+    button.addEventListener('click', () => runAction('notification-state', {
+      notificationKey: button.dataset.notificationKey,
+      notificationAction: button.dataset.notificationAction
+    }, button));
+  });
+
+  $$('[data-operation-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const action = button.dataset.operationAction;
+      runAction(action, {
+        announcementId: button.dataset.announcementId,
+        scheduleId: button.dataset.scheduleId
+      }, button);
+    });
+  });
+
+  $$('[data-report-download]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!selectedGuildId) return;
+      const kind = button.dataset.reportDownload;
+      const format = button.dataset.reportFormat;
+      const link = document.createElement('a');
+      link.href = `/api/guilds/${encodeURIComponent(selectedGuildId)}/reports/${encodeURIComponent(kind)}?format=${encodeURIComponent(format)}`;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+  });
+
+  $$('[data-scheduled-editor]').forEach((form) => {
+    const preview = form.parentElement?.querySelector('[data-scheduled-preview]');
+    const updatePreview = () => {
+      if (!preview) return;
+      const title = form.elements.title?.value.trim() || 'Titre de l’annonce';
+      const description = form.elements.description?.value.trim() || 'Le message apparaîtra ici sans être envoyé.';
+      const color = form.elements.color?.value || '#2dd4bf';
+      preview.style.setProperty('--announcement-color', color);
+      preview.querySelector('strong').textContent = title;
+      preview.querySelector('p').textContent = description;
+    };
+    form.addEventListener('input', updatePreview);
+    updatePreview();
   });
 
   $$('[data-file-upload]').forEach((input) => {

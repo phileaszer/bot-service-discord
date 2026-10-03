@@ -503,6 +503,111 @@ CREATE TABLE IF NOT EXISTS embed_media_links (
     FOREIGN KEY (content_hash) REFERENCES embed_media_objects(content_hash) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS guild_warning_escalation_settings (
+    guild_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    window_days INTEGER NOT NULL DEFAULT 30,
+    timeout_threshold INTEGER NOT NULL DEFAULT 3,
+    timeout_seconds INTEGER NOT NULL DEFAULT 3600,
+    kick_threshold INTEGER NOT NULL DEFAULT 5,
+    ban_threshold INTEGER NOT NULL DEFAULT 7,
+    ignored_role_ids_json TEXT NOT NULL DEFAULT '[]',
+    updated_by_user_id TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS warning_escalation_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    warning_case_id INTEGER,
+    warning_count INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    status TEXT NOT NULL,
+    reason TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dashboard_notification_states (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    notification_key TEXT NOT NULL,
+    read_at TEXT,
+    dismissed_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id, notification_key)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    created_by_user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    color TEXT,
+    recurrence TEXT NOT NULL DEFAULT 'none',
+    status TEXT NOT NULL DEFAULT 'draft',
+    next_run_at TEXT,
+    last_run_at TEXT,
+    last_message_id TEXT,
+    last_error TEXT,
+    approved_by_user_id TEXT,
+    approved_at TEXT,
+    run_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS guild_report_schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    report_kind TEXT NOT NULL,
+    frequency TEXT NOT NULL,
+    format TEXT NOT NULL DEFAULT 'csv',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_by_user_id TEXT,
+    next_run_at TEXT NOT NULL,
+    last_run_at TEXT,
+    last_message_id TEXT,
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (guild_id, report_kind, frequency)
+);
+
+CREATE TABLE IF NOT EXISTS user_notification_preferences (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    service_enabled INTEGER NOT NULL DEFAULT 1,
+    payroll_enabled INTEGER NOT NULL DEFAULT 1,
+    dossier_enabled INTEGER NOT NULL DEFAULT 1,
+    moderation_enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS simulation_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    actor_user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    input_json TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sentinel_validation_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT,
+    trigger TEXT NOT NULL,
+    status TEXT NOT NULL,
+    checks_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -643,6 +748,30 @@ ON embed_media_links (guild_id, message_id);
 
 CREATE INDEX IF NOT EXISTS idx_embed_media_links_hash
 ON embed_media_links (content_hash, status);
+
+CREATE INDEX IF NOT EXISTS idx_warning_escalation_events_guild_user
+ON warning_escalation_events (guild_id, user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_notifications_user
+ON dashboard_notification_states (guild_id, user_id, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_announcements_due
+ON scheduled_announcements (status, next_run_at);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_announcements_guild
+ON scheduled_announcements (guild_id, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_report_schedules_due
+ON guild_report_schedules (enabled, next_run_at);
+
+CREATE INDEX IF NOT EXISTS idx_report_schedules_guild
+ON guild_report_schedules (guild_id, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_simulation_runs_guild
+ON simulation_runs (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_validation_runs_guild
+ON sentinel_validation_runs (guild_id, created_at);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
@@ -727,6 +856,17 @@ db.prepare(`
 
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
     .map(column => column.name);
+
+const scheduledAnnouncementColumns = db.prepare('PRAGMA table_info(scheduled_announcements)').all()
+    .map(column => column.name);
+
+if (!scheduledAnnouncementColumns.includes('approved_by_user_id')) {
+    db.prepare('ALTER TABLE scheduled_announcements ADD COLUMN approved_by_user_id TEXT').run();
+}
+
+if (!scheduledAnnouncementColumns.includes('approved_at')) {
+    db.prepare('ALTER TABLE scheduled_announcements ADD COLUMN approved_at TEXT').run();
+}
 
 if (!dashboardSessionColumns.includes('ip_hash')) {
     db.prepare('ALTER TABLE dashboard_sessions ADD COLUMN ip_hash TEXT').run();

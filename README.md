@@ -42,13 +42,16 @@ Sentinel Gratuit reste utilisable sans abonnement :
 
 ## Premium
 
-Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion plus avancée :
+Sentinel Premium accompagne les serveurs qui ont besoin d'une gestion plus avancée :
 
 - statistiques mensuelles et annuelles ;
 - rapports et exports de paie RP ;
 - taux de paie par rôle, primes, retenues et corrections ;
 - exports CSV, Excel ou PDF ;
 - rapports automatiques ;
+- annonces programmées, brouillons, validation par un second responsable et répétitions hebdomadaires ou mensuelles ;
+- sanctions par paliers après plusieurs avertissements actifs, avec expiration et exemptions de rôles ;
+- mode d’essai sans effet sur les membres, salons ou paiements ;
 - accès illimité aux embeds ;
 - panneaux de dossiers illimités ;
 - catégories, routage et formulaires personnalisés ;
@@ -57,7 +60,11 @@ Sentinel Premium est préparé pour les serveurs qui ont besoin d'une gestion pl
 - réouverture temporaire, rappels et statistiques d’équipe ;
 - automatisations de modération et de dossiers.
 
-Le gratuit reste volontairement simple. Le Premium apportera surtout du confort, du volume et des outils de gestion pour les grosses communautés.
+Le gratuit reste volontairement simple et comprend le centre de notifications ainsi que l’espace personnel des membres. Le Premium apporte surtout du confort, du volume et des outils de gestion pour les grosses communautés.
+
+## Espace personnel
+
+La page `/membre` permet à chaque personne connectée avec Discord de consulter uniquement ses propres heures, sa paie de la semaine, ses dossiers, ses avertissements visibles et ses préférences de notification. Elle ne donne aucun accès à la configuration ou aux données des autres membres.
 
 ## Installation rapide
 
@@ -163,7 +170,7 @@ Main features:
 - weekly RP payroll with estimated amounts and paid/unpaid tracking;
 - moderation commands: join auto-role, warn, timeout, kick, ban by ID, clear and cases;
 - private tickets, called Sentinel dossiers in the French interface;
-- announcement embeds, with unlimited access planned for Premium;
+- announcement embeds, scheduled delivery, approval workflow and unlimited Premium access;
 - web dashboard;
 - per-server language selection;
 

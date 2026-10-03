@@ -48,6 +48,7 @@ const {
 } = require('./database/object-storage');
 const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
+const operations = require('./operations');
 
 const client = new Client({
     intents: [
@@ -76,6 +77,7 @@ const AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS = 28 * 24 * 60 * 60;
 const AUTOMOD_MODERATOR_USER_ID = 'sentinel-automod';
 const AUTOMOD_SPAM_BUCKET_MAX = 5000;
 const AUTOMOD_RAID_BUCKET_MAX = 1000;
+const OPERATIONS_INTERVAL_MS = 60 * 1000;
 const DOSSIER_PANEL_CLICK_COOLDOWN_MS = 8 * 1000;
 const DOSSIER_CREATE_COOLDOWN_MS = 90 * 1000;
 const DOSSIER_ARCHIVE_DIR = process.env.DOSSIER_ARCHIVE_DIR
@@ -175,7 +177,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-10-02-updates-center-v4';
+const SENTINEL_BUILD = 'community-suite-2026-10-03-operations-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -5633,6 +5635,114 @@ function addModerationCase(guildId, targetUserId, moderatorUserId, action, reaso
     };
 }
 
+async function applyWarningEscalation(guild, member, userId, warningCase, language = 'fr') {
+    const settings = operations.getWarningEscalationSettings(guild.id);
+
+    if (!settings.enabled) {
+        return null;
+    }
+
+    const warningCount = operations.getActiveWarningCount(guild.id, userId, settings.windowDays);
+    const action = operations.getWarningEscalationAction(settings, warningCount);
+
+    if (!action) {
+        return { warningCount, action: null, status: 'below_threshold' };
+    }
+
+    if (member && settings.ignoredRoleIds.some(roleId => member.roles.cache.has(roleId))) {
+        operations.addWarningEscalationEvent({
+            guildId: guild.id,
+            userId,
+            warningCaseId: warningCase.id,
+            warningCount,
+            action,
+            status: 'ignored',
+            reason: 'Rôle exempté de l’escalade automatique.'
+        });
+        return { warningCount, action, status: 'ignored' };
+    }
+
+    const duration = action === 'timeout' ? settings.timeoutSeconds * 1000 : null;
+    const reason = language === 'en'
+        ? `Sentinel automatic escalation after ${warningCount} active warnings.`
+        : `Escalade automatique Sentinel après ${warningCount} avertissements actifs.`;
+    let error = null;
+
+    try {
+        if (action === 'timeout') {
+            if (!member) throw new Error('Le membre n’est plus présent sur le serveur.');
+            if (!botHasPermission(guild, PermissionsBitField.Flags.ModerateMembers)) throw new Error('Permission Discord ModerateMembers manquante.');
+            if (!member.moderatable) throw new Error('Le rôle Sentinel est trop bas pour appliquer le timeout.');
+            await member.timeout(duration, reason);
+        } else if (action === 'kick') {
+            if (!member) throw new Error('Le membre n’est plus présent sur le serveur.');
+            if (!botHasPermission(guild, PermissionsBitField.Flags.KickMembers)) throw new Error('Permission Discord KickMembers manquante.');
+            if (!member.kickable) throw new Error('Le rôle Sentinel est trop bas pour expulser ce membre.');
+            await member.kick(reason);
+        } else {
+            if (!botHasPermission(guild, PermissionsBitField.Flags.BanMembers)) throw new Error('Permission Discord BanMembers manquante.');
+            if (member && !member.bannable) throw new Error('Le rôle Sentinel est trop bas pour bannir ce membre.');
+            await guild.members.ban(userId, { reason, deleteMessageSeconds: 0 });
+        }
+    } catch (caught) {
+        error = caught;
+    }
+
+    operations.addWarningEscalationEvent({
+        guildId: guild.id,
+        userId,
+        warningCaseId: warningCase.id,
+        warningCount,
+        action,
+        status: error ? 'failed' : 'applied',
+        reason,
+        errorMessage: error?.message || null
+    });
+
+    if (error) {
+        return { warningCount, action, status: 'failed', error: error.message };
+    }
+
+    const escalationCase = addModerationCase(
+        guild.id,
+        userId,
+        AUTOMOD_MODERATOR_USER_ID,
+        `warning_${action}`,
+        reason,
+        duration
+    );
+    await sendModerationLog(guild, client.user, escalationCase, `<@${userId}>`, language);
+    return { warningCount, action, status: 'applied', caseId: escalationCase.id };
+}
+
+async function addWarningWithEscalation(guild, actorUser, member, userId, reason, language = 'fr') {
+    const warningCase = addModerationCase(guild.id, userId, actorUser.id, 'warn', reason, null);
+    await sendModerationLog(guild, actorUser, warningCase, member ? `${member}` : `<@${userId}>`, language);
+    const escalation = await applyWarningEscalation(guild, member, userId, warningCase, language);
+    return { caseData: warningCase, escalation };
+}
+
+function warningEscalationSummary(escalation, language = 'fr') {
+    if (!escalation?.action) return '';
+    const labels = language === 'en'
+        ? { timeout: 'timeout', kick: 'kick', ban: 'ban' }
+        : { timeout: 'timeout', kick: 'expulsion', ban: 'bannissement' };
+    if (escalation.status === 'applied') {
+        return language === 'en'
+            ? ` Automatic ${labels[escalation.action]} applied at ${escalation.warningCount} active warnings.`
+            : ` ${labels[escalation.action]} automatique appliqué au palier de ${escalation.warningCount} avertissements actifs.`;
+    }
+    if (escalation.status === 'failed') {
+        return language === 'en'
+            ? ` The automatic ${labels[escalation.action]} could not be applied; the incident was logged.`
+            : ` La sanction automatique (${labels[escalation.action]}) n’a pas pu être appliquée; l’incident est journalisé.`;
+    }
+    if (escalation.status === 'ignored') {
+        return language === 'en' ? ' The member is exempt from automatic escalation.' : ' Ce membre est exempté de l’escalade automatique.';
+    }
+    return '';
+}
+
 function getModerationCases(guildId, userId, limit = 10) {
     return db.prepare(`
         SELECT id, target_user_id, moderator_user_id, action, reason, duration, created_at
@@ -6207,9 +6317,15 @@ async function applyAutomodSanction(guild, member, userId, action, reason, durat
     const targetLabel = member ? `${member}` : `<@${userId}>`;
 
     if (action === 'warn') {
-        const caseData = addModerationCase(guild.id, userId, AUTOMOD_MODERATOR_USER_ID, 'warn', reason, null);
-        await sendModerationLog(guild, client.user || getFallbackRequester(), caseData, targetLabel, language);
-        return { applied: true, caseData };
+        const result = await addWarningWithEscalation(
+            guild,
+            client.user || getFallbackRequester(),
+            member,
+            userId,
+            reason,
+            language
+        );
+        return { applied: true, caseData: result.caseData, escalation: result.escalation };
     }
 
     if (action === 'timeout') {
@@ -13853,11 +13969,17 @@ async function handleModerationInteraction(interaction, commandName, language) {
     const reason = getReason(interaction.options.getString('raison'), language);
 
     if (commandName === 'avertir') {
-        const caseData = addModerationCase(guildId, member.id, interaction.user.id, 'warn', reason, null);
-        await sendModerationLog(interaction.guild, interaction.user, caseData, `${member}`, language);
+        const { caseData, escalation } = await addWarningWithEscalation(
+            interaction.guild,
+            interaction.user,
+            member,
+            member.id,
+            reason,
+            language
+        );
 
         await interaction.reply({
-            content: t(language, 'moderationWarned', { member, caseId: caseData.id }),
+            content: `${t(language, 'moderationWarned', { member, caseId: caseData.id })}${warningEscalationSummary(escalation, language)}`,
             flags: MessageFlags.Ephemeral
         });
         return true;
@@ -14348,10 +14470,15 @@ async function handleModerationMessage(message, language) {
 
     if (commandName === 'avertir') {
         const reason = getReason(args.slice(2).join(' '), language);
-        const caseData = addModerationCase(message.guild.id, member.id, message.author.id, 'warn', reason, null);
-
-        await sendModerationLog(message.guild, message.author, caseData, `${member}`, language);
-        await message.reply(t(language, 'moderationWarned', { member, caseId: caseData.id }));
+        const { caseData, escalation } = await addWarningWithEscalation(
+            message.guild,
+            message.author,
+            member,
+            member.id,
+            reason,
+            language
+        );
+        await message.reply(`${t(language, 'moderationWarned', { member, caseId: caseData.id })}${warningEscalationSummary(escalation, language)}`);
         return true;
     }
 
@@ -14443,6 +14570,407 @@ async function handleModerationMessage(message, language) {
     return true;
 }
 
+function reportMemberLabel(guild, userId) {
+    const member = guild.members.cache.get(String(userId));
+    return member?.displayName || member?.user?.globalName || member?.user?.username || String(userId);
+}
+
+function getGuildReportDataset(guild, kind) {
+    const language = getGuildLanguage(guild.id);
+
+    if (kind === 'service') {
+        return {
+            title: `Sentinel - Services - ${guild.name}`,
+            columns: ['Utilisateur', 'ID Discord', 'Temps total', 'En service'],
+            rows: getTopService(guild.id).map(item => ({
+                Utilisateur: reportMemberLabel(guild, item.userId),
+                'ID Discord': item.userId,
+                'Temps total': formatDuration(item.totalTime),
+                'En service': getUserData(guild.id, item.userId)?.startTime ? 'Oui' : 'Non'
+            }))
+        };
+    }
+
+    if (kind === 'payroll') {
+        const payroll = getWeeklyPayroll(guild.id, { guild, language });
+        return {
+            title: `Sentinel - Paie ${payroll.weekStart} - ${guild.name}`,
+            columns: ['Utilisateur', 'ID Discord', 'Temps', 'Taux', 'Ajustements', 'Montant', 'Paiement'],
+            rows: payroll.items.map(item => ({
+                Utilisateur: item.displayName || item.username || item.userId,
+                'ID Discord': item.userId,
+                Temps: item.totalTimeLabel,
+                Taux: item.hourlyRateLabel,
+                Ajustements: item.adjustmentAmountLabel,
+                Montant: item.amountLabel,
+                Paiement: item.paid ? 'Payé' : 'À payer'
+            }))
+        };
+    }
+
+    if (kind === 'dossiers') {
+        const rows = db.prepare(`
+            SELECT * FROM sentinel_dossiers WHERE guild_id = ? ORDER BY id DESC LIMIT 10000
+        `).all(guild.id).map(mapDossier);
+        return {
+            title: `Sentinel - Dossiers - ${guild.name}`,
+            columns: ['Dossier', 'Type', 'Sujet', 'Demandeur', 'Statut', 'Priorité', 'Référent', 'Ouverture', 'Clôture'],
+            rows: rows.map(item => ({
+                Dossier: `#${item.id}`,
+                Type: item.type,
+                Sujet: item.subject || '',
+                Demandeur: item.ownerUserId,
+                Statut: item.status,
+                Priorité: item.priority,
+                Référent: item.referentUserId || '',
+                Ouverture: item.createdAt,
+                Clôture: item.closedAt || ''
+            }))
+        };
+    }
+
+    if (kind === 'moderation') {
+        const rows = db.prepare(`
+            SELECT * FROM moderation_cases WHERE guild_id = ? ORDER BY id DESC LIMIT 10000
+        `).all(guild.id);
+        return {
+            title: `Sentinel - Modération - ${guild.name}`,
+            columns: ['Cas', 'Action', 'Cible', 'Modérateur', 'Raison', 'Durée', 'Date'],
+            rows: rows.map(item => ({
+                Cas: `#${item.id}`,
+                Action: item.action,
+                Cible: item.target_user_id || '',
+                Modérateur: item.moderator_user_id,
+                Raison: item.reason || '',
+                Durée: item.duration ? formatDuration(item.duration) : '',
+                Date: item.created_at
+            }))
+        };
+    }
+
+    throw new Error('Type de rapport inconnu.');
+}
+
+function createGuildReport(guild, kind, format) {
+    const dataset = getGuildReportDataset(guild, kind);
+    return {
+        ...operations.createReportDocument({ ...dataset, format }),
+        title: dataset.title,
+        fileName: `sentinel-${kind}-${new Date().toISOString().slice(0, 10)}.${format === 'xls' ? 'xls' : format}`
+    };
+}
+
+function buildDashboardNotifications(guildId, userId, snapshot = {}) {
+    const notifications = [];
+    const payroll = snapshot.payroll || getWeeklyPayroll(guildId, { guild: client.guilds.cache.get(guildId) });
+    const unpaidCount = payroll.items.filter(item => !item.paid).length;
+    const openDossiers = (snapshot.dossiers || getRecentDossiers(guildId, 100)).filter(item => item.status !== 'closed');
+    const staleDossiers = openDossiers.filter(item => Date.now() - new Date(item.lastActivityAt || item.createdAt).getTime() > 48 * 60 * 60 * 1000);
+    const automodCount = db.prepare(`
+        SELECT COUNT(*) AS count FROM guild_automod_events
+        WHERE guild_id = ? AND created_at >= datetime('now', '-24 hours')
+    `).get(guildId).count;
+    const failedAnnouncements = db.prepare(`
+        SELECT COUNT(*) AS count FROM scheduled_announcements
+        WHERE guild_id = ? AND status = 'failed'
+    `).get(guildId).count;
+    const failedDeliveries = db.prepare(`
+        SELECT COUNT(*) AS count FROM official_update_deliveries
+        WHERE guild_id = ? AND status = 'failed'
+    `).get(guildId).count;
+    const failedReports = db.prepare(`
+        SELECT COUNT(*) AS count FROM guild_report_schedules
+        WHERE guild_id = ? AND last_error IS NOT NULL
+    `).get(guildId).count;
+    const systemAlerts = snapshot.includeSystemAlerts
+        ? (getDatabaseBackupStatus().alerts || [])
+        : [];
+
+    if (staleDossiers.length) notifications.push({
+        key: 'dossiers-stale',
+        severity: 'warning',
+        title: `${staleDossiers.length} dossier(s) sans activité depuis 48 h`,
+        detail: 'La file du personnel contient des demandes à reprendre.',
+        tab: 'dossiers'
+    });
+    if (unpaidCount) notifications.push({
+        key: `payroll-unpaid-${payroll.weekStart}`,
+        severity: 'info',
+        title: `${unpaidCount} paiement(s) à valider`,
+        detail: `Paie de la semaine du ${payroll.weekStart}.`,
+        tab: 'service'
+    });
+    if (automodCount) notifications.push({
+        key: `automod-${new Date().toISOString().slice(0, 10)}`,
+        severity: automodCount >= 10 ? 'danger' : 'info',
+        title: `${automodCount} incident(s) de sûreté en 24 h`,
+        detail: 'Consulte le Centre de sûreté pour vérifier les déclenchements.',
+        tab: 'moderation'
+    });
+    if (failedAnnouncements + failedDeliveries) notifications.push({
+        key: 'announcements-failed',
+        severity: 'danger',
+        title: `${failedAnnouncements + failedDeliveries} annonce(s) non distribuée(s)`,
+        detail: 'Un salon supprimé ou une permission Discord peut bloquer l’envoi.',
+        tab: 'embeds'
+    });
+    if (failedReports) notifications.push({
+        key: 'reports-failed',
+        severity: 'danger',
+        title: `${failedReports} rapport(s) automatique(s) en échec`,
+        detail: 'Vérifie le salon de destination et les permissions de Sentinel.',
+        tab: 'operations'
+    });
+    for (const alert of systemAlerts) {
+        notifications.push({
+            key: `system-${alert.key}`,
+            severity: Number(alert.level || 0) >= 90 ? 'danger' : 'warning',
+            title: alert.message || 'Alerte de maintenance Sentinel',
+            detail: 'La console fondatrice contient le diagnostic et les actions de maintenance.',
+            tab: 'founder'
+        });
+    }
+
+    const states = operations.getNotificationStates(guildId, userId);
+    return notifications.map(item => {
+        const state = states.get(item.key);
+        return {
+            ...item,
+            read: Boolean(state?.read_at),
+            dismissed: Boolean(state?.dismissed_at)
+        };
+    }).filter(item => !item.dismissed);
+}
+
+function getMemberPortalGuild(guild, userId) {
+    const language = getGuildLanguage(guild.id);
+    const service = getUserData(guild.id, userId);
+    const payroll = getWeeklyPayroll(guild.id, { guild, language });
+    const payrollLine = payroll.items.find(item => item.userId === userId) || null;
+    const warningSettings = operations.getWarningEscalationSettings(guild.id);
+    const warnings = getModerationCases(guild.id, userId, 20)
+        .filter(item => ['warn', 'warning_timeout', 'warning_kick', 'warning_ban'].includes(item.action));
+    const dossiers = db.prepare(`
+        SELECT * FROM sentinel_dossiers
+        WHERE guild_id = ? AND owner_user_id = ? ORDER BY id DESC LIMIT 25
+    `).all(guild.id, userId).map(mapDossier).map(item => ({
+        id: item.id,
+        type: item.type,
+        status: item.status,
+        subject: item.subject,
+        priority: item.priority,
+        createdAt: item.createdAt,
+        closedAt: item.closedAt
+    }));
+    const preferences = operations.getUserNotificationPreferences(guild.id, userId);
+    const activeWarningCount = operations.getActiveWarningCount(guild.id, userId, warningSettings.windowDays);
+    const memberNotifications = [];
+
+    if (preferences.serviceEnabled && service?.startTime) {
+        memberNotifications.push({
+            key: 'service-active',
+            title: 'Service en cours',
+            detail: `Prise de service enregistrée le ${new Date(service.startTime).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}.`,
+            createdAt: new Date(service.startTime).toISOString()
+        });
+    }
+    if (preferences.payrollEnabled && payrollLine) {
+        memberNotifications.push({
+            key: `payroll-${payroll.weekStart}`,
+            title: payrollLine.paid ? 'Paie enregistrée' : 'Paie en attente',
+            detail: `${payrollLine.amountLabel} pour la semaine du ${payroll.weekStart}.`,
+            createdAt: payrollLine.paidAt || payroll.weekEnd
+        });
+    }
+    const openDossiers = dossiers.filter(item => item.status !== 'closed');
+    if (preferences.dossierEnabled && openDossiers.length) {
+        memberNotifications.push({
+            key: 'dossiers-open',
+            title: `${openDossiers.length} dossier(s) en cours`,
+            detail: 'Ton registre personnel contient encore des demandes ouvertes.',
+            createdAt: openDossiers[0].createdAt
+        });
+    }
+    if (preferences.moderationEnabled && activeWarningCount) {
+        memberNotifications.push({
+            key: 'warnings-active',
+            title: `${activeWarningCount} avertissement(s) actif(s)`,
+            detail: `Les avertissements sortent du calcul après ${warningSettings.windowDays} jours.`,
+            createdAt: warnings[0]?.created_at || null
+        });
+    }
+
+    return {
+        guild: { id: guild.id, name: guild.name, icon: guild.iconURL() },
+        service: {
+            totalTime: service?.totalTime || 0,
+            totalTimeLabel: formatDuration(service?.totalTime || 0),
+            active: Boolean(service?.startTime),
+            sessionCount: getUserSessionCount(guild.id, userId),
+            sessions: getUserSessions(guild.id, userId, 10).map(item => ({ ...item, durationLabel: formatDuration(item.duration || 0) }))
+        },
+        payroll: {
+            weekStart: payroll.weekStart,
+            weekEnd: payroll.weekEnd,
+            line: payrollLine ? {
+                totalTimeLabel: payrollLine.totalTimeLabel,
+                amountLabel: payrollLine.amountLabel,
+                paid: payrollLine.paid,
+                paidAt: payrollLine.paidAt
+            } : null
+        },
+        warnings: {
+            activeCount: activeWarningCount,
+            expirationDays: warningSettings.windowDays,
+            items: warnings.map(item => ({ id: item.id, action: item.action, reason: item.reason, duration: item.duration, createdAt: item.created_at }))
+        },
+        dossiers,
+        notifications: memberNotifications,
+        preferences
+    };
+}
+
+async function getMemberPortal(userId) {
+    const guilds = [];
+    for (const guild of client.guilds.cache.values()) {
+        const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
+        if (member) guilds.push(getMemberPortalGuild(guild, userId));
+    }
+    return { guilds };
+}
+
+function simulateGuildOperation(guild, actorUserId, kind, input = {}) {
+    let result;
+    if (kind === 'automod') {
+        const content = String(input.content || '').slice(0, 2000);
+        const normalized = content.normalize('NFKC').toLowerCase();
+        const settings = getDashboardAutomodSettings(guild.id);
+        const matchedWord = getAutomodWords(guild.id).find(item => normalized.includes(item.word));
+        const invite = /(?:discord\.gg|discord(?:app)?\.com\/invite)\//i.test(content);
+        result = matchedWord && settings.forbiddenWordsEnabled
+            ? { matched: true, rule: 'forbidden_words', action: settings.forbiddenWordsAction, detail: `Mot détecté : ${matchedWord.word}` }
+            : (invite && settings.inviteFilterEnabled
+                ? { matched: true, rule: 'discord_invite', action: settings.inviteAction, detail: 'Invitation Discord détectée.' }
+                : { matched: false, rule: null, action: 'none', detail: 'Aucune règle active ne bloquerait ce message.' });
+    } else if (kind === 'dossier') {
+        const type = normalizeDossierType(input.type);
+        const setting = getDossierTypeSetting(guild.id, type);
+        const roleIds = getDossierTypeRoleIds(guild.id, type);
+        result = {
+            type,
+            categoryId: setting?.categoryId || null,
+            categoryName: guild.channels.cache.get(setting?.categoryId)?.name || null,
+            roleIds,
+            roleNames: roleIds.map(id => guild.roles.cache.get(id)?.name || id),
+            questions: setting?.questions || []
+        };
+    } else if (kind === 'announcement') {
+        const { data } = buildCustomEmbedData(input, null, getGuildLanguage(guild.id));
+        result = { valid: true, title: data.title, description: data.description, color: data.color, totalCharacters: data.title.length + data.description.length };
+    } else if (kind === 'payroll') {
+        const userId = normalizeUserId(input.userId);
+        const payroll = getWeeklyPayroll(guild.id, { guild });
+        const line = payroll.items.find(item => item.userId === userId);
+        result = line
+            ? { found: true, userId, totalTimeLabel: line.totalTimeLabel, hourlyRateLabel: line.hourlyRateLabel, amountLabel: line.amountLabel, paid: line.paid }
+            : { found: false, userId, detail: 'Aucune ligne de paie pour cette semaine.' };
+    } else {
+        throw new Error('Mode d’essai inconnu.');
+    }
+    const id = operations.addSimulationRun(guild.id, actorUserId, kind, input, result);
+    return { id, kind, result };
+}
+
+function runSentinelGuildValidation(guild, trigger = 'manual') {
+    const warning = operations.getWarningEscalationSettings(guild.id);
+    const commandRoleIds = getCommandRoleIds(guild.id);
+    const dossierRoleIds = getDossierRoleIds(guild.id);
+    const premiumRoleIds = getPremiumRoleIds(guild.id);
+    const missing = ids => ids.filter(id => !guild.roles.cache.has(id));
+    const premiumRolePrimaryKey = db.prepare('PRAGMA table_info(sentinel_premium_roles)').all()
+        .filter(column => column.pk > 0)
+        .sort((left, right) => left.pk - right.pk)
+        .map(column => column.name);
+    const premiumUserPrimaryKey = db.prepare('PRAGMA table_info(sentinel_premium_users)').all()
+        .filter(column => column.pk > 0)
+        .sort((left, right) => left.pk - right.pk)
+        .map(column => column.name);
+    const duplicatedPremiumRole = db.prepare(`
+        SELECT role_id
+        FROM sentinel_premium_roles
+        GROUP BY role_id
+        HAVING COUNT(DISTINCT guild_id) > 1
+        LIMIT 1
+    `).get();
+    const premiumScopeOk = premiumRolePrimaryKey.join(',') === 'guild_id,role_id'
+        && premiumUserPrimaryKey.join(',') === 'guild_id,user_id'
+        && !duplicatedPremiumRole;
+    const checks = [
+        { key: 'database', label: 'Intégrité SQLite', ok: db.pragma('quick_check', { simple: true }) === 'ok' },
+        { key: 'warning-thresholds', label: 'Paliers d’avertissement', ok: warning.timeoutThreshold > 0 && (!warning.kickThreshold || warning.kickThreshold > warning.timeoutThreshold) && (!warning.banThreshold || warning.banThreshold > Math.max(warning.kickThreshold, warning.timeoutThreshold)) },
+        { key: 'command-roles', label: 'Rôles staff existants', ok: missing(commandRoleIds).length === 0, detail: missing(commandRoleIds).join(', ') },
+        { key: 'dossier-roles', label: 'Rôles dossiers existants', ok: missing(dossierRoleIds).length === 0, detail: missing(dossierRoleIds).join(', ') },
+        { key: 'premium-roles', label: 'Rôles Premium existants', ok: missing(premiumRoleIds).length === 0, detail: missing(premiumRoleIds).join(', ') },
+        { key: 'bot-member', label: 'Sentinel présent comme membre', ok: Boolean(guild.members.me) },
+        {
+            key: 'premium-scope',
+            label: 'Accès Premium isolés par serveur',
+            ok: premiumScopeOk,
+            detail: duplicatedPremiumRole ? `Rôle présent sur plusieurs serveurs : ${duplicatedPremiumRole.role_id}` : null
+        }
+    ];
+    return operations.addValidationRun(guild.id, trigger, checks);
+}
+
+let operationsCycleRunning = false;
+
+async function processScheduledOperations() {
+    if (operationsCycleRunning) return;
+    operationsCycleRunning = true;
+    try {
+        for (const item of operations.getDueScheduledAnnouncements()) {
+            const guild = client.guilds.cache.get(item.guildId);
+            const channel = guild?.channels?.cache?.get(item.channelId);
+            if (!guild || !channel?.isTextBased?.()) {
+                operations.completeScheduledAnnouncement(item, { error: 'Serveur ou salon Discord introuvable.' });
+                continue;
+            }
+            try {
+                const message = await channel.send({
+                    embeds: [buildCustomAnnouncementEmbed(item, getGuildLanguage(guild.id))],
+                    allowedMentions: { parse: [] }
+                });
+                addCustomEmbedRecord(guild.id, channel.id, message.id, item.createdByUserId, item);
+                operations.completeScheduledAnnouncement(item, { messageId: message.id });
+            } catch (error) {
+                operations.completeScheduledAnnouncement(item, { error: error.message || error });
+            }
+        }
+
+        for (const item of operations.getDueReportSchedules()) {
+            const guild = client.guilds.cache.get(item.guildId);
+            const channel = guild?.channels?.cache?.get(item.channelId);
+            if (!guild || !channel?.isTextBased?.()) {
+                operations.completeReportSchedule(item, { error: 'Serveur ou salon Discord introuvable.' });
+                continue;
+            }
+            try {
+                const report = createGuildReport(guild, item.reportKind, item.format);
+                const message = await channel.send({
+                    content: `Rapport Sentinel automatique : **${report.title}**`,
+                    files: [new AttachmentBuilder(report.buffer, { name: report.fileName })],
+                    allowedMentions: { parse: [] }
+                });
+                operations.completeReportSchedule(item, { messageId: message.id });
+            } catch (error) {
+                operations.completeReportSchedule(item, { error: error.message || error });
+            }
+        }
+    } finally {
+        operationsCycleRunning = false;
+    }
+}
+
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
@@ -14460,6 +14988,7 @@ client.once(Events.ClientReady, async () => {
             addDossierRole,
             addDossierTypeRole,
             addModerationCase,
+            addWarningWithEscalation,
             addSession,
             addWeeklyPayAdjustment,
             archiveWeeklyPayroll,
@@ -14494,6 +15023,8 @@ client.once(Events.ClientReady, async () => {
             hasCustomEmbedUpload,
             customEmbedUploadRequiresAttachment,
             getDatabaseBackupStatus,
+            buildDashboardNotifications,
+            createGuildReport,
             getAllDossierTypeRoles,
             getDossierArchiveFile,
             getDossierRoleIds,
@@ -14503,6 +15034,8 @@ client.once(Events.ClientReady, async () => {
             getGuildConfig,
             getGuildLanguage,
             getGuildOfficialUpdateHistory,
+            getMemberPortal,
+            getMemberPortalGuild,
             getGuildPayRoleSettings,
             getAutoRole,
             getAssignableRoleError,
@@ -14530,6 +15063,21 @@ client.once(Events.ClientReady, async () => {
             getSentinelSyncStatus,
             getSlashCommandStatus,
             getTemporaryBan,
+            getWarningEscalationSettings: operations.getWarningEscalationSettings,
+            getWarningEscalationEvents: operations.getWarningEscalationEvents,
+            updateWarningEscalationSettings: operations.updateWarningEscalationSettings,
+            getScheduledAnnouncements: operations.getScheduledAnnouncements,
+            saveScheduledAnnouncement: operations.saveScheduledAnnouncement,
+            approveScheduledAnnouncement: operations.approveScheduledAnnouncement,
+            cancelScheduledAnnouncement: operations.cancelScheduledAnnouncement,
+            getReportSchedules: operations.getReportSchedules,
+            saveReportSchedule: operations.saveReportSchedule,
+            removeReportSchedule: operations.removeReportSchedule,
+            setNotificationState: operations.setNotificationState,
+            getUserNotificationPreferences: operations.getUserNotificationPreferences,
+            updateUserNotificationPreferences: operations.updateUserNotificationPreferences,
+            getSimulationRuns: operations.getSimulationRuns,
+            getValidationRuns: operations.getValidationRuns,
             getTopService,
             getTopWeek,
             getWeeklyPayrollArchive,
@@ -14552,6 +15100,8 @@ client.once(Events.ClientReady, async () => {
             parseSlowmodeToSeconds,
             prepareCustomEmbedUploads,
             reconcileDossierPanels,
+            runSentinelGuildValidation,
+            simulateGuildOperation,
             recordDashboardRequestMetric,
             removeAutomodWord,
             removeDossierRole,
@@ -14632,6 +15182,10 @@ client.once(Events.ClientReady, async () => {
         const officialDistribution = await distributeLatestPublicOfficialUpdate();
         console.log(`Bulletin public Sentinel vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
         await processExpiredTemporaryBans();
+        await processScheduledOperations();
+        for (const guild of client.guilds.cache.values()) {
+            runSentinelGuildValidation(guild, 'startup');
+        }
     } catch (error) {
         console.error('Erreur synchronisation serveur Sentinel :', error);
     }
@@ -14639,6 +15193,9 @@ client.once(Events.ClientReady, async () => {
     setInterval(refreshSlashCommandStatus, 6 * 60 * 60 * 1000);
     setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
     setInterval(processExpiredTemporaryBans, 60 * 1000);
+    setInterval(() => processScheduledOperations().catch(error => {
+        console.error('Traitements programmés Sentinel :', error);
+    }), OPERATIONS_INTERVAL_MS);
     setInterval(() => processOfficialUpdateRetries().catch(error => {
         console.error('Nouvelle tentative des annonces officielles Sentinel :', error);
     }), 5 * 60 * 1000);
