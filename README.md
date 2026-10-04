@@ -24,7 +24,7 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 
 ## Version gratuite
 
-Sentinel Gratuit reste utilisable sans abonnement :
+Sentinel comprend :
 
 - panneau de service ;
 - heures personnelles ;
@@ -39,28 +39,6 @@ Sentinel Gratuit reste utilisable sans abonnement :
 - 5 dossiers ouverts en même temps ;
 - 10 derniers dossiers visibles ;
 - rôles responsables par nature de dossier, file d’attente, filtres essentiels, archivage complet vérifié et clôture motivée.
-
-## Premium
-
-Sentinel Premium accompagne les serveurs qui ont besoin d'une gestion plus avancée :
-
-- statistiques mensuelles et annuelles ;
-- rapports et exports de paie RP ;
-- taux de paie par rôle, primes, retenues et corrections ;
-- exports CSV, Excel ou PDF ;
-- rapports automatiques ;
-- annonces programmées, brouillons, validation par un second responsable et répétitions hebdomadaires ou mensuelles ;
-- sanctions par paliers après plusieurs avertissements actifs, avec expiration et exemptions de rôles ;
-- mode d’essai sans effet sur les membres, salons ou paiements ;
-- accès illimité aux embeds ;
-- panneaux de dossiers illimités ;
-- catégories, routage et formulaires personnalisés ;
-- priorités, réponses préparées et délais d’intervention ;
-- recherche dans les archives complètes ;
-- réouverture temporaire, rappels et statistiques d’équipe ;
-- automatisations de modération et de dossiers.
-
-Le gratuit reste volontairement simple et comprend le centre de notifications ainsi que l’espace personnel des membres. Le Premium apporte surtout du confort, du volume et des outils de gestion pour les grosses communautés.
 
 ## Espace personnel
 
@@ -94,7 +72,6 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
 | `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
-| `/premium` | `/premium` | Voir l’accès actuel et les outils Premium |
 | `/support` | `/support` | Obtenir les liens officiels et le serveur support |
 | `/mes-heures` | `/my-hours` | Voir ses heures |
 | `/en-service` | `/on-duty` | Voir les agents en service |
@@ -111,8 +88,6 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/sanctions` | `/mod-cases` | Voir les sanctions récentes |
 | `/embed` | `/embed` | Gérer les annonces Sentinel |
 | `/dossier-panel` | `/ticket-panel` | Publier le panneau de tickets |
-| `/dossier-reouvrir` | `/reopen-ticket` | Premium : réouvrir un dossier encore conservé |
-| `/paie-ajustement` | `/payroll-adjustment` | Premium : ajouter une prime, une retenue ou une correction |
 
 La liste complète et les explications détaillées sont disponibles sur le site.
 
@@ -124,7 +99,7 @@ La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauv
 
 La Console fondateur contient le Centre de maintenance : capacité du volume, répartition de la base, alertes à 60 %, 75 % et 90 %, croissance anormale, suivi SQLite/site/Discord, copies protégées, archives froides et registre des médias d'embeds. Les images importées sont validées, redimensionnées et converties en WebP, puis dédupliquées par SHA-256. Une référence orpheline passe 30 jours en corbeille avant suppression locale ou distante. Les téléchargements, contrôles manuels et restaurations sont autorisés côté serveur uniquement au fondateur avec une session Discord récente. Une restauration crée d'abord une copie de sécurité vérifiée puis est appliquée au redémarrage.
 
-Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Les quotas par serveur sont de 32 Mo en gratuit et 512 Mo en Premium par défaut, réglables avec `EMBED_MEDIA_FREE_QUOTA_MB` et `EMBED_MEDIA_PREMIUM_QUOTA_MB`.
+Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Le quota média par serveur est réglable avec `EMBED_MEDIA_FREE_QUOTA_MB`.
 
 Un bucket privé peut utiliser `DASHBOARD_URL/media` comme base publique. Sentinel valide alors l'empreinte demandée dans SQLite et diffuse uniquement l'objet WebP correspondant, avec cache immuable, sans révéler les identifiants S3 ni permettre de parcourir le bucket.
 
@@ -136,7 +111,7 @@ Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`
 
 ## Sécurité et données
 
-Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe ni les numéros de carte et ne vend aucune donnée. Stripe traite les moyens de paiement; Sentinel conserve seulement les références, états, montants et documents nécessaires au suivi de l’abonnement.
+Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe ni les coordonnées bancaires et ne vend aucune donnée.
 
 Les données nécessaires au fonctionnement sont décrites dans la Politique de confidentialité : identifiants Discord, configuration serveur, temps de service, sanctions, dossiers, annonces, sessions dashboard et journal d'audit.
 
@@ -144,9 +119,9 @@ Les informations d'exploitation du bot restent privées. Les fichiers de configu
 
 Le dashboard applique une autorisation côté serveur à chaque requête. L'accès staff exige à la fois une autorisation donnée par le fondateur dans la Régie et un rôle staff configuré sur le serveur Discord Sentinel. Il donne une vue de régie, mais ne donne ni le rôle fondateur ni les permissions d'administration d'un serveur Discord. Toute action sur un serveur exige aussi que la personne soit membre du serveur concerné et possède les permissions Discord ou le rôle Sentinel attendu.
 
-Les changements de grade staff et d'accès Premium sont réservés au compte fondateur, exigent une connexion Discord récente et une authentification à usage unique, puis sont inscrits dans le journal d'audit. Les changements Premium importants, restaurations, annonces globales et remises à zéro de serveur exigent la validation d’une seconde personne autorisée. Retirer le grade staff révoque immédiatement toutes les sessions dashboard de la personne.
+Les changements de grade staff sont réservés au compte fondateur, exigent une connexion Discord récente et une authentification à usage unique, puis sont inscrits dans le journal d'audit. Les restaurations, annonces globales et remises à zéro de serveur exigent la validation d’une seconde personne autorisée. Retirer le grade staff révoque immédiatement toutes les sessions dashboard de la personne.
 
-Le contrôle Discord de préproduction peut être rendu bloquant avant la mise en service avec `SENTINEL_STAGING_GUILD_ID` et `SENTINEL_STAGING_VALIDATION_REQUIRED=true`. Il crée et supprime de vrais salons et rôles privés. `SENTINEL_STAGING_REAL_ACTIONS=true` ajoute un timeout réel sur `SENTINEL_STAGING_MEMBER_ID` puis un bannissement immédiatement levé sur le compte absent `SENTINEL_STAGING_BAN_TARGET_ID`; ces deux IDs doivent donc être des comptes de test dédiés. La facturation automatisée utilise Stripe Checkout et des webhooks signés configurés avec `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` et `STRIPE_PREMIUM_PRICE_ID`.
+Le contrôle Discord de préproduction peut être rendu bloquant avant la mise en service avec `SENTINEL_STAGING_GUILD_ID` et `SENTINEL_STAGING_VALIDATION_REQUIRED=true`. Il crée et supprime de vrais salons et rôles privés. `SENTINEL_STAGING_REAL_ACTIONS=true` ajoute un timeout réel sur `SENTINEL_STAGING_MEMBER_ID` puis un bannissement immédiatement levé sur le compte absent `SENTINEL_STAGING_BAN_TARGET_ID`; ces deux IDs doivent donc être des comptes de test dédiés.
 
 ## Licence
 
@@ -172,7 +147,7 @@ Main features:
 - weekly RP payroll with estimated amounts and paid/unpaid tracking;
 - moderation commands: join auto-role, warn, timeout, kick, ban by ID, clear and cases;
 - private tickets, called Sentinel dossiers in the French interface;
-- announcement embeds, scheduled delivery, approval workflow and unlimited Premium access;
+- announcement embeds and approval workflow;
 - web dashboard;
 - per-server language selection;
 

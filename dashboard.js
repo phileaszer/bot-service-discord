@@ -36,6 +36,7 @@ const FOUNDER_MFA_SESSION_TTL = boundedEnvInteger('DASHBOARD_FOUNDER_MFA_MINUTES
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
+const PREMIUM_ACCESS_ENABLED = false;
 const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const SERVER_PRESET_LABELS = {
@@ -62,8 +63,6 @@ const ALLOWED_RETURN_PATHS = new Set([
     '/fonctionnalites.html',
     '/commandes',
     '/commandes.html',
-    '/premium',
-    '/premium.html',
     '/securite',
     '/securite.html',
     '/installation',
@@ -2112,6 +2111,10 @@ async function getReferenceMemberForSession(ctx, session = null) {
 }
 
 async function hasDashboardPremiumSubscription(ctx, session = null) {
+    if (!PREMIUM_ACCESS_ENABLED) {
+        return false;
+    }
+
     if (isCreatorUser(session?.user?.id)) {
         return true;
     }
@@ -2129,6 +2132,10 @@ async function hasDashboardPremiumSubscription(ctx, session = null) {
 }
 
 async function hasDashboardAdvancedAccess(ctx, guildId, member = null, session = null) {
+    if (!PREMIUM_ACCESS_ENABLED) {
+        return false;
+    }
+
     if (hasDirectAdvancedAccess(ctx, guildId, member)) {
         return true;
     }
@@ -2499,8 +2506,10 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
     const manualPremiumGuildIds = getManualPremiumGuildIds();
     const premiumRolesByGuild = getManualPremiumRolesByGuild();
     const premiumUsersByGuild = getManualPremiumUsersByGuild();
-    const guilds = Array.from(ctx.client.guilds.cache.values())
-        .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+    const guilds = PREMIUM_ACCESS_ENABLED
+        ? Array.from(ctx.client.guilds.cache.values())
+            .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
+        : [];
 
     const items = [];
 
@@ -2646,7 +2655,7 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
         acc.premiumUserCount += item.premiumUsers.length;
         return acc;
     }, {
-        guildCount: 0,
+        guildCount: PREMIUM_ACCESS_ENABLED ? 0 : ctx.client.guilds.cache.size,
         serverPremiumCount: 0,
         partialPremiumCount: 0,
         freeCount: 0,
@@ -2730,14 +2739,6 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
         }
         : storage;
 
-    const billingOverview = billing.getFounderBillingOverview(50);
-    if (!siteAccess.isFounder) {
-        billingOverview.subscriptions = billingOverview.subscriptions.map(item => ({
-            ...item,
-            customerId: null
-        }));
-    }
-
     return {
         generatedAt: new Date().toISOString(),
         canView: true,
@@ -2748,9 +2749,8 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             ? governance.getFounderMfaStatus(session?.user?.id)
             : null,
         criticalActions: governance.listCriticalActions({ scope: 'global', limit: 50 }),
-        billing: billingOverview,
         staff: await getSiteStaffUsers(ctx),
-        guilds: items
+        guilds: []
     };
 }
 
@@ -3279,7 +3279,6 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             icon: guild.iconURL()
         },
         advanced,
-        billing: billing.getGuildBillingStatus(guild.id),
         criticalActions: canManageGuild || siteAccess.canViewSitePanel
             ? governance.listCriticalActions({ scope: 'guild', guildId: guild.id, limit: 20 })
             : [],
@@ -4415,6 +4414,9 @@ async function executeGlobalCriticalAction(ctx, request) {
     try {
         let message;
         if (request.actionType === 'premium-access') {
+            if (!PREMIUM_ACCESS_ENABLED) {
+                throw createHttpError(409, 'Cette attribution est suspendue.');
+            }
             message = await manageCreatorPremiumAccess(ctx, {
                 user: { id: request.requestedByUserId }
             }, request.payload);
@@ -4986,17 +4988,7 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/billing/webhook') {
-        checkRateLimit(rateLimitKey(req, 'billing-webhook'), RATE_LIMITS.api);
-        const rawBody = await parseRawBody(req, 1024 * 1024);
-        const signature = String(req.headers['stripe-signature'] || '');
-        try {
-            const event = billing.constructWebhookEvent(rawBody, signature);
-            const result = await billing.processWebhookEvent(event, rawBody);
-            json(res, 200, { received: true, duplicate: Boolean(result.duplicate) });
-        } catch (error) {
-            throw createHttpError(400, `Webhook Stripe refusé : ${error.message || error}`);
-        }
-        return;
+        throw createHttpError(404, 'Not found.');
     }
 
     if (!SAFE_METHODS.has(req.method)) {
@@ -5013,7 +5005,6 @@ async function handleApi(req, res, ctx, url) {
                 botOnline: Boolean(ctx.client?.isReady?.()),
                 dashboardOnline: true,
                 guildCount: ctx.client?.guilds?.cache?.size || 0,
-                premiumBilling: billing.billingStatus(),
                 incidents,
                 maintenance
             }
@@ -5122,24 +5113,7 @@ async function handleApi(req, res, ctx, url) {
 
     const billingMatch = /^\/api\/guilds\/(\d{17,20})\/billing\/(checkout|portal)$/.exec(url.pathname);
     if (req.method === 'POST' && billingMatch) {
-        const { guild, oauthManage, siteAccess } = await getDashboardAccess(ctx, session, billingMatch[1]);
-        if (!oauthManage && !siteAccess.isFounder) {
-            throw createHttpError(403, 'Seul un gestionnaire du serveur peut administrer son abonnement Premium.');
-        }
-        const returnUrl = `${getConfiguredDashboardOrigin()}/dashboard?guild=${encodeURIComponent(guild.id)}`;
-        const result = billingMatch[2] === 'checkout'
-            ? await billing.createCheckoutSession({
-                guildId: guild.id,
-                discordUserId: session.user.id,
-                successUrl: `${returnUrl}&billing=success`,
-                cancelUrl: `${returnUrl}&billing=cancelled`
-            })
-            : await billing.createPortalSession({
-                discordUserId: session.user.id,
-                returnUrl
-            });
-        json(res, 200, { ok: true, url: result.url });
-        return;
+        throw createHttpError(404, 'Not found.');
     }
 
     if (req.method === 'GET' && url.pathname === '/api/guilds') {
@@ -5202,7 +5176,7 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
-    if (req.method === 'GET' && url.pathname === '/api/creator/premium-overview') {
+    if (req.method === 'GET' && url.pathname === '/api/creator/overview') {
         await requireSitePanelAccess(ctx, session);
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
 
@@ -5396,41 +5370,7 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/creator/premium-access') {
-        await requireFounderAccess(session, { recentLogin: true });
-
-        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
-        const body = await parseBody(req);
-        let message;
-
-        try {
-            requireFounderMfa(session, body.mfaCode);
-            const validated = await validateCreatorPremiumAccess(ctx, body);
-            const request = governance.createCriticalAction({
-                scope: 'global',
-                actionType: 'premium-access',
-                payload: validated.payload,
-                summary: validated.summary,
-                requestedByUserId: session.user.id
-            });
-            message = `Modification Premium #${request.id} préparée. Une autre personne autorisée doit la valider.`;
-            addSiteAccessAuditLog({ session, body, status: 'success', summary: message, kind: 'premium' });
-        } catch (error) {
-            addSiteAccessAuditLog({
-                session,
-                body,
-                status: 'failed',
-                summary: error.message || 'Modification Premium refusée.',
-                kind: 'premium'
-            });
-            throw error;
-        }
-
-        json(res, 200, {
-            ok: true,
-            message,
-            overview: await buildCreatorPremiumOverview(ctx, session)
-        });
-        return;
+        throw createHttpError(404, 'Not found.');
     }
 
     if (req.method === 'POST' && url.pathname === '/api/creator/site-staff') {

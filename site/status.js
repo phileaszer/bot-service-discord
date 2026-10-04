@@ -21,11 +21,7 @@
       statusReadFailed: 'Impossible de lire le statut en direct.',
       dashboardReadFailed: 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.',
       noIncidents: 'Aucun incident connu pour le moment.',
-      noMaintenance: 'Aucune maintenance annoncée actuellement.',
-      premiumReady: 'Paiement automatisé actif',
-      premiumManual: 'Accès Premium actif',
-      premiumReadyDetail: 'Les abonnements, factures, échecs et résiliations sont synchronisés automatiquement.',
-      premiumManualDetail: 'Les accès Premium sont actifs. Le paiement en ligne est en cours de configuration.'
+      noMaintenance: 'Aucune maintenance annoncée actuellement.'
     },
     en: {
       unavailable: 'Unavailable',
@@ -39,11 +35,7 @@
       statusReadFailed: 'Unable to read the live status.',
       dashboardReadFailed: 'The page is open, but Sentinel is not responding to the status check.',
       noIncidents: 'No known incident right now.',
-      noMaintenance: 'No maintenance announced right now.',
-      premiumReady: 'Automated billing active',
-      premiumManual: 'Premium access active',
-      premiumReadyDetail: 'Subscriptions, invoices, failures, and cancellations are synchronized automatically.',
-      premiumManualDetail: 'Premium access is active. Online billing is being configured.'
+      noMaintenance: 'No maintenance announced right now.'
     }
   };
 
@@ -102,11 +94,6 @@
     `;
   }
 
-  function renderPremiumStatus(billing = {}) {
-    setText('[data-status-premium-goal]', billing.enabled ? t('premiumReady') : t('premiumManual'));
-    setText('[data-status-premium-detail]', billing.enabled ? t('premiumReadyDetail') : t('premiumManualDetail'));
-  }
-
   function renderStatus(status = {}) {
     setDot('bot', Boolean(status.botOnline));
     setDot('dashboard', Boolean(status.dashboardOnline));
@@ -115,7 +102,6 @@
     setText('[data-status-bot-detail]', t('discordActive'));
     setText('[data-status-dashboard-detail]', t('dashboardAccessible'));
     setText('[data-status-guilds]', status.guildCount === null || status.guildCount === undefined ? t('unavailable') : String(status.guildCount));
-    renderPremiumStatus(status.premiumBilling);
     renderList('[data-status-incidents]', status.incidents, t('noIncidents'));
     renderList('[data-status-maintenance]', status.maintenance ? [status.maintenance] : [], t('noMaintenance'));
   }
@@ -143,7 +129,6 @@
       setText('[data-status-bot-detail]', t('statusReadFailed'));
       setText('[data-status-dashboard-detail]', t('dashboardReadFailed'));
       setText('[data-status-guilds]', t('unavailable'));
-      renderPremiumStatus();
     } finally {
       statusRequestInFlight = false;
     }
@@ -179,8 +164,6 @@
   window.addEventListener('sentinel:site-language-change', () => {
     if (lastStatus) {
       renderStatus(lastStatus);
-    } else {
-      renderPremiumStatus();
     }
   });
 

@@ -34,8 +34,6 @@ const publicCommands = [
 
     command('dashboard', 'dashboard', 'Donne le lien du dashboard web Sentinel.', 'Shows the Sentinel web dashboard link.'),
 
-    command('premium', 'premium', 'Affiche l objectif Premium de Sentinel.', 'Shows the Sentinel Premium goal.'),
-
     command('support', 'support', 'Affiche les liens utiles et le serveur support.', 'Shows useful links and the support server.'),
 
     command('config-langue', 'language', 'Configure la langue de ce serveur.', 'Sets this server language.')
@@ -169,8 +167,8 @@ const publicCommands = [
         .addRoleOption(option =>
             option
                 .setName('role')
-                .setDescription('Role avec un taux horaire Premium specifique')
-                .setDescriptionLocalizations(en('Role with a specific Premium hourly rate'))
+                .setDescription('Role avec un taux horaire specifique')
+                .setDescriptionLocalizations(en('Role with a specific hourly rate'))
                 .setRequired(false)
         )
         .addBooleanOption(option =>
@@ -673,8 +671,6 @@ const publicCommands = [
 
     command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the current Sentinel dossier.'),
 
-    command('dossier-reouvrir', 'reopen-ticket', 'Reouvre un dossier Sentinel Premium encore conserve.', 'Reopens a retained Premium Sentinel dossier.'),
-
     command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel dossier.')
         .addUserOption(option =>
             option
@@ -738,8 +734,6 @@ const advancedCommands = [
     command('sync-sentinel', 'sync-sentinel', 'Synchronise les salons, roles et panneaux Sentinel.', 'Synchronizes Sentinel channels, roles and panels.'),
 
     command('maj-sentinel', 'sentinel-update', 'Indique ou preparer une annonce officielle securisee.', 'Shows where to prepare a secured official update.'),
-
-    command('premium-acces', 'premium-access', 'Consulte les acces Premium Sentinel.', 'Shows Sentinel Premium access.'),
 
     command('reset-heures-all', 'reset-hours-all', 'Reinitialise toutes les heures de service.', 'Resets all service hours.'),
 

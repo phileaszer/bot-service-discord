@@ -63,6 +63,8 @@ const client = new Client({
 });
 
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
+// The paid offer is intentionally suspended. Existing records stay untouched for a future relaunch.
+const PREMIUM_ACCESS_ENABLED = false;
 const DEBUG_INTERACTIONS = String(process.env.DEBUG_INTERACTIONS || '').toLowerCase() === 'true';
 const FREE_HISTORY_LIMIT = 5;
 const FREE_TOP_LIMIT = 10;
@@ -540,14 +542,14 @@ const I18N = {
         customEmbedUploadTooLarge: '❌ Image locale trop lourde. Garde un total maximum de 8 Mo par embed.',
         customEmbedMediaQuotaReached: '❌ Quota d’images atteint pour ce serveur ({used} Mo sur {limit} Mo). Supprime un ancien embed ou libère de l’espace avant de réessayer.',
         customEmbedTooLarge: '❌ Cet embed est trop long. Garde le titre sous 256 caractères, le message sous 4000 caractères et le total sous 6000 caractères.',
-        customEmbedLimitReached: '⭐ Le gratuit permet **{limit}** embeds Sentinel actifs par serveur. Tu peux modifier tes embeds existants sans limite avec `/embed modifier`, supprimer un embed avec `/embed supprimer`, ou passer Premium pour créer en illimité.',
+        customEmbedLimitReached: 'Ce serveur peut conserver **{limit}** embeds Sentinel actifs. Tu peux modifier ou supprimer les embeds existants depuis le dashboard.',
         customEmbedCreated: '✅ Embed Sentinel envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
         customEmbedEdited: '✅ Embed Sentinel `{messageId}` modifié. Les modifications ne consomment pas de quota.',
-        customEmbedDeleted: '✅ Embed Sentinel `{messageId}` supprimé. Son emplacement gratuit est libéré.',
+        customEmbedDeleted: '✅ Embed Sentinel `{messageId}` supprimé. Son emplacement est libéré.',
         customEmbedNotFound: '❌ Aucun embed Sentinel géré ne correspond à cet ID.',
         customEmbedNoEditFields: '❌ Indique au moins un champ à modifier : titre, message, couleur, image, miniature ou footer.',
-        customEmbedQuotaFree: 'Quota gratuit : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
-        customEmbedQuotaUnlimited: 'Quota Premium : accès illimité aux embeds.',
+        customEmbedQuotaFree: 'Quota : **{used}/{limit}** embeds actifs utilisés. Restant : **{remaining}**.',
+        customEmbedQuotaUnlimited: 'Quota sans limite.',
         dossierPanelTitle: 'Sentinel | Bureau d’accueil',
         dossierPanelDescription: '`Accueil confidentiel`\nChoisis la nature de ta demande. Sentinel préparera un espace réservé avec les personnes habilitées et gardera le suivi dans un dossier clair.',
         dossierPanelAccessName: 'Accueil',
@@ -571,17 +573,17 @@ const I18N = {
         dossierAlreadyOpen: 'Tu as déjà un dossier ouvert : {channel}',
         dossierCooldown: '⏳ Attends encore **{time}** avant d’ouvrir un nouveau dossier.',
         dossierPanelCooldown: '⏳ Le panneau vient déjà d’être utilisé. Réessaie dans **{time}**.',
-        dossierPanelLimitReached: '⭐ La version gratuite permet **{limit}** panneau de dossiers par serveur. Tu peux garder ce panneau, ou passer Premium pour publier plusieurs bureaux d’accueil.',
-        dossierOpenLimitReached: '⭐ Ce serveur a déjà **{limit}** dossiers ouverts. Ferme un dossier terminé, ou passe Premium pour ouvrir plus de dossiers en même temps.',
+        dossierPanelLimitReached: 'Ce serveur peut conserver **{limit}** panneau de dossiers. Garde ce panneau ou supprime-le avant d’en publier un autre.',
+        dossierOpenLimitReached: 'Ce serveur a déjà **{limit}** dossiers ouverts. Ferme un dossier terminé avant d’en ouvrir un autre.',
         dossierCreated: 'Dossier créé : {channel}',
         dossierNotInDossier: 'Ce bouton doit être utilisé dans un dossier Sentinel.',
         dossierCloseDenied: 'Seul le demandeur ou un membre autorisé peut clôturer ce dossier.',
         dossierClosed: 'Dossier clôturé. Le compte rendu a été transmis, puis l’espace va être fermé.',
         dossierClaimed: 'Dossier pris en charge par {member}.',
         dossierClaimDenied: 'Tu dois avoir un rôle autorisé pour prendre en charge ce dossier.',
-        dossierClaimPremiumOnly: '⭐ Les options Premium des dossiers concernent surtout les volumes, les formulaires, les priorités et les automatisations.',
+        dossierClaimPremiumOnly: 'Cette option de dossier est indisponible pour le moment.',
         dossierStatusDenied: 'Tu dois avoir un rôle autorisé pour modifier le statut du dossier.',
-        dossierStatusPremiumOnly: '⭐ Les options Premium des dossiers concernent surtout les volumes, les formulaires, les priorités et les automatisations.',
+        dossierStatusPremiumOnly: 'Cette option de dossier est indisponible pour le moment.',
         dossierStatusUpdated: 'Statut du dossier mis à jour : **{status}**.',
         dossierRoleAdded: '✅ {role} peut maintenant prendre en charge et gérer les dossiers Sentinel.',
         dossierRoleRemoved: '✅ {role} ne peut plus prendre en charge les dossiers Sentinel.',
@@ -793,14 +795,14 @@ const I18N = {
         customEmbedUploadTooLarge: '❌ Local image too large. Keep the total under 8 MB per embed.',
         customEmbedMediaQuotaReached: '❌ This server reached its image quota ({used} MB of {limit} MB). Delete an older embed or free storage before trying again.',
         customEmbedTooLarge: '❌ This embed is too long. Keep the title under 256 characters, the message under 4000 characters, and the total under 6000 characters.',
-        customEmbedLimitReached: '⭐ Free servers can keep **{limit}** active Sentinel embeds. You can edit existing embeds without limit with `/embed edit`, delete one with `/embed delete`, or upgrade to Premium for unlimited creation.',
+        customEmbedLimitReached: 'This server can keep **{limit}** active Sentinel embeds. You can edit or delete existing embeds from the dashboard.',
         customEmbedCreated: '✅ Sentinel embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
         customEmbedEdited: '✅ Sentinel embed `{messageId}` edited. Edits do not use quota.',
-        customEmbedDeleted: '✅ Sentinel embed `{messageId}` deleted. Its free slot is now available.',
+        customEmbedDeleted: '✅ Sentinel embed `{messageId}` deleted. Its slot is now available.',
         customEmbedNotFound: '❌ No managed Sentinel embed matches this ID.',
         customEmbedNoEditFields: '❌ Provide at least one field to edit: title, message, color, image, thumbnail, or footer.',
-        customEmbedQuotaFree: 'Free quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
-        customEmbedQuotaUnlimited: 'Premium quota: unlimited embed access.',
+        customEmbedQuotaFree: 'Quota: **{used}/{limit}** active embeds used. Remaining: **{remaining}**.',
+        customEmbedQuotaUnlimited: 'Unlimited quota.',
         dossierPanelTitle: 'Sentinel | Reception desk',
         dossierPanelDescription: '`Confidential reception`\nChoose the nature of your request. Sentinel will prepare a reserved space with authorized personnel and keep the follow-up inside one clear dossier.',
         dossierPanelAccessName: 'Reception',
@@ -824,17 +826,17 @@ const I18N = {
         dossierAlreadyOpen: 'You already have an open dossier: {channel}',
         dossierCooldown: '⏳ Wait another **{time}** before opening a new dossier.',
         dossierPanelCooldown: '⏳ This panel was just used. Try again in **{time}**.',
-        dossierPanelLimitReached: '⭐ The free version allows **{limit}** dossier panel per server. Keep this panel, or upgrade to Premium to publish multiple reception desks.',
-        dossierOpenLimitReached: '⭐ This server already has **{limit}** open dossiers. Close a completed dossier, or upgrade to Premium to keep more dossiers open at once.',
+        dossierPanelLimitReached: 'This server can keep **{limit}** dossier panel. Keep this panel or delete it before publishing another one.',
+        dossierOpenLimitReached: 'This server already has **{limit}** open dossiers. Close a completed dossier before opening another one.',
         dossierCreated: 'Dossier created: {channel}',
         dossierNotInDossier: 'This button must be used inside a Sentinel dossier.',
         dossierCloseDenied: 'Only the requester or an authorized member can close this dossier.',
         dossierClosed: 'Dossier closed. The written record has been sent, then the space will be sealed.',
         dossierClaimed: 'Dossier taken over by {member}.',
         dossierClaimDenied: 'You need an authorized role to take over this dossier.',
-        dossierClaimPremiumOnly: '⭐ Premium dossier options mainly cover volume, forms, priorities, and automations.',
+        dossierClaimPremiumOnly: 'This dossier option is currently unavailable.',
         dossierStatusDenied: 'You need an authorized role to update this dossier status.',
-        dossierStatusPremiumOnly: '⭐ Premium dossier options mainly cover volume, forms, priorities, and automations.',
+        dossierStatusPremiumOnly: 'This dossier option is currently unavailable.',
         dossierStatusUpdated: 'Dossier status updated: **{status}**.',
         dossierRoleAdded: '✅ {role} can now take over and manage Sentinel dossiers.',
         dossierRoleRemoved: '✅ {role} can no longer take over Sentinel dossiers.',
@@ -2021,6 +2023,10 @@ function getAdvancedGuildIds() {
 }
 
 function isAdvancedGuild(guildId) {
+    if (!PREMIUM_ACCESS_ENABLED) {
+        return false;
+    }
+
     return Boolean(guildId && (
         getAdvancedGuildIds().includes(String(guildId))
         || isManualPremiumGuild(guildId)
@@ -2168,6 +2174,10 @@ function hasCachedReferencePremiumSubscription(userId) {
 }
 
 function hasAdvancedAccess(member, guildId = null) {
+    if (!PREMIUM_ACCESS_ENABLED) {
+        return false;
+    }
+
     const resolvedGuildId = guildId || member?.guild?.id;
 
     return Boolean(resolvedGuildId && (
@@ -2191,11 +2201,9 @@ function isAdvancedTextCommand(content) {
 }
 
 function getAdvancedUnavailableMessage(language = 'fr', commandName = null) {
-    if (commandName === 'reset-heures-all') {
-        return t(language, 'resetAllPremiumOnly');
-    }
-
-    return t(language, 'unavailable');
+    return language === 'en'
+        ? 'This command is currently unavailable.'
+        : 'Cette commande est indisponible pour le moment.';
 }
 
 function clampNumber(value, min, max) {
@@ -2506,6 +2514,10 @@ function getAutomodSettings(guildId) {
 }
 
 function hasActivePremiumUnlockForAutomod(guildId, settings = null) {
+    if (!PREMIUM_ACCESS_ENABLED) {
+        return false;
+    }
+
     if (isAdvancedGuild(guildId)) {
         return true;
     }
@@ -4045,8 +4057,8 @@ function markDossierReminder(guildId, channelId) {
 async function reopenDossierChannel(guild, channel, actor, language = 'fr', options = {}) {
     if (!isAdvancedGuild(guild.id) && !options.advanced) {
         throw new Error(language === 'en'
-            ? 'Dossier reopening is reserved for Premium servers.'
-            : 'La réouverture des dossiers est réservée aux serveurs Premium.');
+            ? 'Dossier reopening is currently unavailable.'
+            : 'La réouverture des dossiers est indisponible pour le moment.');
     }
 
     const dossier = reopenDossierRecord(guild.id, channel.id);
@@ -10319,7 +10331,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     {
                         name: 'Inside a dossier',
                         value: [
-                            'Free servers can reply, add participants, prepare a written record, and close the dossier.',
+                            'Teams can reply, add participants, prepare a written record, and close the dossier.',
                             '`/ticket-roles action:add role:@role` gives a role access to dossier handling.',
                             '`/ticket-claim` marks you as the dossier referent.',
                             '`/ticket-status status:...` updates the visible status if the requester made a mistake or the situation changes.',
@@ -10330,21 +10342,20 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         ].join('\n')
                     },
                     {
-                        name: 'Free / Premium',
+                        name: 'Capacity',
                         value: [
-                            `Free servers: ${FREE_DOSSIER_PANEL_LIMIT} panel, ${FREE_OPEN_DOSSIER_LIMIT} open dossiers, ${FREE_DOSSIER_HISTORY_LIMIT} visible recent dossiers.`,
-                            'Premium: unlimited panels, custom categories, advanced forms, priorities, templates, full history, statistics, and automations.'
+                            `${FREE_DOSSIER_PANEL_LIMIT} panel, ${FREE_OPEN_DOSSIER_LIMIT} open dossiers, and ${FREE_DOSSIER_HISTORY_LIMIT} visible recent dossiers.`
                         ].join('\n')
                     }
                 ]
             },
             {
                 id: 'commands',
-                label: 'Free commands',
-                menuDescription: 'The main free service commands.',
+                label: 'Commands',
+                menuDescription: 'The main Sentinel service commands.',
                 emoji: '📋',
-                title: 'Sentinel | Free commands',
-                description: 'The free version keeps the essentials visible and simple.',
+                title: 'Sentinel | Commands',
+                description: 'The available actions stay visible and simple.',
                 fields: [
                     {
                         name: 'Members',
@@ -10360,7 +10371,6 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         value: [
                             '`/dashboard` gives the web dashboard link.',
                             '`/support` gives official support links.',
-                            '`/premium` shows the current access and advanced Premium tools.',
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/payroll-config` sets the global hourly RP amount.',
                             '`/weekly-payroll` shows who is paid or still to pay this week.',
@@ -10369,7 +10379,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/payroll-archive` archives the current week payroll.',
                             '`/autorole-config` manages the role given to new members.',
                             '`/embed create` sends an announcement as Sentinel.',
-                            'Free servers can keep 2 active Sentinel embeds. Edits are unlimited.'
+                            'Servers can keep 2 active Sentinel embeds. Edits are unlimited.'
                         ].join('\n')
                     }
                 ]
@@ -10383,7 +10393,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 description: 'Sentinel checks Discord permissions and role hierarchy before every sanction.',
                 fields: [
                     {
-                        name: 'Free moderation',
+                        name: 'Moderation actions',
                         value: [
                             '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
                             '`/autorole-config` can give a role automatically when a member joins.',
@@ -10399,13 +10409,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             },
             {
                 id: 'limits',
-                label: isReferenceServer ? 'Reference server' : 'Free limits',
-                menuDescription: isReferenceServer ? 'What is open on the reference server.' : 'What free servers can use today.',
+                label: isReferenceServer ? 'Reference server' : 'Limits',
+                menuDescription: isReferenceServer ? 'What is open on the reference server.' : 'Current Sentinel limits.',
                 emoji: '⭐',
-                title: isReferenceServer ? 'Sentinel | Reference server' : 'Sentinel | Free limits',
+                title: isReferenceServer ? 'Sentinel | Reference server' : 'Sentinel | Limits',
                 description: isReferenceServer
                     ? 'This server has access to the complete Sentinel command set.'
-                    : 'The free version stays useful, while larger tools are available with Premium.',
+                    : 'Current capacity for this server.',
                 fields: isReferenceServer
                     ? [
                         {
@@ -10420,13 +10430,12 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     ]
                     : [
                         {
-                            name: 'Free access',
+                            name: 'Available capacity',
                             value: [
                                 `Personal history: last ${FREE_HISTORY_LIMIT} sessions.`,
                                 `Public ranking: top ${FREE_TOP_LIMIT}.`,
                                 `Sentinel embeds: ${FREE_CUSTOM_EMBED_LIMIT} active embeds, unlimited edits.`,
-                                '`/reset-hours-all` is reserved for Sentinel Premium.',
-                                'Premium access is managed from the Sentinel dashboard.'
+                                'Global hour resets are currently unavailable.'
                             ].join('\n')
                         }
                     ]
@@ -10507,7 +10516,6 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/config-voir` affiche les réglages du poste.',
                         '`/dashboard` ouvre la console de gestion.',
                         '`/support` affiche les accès officiels.',
-                        '`/premium` affiche la progression avant l’ouverture Premium.',
                         '`/diagnostic` vérifie les accès et l’ordre des grades.',
                         '`/ping` vérifie que Sentinel et ses registres répondent.'
                     ].join('\n')
@@ -10637,22 +10645,20 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     {
                         name: 'Suivi du dossier',
                         value: [
-                            'En gratuit, l’équipe peut répondre, ajouter des intervenants, préparer un compte rendu et clôturer le dossier.',
+                            'L’équipe peut répondre, ajouter des intervenants, préparer un compte rendu et clôturer le dossier.',
                             '`/dossier-roles action:ajouter role:@rôle` donne accès à la gestion des dossiers.',
                             '`/dossier-prendre` te marque comme référent du dossier.',
                             '`/dossier-statut statut:...` corrige le statut visible si le demandeur s’est trompé ou si la situation change.',
                             '`/dossier-fermer` demande le motif et la résolution, archive tout le dossier puis le scelle.',
-                            '`/dossier-reouvrir` rouvre un dossier Premium encore conservé.',
                             '`/dossier-ajouter membre:@membre` ajoute un intervenant.',
                             '`/dossier-retirer membre:@membre` retire un intervenant.',
                             '`/dossier-compte-rendu` envoie le compte rendu dans le salon de logs quand c’est possible.'
                         ].join('\n')
                     },
                     {
-                        name: 'Gratuit / Premium',
+                        name: 'Capacité',
                         value: [
-                            `Serveur gratuit : ${FREE_DOSSIER_PANEL_LIMIT} panneau, ${FREE_OPEN_DOSSIER_LIMIT} dossiers ouverts, ${FREE_DOSSIER_HISTORY_LIMIT} derniers dossiers visibles.`,
-                            'Premium : panneaux illimités, routage, formulaires avancés, réponses préparées, recherche d’archives, réouverture, délais et statistiques.'
+                            `${FREE_DOSSIER_PANEL_LIMIT} panneau, ${FREE_OPEN_DOSSIER_LIMIT} dossiers ouverts et ${FREE_DOSSIER_HISTORY_LIMIT} derniers dossiers visibles.`
                         ].join('\n')
                     }
                 ]
@@ -10662,8 +10668,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Répertoire',
             menuDescription: 'Les commandes ouvertes à tous les serveurs.',
             emoji: '📋',
-            title: 'Sentinel | Répertoire gratuit',
-            description: 'Le répertoire gratuit garde les actions essentielles, sans noyer les équipes.',
+            title: 'Sentinel | Répertoire',
+            description: 'Le répertoire garde les actions essentielles, sans noyer les équipes.',
             fields: [
                 {
                     name: 'Agents',
@@ -10679,7 +10685,6 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     value: [
                         '`/dashboard` donne le lien de la console.',
                         '`/support` donne les accès officiels.',
-                        '`/premium` indique l’accès actuel et les outils Premium.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/config-paie` règle le montant horaire RP.',
                         '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
@@ -10687,7 +10692,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/paie-marquer paye:true membre:@membre` marque une ligne comme payée ou non payée.',
                         '`/config-autorole` gère le rôle donné automatiquement aux nouveaux membres.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
-                        `Le gratuit garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
+                        `Le serveur garde ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs. Les modifications sont illimitées.`
                     ].join('\n')
                 }
             ]
@@ -10701,7 +10706,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             description: 'Sentinel vérifie les accès et l’ordre des grades avant chaque mesure.',
             fields: [
                 {
-                    name: 'Mesures gratuites',
+                    name: 'Mesures disponibles',
                     value: [
                         '`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`.',
                         '`/config-autorole` peut donner un grade automatiquement quand un membre rejoint.',
@@ -10717,13 +10722,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
         },
         {
             id: 'limits',
-            label: isReferenceServer ? 'Accès complet' : 'Accès gratuit',
-            menuDescription: isReferenceServer ? 'Ce qui est ouvert ici.' : 'Ce que les serveurs gratuits peuvent utiliser.',
+            label: isReferenceServer ? 'Accès complet' : 'Capacité',
+            menuDescription: isReferenceServer ? 'Ce qui est ouvert ici.' : 'Les limites actuelles du serveur.',
             emoji: '⭐',
-            title: isReferenceServer ? 'Sentinel | Accès complet' : 'Sentinel | Accès gratuit',
+            title: isReferenceServer ? 'Sentinel | Accès complet' : 'Sentinel | Capacité',
             description: isReferenceServer
                 ? 'Ce serveur dispose de l’ensemble du registre Sentinel.'
-                : 'Le gratuit reste opérationnel, les outils de grande équipe passent par le Premium.',
+                : 'Capacité actuelle de Sentinel pour ce serveur.',
             fields: isReferenceServer
                 ? [
                     {
@@ -10738,13 +10743,12 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 ]
                 : [
                     {
-                        name: 'Accès gratuit',
+                        name: 'Capacité disponible',
                         value: [
                             `Historique personnel : ${FREE_HISTORY_LIMIT} derniers services.`,
                             `Registre public : top ${FREE_TOP_LIMIT}.`,
                             `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs, modifications illimitées.`,
-                            '`/reset-heures-all` est réservé à Sentinel Premium.',
-                            'L’accès Premium se gère depuis le dashboard Sentinel.'
+                            'La remise à zéro générale est indisponible pour le moment.'
                         ].join('\n')
                     }
                 ]
@@ -15476,14 +15480,16 @@ client.on(Events.InteractionCreate, async interaction => {
 
         if (commandName === 'premium') {
             return interaction.reply({
-                embeds: [buildPremiumEmbed(interaction.guild, interaction.user, interaction.member)],
-                components: buildPremiumComponents(language),
+                content: getAdvancedUnavailableMessage(language),
                 flags: MessageFlags.Ephemeral
             });
         }
 
         if (commandName === 'premium-acces') {
-            return handlePremiumAccessCommand(interaction, language);
+            return interaction.reply({
+                content: getAdvancedUnavailableMessage(language),
+                flags: MessageFlags.Ephemeral
+            });
         }
 
         if (commandName === 'support') {
@@ -15494,7 +15500,7 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
-        if (isAdvancedCommand(commandName) && !hasAdvancedAccess(interaction.member)) {
+        if (isAdvancedCommand(commandName) && commandName !== 'maj-sentinel' && !hasAdvancedAccess(interaction.member)) {
             return interaction.reply({
                 content: getAdvancedUnavailableMessage(language, commandName),
                 flags: MessageFlags.Ephemeral
@@ -16771,10 +16777,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     if (/^!premium$/i.test(content)) {
-        return message.reply({
-            embeds: [buildPremiumEmbed(message.guild, message.author, message.member)],
-            components: buildPremiumComponents(language)
-        });
+        return message.reply(getAdvancedUnavailableMessage(language));
     }
 
     if (/^!support$/i.test(content)) {
