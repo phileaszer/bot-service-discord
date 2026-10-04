@@ -608,6 +608,120 @@ CREATE TABLE IF NOT EXISTS sentinel_validation_runs (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS founder_mfa (
+    user_id TEXT PRIMARY KEY,
+    secret_encrypted TEXT,
+    pending_secret_encrypted TEXT,
+    recovery_code_hashes_json TEXT NOT NULL DEFAULT '[]',
+    enabled INTEGER NOT NULL DEFAULT 0,
+    last_counter INTEGER,
+    enabled_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS critical_action_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL,
+    guild_id TEXT,
+    action_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    requested_by_user_id TEXT NOT NULL,
+    approved_by_user_id TEXT,
+    rejected_by_user_id TEXT,
+    decision_reason TEXT,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    decided_at TEXT,
+    executed_at TEXT,
+    error_message TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS member_notification_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    period_key TEXT NOT NULL,
+    frequency TEXT NOT NULL,
+    status TEXT NOT NULL,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    message_id TEXT,
+    error_message TEXT,
+    attempted_at TEXT NOT NULL,
+    delivered_at TEXT,
+    UNIQUE (guild_id, user_id, period_key)
+);
+
+CREATE TABLE IF NOT EXISTS premium_billing_customers (
+    discord_user_id TEXT PRIMARY KEY,
+    stripe_customer_id TEXT NOT NULL UNIQUE,
+    email TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS premium_billing_subscriptions (
+    stripe_subscription_id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    discord_user_id TEXT,
+    stripe_customer_id TEXT NOT NULL,
+    stripe_price_id TEXT,
+    status TEXT NOT NULL,
+    current_period_end TEXT,
+    cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+    payment_failure_at TEXT,
+    grace_ends_at TEXT,
+    latest_invoice_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS premium_billing_invoices (
+    stripe_invoice_id TEXT PRIMARY KEY,
+    stripe_subscription_id TEXT,
+    guild_id TEXT,
+    stripe_customer_id TEXT,
+    status TEXT NOT NULL,
+    currency TEXT,
+    amount_due INTEGER NOT NULL DEFAULT 0,
+    amount_paid INTEGER NOT NULL DEFAULT 0,
+    amount_refunded INTEGER NOT NULL DEFAULT 0,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    hosted_invoice_url TEXT,
+    invoice_pdf TEXT,
+    paid_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS premium_billing_refunds (
+    stripe_refund_id TEXT PRIMARY KEY,
+    stripe_charge_id TEXT,
+    stripe_invoice_id TEXT,
+    guild_id TEXT,
+    amount INTEGER NOT NULL DEFAULT 0,
+    currency TEXT,
+    status TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS premium_billing_events (
+    stripe_event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    livemode INTEGER NOT NULL DEFAULT 0,
+    payload_sha256 TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error_message TEXT,
+    received_at TEXT NOT NULL,
+    processed_at TEXT,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -772,6 +886,24 @@ ON simulation_runs (guild_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_validation_runs_guild
 ON sentinel_validation_runs (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_critical_actions_scope_status
+ON critical_action_requests (scope, guild_id, status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_member_notification_deliveries_user
+ON member_notification_deliveries (guild_id, user_id, attempted_at);
+
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_guild_status
+ON premium_billing_subscriptions (guild_id, status, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_customer
+ON premium_billing_subscriptions (stripe_customer_id, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_guild
+ON premium_billing_invoices (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_billing_events_received
+ON premium_billing_events (received_at);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
@@ -866,6 +998,21 @@ if (!scheduledAnnouncementColumns.includes('approved_by_user_id')) {
 
 if (!scheduledAnnouncementColumns.includes('approved_at')) {
     db.prepare('ALTER TABLE scheduled_announcements ADD COLUMN approved_at TEXT').run();
+}
+
+const userNotificationPreferenceColumns = db.prepare('PRAGMA table_info(user_notification_preferences)').all()
+    .map(column => column.name);
+
+if (!userNotificationPreferenceColumns.includes('digest_frequency')) {
+    db.prepare("ALTER TABLE user_notification_preferences ADD COLUMN digest_frequency TEXT NOT NULL DEFAULT 'none'").run();
+}
+
+if (!userNotificationPreferenceColumns.includes('next_digest_at')) {
+    db.prepare('ALTER TABLE user_notification_preferences ADD COLUMN next_digest_at TEXT').run();
+}
+
+if (!userNotificationPreferenceColumns.includes('last_digest_at')) {
+    db.prepare('ALTER TABLE user_notification_preferences ADD COLUMN last_digest_at TEXT').run();
 }
 
 if (!dashboardSessionColumns.includes('ip_hash')) {

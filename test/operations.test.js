@@ -114,6 +114,24 @@ test('member preferences cannot affect another guild record', () => {
     assert.equal(operations.getUserNotificationPreferences('100000000000000009', userId).payrollEnabled, true);
 });
 
+test('member digest scheduling and delivery history stay scoped to the member', () => {
+    const preferences = operations.updateUserNotificationPreferences(guildId, userId, {
+        digestFrequency: 'daily'
+    });
+    assert.equal(preferences.digestFrequency, 'daily');
+    assert.ok(preferences.nextDigestAt);
+    db.prepare(`
+        UPDATE user_notification_preferences SET next_digest_at = ? WHERE guild_id = ? AND user_id = ?
+    `).run(new Date(Date.now() - 1000).toISOString(), guildId, userId);
+    const due = operations.getDueMemberDigests().find(item => item.guildId === guildId && item.userId === userId);
+    assert.ok(due);
+    operations.completeMemberDigest(due, { messageId: '100000000000000007', itemCount: 2 });
+    const history = operations.getMemberDigestHistory(guildId, userId);
+    assert.equal(history[0].status, 'delivered');
+    assert.equal(history[0].itemCount, 2);
+    assert.equal(operations.getMemberDigestHistory('100000000000000009', userId).length, 0);
+});
+
 test('site access capabilities keep founder, staff and member boundaries distinct', () => {
     const founder = siteCapabilities(SITE_ACCESS_ROLES.FOUNDER);
     const staff = siteCapabilities(SITE_ACCESS_ROLES.STAFF);

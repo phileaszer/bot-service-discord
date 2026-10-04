@@ -25,6 +25,8 @@ let dossierArchiveMatches = [];
 let dossierArchiveItemIds = [];
 let creatorOverview = null;
 let creatorOverviewLoading = false;
+let founderMfaCode = '';
+let founderMfaSetup = null;
 let canViewPremiumOverview = false;
 let currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
 let dashboardHydrating = false;
@@ -280,7 +282,9 @@ function forgetLastGuildId(guildId = null) {
 }
 
 function getRestorableGuildIds() {
+  const queryGuildId = new URLSearchParams(window.location.search).get('guild');
   const candidates = [
+    /^\d{17,20}$/.test(String(queryGuildId || '')) ? queryGuildId : null,
     readStoredLastGuildId(),
     currentSettings?.lastGuildId
   ].filter((guildId, index, list) => guildId && list.indexOf(guildId) === index);
@@ -1627,6 +1631,7 @@ function renderServerHome(state, premiumBadge) {
       ${dashboardPath(state)}
       ${planScopeCards(state)}
       <div class="server-home-grid pro-home-grid">
+        ${guildBillingPanel(state)}
         <article class="home-block home-block-config">
           <div class="home-block-heading">
             <h3>Configuration</h3>
@@ -1695,6 +1700,7 @@ function renderPremiumHome(state, premiumBadge) {
         <article><span>Dossiers ouverts</span><strong>${escapeHtml(openDossiers)}</strong></article>
         <article><span>Protection</span><strong>Renforcée</strong></article>
       </div>
+      ${guildBillingPanel(state)}
       ${notificationCenter(state, true)}
       ${premiumNavigationCards()}
     </section>
@@ -4761,6 +4767,7 @@ function warningEscalationPanel(state, premiumTag) {
 }
 
 function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premiumTag) {
+  const pendingCritical = (state.criticalActions || []).filter(item => item.status === 'pending');
   return `
     <section class="dashboard-panel premium-panel module-panel premium-view-panel" id="moderation">
       <div class="panel-heading row-heading">
@@ -4826,10 +4833,12 @@ function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premi
         ${automodPremiumPanel(state, premiumTag)}
         ${warningEscalationPanel(state, premiumTag)}
         <form data-action-form="reset-guild">
-          ${labelHelp('Remise à zéro générale', 'Remet à zéro toutes les heures de service du serveur.', ` ${premiumTag}`)}
-          <button class="button" type="submit">Réinitialiser</button>
+          ${labelHelp('Remise à zéro générale', 'Prépare la remise à zéro de toutes les heures. Un autre responsable devra la valider.', ` ${premiumTag}`)}
+          <input name="confirmation" autocomplete="off" placeholder="REINITIALISER" required>
+          <button class="button" type="submit">Demander la remise à zéro</button>
         </form>
       </div>
+      ${pendingCritical.length ? `<div class="maintenance-file-list"><h3>Validations en attente</h3>${pendingCritical.map(item => `<div class="maintenance-file-row"><span><strong>#${escapeHtml(item.id)}</strong><small>${escapeHtml(item.summary)}</small></span>${String(item.requestedByUserId) !== String(currentUser?.id) ? `<span class="maintenance-file-actions"><button class="button button-small" type="button" data-guild-critical-action="approve-critical-action" data-request-id="${escapeHtml(item.id)}">Approuver</button><button class="button button-small button-ghost" type="button" data-guild-critical-action="reject-critical-action" data-request-id="${escapeHtml(item.id)}">Refuser</button></span>` : '<small>Validation par une autre personne requise</small>'}</div>`).join('')}</div>` : ''}
     </section>
   `;
 }
@@ -5584,6 +5593,102 @@ function founderStoragePanel(overview) {
   `;
 }
 
+function founderSecurityPanel(overview) {
+  if (!overview?.access?.isFounder) return '';
+  const status = overview.founderMfa || {};
+  return `
+    <section class="founder-storage-panel" aria-label="Double sécurité fondatrice">
+      <div class="panel-heading row-heading">
+        <div><p class="eyebrow">Identité renforcée</p><h3>Double sécurité fondatrice</h3><p class="muted">Les restaurations, annonces globales, accès staff et changements Premium exigent cette vérification.</p></div>
+        ${statusBadge(status.enabled ? 'Active' : 'À configurer', Boolean(status.enabled))}
+      </div>
+      ${status.enabled ? `
+        <label><span>Code à usage unique ou code de secours</span><input data-founder-mfa-code type="password" inputmode="numeric" autocomplete="one-time-code" value="${escapeHtml(founderMfaCode)}" placeholder="Code de sécurité"></label>
+        <p class="muted">Une validation reste valable cinq minutes dans cette session. Codes de secours restants : ${escapeHtml(status.recoveryCodesRemaining || 0)}.</p>
+        <form data-founder-mfa-form><input type="hidden" name="action" value="disable"><input name="code" type="password" autocomplete="one-time-code" placeholder="Code pour désactiver" required><button class="button button-small button-ghost" type="submit">Désactiver</button></form>
+      ` : `
+        <button class="button button-small" type="button" data-founder-mfa-setup>Préparer l’authentificateur</button>
+        ${founderMfaSetup ? `
+          <div class="founder-console-note"><strong>Secret à enregistrer maintenant</strong><span><code>${escapeHtml(founderMfaSetup.secret)}</code></span><small>Ajoute-le dans ton application d’authentification, puis garde les codes de secours hors du site.</small></div>
+          <div class="maintenance-file-list">${(founderMfaSetup.recoveryCodes || []).map(code => `<code>${escapeHtml(code)}</code>`).join(' ')}</div>
+        ` : status.setupPending ? '<p class="muted">Une configuration est en attente. Tu peux la recommencer pour afficher un nouveau secret.</p>' : ''}
+        <form data-founder-mfa-form><input type="hidden" name="action" value="enable"><input name="code" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Code à 6 chiffres" required><button class="button button-small" type="submit">Activer</button></form>
+      `}
+    </section>
+  `;
+}
+
+function criticalActionsPanel(overview) {
+  const actions = overview?.criticalActions || [];
+  if (!actions.length) return '';
+  const labels = { 'premium-access': 'Accès Premium', 'restore-backup': 'Restauration', 'official-update': 'Annonce globale', 'reset-guild': 'Remise à zéro' };
+  return `
+    <section class="founder-storage-panel" aria-label="Validations critiques">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Double validation</p><h3>Actions critiques</h3><p class="muted">Le demandeur ne peut jamais valider sa propre action.</p></div></div>
+      <div class="maintenance-file-list">
+        ${actions.slice(0, 30).map(item => `
+          <div class="maintenance-file-row">
+            <span><strong>#${escapeHtml(item.id)} · ${escapeHtml(labels[item.actionType] || item.actionType)}</strong><small>${escapeHtml(item.summary)}</small><small>${escapeHtml(item.status)} · ${escapeHtml(formatAuditDate(item.createdAt))}</small></span>
+            ${item.status === 'pending' && String(item.requestedByUserId) !== String(currentUser?.id) ? `<span class="maintenance-file-actions"><button class="button button-small" type="button" data-critical-action="approve" data-request-id="${escapeHtml(item.id)}">Approuver</button><button class="button button-small button-ghost" type="button" data-critical-action="reject" data-request-id="${escapeHtml(item.id)}">Refuser</button></span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function founderBillingPanel(overview) {
+  const billing = overview?.billing;
+  if (!billing) return '';
+  const money = (amount, currency = 'eur') => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: String(currency || 'eur').toUpperCase() }).format((Number(amount) || 0) / 100);
+  return `
+    <section class="founder-storage-panel" aria-label="Suivi des abonnements Premium">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Facturation Premium</p><h3>Abonnements, factures et remboursements</h3><p class="muted">Les droits sont synchronisés par les événements signés du prestataire.</p></div>${statusBadge(billing.status?.enabled ? `Stripe ${billing.status.mode}` : 'À configurer', Boolean(billing.status?.enabled))}</div>
+      <div class="dashboard-metrics dashboard-kpis">
+        <article class="dashboard-kpi"><span>Abonnements suivis</span><strong>${escapeHtml(billing.subscriptions?.length || 0)}</strong></article>
+        <article class="dashboard-kpi"><span>Factures</span><strong>${escapeHtml(billing.invoices?.length || 0)}</strong></article>
+        <article class="dashboard-kpi"><span>Remboursements</span><strong>${escapeHtml(billing.refunds?.length || 0)}</strong></article>
+        <article class="dashboard-kpi"><span>Événements en échec</span><strong>${escapeHtml(billing.failedEvents?.length || 0)}</strong></article>
+      </div>
+      <div class="maintenance-file-list">
+        ${(billing.invoices || []).slice(0, 12).map(invoice => `<div class="maintenance-file-row"><span><strong>${escapeHtml(invoice.guildId || 'Serveur non rattaché')} · ${escapeHtml(money(invoice.amountPaid || invoice.amountDue, invoice.currency))}</strong><small>${escapeHtml(invoice.status)} · ${escapeHtml(formatAuditDate(invoice.createdAt))}</small></span>${invoice.hostedInvoiceUrl ? `<a class="button button-small button-ghost" href="${escapeHtml(invoice.hostedInvoiceUrl)}" target="_blank" rel="noopener">Facture</a>` : ''}</div>`).join('') || '<p class="muted">Aucune facture synchronisée.</p>'}
+      </div>
+    </section>
+  `;
+}
+
+function founderOfficialUpdatePanel(overview) {
+  if (!overview?.access?.isFounder) return '';
+  return `
+    <section class="founder-storage-panel" aria-label="Annonce globale Sentinel">
+      <div class="panel-heading"><p class="eyebrow">Publication protégée</p><h3>Annonce globale</h3><p class="muted">La publication reste en attente jusqu’à la validation d’une autre personne autorisée.</p></div>
+      <form data-founder-official-update class="operation-form-grid">
+        <input name="titleFr" maxlength="256" placeholder="Titre français" required>
+        <textarea name="bodyFr" maxlength="4000" placeholder="Message français" required></textarea>
+        <input name="titleEn" maxlength="256" placeholder="Titre anglais facultatif">
+        <textarea name="bodyEn" maxlength="4000" placeholder="Message anglais facultatif"></textarea>
+        <label><input name="includeSubscribers" type="checkbox"><span>Diffuser aux serveurs ayant configuré un salon de nouveautés</span></label>
+        <button class="button" type="submit">Soumettre à validation</button>
+      </form>
+    </section>
+  `;
+}
+
+function guildBillingPanel(state) {
+  const billing = state?.billing;
+  if (!billing) return '';
+  const subscription = billing.subscription;
+  const canStartCheckout = !subscription || ['canceled', 'incomplete_expired'].includes(subscription.status);
+  const status = subscription?.entitled ? 'Premium actif' : (subscription?.status || 'Aucun abonnement');
+  return `
+    <article class="home-block">
+      <div class="home-block-heading"><div><p class="eyebrow">Abonnement</p><h3>${escapeHtml(status)}</h3></div>${statusBadge(status, Boolean(subscription?.entitled))}</div>
+      <p class="muted">${subscription?.currentPeriodEnd ? `Période actuelle jusqu’au ${escapeHtml(formatAuditDate(subscription.currentPeriodEnd))}.` : 'L’activation et le retrait du Premium sont synchronisés automatiquement après paiement.'}</p>
+      ${(canStartCheckout ? billing.enabled : billing.portalConfigured) ? `<button class="button button-small" type="button" data-billing-action="${canStartCheckout ? 'checkout' : 'portal'}">${canStartCheckout ? 'Passer au Premium' : 'Gérer l’abonnement'}</button>` : '<span class="muted">Paiement en cours de configuration.</span>'}
+    </article>
+  `;
+}
+
 function creatorStaffManagePanel(overview) {
   return `
     <div class="founder-console-note">
@@ -5792,6 +5897,10 @@ function renderFounderPremiumPanel() {
           <small>accès Premium manuel</small>
         </article>
       </div>
+      ${founderSecurityPanel(overview)}
+      ${criticalActionsPanel(overview)}
+      ${founderOfficialUpdatePanel(overview)}
+      ${founderBillingPanel(overview)}
       ${founderStoragePanel(overview)}
       ${creatorStaffManagePanel(overview)}
       ${creatorPremiumManagePanel(overview)}
@@ -6199,10 +6308,11 @@ async function manageCreatorPremiumAccess(data, button = null) {
   try {
     const payload = await api('/api/creator/premium-access', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify({ ...data, mfaCode: founderMfaCode })
     });
 
     creatorOverview = payload.overview || creatorOverview;
+    founderMfaCode = '';
     currentSiteAccess = creatorOverview?.access || currentSiteAccess;
     canViewPremiumOverview = Boolean(creatorOverview?.canView);
 
@@ -6232,10 +6342,11 @@ async function manageCreatorSiteStaffAccess(data, button = null) {
   try {
     const payload = await api('/api/creator/site-staff', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify({ ...data, mfaCode: founderMfaCode })
     });
 
     creatorOverview = payload.overview || creatorOverview;
+    founderMfaCode = '';
     currentSiteAccess = creatorOverview?.access || currentSiteAccess;
     canViewPremiumOverview = Boolean(creatorOverview?.canView);
     renderDashboard();
@@ -6255,15 +6366,80 @@ async function manageCreatorMaintenance(data, button = null) {
   try {
     const payload = await api('/api/creator/maintenance', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify({ ...data, mfaCode: founderMfaCode })
     });
     creatorOverview = payload.overview || creatorOverview;
+    founderMfaCode = '';
     currentSiteAccess = creatorOverview?.access || currentSiteAccess;
     renderDashboard();
     toast(payload.message || 'Centre de maintenance actualisé.');
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
+    setLoading(button, false);
+  }
+}
+
+async function manageFounderMfa(data, button = null) {
+  setLoading(button, true);
+  try {
+    const payload = await api('/api/creator/mfa', { method: 'POST', body: JSON.stringify(data) });
+    if (data.action === 'setup') founderMfaSetup = payload.result;
+    if (data.action === 'enable' || data.action === 'disable') founderMfaSetup = null;
+    if (creatorOverview) creatorOverview.founderMfa = payload.status;
+    if (data.action === 'enable') founderMfaCode = '';
+    if (data.action === 'disable') founderMfaCode = '';
+    renderDashboard();
+    toast(data.action === 'enable' ? 'Double sécurité activée.' : (data.action === 'disable' ? 'Double sécurité désactivée.' : 'Configuration préparée.'));
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function manageCriticalAction(data, button = null) {
+  setLoading(button, true);
+  try {
+    const payload = await api('/api/creator/critical-action', { method: 'POST', body: JSON.stringify(data) });
+    creatorOverview = payload.overview || creatorOverview;
+    founderMfaCode = '';
+    renderDashboard();
+    toast(payload.message || 'Décision enregistrée.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function submitOfficialUpdate(data, button = null) {
+  setLoading(button, true);
+  try {
+    const payload = await api('/api/creator/official-update', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, includeSubscribers: Boolean(data.includeSubscribers), mfaCode: founderMfaCode })
+    });
+    creatorOverview = payload.overview || creatorOverview;
+    founderMfaCode = '';
+    renderDashboard();
+    toast(payload.message || 'Annonce soumise à validation.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function openBilling(action, button = null) {
+  if (!selectedGuildId || !['checkout', 'portal'].includes(action)) return;
+  setLoading(button, true);
+  try {
+    const payload = await api(`/api/guilds/${selectedGuildId}/billing/${action}`, { method: 'POST', body: '{}' });
+    if (!payload.url || !String(payload.url).startsWith('https://')) throw new Error('Lien de paiement invalide.');
+    window.location.assign(payload.url);
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
     setLoading(button, false);
   }
 }
@@ -6493,6 +6669,44 @@ async function loadUserProfile(userId, button = null) {
 }
 
 function attachDashboardHandlers() {
+  $('[data-founder-mfa-code]')?.addEventListener('input', (event) => {
+    founderMfaCode = String(event.currentTarget.value || '').trim();
+  });
+
+  $('[data-founder-mfa-setup]')?.addEventListener('click', (event) => {
+    manageFounderMfa({ action: 'setup' }, event.currentTarget);
+  });
+
+  $$('[data-founder-mfa-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      manageFounderMfa(formData(form), $('button[type="submit"]', form));
+    });
+  });
+
+  $('[data-founder-official-update]')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    submitOfficialUpdate(formData(form), $('button[type="submit"]', form));
+  });
+
+  $$('[data-critical-action]').forEach((button) => {
+    button.addEventListener('click', () => manageCriticalAction({
+      action: button.dataset.criticalAction,
+      requestId: button.dataset.requestId
+    }, button));
+  });
+
+  $$('[data-billing-action]').forEach((button) => {
+    button.addEventListener('click', () => openBilling(button.dataset.billingAction, button));
+  });
+
+  $$('[data-guild-critical-action]').forEach((button) => {
+    button.addEventListener('click', () => runAction(button.dataset.guildCriticalAction, {
+      requestId: button.dataset.requestId
+    }, button));
+  });
+
   $$('[data-dashboard-tab]').forEach((button) => {
     button.addEventListener('click', () => {
       const nextTab = button.dataset.dashboardTab;
@@ -6921,6 +7135,25 @@ async function bootstrap() {
       currentState = null;
       dashboardHydrating = false;
       renderDashboard();
+    }
+
+    const billingResult = new URLSearchParams(window.location.search).get('billing');
+    if (billingResult === 'success') {
+      toast('Paiement reçu. L’accès Premium sera actualisé dès confirmation sécurisée de Stripe.');
+      [2000, 5000, 10000].forEach((delay) => {
+        window.setTimeout(() => {
+          if (selectedGuildId && !currentState?.billing?.subscription?.entitled) {
+            refreshGuildState().catch(() => {});
+          }
+        }, delay);
+      });
+    } else if (billingResult === 'cancelled') {
+      toast('Paiement annulé. Aucun abonnement n’a été créé.', 'error');
+    }
+    if (billingResult) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('billing');
+      window.history.replaceState({}, '', cleanUrl);
     }
   } catch (error) {
     currentUser = null;

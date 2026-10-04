@@ -64,7 +64,7 @@ Le gratuit reste volontairement simple et comprend le centre de notifications ai
 
 ## Espace personnel
 
-La page `/membre` permet à chaque personne connectée avec Discord de consulter uniquement ses propres heures, sa paie de la semaine, ses dossiers, ses avertissements visibles et ses préférences de notification. Elle ne donne aucun accès à la configuration ou aux données des autres membres.
+La page `/membre` permet à chaque personne connectée avec Discord de consulter uniquement ses propres heures, sa paie de la semaine, ses dossiers, ses avertissements visibles et ses préférences de notification. Un résumé Discord quotidien ou hebdomadaire peut être activé volontairement et désactivé à tout moment. Elle ne donne aucun accès à la configuration ou aux données des autres membres.
 
 ## Installation rapide
 
@@ -94,7 +94,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
 | `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
-| `/premium` | `/premium` | Voir l'objectif avant l'ouverture Premium |
+| `/premium` | `/premium` | Voir l’accès actuel et les outils Premium |
 | `/support` | `/support` | Obtenir les liens officiels et le serveur support |
 | `/mes-heures` | `/my-hours` | Voir ses heures |
 | `/en-service` | `/on-duty` | Voir les agents en service |
@@ -130,13 +130,13 @@ Un bucket privé peut utiliser `DASHBOARD_URL/media` comme base publique. Sentin
 
 - `npm run backup:db` crée une sauvegarde manuelle compressée et vérifie la politique de rétention.
 - `npm run restore:db` liste les sauvegardes `.db` et `.db.gz` disponibles.
-- `npm run restore:db -- <fichier.db.gz>` vérifie l'intégrité SQLite avant de restaurer la base et crée d'abord une copie de sécurité compressée.
+- La restauration normale se demande depuis la console fondatrice et exige les validations renforcées. La commande locale est réservée au bris de glace : active temporairement `SENTINEL_ALLOW_OFFLINE_RESTORE=true`, puis utilise `npm run restore:db -- <fichier.db.gz> RESTAURER_SENTINEL_HORS_LIGNE`. Elle vérifie l'intégrité SQLite et crée d'abord une copie de sécurité compressée.
 
 Les limites et durées sont configurables avec les variables `DATABASE_BACKUP_*`, `DATABASE_AUTOMOD_RETENTION_DAYS`, `DATABASE_AUDIT_RETENTION_DAYS`, `DATABASE_SLOW_QUERY_MS`, `EMBED_MEDIA_*`, `SENTINEL_OBJECT_STORAGE_*` et `DATABASE_INCREMENTAL_VACUUM_ENABLED` décrites dans `.env.example`.
 
 ## Sécurité et données
 
-Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe, ne collecte pas les informations de paiement et ne vend aucune donnée.
+Sentinel ne lit pas les messages privés, ne collecte pas les mots de passe ni les numéros de carte et ne vend aucune donnée. Stripe traite les moyens de paiement; Sentinel conserve seulement les références, états, montants et documents nécessaires au suivi de l’abonnement.
 
 Les données nécessaires au fonctionnement sont décrites dans la Politique de confidentialité : identifiants Discord, configuration serveur, temps de service, sanctions, dossiers, annonces, sessions dashboard et journal d'audit.
 
@@ -144,7 +144,9 @@ Les informations d'exploitation du bot restent privées. Les fichiers de configu
 
 Le dashboard applique une autorisation côté serveur à chaque requête. L'accès staff exige à la fois une autorisation donnée par le fondateur dans la Régie et un rôle staff configuré sur le serveur Discord Sentinel. Il donne une vue de régie, mais ne donne ni le rôle fondateur ni les permissions d'administration d'un serveur Discord. Toute action sur un serveur exige aussi que la personne soit membre du serveur concerné et possède les permissions Discord ou le rôle Sentinel attendu.
 
-Les changements de grade staff et d'accès Premium sont réservés au compte fondateur, exigent une connexion Discord récente et sont inscrits dans le journal d'audit. Retirer le grade staff révoque immédiatement toutes les sessions dashboard de la personne.
+Les changements de grade staff et d'accès Premium sont réservés au compte fondateur, exigent une connexion Discord récente et une authentification à usage unique, puis sont inscrits dans le journal d'audit. Les changements Premium importants, restaurations, annonces globales et remises à zéro de serveur exigent la validation d’une seconde personne autorisée. Retirer le grade staff révoque immédiatement toutes les sessions dashboard de la personne.
+
+Le contrôle Discord de préproduction peut être rendu bloquant avant la mise en service avec `SENTINEL_STAGING_GUILD_ID` et `SENTINEL_STAGING_VALIDATION_REQUIRED=true`. Il crée et supprime de vrais salons et rôles privés. `SENTINEL_STAGING_REAL_ACTIONS=true` ajoute un timeout réel sur `SENTINEL_STAGING_MEMBER_ID` puis un bannissement immédiatement levé sur le compte absent `SENTINEL_STAGING_BAN_TARGET_ID`; ces deux IDs doivent donc être des comptes de test dédiés. La facturation automatisée utilise Stripe Checkout et des webhooks signés configurés avec `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` et `STRIPE_PREMIUM_PRICE_ID`.
 
 ## Licence
 

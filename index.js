@@ -49,6 +49,9 @@ const {
 const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
 const operations = require('./operations');
+const governance = require('./governance');
+const billing = require('./billing');
+const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
 
 const client = new Client({
     intents: [
@@ -177,7 +180,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-10-03-operations-v1';
+const SENTINEL_BUILD = 'community-suite-2026-10-03-security-billing-v2';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -208,7 +211,6 @@ const DEFAULT_PREMIUM_SUBSCRIBER_ROLE_NAMES = [
     'premium subscriber'
 ];
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
-const PREMIUM_SERVER_GOAL = Number.parseInt(process.env.PREMIUM_SERVER_GOAL || '50', 10);
 const DATABASE_FILE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db');
 const DATABASE_BACKUP_ENABLED = String(process.env.DATABASE_BACKUP_ENABLED || 'true').toLowerCase() !== 'false';
 const DATABASE_BACKUP_INTERVAL_MS = Math.max(
@@ -346,7 +348,7 @@ const I18N = {
         installCommandsOnly: 'Le lien utilise a probablement installe uniquement les commandes.',
         reinvite: 'Reinvite Sentinel avec ce lien : {inviteUrl}',
         unavailable: 'Cette commande n’est pas disponible sur ce serveur pour le moment.',
-        resetAllPremiumOnly: '⭐ `/reset-heures-all` sera disponible avec l’abonnement Premium Sentinel. En gratuit, utilise `/reset-heures membre:@membre` ou `/reset-heures utilisateur_id:ID` pour réinitialiser une seule personne.',
+        resetAllPremiumOnly: '⭐ `/reset-heures-all` est réservé au Premium Sentinel. En gratuit, utilise `/reset-heures membre:@membre` ou `/reset-heures utilisateur_id:ID` pour réinitialiser une seule personne.',
         bootstrapRoles: 'Aucun role configure. En amorcage, le proprietaire, les administrateurs et les membres avec Gerer le serveur ou Gerer les roles peuvent configurer Sentinel.',
         accessDenied: '❌ Tu n’as pas accès à cette commande.\nSi aucun rôle de gestion n’est encore configuré, un membre avec `Administrateur`, `Gérer le serveur` ou `Gérer les rôles` peut lancer `/config-permissions action:ajouter role:@role`.',
         languageSet: '✅ La langue de ce serveur est maintenant le français.',
@@ -599,7 +601,7 @@ const I18N = {
         installCommandsOnly: 'The link used probably installed commands only.',
         reinvite: 'Reinvite Sentinel with this link: {inviteUrl}',
         unavailable: 'This command is not available on this server for now.',
-        resetAllPremiumOnly: '⭐ `/reset-hours-all` will be available with Sentinel Premium. On the free plan, use `/reset-hours member:@member` or `/reset-hours user_id:ID` to reset one person.',
+        resetAllPremiumOnly: '⭐ `/reset-hours-all` is reserved for Sentinel Premium. On the free plan, use `/reset-hours member:@member` or `/reset-hours user_id:ID` to reset one person.',
         bootstrapRoles: 'No role configured. During setup, the owner, administrators, and members with Manage Server or Manage Roles can configure Sentinel.',
         accessDenied: '❌ You do not have access to this command.\nIf no management role is configured yet, a member with `Administrator`, `Manage Server`, or `Manage Roles` can run `/config-permissions action:add role:@role`.',
         languageSet: '✅ This server language is now French.',
@@ -1130,11 +1132,6 @@ function buildDashboardComponents(language = 'fr') {
 
 function buildPremiumEmbed(guild, requester, member = null) {
     const language = getGuildLanguage(guild.id);
-    const guildCount = client.guilds.cache.size || 0;
-    const remaining = Math.max(PREMIUM_SERVER_GOAL - guildCount, 0);
-    const progressPercent = PREMIUM_SERVER_GOAL > 0
-        ? Math.min(Math.round((guildCount / PREMIUM_SERVER_GOAL) * 100), 100)
-        : 0;
     const hasReferenceAccess = hasAdvancedAccess(member, guild.id);
 
     const embed = createSentinelEmbed({
@@ -1142,20 +1139,14 @@ function buildPremiumEmbed(guild, requester, member = null) {
         title: language === 'en' ? 'Sentinel | Premium' : 'Sentinel | Premium',
         description: language === 'en'
             ? [
-                'Sentinel Premium is not publicly open yet.',
-                `It will become available when Sentinel reaches **${PREMIUM_SERVER_GOAL} servers**.`,
-                '',
                 hasReferenceAccess
-                    ? 'This server already has reference access to the advanced tools.'
-                    : 'Until then, the free version keeps the essential service, moderation, embeds and dossier features.'
+                    ? 'Premium access is active on this server.'
+                    : 'Premium access unlocks advanced tools while the free version keeps the essential service, moderation, embeds and dossier features.'
             ].join('\n')
             : [
-                'Sentinel Premium n’est pas encore ouvert publiquement.',
-                `Il deviendra disponible quand Sentinel aura atteint **${PREMIUM_SERVER_GOAL} serveurs**.`,
-                '',
                 hasReferenceAccess
-                    ? 'Ce serveur dispose déjà de l’accès de référence aux outils avancés.'
-                    : 'En attendant, le gratuit garde les bases utiles : service, modération, embeds et dossiers.'
+                    ? 'L’accès Premium est actif sur ce serveur.'
+                    : 'Le Premium débloque les outils avancés tandis que le gratuit conserve les fonctions essentielles de service, modération, annonces et dossiers.'
             ].join('\n'),
         requester,
         thumbnail: guild.iconURL(),
@@ -1164,21 +1155,14 @@ function buildPremiumEmbed(guild, requester, member = null) {
 
     embed.addFields(
         {
-            name: language === 'en' ? 'Current progress' : 'Progression actuelle',
+            name: language === 'en' ? 'Current access' : 'Accès actuel',
             value: language === 'en'
-                ? `**${guildCount}/${PREMIUM_SERVER_GOAL}** servers (${progressPercent}%).`
-                : `**${guildCount}/${PREMIUM_SERVER_GOAL}** serveurs (${progressPercent}%).`,
+                ? (hasReferenceAccess ? 'Premium enabled' : 'Free plan')
+                : (hasReferenceAccess ? 'Premium actif' : 'Formule gratuite'),
             inline: true
         },
         {
-            name: language === 'en' ? 'Remaining' : 'Restant',
-            value: language === 'en'
-                ? (remaining === 0 ? 'Goal reached.' : `${remaining} server(s).`)
-                : (remaining === 0 ? 'Objectif atteint.' : `${remaining} serveur(s).`),
-            inline: true
-        },
-        {
-            name: language === 'en' ? 'Planned payroll benefits' : 'Paie Premium prévue',
+            name: language === 'en' ? 'Premium tools' : 'Outils Premium',
             value: language === 'en'
                 ? 'Role rates, bonuses, deductions, corrections, exports and more complete reports.'
                 : 'Taux par rôle, primes, retenues, corrections, exports et rapports plus complets.',
@@ -1200,7 +1184,7 @@ function buildPremiumComponents(language = 'fr') {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel(language === 'en' ? 'Free Premium' : 'Premium gratuit')
+                .setLabel(language === 'en' ? 'View Premium' : 'Voir le Premium')
                 .setStyle(ButtonStyle.Link)
                 .setURL(getPublicSiteUrl('premium.html')),
             new ButtonBuilder()
@@ -1220,17 +1204,11 @@ async function handlePremiumAccessCommand(interaction, language = 'fr') {
     }
 
     const action = String(interaction.options.getString('action') || 'voir');
-    const target = String(interaction.options.getString('cible') || 'serveur');
     const providedGuildId = normalizeUserId(
         interaction.options.getString('serveur_id')
         || interaction.options.getString('server_id')
     );
     const guildId = providedGuildId || interaction.guildId;
-    const role = interaction.options.getRole('role');
-    const userId = normalizeUserId(
-        interaction.options.getString('utilisateur_id')
-        || interaction.options.getString('user_id')
-    );
 
     if (!guildId) {
         return interaction.reply({
@@ -1255,69 +1233,10 @@ async function handlePremiumAccessCommand(interaction, language = 'fr') {
         });
     }
 
-    const add = action === 'ajouter';
-    const remove = action === 'retirer';
-
-    if (!add && !remove) {
-        return interaction.reply({
-            content: t(language, 'premiumAccessTargetInvalid'),
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    let targetLabel = null;
-
-    if (target === 'serveur') {
-        if (add) {
-            grantPremiumGuild(guildId, interaction.user.id);
-        } else {
-            revokePremiumGuild(guildId);
-        }
-
-        targetLabel = `serveur \`${guildId}\``;
-    } else if (target === 'role') {
-        if (!role || role.id === interaction.guildId) {
-            return interaction.reply({
-                content: t(language, 'premiumAccessRoleRequired'),
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
-        const roleGuildId = role.guild?.id || interaction.guildId;
-
-        if (add) {
-            grantPremiumRole(roleGuildId, role.id, interaction.user.id);
-        } else {
-            revokePremiumRole(roleGuildId, role.id);
-        }
-
-        targetLabel = `${role}`;
-    } else if (target === 'utilisateur') {
-        if (!userId) {
-            return interaction.reply({
-                content: t(language, 'premiumAccessUserRequired'),
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
-        if (add) {
-            grantPremiumUser(guildId, userId, interaction.user.id);
-        } else {
-            revokePremiumUser(guildId, userId);
-        }
-
-        targetLabel = `<@${userId}>`;
-    } else {
-        return interaction.reply({
-            content: t(language, 'premiumAccessTargetInvalid'),
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
     return interaction.reply({
-        content: t(language, add ? 'premiumAccessAdded' : 'premiumAccessRemoved', {
-            target: targetLabel
-        }),
+        content: language === 'en'
+            ? 'Premium changes are now prepared in the founder console with a one-time code, then approved by another authorized person. The Discord command remains available for read-only review.'
+            : 'Les modifications Premium se préparent désormais dans la console fondatrice avec un code à usage unique, puis sont validées par une autre personne autorisée. La commande Discord reste disponible en lecture seule.',
         flags: MessageFlags.Ephemeral
     });
 }
@@ -2105,6 +2024,7 @@ function isAdvancedGuild(guildId) {
     return Boolean(guildId && (
         getAdvancedGuildIds().includes(String(guildId))
         || isManualPremiumGuild(guildId)
+        || billing.hasBillingPremiumGuild(guildId)
     ));
 }
 
@@ -10128,7 +10048,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/lock`, `/unlock`, `/slowmode duree` - gerer rapidement un salon',
         '`/config-paie role:@role` - definir un taux horaire Premium par role',
         '`/paie-ajustement` - ajouter une prime, une retenue ou une correction de paie',
-        'Plus tard : sanctions automatiques apres X avertissements, configurables par serveur.'
+        'Escalade active : timeout, expulsion ou bannissement après les seuils d’avertissements choisis, avec expiration, rôles exemptés et journal.'
     ];
     const freeLimits = isReferenceServer
         ? [
@@ -10413,7 +10333,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Free / Premium',
                         value: [
                             `Free servers: ${FREE_DOSSIER_PANEL_LIMIT} panel, ${FREE_OPEN_DOSSIER_LIMIT} open dossiers, ${FREE_DOSSIER_HISTORY_LIMIT} visible recent dossiers.`,
-                            'Premium later: unlimited panels, custom categories, advanced forms, priorities, templates, full history, statistics, and automations.'
+                            'Premium: unlimited panels, custom categories, advanced forms, priorities, templates, full history, statistics, and automations.'
                         ].join('\n')
                     }
                 ]
@@ -10440,7 +10360,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         value: [
                             '`/dashboard` gives the web dashboard link.',
                             '`/support` gives official support links.',
-                            '`/premium` shows when Premium will open.',
+                            '`/premium` shows the current access and advanced Premium tools.',
                             '`/reset-hours member:@member` or `user_id:ID` resets one person, even if they left.',
                             '`/payroll-config` sets the global hourly RP amount.',
                             '`/weekly-payroll` shows who is paid or still to pay this week.',
@@ -10485,7 +10405,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 title: isReferenceServer ? 'Sentinel | Reference server' : 'Sentinel | Free limits',
                 description: isReferenceServer
                     ? 'This server has access to the complete Sentinel command set.'
-                    : 'The free version stays useful, while larger tools are planned for Premium.',
+                    : 'The free version stays useful, while larger tools are available with Premium.',
                 fields: isReferenceServer
                     ? [
                         {
@@ -10505,8 +10425,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                                 `Personal history: last ${FREE_HISTORY_LIMIT} sessions.`,
                                 `Public ranking: top ${FREE_TOP_LIMIT}.`,
                                 `Sentinel embeds: ${FREE_CUSTOM_EMBED_LIMIT} active embeds, unlimited edits.`,
-                                '`/reset-hours-all` will be reserved for Sentinel Premium.',
-                                `Premium is planned when Sentinel reaches ${PREMIUM_SERVER_GOAL} servers.`
+                                '`/reset-hours-all` is reserved for Sentinel Premium.',
+                                'Premium access is managed from the Sentinel dashboard.'
                             ].join('\n')
                         }
                     ]
@@ -10759,7 +10679,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     value: [
                         '`/dashboard` donne le lien de la console.',
                         '`/support` donne les accès officiels.',
-                        '`/premium` indique quand le Premium ouvrira.',
+                        '`/premium` indique l’accès actuel et les outils Premium.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
                         '`/config-paie` règle le montant horaire RP.',
                         '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
@@ -10823,8 +10743,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             `Historique personnel : ${FREE_HISTORY_LIMIT} derniers services.`,
                             `Registre public : top ${FREE_TOP_LIMIT}.`,
                             `Embeds Sentinel : ${FREE_CUSTOM_EMBED_LIMIT} embeds actifs, modifications illimitées.`,
-                            '`/reset-heures-all` sera réservé à Sentinel Premium.',
-                            `Premium est prévu quand Sentinel aura atteint ${PREMIUM_SERVER_GOAL} serveurs.`
+                            '`/reset-heures-all` est réservé à Sentinel Premium.',
+                            'L’accès Premium se gère depuis le dashboard Sentinel.'
                         ].join('\n')
                     }
                 ]
@@ -14826,7 +14746,8 @@ function getMemberPortalGuild(guild, userId) {
         },
         dossiers,
         notifications: memberNotifications,
-        preferences
+        preferences,
+        digestHistory: operations.getMemberDigestHistory(guild.id, userId, 10)
     };
 }
 
@@ -14924,6 +14845,49 @@ function runSentinelGuildValidation(guild, trigger = 'manual') {
 
 let operationsCycleRunning = false;
 
+async function processMemberNotificationDigests() {
+    for (const item of operations.getDueMemberDigests(50)) {
+        const guild = client.guilds.cache.get(item.guildId);
+        if (!guild) {
+            operations.completeMemberDigest(item, { error: 'Serveur Discord introuvable.' });
+            continue;
+        }
+        const member = guild.members.cache.get(item.userId)
+            || await guild.members.fetch(item.userId).catch(() => null);
+        if (!member) {
+            operations.completeMemberDigest(item, { error: 'Le membre ne fait plus partie du serveur.' });
+            continue;
+        }
+        try {
+            const portal = getMemberPortalGuild(guild, item.userId);
+            const notifications = portal.notifications.slice(0, 10);
+            if (!notifications.length) {
+                operations.completeMemberDigest(item, { skipped: true, itemCount: 0 });
+                continue;
+            }
+            const recipient = member.user || await client.users.fetch(item.userId);
+            const message = await recipient.send({
+                embeds: [new EmbedBuilder()
+                    .setColor(SENTINEL_COLORS.accent)
+                    .setTitle(`Sentinel | Registre personnel de ${guild.name}`)
+                    .setDescription(item.digestFrequency === 'weekly'
+                        ? 'Voici ton relevé hebdomadaire demandé depuis ton espace personnel.'
+                        : 'Voici ton relevé quotidien demandé depuis ton espace personnel.')
+                    .addFields(notifications.map(notification => ({
+                        name: String(notification.title || 'Information').slice(0, 256),
+                        value: String(notification.detail || 'Consulte ton espace Sentinel.').slice(0, 1024)
+                    })))
+                    .setFooter({ text: 'Tu peux modifier ou arrêter ces messages depuis ton espace personnel.' })
+                    .setTimestamp()],
+                allowedMentions: { parse: [] }
+            });
+            operations.completeMemberDigest(item, { messageId: message.id, itemCount: notifications.length });
+        } catch (error) {
+            operations.completeMemberDigest(item, { error: error.message || error });
+        }
+    }
+}
+
 async function processScheduledOperations() {
     if (operationsCycleRunning) return;
     operationsCycleRunning = true;
@@ -14966,16 +14930,66 @@ async function processScheduledOperations() {
                 operations.completeReportSchedule(item, { error: error.message || error });
             }
         }
+
+        await processMemberNotificationDigests();
     } finally {
         operationsCycleRunning = false;
+    }
+}
+
+async function runStartupStagingValidation() {
+    const config = stagingValidationConfig();
+    try {
+        const result = await runDiscordStagingValidation(client, {
+            verifyPremiumIsolation: async (guild, role) => {
+                grantPremiumRole(guild.id, role.id, client.user.id);
+                try {
+                    const currentGuildHasRole = getPremiumRoleIds(guild.id).includes(role.id);
+                    const otherGuildHasRole = client.guilds.cache.some(item => (
+                        item.id !== guild.id && getPremiumRoleIds(item.id).includes(role.id)
+                    ));
+                    return {
+                        ok: currentGuildHasRole && !otherGuildHasRole,
+                        detail: otherGuildHasRole ? 'Le rôle temporaire a débordé sur un autre serveur.' : null
+                    };
+                } finally {
+                    revokePremiumRole(guild.id, role.id);
+                }
+            }
+        });
+        const checks = result.skipped
+            ? [{ key: 'staging-disabled', label: 'Serveur de préproduction non configuré', ok: true }]
+            : result.checks;
+        operations.addValidationRun(result.guildId || config.guildId, 'discord-staging', checks);
+        console.log(result.skipped
+            ? 'Validation Discord de préproduction désactivée.'
+            : `Validation Discord de préproduction réussie : ${checks.length} contrôle(s).`);
+        return result;
+    } catch (error) {
+        const checks = Array.isArray(error.checks) && error.checks.length
+            ? error.checks
+            : [{ key: 'staging-error', label: 'Validation Discord de préproduction', ok: false, detail: error.message }];
+        operations.addValidationRun(config.guildId, 'discord-staging', checks);
+        console.error('Validation Discord de préproduction échouée :', error);
+        if (config.required) throw error;
+        return { skipped: false, failed: true, guildId: config.guildId, checks };
     }
 }
 
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
-    startDatabaseBackupSchedule();
 
+    try {
+        await runStartupStagingValidation();
+    } catch (error) {
+        console.error('Mise en service refusée par la validation de préproduction.');
+        await client.destroy();
+        process.exitCode = 1;
+        return;
+    }
+
+    startDatabaseBackupSchedule();
     startDashboardServer({
         client,
         build: SENTINEL_BUILD,
@@ -15114,6 +15128,7 @@ client.once(Events.ClientReady, async () => {
             resetUser,
             sendModerationLog,
             sendOfficialUpdateTest,
+            publishOfficialStatusUpdate,
             sendDossierTranscript,
             sendServiceLog,
             setDossierReferent,
@@ -15496,40 +15511,10 @@ client.on(Events.InteractionCreate, async interaction => {
                     flags: MessageFlags.Ephemeral
                 });
             }
-
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-            const titleFr = String(interaction.options.getString('titre') || '').trim();
-            const bodyFr = String(interaction.options.getString('message') || '').trim();
-            const titleEn = String(interaction.options.getString('titre_en') || '').trim();
-            const bodyEn = String(interaction.options.getString('message_en') || '').trim();
-            const includeSubscribers = Boolean(interaction.options.getBoolean('diffuser'));
-            const result = await publishOfficialStatusUpdate({
-                titleFr,
-                bodyFr,
-                titleEn,
-                bodyEn,
-                requester: interaction.user,
-                includeSubscribers
-            });
-
-            if (result.totalCount === 0) {
-                auditStatus = 'failed';
-                auditSummary = t(language, 'officialUpdateNoTarget');
-
-                return interaction.editReply({
-                    content: auditSummary
-                });
-            }
-
-            auditSummary = t(language, 'officialUpdateSent', {
-                referenceCount: result.referenceCount,
-                subscriberCount: result.subscriberCount
-            });
-
-            return interaction.editReply({
-                content: auditSummary
-            });
+            auditSummary = language === 'en'
+                ? 'Global announcements are now prepared in the founder console, protected by a one-time code, then approved by another authorized person.'
+                : 'Les annonces globales se préparent désormais dans la console fondatrice, avec un code à usage unique, puis la validation d’une autre personne autorisée.';
+            return interaction.reply({ content: auditSummary, flags: MessageFlags.Ephemeral });
         }
 
         if (await handleCustomEmbedInteraction(interaction, commandName, language)) {
@@ -16496,11 +16481,19 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
-        resetGuild(interaction.guild.id);
-        clearLongServiceAlertsForGuild(interaction.guild.id);
+        const request = governance.createCriticalAction({
+            scope: 'guild',
+            guildId: interaction.guild.id,
+            actionType: 'reset-guild',
+            payload: {},
+            summary: `Réinitialiser toutes les heures de ${interaction.guild.name}`,
+            requestedByUserId: interaction.user.id
+        });
 
         return interaction.update({
-            content: t(buttonLanguage, 'resetGuildDone'),
+            content: buttonLanguage === 'en'
+                ? `Critical request #${request.id} created. Another authorized manager must approve it from the dashboard.`
+                : `Demande critique #${request.id} créée. Un autre responsable autorisé doit l’approuver depuis le dashboard.`,
             components: [],
             embeds: []
         });

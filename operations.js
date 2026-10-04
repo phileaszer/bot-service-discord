@@ -419,27 +419,137 @@ function getUserNotificationPreferences(guildId, userId) {
         payrollEnabled: Boolean(row.payroll_enabled),
         dossierEnabled: Boolean(row.dossier_enabled),
         moderationEnabled: Boolean(row.moderation_enabled),
+        digestFrequency: ['daily', 'weekly'].includes(row.digest_frequency) ? row.digest_frequency : 'none',
+        nextDigestAt: row.next_digest_at || null,
+        lastDigestAt: row.last_digest_at || null,
         updatedAt: row.updated_at
     };
 }
 
+function nextDigestDate(frequency, from = Date.now()) {
+    if (!['daily', 'weekly'].includes(frequency)) return null;
+    const next = new Date(from);
+    next.setUTCSeconds(0, 0);
+    next.setUTCHours(8, 0, 0, 0);
+    if (next.getTime() <= from) next.setUTCDate(next.getUTCDate() + 1);
+    if (frequency === 'weekly') {
+        const daysUntilMonday = (8 - next.getUTCDay()) % 7;
+        if (daysUntilMonday) next.setUTCDate(next.getUTCDate() + daysUntilMonday);
+    }
+    return next.toISOString();
+}
+
 function updateUserNotificationPreferences(guildId, userId, patch) {
     const current = getUserNotificationPreferences(guildId, userId);
+    const digestFrequency = ['daily', 'weekly', 'none'].includes(String(patch.digestFrequency || ''))
+        ? String(patch.digestFrequency)
+        : current.digestFrequency;
+    const nextDigestAt = digestFrequency === 'none'
+        ? null
+        : (digestFrequency === current.digestFrequency && current.nextDigestAt && Date.parse(current.nextDigestAt) > Date.now()
+            ? current.nextDigestAt
+            : nextDigestDate(digestFrequency));
     db.prepare(`
         UPDATE user_notification_preferences
         SET service_enabled = ?, payroll_enabled = ?, dossier_enabled = ?,
-            moderation_enabled = ?, updated_at = ?
+            moderation_enabled = ?, digest_frequency = ?, next_digest_at = ?, updated_at = ?
         WHERE guild_id = ? AND user_id = ?
     `).run(
         Number(booleanValue(patch.serviceEnabled, current.serviceEnabled)),
         Number(booleanValue(patch.payrollEnabled, current.payrollEnabled)),
         Number(booleanValue(patch.dossierEnabled, current.dossierEnabled)),
         Number(booleanValue(patch.moderationEnabled, current.moderationEnabled)),
+        digestFrequency,
+        nextDigestAt,
         new Date().toISOString(),
         guildId,
         userId
     );
     return getUserNotificationPreferences(guildId, userId);
+}
+
+function getDueMemberDigests(limit = 25) {
+    return db.prepare(`
+        SELECT * FROM user_notification_preferences
+        WHERE digest_frequency IN ('daily', 'weekly')
+          AND next_digest_at IS NOT NULL
+          AND next_digest_at <= ?
+        ORDER BY datetime(next_digest_at) ASC LIMIT ?
+    `).all(new Date().toISOString(), clampInteger(limit, 25, 1, 100)).map(row => ({
+        guildId: row.guild_id,
+        userId: row.user_id,
+        serviceEnabled: Boolean(row.service_enabled),
+        payrollEnabled: Boolean(row.payroll_enabled),
+        dossierEnabled: Boolean(row.dossier_enabled),
+        moderationEnabled: Boolean(row.moderation_enabled),
+        digestFrequency: row.digest_frequency,
+        nextDigestAt: row.next_digest_at
+    }));
+}
+
+function digestPeriodKey(frequency, at = Date.now()) {
+    const date = new Date(at);
+    if (frequency === 'daily') return `daily-${date.toISOString().slice(0, 10)}`;
+    const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = monday.getUTCDay() || 7;
+    monday.setUTCDate(monday.getUTCDate() - day + 1);
+    return `weekly-${monday.toISOString().slice(0, 10)}`;
+}
+
+function completeMemberDigest(item, result = {}) {
+    const now = new Date().toISOString();
+    const periodKey = digestPeriodKey(item.digestFrequency);
+    db.prepare(`
+        INSERT INTO member_notification_deliveries (
+            guild_id, user_id, period_key, frequency, status, item_count,
+            message_id, error_message, attempted_at, delivered_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(guild_id, user_id, period_key) DO UPDATE SET
+            status = excluded.status, item_count = excluded.item_count,
+            message_id = excluded.message_id, error_message = excluded.error_message,
+            attempted_at = excluded.attempted_at, delivered_at = excluded.delivered_at
+    `).run(
+        item.guildId,
+        item.userId,
+        periodKey,
+        item.digestFrequency,
+        result.error ? 'failed' : (result.skipped ? 'empty' : 'delivered'),
+        Number(result.itemCount || 0),
+        result.messageId || null,
+        result.error ? String(result.error).slice(0, 500) : null,
+        now,
+        result.error || result.skipped ? null : now
+    );
+    db.prepare(`
+        UPDATE user_notification_preferences
+        SET next_digest_at = ?,
+            last_digest_at = CASE WHEN ? THEN last_digest_at ELSE ? END,
+            updated_at = ?
+        WHERE guild_id = ? AND user_id = ?
+    `).run(
+        nextDigestDate(item.digestFrequency),
+        Number(Boolean(result.error)),
+        now,
+        now,
+        item.guildId,
+        item.userId
+    );
+}
+
+function getMemberDigestHistory(guildId, userId, limit = 10) {
+    return db.prepare(`
+        SELECT * FROM member_notification_deliveries
+        WHERE guild_id = ? AND user_id = ?
+        ORDER BY id DESC LIMIT ?
+    `).all(guildId, userId, clampInteger(limit, 10, 1, 50)).map(row => ({
+        id: row.id,
+        frequency: row.frequency,
+        status: row.status,
+        itemCount: row.item_count,
+        errorMessage: row.error_message,
+        attemptedAt: row.attempted_at,
+        deliveredAt: row.delivered_at
+    }));
 }
 
 function addSimulationRun(guildId, actorUserId, kind, input, result) {
@@ -596,10 +706,13 @@ module.exports = {
     cancelScheduledAnnouncement,
     completeReportSchedule,
     completeScheduledAnnouncement,
+    completeMemberDigest,
     createReportDocument,
     getActiveWarningCount,
     getDueReportSchedules,
     getDueScheduledAnnouncements,
+    getDueMemberDigests,
+    getMemberDigestHistory,
     getNotificationStates,
     getReportSchedules,
     getScheduledAnnouncement,

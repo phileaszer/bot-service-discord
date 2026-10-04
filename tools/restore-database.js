@@ -8,6 +8,7 @@ const Database = require('better-sqlite3');
 
 const databasePath = path.resolve(process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'service.db'));
 const backupDirectory = path.resolve(process.env.DATABASE_BACKUP_DIR || path.join(path.dirname(databasePath), 'backups'));
+const OFFLINE_RESTORE_CONFIRMATION = 'RESTAURER_SENTINEL_HORS_LIGNE';
 
 function listBackups() {
     if (!fs.existsSync(backupDirectory)) {
@@ -144,15 +145,27 @@ async function restoreDatabase(fileName) {
 }
 
 const backupFileName = process.argv[2];
+const confirmation = process.argv[3];
+
+function assertOfflineRestoreAuthorized() {
+    if (process.env.SENTINEL_ALLOW_OFFLINE_RESTORE !== 'true') {
+        throw new Error('La restauration hors ligne est verrouillee. Utilise la console fondatrice ou active explicitement SENTINEL_ALLOW_OFFLINE_RESTORE=true pour une intervention d urgence.');
+    }
+
+    if (confirmation !== OFFLINE_RESTORE_CONFIRMATION) {
+        throw new Error(`Confirmation manquante. Ajoute exactement ${OFFLINE_RESTORE_CONFIRMATION} apres le nom de la sauvegarde.`);
+    }
+}
 
 async function main() {
     if (!backupFileName) {
         printBackups();
         console.log('');
-        console.log('Utilisation : npm run restore:db -- <nom-du-fichier.db ou .db.gz>');
+        console.log(`Restauration d urgence : SENTINEL_ALLOW_OFFLINE_RESTORE=true npm run restore:db -- <nom-du-fichier.db ou .db.gz> ${OFFLINE_RESTORE_CONFIRMATION}`);
         return;
     }
 
+    assertOfflineRestoreAuthorized();
     await restoreDatabase(backupFileName);
 }
 

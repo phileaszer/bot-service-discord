@@ -60,6 +60,12 @@
     return `<div class="member-list">${items.map(item => `<article><span>${escapeHtml(item.title)}</span><strong>${escapeHtml(item.detail)}</strong>${item.createdAt ? `<small>${escapeHtml(formatDate(item.createdAt))}</small>` : ''}</article>`).join('')}</div>`;
   }
 
+  function digestHistory(items) {
+    if (!items?.length) return '<p class="muted">Aucun résumé Discord envoyé pour le moment.</p>';
+    const labels = { delivered: 'Envoyé', empty: 'Aucune nouveauté', failed: 'Échec' };
+    return `<div class="member-list">${items.map(item => `<article><span>${escapeHtml(labels[item.status] || item.status)}</span><strong>${escapeHtml(item.itemCount || 0)} information(s)</strong><small>${escapeHtml(formatDate(item.deliveredAt || item.attemptedAt))}${item.errorMessage ? ` · ${escapeHtml(item.errorMessage)}` : ''}</small></article>`).join('')}</div>`;
+  }
+
   function renderGuild(item) {
     const icon = safeImage(item.guild.icon);
     const line = item.payroll.line;
@@ -77,8 +83,10 @@
           <article class="inline-form"><h3>Mes dossiers</h3>${dossierList(item.dossiers)}</article>
           <article class="inline-form"><h3>Mon registre disciplinaire</h3>${warningList(item.warnings)}</article>
           <article class="inline-form"><h3>Mes notifications</h3>${notificationList(item.notifications || [])}</article>
+          <article class="inline-form"><h3>Historique des résumés Discord</h3>${digestHistory(item.digestHistory)}</article>
           <article class="inline-form"><h3>Alertes souhaitées</h3><form data-preferences data-guild-id="${escapeHtml(item.guild.id)}" class="member-preferences">
             ${[['serviceEnabled', 'Services'], ['payrollEnabled', 'Paie RP'], ['dossierEnabled', 'Dossiers'], ['moderationEnabled', 'Modération']].map(([key, label]) => `<label><input type="checkbox" name="${key}" ${item.preferences[key] ? 'checked' : ''}><span>${label}</span></label>`).join('')}
+            <label><span>Résumé privé Discord</span><select name="digestFrequency"><option value="none" ${item.preferences.digestFrequency === 'none' ? 'selected' : ''}>Désactivé</option><option value="daily" ${item.preferences.digestFrequency === 'daily' ? 'selected' : ''}>Chaque jour</option><option value="weekly" ${item.preferences.digestFrequency === 'weekly' ? 'selected' : ''}>Chaque semaine</option></select></label>
             <button class="button" type="submit">Enregistrer</button>
           </form></article>
         </div>
@@ -98,6 +106,7 @@
         button.disabled = true;
         const body = { guildId: form.dataset.guildId };
         form.querySelectorAll('input[type="checkbox"]').forEach(input => { body[input.name] = input.checked; });
+        body.digestFrequency = form.elements.digestFrequency?.value || 'none';
         try {
           const payload = await api('/api/me/preferences', { method: 'POST', body: JSON.stringify(body) });
           const guild = portal.guilds.find(candidate => candidate.guild.id === form.dataset.guildId);

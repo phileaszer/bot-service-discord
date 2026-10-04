@@ -1,7 +1,6 @@
 (() => {
   const RAILWAY_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
   const STATUS_REFRESH_INTERVAL = 90 * 1000;
-  const PREMIUM_SERVER_GOAL = 50;
   const endpoint = window.location.hostname.endsWith('railway.app')
     ? '/api/status'
     : `${RAILWAY_ORIGIN}/api/status`;
@@ -23,13 +22,10 @@
       dashboardReadFailed: 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.',
       noIncidents: 'Aucun incident connu pour le moment.',
       noMaintenance: 'Aucune maintenance annoncée actuellement.',
-      premiumGoalReached: 'Objectif atteint',
-      premiumGoalWaiting: 'Le Premium ouvrira quand Sentinel aura atteint 50 serveurs.',
-      premiumGoalProgress: (count) => `${count}/${PREMIUM_SERVER_GOAL} serveurs`,
-      premiumRemaining: (remaining) => remaining === 1
-        ? 'Encore 1 serveur avant l’ouverture du Premium.'
-        : `Encore ${remaining} serveurs avant l’ouverture du Premium.`,
-      premiumReady: 'Sentinel a atteint l’objectif communautaire. Le Premium peut être ouvert.'
+      premiumReady: 'Paiement automatisé actif',
+      premiumManual: 'Accès Premium actif',
+      premiumReadyDetail: 'Les abonnements, factures, échecs et résiliations sont synchronisés automatiquement.',
+      premiumManualDetail: 'Les accès Premium sont actifs. Le paiement en ligne est en cours de configuration.'
     },
     en: {
       unavailable: 'Unavailable',
@@ -44,13 +40,10 @@
       dashboardReadFailed: 'The page is open, but Sentinel is not responding to the status check.',
       noIncidents: 'No known incident right now.',
       noMaintenance: 'No maintenance announced right now.',
-      premiumGoalReached: 'Goal reached',
-      premiumGoalWaiting: 'Premium will open when Sentinel reaches 50 servers.',
-      premiumGoalProgress: (count) => `${count}/${PREMIUM_SERVER_GOAL} servers`,
-      premiumRemaining: (remaining) => remaining === 1
-        ? '1 more server before Premium opens.'
-        : `${remaining} more servers before Premium opens.`,
-      premiumReady: 'Sentinel has reached the community goal. Premium can be opened.'
+      premiumReady: 'Automated billing active',
+      premiumManual: 'Premium access active',
+      premiumReadyDetail: 'Subscriptions, invoices, failures, and cancellations are synchronized automatically.',
+      premiumManualDetail: 'Premium access is active. Online billing is being configured.'
     }
   };
 
@@ -109,30 +102,9 @@
     `;
   }
 
-  function renderPremiumGoal(guildCount) {
-    const count = Number(guildCount);
-    const fill = document.querySelector('[data-status-premium-fill]');
-
-    if (!Number.isFinite(count) || count < 0) {
-      setText('[data-status-premium-goal]', t('checking'));
-      setText('[data-status-premium-detail]', t('premiumGoalWaiting'));
-      if (fill) fill.style.width = '0%';
-      return;
-    }
-
-    const safeCount = Math.floor(count);
-    const progress = Math.min(Math.max((safeCount / PREMIUM_SERVER_GOAL) * 100, 0), 100);
-
-    setText('[data-status-premium-goal]', safeCount >= PREMIUM_SERVER_GOAL
-      ? t('premiumGoalReached')
-      : t('premiumGoalProgress', safeCount));
-    setText('[data-status-premium-detail]', safeCount >= PREMIUM_SERVER_GOAL
-      ? t('premiumReady')
-      : t('premiumRemaining', PREMIUM_SERVER_GOAL - safeCount));
-
-    if (fill) {
-      fill.style.width = `${progress}%`;
-    }
+  function renderPremiumStatus(billing = {}) {
+    setText('[data-status-premium-goal]', billing.enabled ? t('premiumReady') : t('premiumManual'));
+    setText('[data-status-premium-detail]', billing.enabled ? t('premiumReadyDetail') : t('premiumManualDetail'));
   }
 
   function renderStatus(status = {}) {
@@ -143,7 +115,7 @@
     setText('[data-status-bot-detail]', t('discordActive'));
     setText('[data-status-dashboard-detail]', t('dashboardAccessible'));
     setText('[data-status-guilds]', status.guildCount === null || status.guildCount === undefined ? t('unavailable') : String(status.guildCount));
-    renderPremiumGoal(status.guildCount);
+    renderPremiumStatus(status.premiumBilling);
     renderList('[data-status-incidents]', status.incidents, t('noIncidents'));
     renderList('[data-status-maintenance]', status.maintenance ? [status.maintenance] : [], t('noMaintenance'));
   }
@@ -171,7 +143,7 @@
       setText('[data-status-bot-detail]', t('statusReadFailed'));
       setText('[data-status-dashboard-detail]', t('dashboardReadFailed'));
       setText('[data-status-guilds]', t('unavailable'));
-      renderPremiumGoal(null);
+      renderPremiumStatus();
     } finally {
       statusRequestInFlight = false;
     }
@@ -208,7 +180,7 @@
     if (lastStatus) {
       renderStatus(lastStatus);
     } else {
-      renderPremiumGoal(null);
+      renderPremiumStatus();
     }
   });
 

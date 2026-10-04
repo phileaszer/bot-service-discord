@@ -259,6 +259,10 @@ async function main() {
         return;
     }
 
+    if (subscribersOnly || shouldBroadcastToStatusSubscribers(args)) {
+        throw new Error('La diffusion globale doit être préparée dans la console fondatrice puis validée par une seconde personne autorisée.');
+    }
+
     const client = new Client({
         intents: [
             GatewayIntentBits.Guilds,

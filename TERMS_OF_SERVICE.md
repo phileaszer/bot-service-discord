@@ -38,6 +38,8 @@ Si les permissions ou la hiérarchie des rôles sont mal configurées, certaines
 
 Certaines options avancées peuvent être réservées à une offre Premium. Les limites et fonctionnalités disponibles peuvent évoluer avec le temps.
 
+Les paiements Premium sont traités par Stripe. Le prix, la période de facturation et les conditions de renouvellement sont affichés avant validation dans Stripe Checkout. La résiliation et les documents de facturation sont accessibles depuis le portail de facturation lié au compte Discord payeur. Les remboursements éventuels sont examinés via le support Sentinel, sans limiter les droits impératifs applicables au consommateur.
+
 ## Responsabilité
 
 L'éditeur de Sentinel ne pourra pas être tenu responsable des pertes de données, erreurs de configuration, interruptions de service, sanctions mal utilisées, conflits de permissions ou dommages indirects liés à l'utilisation du bot.
@@ -97,6 +99,8 @@ If permissions or role hierarchy are incorrectly configured, some actions may fa
 ## Premium
 
 Some advanced options may be reserved for a Premium offer. Available limits and features may change over time.
+
+Premium payments are processed by Stripe. Price, billing period, and renewal terms are shown before confirmation in Stripe Checkout. Cancellation and billing documents are available through the billing portal linked to the paying Discord account. Refund requests are reviewed through Sentinel support without limiting any mandatory consumer rights.
 
 ## Liability
 

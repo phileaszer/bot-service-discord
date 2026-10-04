@@ -19,6 +19,8 @@ Sentinel collecte uniquement les données nécessaires à son fonctionnement :
 - annonces créées, brouillons et programmations d’envoi avec les embeds Sentinel ;
 - profil Discord utilisé pour le dashboard : identifiant, nom, avatar et serveurs accessibles ;
 - préférences du site et de notification, comme la langue choisie et les catégories activées ;
+- fréquence choisie pour les résumés Discord et historique technique de leur livraison ;
+- données de suivi Premium fournies par Stripe : identifiant client, e-mail de facturation, identifiants et états d’abonnement, factures, montants, devise, remboursements et incidents de paiement ;
 - résultats des essais de configuration et contrôles automatiques, sans exécution réelle sur les membres ;
 - sessions dashboard, jetons OAuth nécessaires à la connexion, date d'expiration, empreinte d'adresse IP et navigateur ;
 - journal d'audit indiquant qui a fait quoi, quand, sur quel serveur et depuis quelle interface.
@@ -28,8 +30,8 @@ Sentinel collecte uniquement les données nécessaires à son fonctionnement :
 Sentinel ne collecte pas :
 
 - les mots de passe ;
-- les informations de paiement ;
-- les adresses e-mail Discord ;
+- les numéros de carte, cryptogrammes et coordonnées bancaires, qui sont traités directement par Stripe ;
+- les adresses e-mail Discord non fournies volontairement au prestataire de paiement ;
 - les messages privés ;
 - les conversations vocales ;
 - le contenu général des messages d'un serveur, sauf lorsqu'une action volontaire du bot le nécessite, par exemple une purge, une sanction ou une transcription de dossier.
@@ -46,6 +48,8 @@ Les données sont utilisées pour :
 - publier, modifier ou programmer des annonces Sentinel ;
 - produire des exports et rapports demandés par les responsables autorisés ;
 - présenter à chaque membre connecté son propre espace personnel ;
+- envoyer, uniquement sur demande du membre, un résumé privé quotidien ou hebdomadaire de ses alertes ;
+- gérer l’activation, la résiliation, les factures, les remboursements et les échecs d’un abonnement Premium ;
 - permettre la connexion au dashboard ;
 - afficher les serveurs administrables par l'utilisateur connecté ;
 - sécuriser les sessions du dashboard ;
@@ -55,7 +59,7 @@ Les données sont utilisées pour :
 
 Les données ne sont pas vendues.
 
-Elles peuvent transiter par des services techniques nécessaires au fonctionnement de Sentinel, notamment Discord, l'hébergeur du bot, GitHub Pages pour le site public et les services utilisés pour la connexion OAuth.
+Elles peuvent transiter par des services techniques nécessaires au fonctionnement de Sentinel, notamment Discord, l'hébergeur du bot, GitHub Pages pour le site public, les services utilisés pour la connexion OAuth et Stripe pour la facturation Premium. Stripe traite les moyens de paiement selon sa propre politique de confidentialité; Sentinel ne reçoit pas les numéros de carte.
 
 Les données peuvent aussi être communiquées si une obligation légale l'impose.
 
@@ -91,7 +95,7 @@ Pour toute question concernant la confidentialité, utilisez le serveur support 
 
 # Privacy Policy
 
-Last updated: August 9, 2026
+Last updated: October 3, 2026
 
 This policy explains what data Sentinel collects, why it is used and how it is retained.
 
@@ -110,6 +114,8 @@ Sentinel only collects data required for its features:
 - announcements created with Sentinel embeds;
 - Discord dashboard profile: ID, username, avatar and accessible servers;
 - website preferences, such as selected language;
+- selected Discord digest frequency and technical delivery history;
+- Premium billing metadata provided by Stripe: customer ID, billing email, subscription IDs and statuses, invoices, amounts, currency, refunds, and payment incidents;
 - dashboard sessions, OAuth tokens required for login, expiration date, IP fingerprint and browser information;
 - audit logs showing who did what, when, on which server and from which interface.
 
@@ -118,8 +124,8 @@ Sentinel only collects data required for its features:
 Sentinel does not collect:
 
 - passwords;
-- payment information;
-- Discord email addresses;
+- card numbers, security codes, and bank details, which are processed directly by Stripe;
+- Discord email addresses not voluntarily provided to the payment provider;
 - private messages;
 - voice conversations;
 - general server message content, except when a deliberate bot action requires it, such as clearing messages, creating a moderation case or generating a ticket transcript.
@@ -134,6 +140,8 @@ Data is used to:
 - apply and view moderation actions;
 - create and manage tickets;
 - publish or edit Sentinel announcements;
+- send an optional daily or weekly private alert digest requested by the member;
+- manage Premium activation, cancellation, invoices, refunds, and payment failures;
 - provide dashboard login;
 - display servers the connected user can manage;
 - secure dashboard sessions;
@@ -143,7 +151,7 @@ Data is used to:
 
 Data is not sold.
 
-It may pass through technical services required for Sentinel to work, including Discord, the bot host, GitHub Pages for the public website and OAuth login services.
+It may pass through technical services required for Sentinel to work, including Discord, the bot host, GitHub Pages for the public website, OAuth login services, and Stripe for Premium billing. Stripe processes payment methods under its own privacy policy; Sentinel does not receive card numbers.
 
 Data may also be disclosed if required by law.
 

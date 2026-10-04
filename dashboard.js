@@ -7,6 +7,8 @@ const zlib = require('zlib');
 const { ChannelType, PermissionsBitField } = require('discord.js');
 const db = require('./database/database');
 const { SITE_ACCESS_ROLES, siteCapabilities } = require('./access-policy');
+const governance = require('./governance');
+const billing = require('./billing');
 
 const sessions = new Map();
 const oauthStates = new Map();
@@ -30,6 +32,7 @@ const OAUTH_STATE_TTL = 10 * 60 * 1000;
 const OAUTH_STATES_MAX = 1000;
 const PRIVILEGED_REAUTH_TTL = boundedEnvInteger('DASHBOARD_PRIVILEGED_REAUTH_MINUTES', 30, 5, 120) * 60 * 1000;
 const PRIVILEGED_IDENTITY_TTL = boundedEnvInteger('DASHBOARD_PRIVILEGED_VERIFY_SECONDS', 300, 60, 900) * 1000;
+const FOUNDER_MFA_SESSION_TTL = boundedEnvInteger('DASHBOARD_FOUNDER_MFA_MINUTES', 5, 1, 15) * 60 * 1000;
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
@@ -954,6 +957,21 @@ async function requireFounderAccess(session, options = {}) {
     }
 }
 
+function requireFounderMfa(session, code) {
+    if (session?.founderMfaVerifiedAt > Date.now() - FOUNDER_MFA_SESSION_TTL) {
+        return { method: 'session' };
+    }
+    try {
+        const result = governance.verifyFounderMfa(session?.user?.id, code);
+        session.founderMfaVerifiedAt = Date.now();
+        return result;
+    } catch (error) {
+        throw createHttpError(403, error.message || 'Code de sécurité fondatrice invalide.', {
+            code: 'FOUNDER_MFA_REQUIRED'
+        });
+    }
+}
+
 async function requireSitePanelAccess(ctx, session) {
     const access = await getSiteAccess(ctx, session?.user?.id);
 
@@ -1773,6 +1791,32 @@ function parseBody(req) {
     });
 }
 
+function parseRawBody(req, maxBytes = 1024 * 1024) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+        let rejected = false;
+
+        req.on('data', chunk => {
+            if (rejected) return;
+            size += chunk.length;
+            if (size > maxBytes) {
+                rejected = true;
+                reject(createHttpError(413, 'Payload too large.'));
+                req.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+        req.on('end', () => {
+            if (!rejected) resolve(Buffer.concat(chunks));
+        });
+        req.on('error', () => {
+            if (!rejected) reject(createHttpError(400, 'Request body read failed.'));
+        });
+    });
+}
+
 function sameOriginFromHeader(req, value) {
     if (!value) {
         return false;
@@ -2240,6 +2284,46 @@ function revokeDashboardPremiumUser(userId, guildId = null) {
     `).run(String(userId));
 }
 
+async function validateCreatorPremiumAccess(ctx, body) {
+    const actionValue = String(body.action || '').trim().toLowerCase();
+    const targetValue = String(body.target || '').trim().toLowerCase();
+    const action = actionValue === 'add' || actionValue === 'ajouter'
+        ? 'add'
+        : (actionValue === 'remove' || actionValue === 'retirer' ? 'remove' : null);
+    const target = targetValue === 'serveur' ? 'server'
+        : (targetValue === 'utilisateur' ? 'user' : targetValue);
+    const guildId = normalizeDiscordIdValue(body.guildId || body.serverId || body.serveurId);
+    const roleId = normalizeDiscordIdValue(body.roleId);
+    const userId = normalizeDiscordIdValue(body.userId || body.utilisateurId);
+
+    if (!action) throw createHttpError(400, 'Invalid Premium action.');
+    if (!['server', 'role', 'user'].includes(target)) throw createHttpError(400, 'Invalid Premium target.');
+    if (['server', 'role'].includes(target) && !guildId) throw createHttpError(400, 'Invalid server ID.');
+    if (target === 'role' && !roleId) throw createHttpError(400, 'Invalid role ID.');
+    if (target === 'user' && !userId) throw createHttpError(400, 'Invalid Discord user ID.');
+
+    if (target === 'role') {
+        const guild = ctx.client.guilds.cache.get(guildId)
+            || await ctx.client.guilds.fetch(guildId).catch(() => null);
+        if (!guild) throw createHttpError(404, 'Sentinel is not installed on this server.');
+        await guild.roles.fetch().catch(() => null);
+        if (!guild.roles.cache.has(roleId)) throw createHttpError(404, 'Role not found.');
+    }
+
+    const payload = {
+        action,
+        target,
+        guildId: guildId || null,
+        roleId: roleId || null,
+        userId: userId || null
+    };
+    const targetId = target === 'server' ? guildId : (target === 'role' ? roleId : userId);
+    return {
+        payload,
+        summary: `${action === 'add' ? 'Ajouter' : 'Retirer'} le Premium ${target} pour ${targetId}`
+    };
+}
+
 async function manageCreatorPremiumAccess(ctx, session, body) {
     const action = String(body.action || '').trim().toLowerCase();
     const target = String(body.target || '').trim().toLowerCase();
@@ -2427,6 +2511,8 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
 
         const isConfiguredPremium = configuredAdvancedGuildIds.has(guild.id);
         const isManualPremium = manualPremiumGuildIds.has(guild.id);
+        const billingState = billing.getGuildBillingSummary(guild.id);
+        const isBillingPremium = Boolean(billingState.subscription?.entitled);
         const isReferenceGuild = guild.id === SENTINEL_REFERENCE_GUILD_ID;
         const premiumRoleRows = premiumRolesByGuild.get(guild.id) || [];
         const premiumUserRows = premiumUsersByGuild.get(guild.id) || [];
@@ -2485,6 +2571,10 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             reasons.push('Premium serveur manuel');
         }
 
+        if (isBillingPremium) {
+            reasons.push('Abonnement Premium payé');
+        }
+
         if (premiumRoles.length > 0) {
             reasons.push(`${premiumRoles.length} rôle(s) Premium`);
         }
@@ -2497,7 +2587,7 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             reasons.push('Staff Sentinel reconnu automatiquement');
         }
 
-        const fullPremium = isConfiguredPremium || isManualPremium;
+        const fullPremium = isConfiguredPremium || isManualPremium || isBillingPremium;
         const partialPremium = !fullPremium && (
             premiumRoles.length > 0
             || premiumUsers.length > 0
@@ -2515,6 +2605,13 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             partialPremium,
             configuredPremium: isConfiguredPremium,
             manualPremium: isManualPremium,
+            billingPremium: isBillingPremium,
+            billing: {
+                provider: billingState.provider,
+                enabled: billingState.enabled,
+                mode: billingState.mode,
+                subscription: billingState.subscription
+            },
             referenceGuild: isReferenceGuild,
             reasons,
             premiumRoles,
@@ -2633,12 +2730,25 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
         }
         : storage;
 
+    const billingOverview = billing.getFounderBillingOverview(50);
+    if (!siteAccess.isFounder) {
+        billingOverview.subscriptions = billingOverview.subscriptions.map(item => ({
+            ...item,
+            customerId: null
+        }));
+    }
+
     return {
         generatedAt: new Date().toISOString(),
         canView: true,
         access: siteAccess,
         summary,
         storage: protectedStorage,
+        founderMfa: siteAccess.isFounder
+            ? governance.getFounderMfaStatus(session?.user?.id)
+            : null,
+        criticalActions: governance.listCriticalActions({ scope: 'global', limit: 50 }),
+        billing: billingOverview,
         staff: await getSiteStaffUsers(ctx),
         guilds: items
     };
@@ -3112,6 +3222,7 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
         advanced
     );
     const siteAccess = options.siteAccess || await getSiteAccess(ctx, session?.user?.id);
+    const canManageGuild = Boolean(viewerMember && ctx.helpers.hasCommandRoleAccess(viewerMember));
     const canViewGlobalAudit = siteAccess.isFounder;
     const auditLimit = advanced || canViewGlobalAudit ? 50 : 10;
     const moderationCaseLimit = advanced || canViewGlobalAudit ? 25 : 10;
@@ -3168,6 +3279,10 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             icon: guild.iconURL()
         },
         advanced,
+        billing: billing.getGuildBillingStatus(guild.id),
+        criticalActions: canManageGuild || siteAccess.canViewSitePanel
+            ? governance.listCriticalActions({ scope: 'guild', guildId: guild.id, limit: 20 })
+            : [],
         creator: {
             canViewPremiumOverview: siteAccess.canViewSitePanel,
             canManagePremium: siteAccess.canManagePremium,
@@ -4296,6 +4411,38 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
     throw createHttpError(400, 'Unknown dossier action.');
 }
 
+async function executeGlobalCriticalAction(ctx, request) {
+    try {
+        let message;
+        if (request.actionType === 'premium-access') {
+            message = await manageCreatorPremiumAccess(ctx, {
+                user: { id: request.requestedByUserId }
+            }, request.payload);
+        } else if (request.actionType === 'restore-backup') {
+            const restore = await ctx.helpers.restoreManagedDatabaseBackup(request.payload.fileName);
+            message = `Restauration de ${restore.backupFile} préparée. Copie de sécurité : ${restore.safetyBackupFile}. Sentinel va redémarrer.`;
+        } else if (request.actionType === 'official-update') {
+            const requester = await ctx.client.users.fetch(request.requestedByUserId).catch(() => ({
+                id: request.requestedByUserId,
+                username: 'Fondatrice Sentinel'
+            }));
+            const result = await ctx.helpers.publishOfficialStatusUpdate({
+                ...request.payload,
+                requester
+            });
+            if (!result.totalCount) throw new Error('Aucun salon de nouveautés n’a accepté cette annonce.');
+            message = `Annonce publiée dans ${result.totalCount} salon(s), dont ${result.subscriberCount} serveur(s) abonné(s).`;
+        } else {
+            throw createHttpError(400, 'Action critique inconnue.');
+        }
+        governance.completeCriticalAction(request.id);
+        return message;
+    } catch (error) {
+        governance.completeCriticalAction(request.id, error.message || error);
+        throw error;
+    }
+}
+
 async function runDashboardAction(ctx, guild, member, body, session = null) {
     const action = body.action;
     const language = ctx.helpers.getGuildLanguage(guild.id);
@@ -4657,12 +4804,45 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         return resetUserFromDashboard(ctx, guild, member, body);
     }
 
+    if (action === 'approve-critical-action' || action === 'reject-critical-action') {
+        await requireAdvanced(ctx, guild.id, member, session);
+        requireCommandAccess(ctx, member);
+        const request = governance.getCriticalAction(Number(body.requestId));
+        if (!request || request.scope !== 'guild' || request.guildId !== guild.id) {
+            throw createHttpError(404, 'Demande critique introuvable pour ce serveur.');
+        }
+        if (action === 'reject-critical-action') {
+            governance.rejectCriticalAction(request.id, member.id, body.reason);
+            return `Demande critique #${request.id} refusée.`;
+        }
+        const approved = governance.beginCriticalActionDecision(request.id, member.id);
+        try {
+            if (approved.actionType !== 'reset-guild') throw new Error('Action serveur critique inconnue.');
+            ctx.helpers.resetGuild(guild.id);
+            ctx.helpers.clearLongServiceAlertsForGuild?.(guild.id);
+            governance.completeCriticalAction(approved.id);
+            return `Demande #${approved.id} approuvée. Toutes les heures du serveur ont été réinitialisées.`;
+        } catch (error) {
+            governance.completeCriticalAction(approved.id, error.message || error);
+            throw error;
+        }
+    }
+
     if (action === 'reset-guild') {
         await requireAdvanced(ctx, guild.id, member, session);
         requireCommandAccess(ctx, member);
-        ctx.helpers.resetGuild(guild.id);
-        ctx.helpers.clearLongServiceAlertsForGuild?.(guild.id);
-        return 'Toutes les heures du serveur ont ete reinitialisees.';
+        if (String(body.confirmation || '').trim() !== 'REINITIALISER') {
+            throw createHttpError(400, 'Confirmation invalide. Écris exactement REINITIALISER.');
+        }
+        const request = governance.createCriticalAction({
+            scope: 'guild',
+            guildId: guild.id,
+            actionType: 'reset-guild',
+            payload: {},
+            summary: `Réinitialiser toutes les heures de ${guild.name}`,
+            requestedByUserId: member.id
+        });
+        return `Demande critique #${request.id} créée. Un autre responsable doit l’approuver avant la réinitialisation.`;
     }
 
     if (action === 'sync-service') {
@@ -4805,6 +4985,20 @@ async function handleApi(req, res, ctx, url) {
         throw createHttpError(405, 'Method not allowed.');
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/billing/webhook') {
+        checkRateLimit(rateLimitKey(req, 'billing-webhook'), RATE_LIMITS.api);
+        const rawBody = await parseRawBody(req, 1024 * 1024);
+        const signature = String(req.headers['stripe-signature'] || '');
+        try {
+            const event = billing.constructWebhookEvent(rawBody, signature);
+            const result = await billing.processWebhookEvent(event, rawBody);
+            json(res, 200, { received: true, duplicate: Boolean(result.duplicate) });
+        } catch (error) {
+            throw createHttpError(400, `Webhook Stripe refusé : ${error.message || error}`);
+        }
+        return;
+    }
+
     if (!SAFE_METHODS.has(req.method)) {
         requireTrustedMutationOrigin(req);
     }
@@ -4819,6 +5013,7 @@ async function handleApi(req, res, ctx, url) {
                 botOnline: Boolean(ctx.client?.isReady?.()),
                 dashboardOnline: true,
                 guildCount: ctx.client?.guilds?.cache?.size || 0,
+                premiumBilling: billing.billingStatus(),
                 incidents,
                 maintenance
             }
@@ -4925,6 +5120,28 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    const billingMatch = /^\/api\/guilds\/(\d{17,20})\/billing\/(checkout|portal)$/.exec(url.pathname);
+    if (req.method === 'POST' && billingMatch) {
+        const { guild, oauthManage, siteAccess } = await getDashboardAccess(ctx, session, billingMatch[1]);
+        if (!oauthManage && !siteAccess.isFounder) {
+            throw createHttpError(403, 'Seul un gestionnaire du serveur peut administrer son abonnement Premium.');
+        }
+        const returnUrl = `${getConfiguredDashboardOrigin()}/dashboard?guild=${encodeURIComponent(guild.id)}`;
+        const result = billingMatch[2] === 'checkout'
+            ? await billing.createCheckoutSession({
+                guildId: guild.id,
+                discordUserId: session.user.id,
+                successUrl: `${returnUrl}&billing=success`,
+                cancelUrl: `${returnUrl}&billing=cancelled`
+            })
+            : await billing.createPortalSession({
+                discordUserId: session.user.id,
+                returnUrl
+            });
+        json(res, 200, { ok: true, url: result.url });
+        return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/guilds') {
         const oauthGuilds = await getOauthGuilds(session);
         const hasPremiumSubscription = await hasDashboardPremiumSubscription(ctx, session);
@@ -4996,6 +5213,117 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/creator/mfa') {
+        await requireFounderAccess(session, { recentLogin: true });
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        const action = String(body.action || '').trim().toLowerCase();
+        let result;
+        if (action === 'setup') {
+            if (governance.getFounderMfaStatus(session.user.id).enabled) {
+                throw createHttpError(409, 'La double sécurité fondatrice est déjà active.');
+            }
+            result = governance.beginFounderMfaSetup(
+                session.user.id,
+                session.user.globalName || session.user.username || session.user.id
+            );
+        } else if (action === 'enable') {
+            result = governance.enableFounderMfa(session.user.id, body.code);
+            session.founderMfaVerifiedAt = Date.now();
+        } else if (action === 'disable') {
+            result = governance.disableFounderMfa(session.user.id, body.code);
+            session.founderMfaVerifiedAt = null;
+        } else {
+            throw createHttpError(400, 'Action MFA inconnue.');
+        }
+        addSiteAccessAuditLog({
+            session,
+            body: { action },
+            status: 'success',
+            summary: `Double sécurité fondatrice : ${action}.`,
+            kind: 'founder_mfa'
+        });
+        json(res, 200, {
+            ok: true,
+            result,
+            status: governance.getFounderMfaStatus(session.user.id)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/critical-action') {
+        await requireSitePanelAccess(ctx, session);
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        const action = String(body.action || '').trim().toLowerCase();
+        const existing = governance.getCriticalAction(Number(body.requestId));
+        if (!existing || existing.scope !== 'global') {
+            throw createHttpError(404, 'Demande critique introuvable.');
+        }
+        let message;
+        if (action === 'reject') {
+            const rejected = governance.rejectCriticalAction(existing.id, session.user.id, body.reason);
+            message = `Demande critique #${rejected.id} refusée.`;
+        } else if (action === 'approve') {
+            const approved = governance.beginCriticalActionDecision(existing.id, session.user.id);
+            message = await executeGlobalCriticalAction(ctx, approved);
+        } else {
+            throw createHttpError(400, 'Décision critique inconnue.');
+        }
+        addSiteAccessAuditLog({
+            session,
+            body: { action, requestId: existing.id },
+            status: 'success',
+            summary: message,
+            kind: 'critical_action'
+        });
+        json(res, 200, {
+            ok: true,
+            message,
+            overview: await buildCreatorPremiumOverview(ctx, session)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/official-update') {
+        await requireFounderAccess(session, { recentLogin: true });
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        requireFounderMfa(session, body.mfaCode);
+        const titleFr = String(body.titleFr || '').trim().slice(0, 256);
+        const bodyFr = String(body.bodyFr || '').trim().slice(0, 4000);
+        const titleEn = String(body.titleEn || '').trim().slice(0, 256);
+        const bodyEn = String(body.bodyEn || '').trim().slice(0, 4000);
+        if (!titleFr || !bodyFr) throw createHttpError(400, 'Le titre et le message français sont obligatoires.');
+        if (Boolean(titleEn) !== Boolean(bodyEn)) throw createHttpError(400, 'Le titre et le message anglais doivent être remplis ensemble.');
+        const request = governance.createCriticalAction({
+            scope: 'global',
+            actionType: 'official-update',
+            payload: {
+                titleFr,
+                bodyFr,
+                titleEn,
+                bodyEn,
+                includeSubscribers: Boolean(body.includeSubscribers)
+            },
+            summary: `Publier l’annonce globale « ${titleFr.slice(0, 120)} »`,
+            requestedByUserId: session.user.id
+        });
+        addSiteAccessAuditLog({
+            session,
+            body: { action: 'request', target: 'official-update' },
+            status: 'success',
+            summary: `Annonce globale #${request.id} soumise à validation.`,
+            kind: 'official_update'
+        });
+        json(res, 200, {
+            ok: true,
+            message: `Annonce #${request.id} préparée. Une autre personne autorisée doit la valider.`,
+            overview: await buildCreatorPremiumOverview(ctx, session)
+        });
+        return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/creator/maintenance/download') {
         await requireFounderAccess(session, { recentLogin: true });
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
@@ -5032,9 +5360,17 @@ async function handleApi(req, res, ctx, url) {
                 if (String(body.confirmation || '').trim() !== 'RESTAURER SENTINEL') {
                     throw createHttpError(400, 'Confirmation invalide. Écris exactement RESTAURER SENTINEL.');
                 }
-
-                const restore = await ctx.helpers.restoreManagedDatabaseBackup(body.fileName);
-                message = `Restauration de ${restore.backupFile} préparée. Copie de sécurité : ${restore.safetyBackupFile}. Sentinel va redémarrer.`;
+                requireFounderMfa(session, body.mfaCode);
+                const file = ctx.helpers.resolveMaintenanceFile?.('backup', body.fileName);
+                if (!file) throw createHttpError(404, 'Archive Sentinel introuvable.');
+                const request = governance.createCriticalAction({
+                    scope: 'global',
+                    actionType: 'restore-backup',
+                    payload: { fileName: file.fileName },
+                    summary: `Restaurer la sauvegarde ${file.fileName}`,
+                    requestedByUserId: session.user.id
+                });
+                message = `Restauration #${request.id} préparée. Une autre personne autorisée doit la valider.`;
             } else {
                 throw createHttpError(400, 'Action de maintenance inconnue.');
             }
@@ -5067,7 +5403,16 @@ async function handleApi(req, res, ctx, url) {
         let message;
 
         try {
-            message = await manageCreatorPremiumAccess(ctx, session, body);
+            requireFounderMfa(session, body.mfaCode);
+            const validated = await validateCreatorPremiumAccess(ctx, body);
+            const request = governance.createCriticalAction({
+                scope: 'global',
+                actionType: 'premium-access',
+                payload: validated.payload,
+                summary: validated.summary,
+                requestedByUserId: session.user.id
+            });
+            message = `Modification Premium #${request.id} préparée. Une autre personne autorisée doit la valider.`;
             addSiteAccessAuditLog({ session, body, status: 'success', summary: message, kind: 'premium' });
         } catch (error) {
             addSiteAccessAuditLog({
@@ -5096,6 +5441,7 @@ async function handleApi(req, res, ctx, url) {
         let message;
 
         try {
+            requireFounderMfa(session, body.mfaCode);
             message = await manageCreatorSiteStaffAccess(ctx, session, body);
             addSiteAccessAuditLog({ session, body, status: 'success', summary: message, kind: 'site_staff' });
         } catch (error) {
