@@ -171,21 +171,6 @@ const publicCommands = [
                 .setDescriptionLocalizations(en('Displayed currency or unit, for example $, SA$, or credits'))
                 .setMaxLength(8)
                 .setRequired(false)
-        )
-        .addRoleOption(option =>
-            option
-                .setName('role')
-                .setDescription('Role avec un taux horaire specifique')
-                .setDescriptionLocalizations(en('Role with a specific hourly rate'))
-                .setRequired(false)
-        )
-        .addBooleanOption(option =>
-            option
-                .setName('retirer')
-                .setNameLocalizations(en('remove'))
-                .setDescription('Retirer le taux specifique de ce role')
-                .setDescriptionLocalizations(en('Remove this role specific rate'))
-                .setRequired(false)
         ),
 
     command('config-permissions', 'config-permissions', 'Configure les roles autorises a gerer le bot.', 'Configures roles allowed to manage the bot.')
@@ -220,55 +205,6 @@ const publicCommands = [
                 .setNameLocalizations(en('week'))
                 .setDescription('Lundi de la semaine, format AAAA-MM-JJ. Vide = dernières archives')
                 .setDescriptionLocalizations(en('Week Monday, YYYY-MM-DD. Empty = latest archives'))
-                .setRequired(false)
-        ),
-
-    command('paie-ajustement', 'payroll-adjustment', 'Ajoute une prime, une retenue ou une correction de paie RP.', 'Adds a bonus, deduction, or correction to RP payroll.')
-        .addStringOption(option =>
-            option
-                .setName('type')
-                .setDescription('Type d ajustement')
-                .setDescriptionLocalizations(en('Adjustment type'))
-                .setRequired(true)
-                .addChoices(
-                    { name: 'Prime', name_localizations: en('Bonus'), value: 'bonus' },
-                    { name: 'Retenue', name_localizations: en('Deduction'), value: 'deduction' },
-                    { name: 'Correction', name_localizations: en('Correction'), value: 'correction' }
-                )
-        )
-        .addNumberOption(option =>
-            option
-                .setName('montant')
-                .setNameLocalizations(en('amount'))
-                .setDescription('Montant positif de l ajustement')
-                .setDescriptionLocalizations(en('Positive adjustment amount'))
-                .setMinValue(0.01)
-                .setMaxValue(100000000)
-                .setRequired(true)
-        )
-        .addUserOption(option =>
-            option
-                .setName('membre')
-                .setNameLocalizations(en('member'))
-                .setDescription('Membre concerne')
-                .setDescriptionLocalizations(en('Target member'))
-                .setRequired(false)
-        )
-        .addStringOption(option =>
-            option
-                .setName('utilisateur_id')
-                .setNameLocalizations(en('user_id'))
-                .setDescription('ID Discord si la personne n est plus sur le serveur')
-                .setDescriptionLocalizations(en('Discord ID if the person is no longer on the server'))
-                .setRequired(false)
-        )
-        .addStringOption(option =>
-            option
-                .setName('raison')
-                .setNameLocalizations(en('reason'))
-                .setDescription('Raison courte')
-                .setDescriptionLocalizations(en('Short reason'))
-                .setMaxLength(240)
                 .setRequired(false)
         ),
 
