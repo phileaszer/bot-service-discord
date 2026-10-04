@@ -29,6 +29,14 @@ function getAdvancedGuildId() {
     return /^\d{17,20}$/.test(guildId) ? guildId : null;
 }
 
+const REFERENCE_OPERATION_COMMAND_NAMES = new Set([
+    'ping',
+    'diagnostic',
+    'sync-service',
+    'sync-sentinel',
+    'maj-sentinel'
+]);
+
 const publicCommands = [
     command('aide', 'help', 'Affiche le guide de demarrage de Sentinel.', 'Shows the Sentinel getting started guide.'),
 
@@ -963,6 +971,7 @@ const advancedCommands = [
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+const referenceOperationCommands = advancedCommands.filter(item => REFERENCE_OPERATION_COMMAND_NAMES.has(item.name));
 
 (async () => {
     try {
@@ -986,7 +995,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
                         process.env.CLIENT_ID,
                         advancedGuildId
                     ),
-                    { body: advancedCommands.map(item => item.toJSON()) }
+                    { body: referenceOperationCommands.map(item => item.toJSON()) }
                 );
 
                 console.log('Commandes avancees localisees enregistrees sur le serveur configure.');

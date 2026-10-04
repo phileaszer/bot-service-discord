@@ -35,5 +35,6 @@ test('paid access and its public entry points stay disabled', () => {
     assert.match(dashboardSource, /const PREMIUM_ACCESS_ENABLED = false;/);
     assert.doesNotMatch(commandSource, /command\('premium'/);
     assert.doesNotMatch(commandSource, /command\('premium-acces'/);
+    assert.match(commandSource, /referenceOperationCommands\.map\(item => item\.toJSON\(\)\)/);
     assert.match(dashboardSource, /url\.pathname === '\/api\/creator\/premium-access'[\s\S]{0,120}createHttpError\(404/);
 });

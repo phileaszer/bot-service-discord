@@ -161,6 +161,13 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'dossier-reouvrir',
     'reopen-ticket'
 ]);
+const REFERENCE_OPERATION_COMMAND_NAMES = new Set([
+    'ping',
+    'diagnostic',
+    'sync-service',
+    'sync-sentinel',
+    'maj-sentinel'
+]);
 const ADVANCED_TEXT_COMMANDS = [
     /^!(heures|hours)(?:\s|$)/i,
     /^!(top-semaine|top-week)$/i,
@@ -15500,7 +15507,10 @@ client.on(Events.InteractionCreate, async interaction => {
             });
         }
 
-        if (isAdvancedCommand(commandName) && commandName !== 'maj-sentinel' && !hasAdvancedAccess(interaction.member)) {
+        const hasReferenceOperationAccess = REFERENCE_OPERATION_COMMAND_NAMES.has(commandName)
+            && hasReferenceStaffPremiumAccess(interaction.member);
+
+        if (isAdvancedCommand(commandName) && !hasReferenceOperationAccess && !hasAdvancedAccess(interaction.member)) {
             return interaction.reply({
                 content: getAdvancedUnavailableMessage(language, commandName),
                 flags: MessageFlags.Ephemeral
