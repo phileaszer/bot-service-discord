@@ -138,28 +138,6 @@ CREATE TABLE IF NOT EXISTS guild_command_roles (
     PRIMARY KEY (guild_id, role_id)
 );
 
-CREATE TABLE IF NOT EXISTS sentinel_premium_guilds (
-    guild_id TEXT PRIMARY KEY,
-    granted_by_user_id TEXT,
-    created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS sentinel_premium_roles (
-    guild_id TEXT NOT NULL,
-    role_id TEXT NOT NULL,
-    granted_by_user_id TEXT,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (guild_id, role_id)
-);
-
-CREATE TABLE IF NOT EXISTS sentinel_premium_users (
-    guild_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    granted_by_user_id TEXT,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (guild_id, user_id)
-);
-
 CREATE TABLE IF NOT EXISTS sentinel_dossier_roles (
     guild_id TEXT,
     role_id TEXT,
@@ -655,73 +633,6 @@ CREATE TABLE IF NOT EXISTS member_notification_deliveries (
     UNIQUE (guild_id, user_id, period_key)
 );
 
-CREATE TABLE IF NOT EXISTS premium_billing_customers (
-    discord_user_id TEXT PRIMARY KEY,
-    stripe_customer_id TEXT NOT NULL UNIQUE,
-    email TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS premium_billing_subscriptions (
-    stripe_subscription_id TEXT PRIMARY KEY,
-    guild_id TEXT NOT NULL,
-    discord_user_id TEXT,
-    stripe_customer_id TEXT NOT NULL,
-    stripe_price_id TEXT,
-    status TEXT NOT NULL,
-    current_period_end TEXT,
-    cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
-    payment_failure_at TEXT,
-    grace_ends_at TEXT,
-    latest_invoice_id TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS premium_billing_invoices (
-    stripe_invoice_id TEXT PRIMARY KEY,
-    stripe_subscription_id TEXT,
-    guild_id TEXT,
-    stripe_customer_id TEXT,
-    status TEXT NOT NULL,
-    currency TEXT,
-    amount_due INTEGER NOT NULL DEFAULT 0,
-    amount_paid INTEGER NOT NULL DEFAULT 0,
-    amount_refunded INTEGER NOT NULL DEFAULT 0,
-    attempt_count INTEGER NOT NULL DEFAULT 0,
-    hosted_invoice_url TEXT,
-    invoice_pdf TEXT,
-    paid_at TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS premium_billing_refunds (
-    stripe_refund_id TEXT PRIMARY KEY,
-    stripe_charge_id TEXT,
-    stripe_invoice_id TEXT,
-    guild_id TEXT,
-    amount INTEGER NOT NULL DEFAULT 0,
-    currency TEXT,
-    status TEXT,
-    reason TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS premium_billing_events (
-    stripe_event_id TEXT PRIMARY KEY,
-    event_type TEXT NOT NULL,
-    livemode INTEGER NOT NULL DEFAULT 0,
-    payload_sha256 TEXT NOT NULL,
-    status TEXT NOT NULL,
-    error_message TEXT,
-    received_at TEXT NOT NULL,
-    processed_at TEXT,
-    updated_at TEXT NOT NULL
-);
-
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -757,12 +668,6 @@ ON weekly_payment_events (guild_id, user_id, week_start, changed_at);
 
 CREATE INDEX IF NOT EXISTS idx_guild_command_roles_guild
 ON guild_command_roles (guild_id);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_premium_roles_guild
-ON sentinel_premium_roles (guild_id);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_premium_users_guild
-ON sentinel_premium_users (guild_id);
 
 CREATE INDEX IF NOT EXISTS idx_sentinel_dossier_roles_guild
 ON sentinel_dossier_roles (guild_id);
@@ -893,17 +798,6 @@ ON critical_action_requests (scope, guild_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_member_notification_deliveries_user
 ON member_notification_deliveries (guild_id, user_id, attempted_at);
 
-CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_guild_status
-ON premium_billing_subscriptions (guild_id, status, updated_at);
-
-CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_customer
-ON premium_billing_subscriptions (stripe_customer_id, updated_at);
-
-CREATE INDEX IF NOT EXISTS idx_billing_invoices_guild
-ON premium_billing_invoices (guild_id, created_at);
-
-CREATE INDEX IF NOT EXISTS idx_billing_events_received
-ON premium_billing_events (received_at);
 `);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
@@ -964,7 +858,7 @@ db.prepare(`
     'Sentinel | Mise à jour majeure',
     [
         'Le dashboard est plus rapide, plus clair et mieux adapté aux appareils mobiles.',
-        'Les vues Gratuit et Premium sont séparées, avec des accès Premium liés aux utilisateurs, serveurs ou rôles Discord.',
+        'Toutes les fonctions Sentinel sont accessibles à chaque serveur depuis une interface unique.',
         'Le service, la paie RP, les dossiers privés et le Centre de sûreté disposent de nouveaux outils de suivi.',
         'Les images peuvent être importées directement depuis un ordinateur pour les annonces Discord.',
         'Chaque serveur peut désormais recevoir les annonces officielles Sentinel dans un salon séparé du statut technique.',
@@ -974,7 +868,7 @@ db.prepare(`
     'Sentinel | Major update',
     [
         'The dashboard is faster, clearer, and better suited to mobile devices.',
-        'Free and Premium views are separated, with Premium access linked to Discord users, servers, or roles.',
+        'Every Sentinel feature is available to every server from one unified interface.',
         'Duty tracking, RP payroll, private cases, and the Safety Center now provide improved follow-up tools.',
         'Images can be uploaded directly from a computer for Discord announcements.',
         'Every server can now receive official Sentinel announcements in a channel separate from technical status.',
@@ -984,6 +878,31 @@ db.prepare(`
     'mise à jour officielle',
     '2026-10-02T00:00:00.000Z',
     '2026-10-02T00:00:00.000Z'
+);
+
+db.prepare(`
+    UPDATE official_updates
+    SET body_fr = ?, body_en = ?
+    WHERE public_key = 'sentinel-major-update-2026-10-02'
+`).run(
+    [
+        'Le dashboard est plus rapide, plus clair et mieux adapté aux appareils mobiles.',
+        'Toutes les fonctions Sentinel sont accessibles à chaque serveur depuis une interface unique.',
+        'Le service, la paie RP, les dossiers privés et le Centre de sûreté disposent de nouveaux outils de suivi.',
+        'Les images peuvent être importées directement depuis un ordinateur pour les annonces Discord.',
+        'Chaque serveur peut désormais recevoir les annonces officielles Sentinel dans un salon séparé du statut technique.',
+        'Le salon peut être testé depuis le dashboard, prévenir un rôle choisi et afficher le suivi des livraisons.',
+        'Les annonces manquées sont retentées automatiquement et restent consultables sur la nouvelle page publique Nouveautés.'
+    ].join('\n'),
+    [
+        'The dashboard is faster, clearer, and better suited to mobile devices.',
+        'Every Sentinel feature is available to every server from one unified interface.',
+        'Duty tracking, RP payroll, private cases, and the Safety Center now provide improved follow-up tools.',
+        'Images can be uploaded directly from a computer for Discord announcements.',
+        'Every server can now receive official Sentinel announcements in a channel separate from technical status.',
+        'The channel can be tested from the dashboard, notify a selected role, and display delivery tracking.',
+        'Missed announcements are retried automatically and remain available on the new public Updates page.'
+    ].join('\n')
 );
 
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()

@@ -8,7 +8,6 @@ const { ChannelType, PermissionsBitField } = require('discord.js');
 const db = require('./database/database');
 const { SITE_ACCESS_ROLES, siteCapabilities } = require('./access-policy');
 const governance = require('./governance');
-const billing = require('./billing');
 
 const sessions = new Map();
 const oauthStates = new Map();
@@ -36,7 +35,7 @@ const FOUNDER_MFA_SESSION_TTL = boundedEnvInteger('DASHBOARD_FOUNDER_MFA_MINUTES
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
-const PREMIUM_ACCESS_ENABLED = false;
+const ADVANCED_FEATURES_FREE = true;
 const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const SERVER_PRESET_LABELS = {
@@ -2092,55 +2091,8 @@ function hasDirectAdvancedAccess(ctx, guildId, member = null) {
         : ctx.helpers.isAdvancedGuild(guildId);
 }
 
-async function getReferenceMemberForSession(ctx, session = null) {
-    const userId = session?.user?.id;
-
-    if (!userId || !ctx.helpers.hasReferencePremiumSubscription) {
-        return null;
-    }
-
-    const referenceGuild = ctx.client.guilds.cache.get(SENTINEL_REFERENCE_GUILD_ID)
-        || await ctx.client.guilds.fetch(SENTINEL_REFERENCE_GUILD_ID).catch(() => null);
-
-    if (!referenceGuild) {
-        return null;
-    }
-
-    return referenceGuild.members.cache.get(userId)
-        || await referenceGuild.members.fetch(userId).catch(() => null);
-}
-
-async function hasDashboardPremiumSubscription(ctx, session = null) {
-    if (!PREMIUM_ACCESS_ENABLED) {
-        return false;
-    }
-
-    if (isCreatorUser(session?.user?.id)) {
-        return true;
-    }
-
-    if (ctx.helpers.hasManualPremiumUserSubscription?.(session?.user?.id)) {
-        return true;
-    }
-
-    const referenceMember = await getReferenceMemberForSession(ctx, session);
-
-    return Boolean(
-        referenceMember
-        && ctx.helpers.hasReferencePremiumSubscription?.(referenceMember)
-    );
-}
-
 async function hasDashboardAdvancedAccess(ctx, guildId, member = null, session = null) {
-    if (!PREMIUM_ACCESS_ENABLED) {
-        return false;
-    }
-
-    if (hasDirectAdvancedAccess(ctx, guildId, member)) {
-        return true;
-    }
-
-    return hasDashboardPremiumSubscription(ctx, session);
+    return Boolean(ADVANCED_FEATURES_FREE && /^\d{17,20}$/.test(String(guildId || '')));
 }
 
 function applyDashboardPremiumQuota(quota, advanced = false) {
@@ -2159,8 +2111,8 @@ function applyDashboardPremiumQuota(quota, advanced = false) {
 function formatDashboardCustomEmbedQuota(ctx, guildId, language = 'fr', member = null, advanced = false) {
     if (advanced) {
         return language === 'en'
-            ? 'Premium quota: unlimited embed access.'
-            : 'Quota Premium : accès illimité aux embeds.';
+            ? 'Unlimited Sentinel embed access.'
+            : 'Accès illimité aux embeds Sentinel.';
     }
 
     return ctx.helpers.formatCustomEmbedQuota(guildId, language, member);
@@ -2175,237 +2127,13 @@ async function requireAdvanced(ctx, guildId, member = null, session = null) {
     const hasAccess = await hasDashboardAdvancedAccess(ctx, guildId, member, session);
 
     if (!hasAccess) {
-        throw createHttpError(402, 'This action is reserved for Sentinel Premium.');
+        throw createHttpError(403, 'This Sentinel action is not available on this server.');
     }
-}
-
-function getDashboardAdvancedGuildIds() {
-    return [
-        SENTINEL_REFERENCE_GUILD_ID,
-        process.env.SENTINEL_REFERENCE_GUILD_ID,
-        process.env.SENTINEL_PREMIUM_GUILD_ID,
-        process.env.SENTINEL_PREMIUM_GUILD_IDS,
-        process.env.PREMIUM_GUILD_IDS
-    ]
-        .flatMap(value => String(value || '').split(','))
-        .map(value => value.trim())
-        .filter(value => /^\d{17,20}$/.test(value));
 }
 
 function normalizeDiscordIdValue(value) {
     const id = String(value || '').trim();
     return /^\d{17,20}$/.test(id) ? id : null;
-}
-
-function getManualPremiumGuildIds() {
-    return new Set(db.prepare(`
-        SELECT guild_id
-        FROM sentinel_premium_guilds
-        ORDER BY guild_id ASC
-    `).all().map(row => row.guild_id));
-}
-
-function getManualPremiumRolesByGuild() {
-    const byGuild = new Map();
-
-    for (const row of db.prepare(`
-        SELECT guild_id, role_id, granted_by_user_id, created_at
-        FROM sentinel_premium_roles
-        ORDER BY guild_id ASC, role_id ASC
-    `).all()) {
-        if (!byGuild.has(row.guild_id)) {
-            byGuild.set(row.guild_id, []);
-        }
-
-        byGuild.get(row.guild_id).push(row);
-    }
-
-    return byGuild;
-}
-
-function getManualPremiumUsersByGuild() {
-    const byGuild = new Map();
-
-    for (const row of db.prepare(`
-        SELECT guild_id, user_id, granted_by_user_id, created_at
-        FROM sentinel_premium_users
-        ORDER BY guild_id ASC, user_id ASC
-    `).all()) {
-        if (!byGuild.has(row.guild_id)) {
-            byGuild.set(row.guild_id, []);
-        }
-
-        byGuild.get(row.guild_id).push(row);
-    }
-
-    return byGuild;
-}
-
-function grantDashboardPremiumGuild(guildId, grantedByUserId = null) {
-    db.prepare(`
-        INSERT OR REPLACE INTO sentinel_premium_guilds (guild_id, granted_by_user_id, created_at)
-        VALUES (?, ?, ?)
-    `).run(String(guildId), grantedByUserId || null, new Date().toISOString());
-}
-
-function revokeDashboardPremiumGuild(guildId) {
-    db.prepare(`
-        DELETE FROM sentinel_premium_guilds
-        WHERE guild_id = ?
-    `).run(String(guildId));
-}
-
-function grantDashboardPremiumRole(guildId, roleId, grantedByUserId = null) {
-    db.prepare(`
-        INSERT OR REPLACE INTO sentinel_premium_roles (guild_id, role_id, granted_by_user_id, created_at)
-        VALUES (?, ?, ?, ?)
-    `).run(String(guildId), String(roleId), grantedByUserId || null, new Date().toISOString());
-}
-
-function revokeDashboardPremiumRole(guildId, roleId) {
-    db.prepare(`
-        DELETE FROM sentinel_premium_roles
-        WHERE guild_id = ? AND role_id = ?
-    `).run(String(guildId), String(roleId));
-}
-
-function grantDashboardPremiumUser(guildId, userId, grantedByUserId = null) {
-    db.prepare(`
-        INSERT OR REPLACE INTO sentinel_premium_users (guild_id, user_id, granted_by_user_id, created_at)
-        VALUES (?, ?, ?, ?)
-    `).run(String(guildId), String(userId), grantedByUserId || null, new Date().toISOString());
-}
-
-function revokeDashboardPremiumUser(userId, guildId = null) {
-    if (guildId) {
-        db.prepare(`
-            DELETE FROM sentinel_premium_users
-            WHERE guild_id = ? AND user_id = ?
-        `).run(String(guildId), String(userId));
-        return;
-    }
-
-    db.prepare(`
-        DELETE FROM sentinel_premium_users
-        WHERE user_id = ?
-    `).run(String(userId));
-}
-
-async function validateCreatorPremiumAccess(ctx, body) {
-    const actionValue = String(body.action || '').trim().toLowerCase();
-    const targetValue = String(body.target || '').trim().toLowerCase();
-    const action = actionValue === 'add' || actionValue === 'ajouter'
-        ? 'add'
-        : (actionValue === 'remove' || actionValue === 'retirer' ? 'remove' : null);
-    const target = targetValue === 'serveur' ? 'server'
-        : (targetValue === 'utilisateur' ? 'user' : targetValue);
-    const guildId = normalizeDiscordIdValue(body.guildId || body.serverId || body.serveurId);
-    const roleId = normalizeDiscordIdValue(body.roleId);
-    const userId = normalizeDiscordIdValue(body.userId || body.utilisateurId);
-
-    if (!action) throw createHttpError(400, 'Invalid Premium action.');
-    if (!['server', 'role', 'user'].includes(target)) throw createHttpError(400, 'Invalid Premium target.');
-    if (['server', 'role'].includes(target) && !guildId) throw createHttpError(400, 'Invalid server ID.');
-    if (target === 'role' && !roleId) throw createHttpError(400, 'Invalid role ID.');
-    if (target === 'user' && !userId) throw createHttpError(400, 'Invalid Discord user ID.');
-
-    if (target === 'role') {
-        const guild = ctx.client.guilds.cache.get(guildId)
-            || await ctx.client.guilds.fetch(guildId).catch(() => null);
-        if (!guild) throw createHttpError(404, 'Sentinel is not installed on this server.');
-        await guild.roles.fetch().catch(() => null);
-        if (!guild.roles.cache.has(roleId)) throw createHttpError(404, 'Role not found.');
-    }
-
-    const payload = {
-        action,
-        target,
-        guildId: guildId || null,
-        roleId: roleId || null,
-        userId: userId || null
-    };
-    const targetId = target === 'server' ? guildId : (target === 'role' ? roleId : userId);
-    return {
-        payload,
-        summary: `${action === 'add' ? 'Ajouter' : 'Retirer'} le Premium ${target} pour ${targetId}`
-    };
-}
-
-async function manageCreatorPremiumAccess(ctx, session, body) {
-    const action = String(body.action || '').trim().toLowerCase();
-    const target = String(body.target || '').trim().toLowerCase();
-    const add = action === 'add' || action === 'ajouter';
-    const remove = action === 'remove' || action === 'retirer';
-    const guildId = normalizeDiscordIdValue(body.guildId || body.serverId || body.serveurId);
-    const roleId = normalizeDiscordIdValue(body.roleId);
-    const userId = normalizeDiscordIdValue(body.userId || body.utilisateurId);
-
-    if (!add && !remove) {
-        throw createHttpError(400, 'Invalid Premium action.');
-    }
-
-    if (target === 'server' || target === 'serveur') {
-        if (!guildId) {
-            throw createHttpError(400, 'Invalid server ID.');
-        }
-
-        if (add) {
-            grantDashboardPremiumGuild(guildId, session.user.id);
-            return `Premium serveur ajouté pour ${guildId}.`;
-        }
-
-        revokeDashboardPremiumGuild(guildId);
-        return `Premium serveur retiré pour ${guildId}.`;
-    }
-
-    if (target === 'role') {
-        if (!guildId) {
-            throw createHttpError(400, 'Invalid server ID.');
-        }
-
-        if (!roleId) {
-            throw createHttpError(400, 'Invalid role ID.');
-        }
-
-        const guild = ctx.client.guilds.cache.get(guildId)
-            || await ctx.client.guilds.fetch(guildId).catch(() => null);
-
-        if (!guild) {
-            throw createHttpError(404, 'Sentinel is not installed on this server.');
-        }
-
-        await guild.roles.fetch().catch(() => null);
-
-        if (!guild.roles.cache.has(roleId)) {
-            throw createHttpError(404, 'Role not found.');
-        }
-
-        if (add) {
-            grantDashboardPremiumRole(guildId, roleId, session.user.id);
-            return `Premium rôle ajouté pour ${roleId}.`;
-        }
-
-        revokeDashboardPremiumRole(guildId, roleId);
-        return `Premium rôle retiré pour ${roleId}.`;
-    }
-
-    if (target === 'user' || target === 'utilisateur') {
-        if (!userId) {
-            throw createHttpError(400, 'Invalid Discord user ID.');
-        }
-
-        if (add) {
-            grantDashboardPremiumUser(guildId || SENTINEL_REFERENCE_GUILD_ID, userId, session.user.id);
-            return `Premium utilisateur ajouté pour ${userId}.`;
-        }
-
-        revokeDashboardPremiumUser(userId, guildId);
-        return guildId
-            ? `Premium utilisateur retiré pour ${userId} sur ${guildId}.`
-            : `Premium utilisateur retiré partout pour ${userId}.`;
-    }
-
-    throw createHttpError(400, 'Invalid Premium target.');
 }
 
 async function getSiteStaffUsers(ctx) {
@@ -2502,166 +2230,9 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
 
 async function buildCreatorPremiumOverview(ctx, session = null) {
     const siteAccess = await getSiteAccess(ctx, session?.user?.id);
-    const configuredAdvancedGuildIds = new Set(getDashboardAdvancedGuildIds());
-    const manualPremiumGuildIds = getManualPremiumGuildIds();
-    const premiumRolesByGuild = getManualPremiumRolesByGuild();
-    const premiumUsersByGuild = getManualPremiumUsersByGuild();
-    const guilds = PREMIUM_ACCESS_ENABLED
-        ? Array.from(ctx.client.guilds.cache.values())
-            .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-        : [];
-
-    const items = [];
-
-    for (const guild of guilds) {
-        if (guild.roles.cache.size <= 1) {
-            await guild.roles.fetch().catch(() => null);
-        }
-
-        const isConfiguredPremium = configuredAdvancedGuildIds.has(guild.id);
-        const isManualPremium = manualPremiumGuildIds.has(guild.id);
-        const billingState = billing.getGuildBillingSummary(guild.id);
-        const isBillingPremium = Boolean(billingState.subscription?.entitled);
-        const isReferenceGuild = guild.id === SENTINEL_REFERENCE_GUILD_ID;
-        const premiumRoleRows = premiumRolesByGuild.get(guild.id) || [];
-        const premiumUserRows = premiumUsersByGuild.get(guild.id) || [];
-        const premiumRoles = premiumRoleRows.map(row => {
-            const role = guild.roles.cache.get(row.role_id);
-
-            return {
-                id: row.role_id,
-                name: role?.name || null,
-                exists: Boolean(role),
-                grantedByUserId: row.granted_by_user_id || null,
-                createdAt: row.created_at
-            };
-        });
-        const premiumUsers = [];
-
-        for (const row of premiumUserRows) {
-            const profile = getUserProfile(row.user_id);
-            const member = guild.members.cache.get(row.user_id)
-                || await guild.members.fetch(row.user_id).catch(() => null);
-            const user = member?.user || (
-                profile
-                    ? null
-                    : await ctx.client.users.fetch(row.user_id).catch(() => null)
-            );
-
-            premiumUsers.push({
-                id: row.user_id,
-                tag: user?.tag || profile?.username || null,
-                username: user?.username || profile?.username || null,
-                inGuild: Boolean(member),
-                grantedByUserId: row.granted_by_user_id || null,
-                createdAt: row.created_at
-            });
-        }
-
-        const referenceStaffRoleIds = isReferenceGuild && ctx.helpers.getCommandRoleIds
-            ? ctx.helpers.getCommandRoleIds(guild.id)
-            : [];
-        const referenceStaffRoles = referenceStaffRoleIds.map(roleId => {
-            const role = guild.roles.cache.get(roleId);
-
-            return {
-                id: roleId,
-                name: role?.name || null,
-                exists: Boolean(role)
-            };
-        });
-        const reasons = [];
-
-        if (isConfiguredPremium) {
-            reasons.push(isReferenceGuild ? 'Serveur de référence' : 'Serveur Premium configuré');
-        }
-
-        if (isManualPremium) {
-            reasons.push('Premium serveur manuel');
-        }
-
-        if (isBillingPremium) {
-            reasons.push('Abonnement Premium payé');
-        }
-
-        if (premiumRoles.length > 0) {
-            reasons.push(`${premiumRoles.length} rôle(s) Premium`);
-        }
-
-        if (premiumUsers.length > 0) {
-            reasons.push(`${premiumUsers.length} personne(s) Premium`);
-        }
-
-        if (isReferenceGuild && referenceStaffRoles.length > 0) {
-            reasons.push('Staff Sentinel reconnu automatiquement');
-        }
-
-        const fullPremium = isConfiguredPremium || isManualPremium || isBillingPremium;
-        const partialPremium = !fullPremium && (
-            premiumRoles.length > 0
-            || premiumUsers.length > 0
-            || (isReferenceGuild && referenceStaffRoles.length > 0)
-        );
-
-        items.push({
-            id: guild.id,
-            name: guild.name,
-            icon: guild.iconURL(),
-            memberCount: guild.memberCount || null,
-            premium: fullPremium || partialPremium,
-            premiumScope: fullPremium ? 'server' : (partialPremium ? 'partial' : 'none'),
-            fullPremium,
-            partialPremium,
-            configuredPremium: isConfiguredPremium,
-            manualPremium: isManualPremium,
-            billingPremium: isBillingPremium,
-            billing: {
-                provider: billingState.provider,
-                enabled: billingState.enabled,
-                mode: billingState.mode,
-                subscription: billingState.subscription
-            },
-            referenceGuild: isReferenceGuild,
-            reasons,
-            premiumRoles,
-            premiumUsers,
-            referenceStaffRoles
-        });
-    }
-
-    const premiumOrder = { server: 0, partial: 1, none: 2 };
-    items.sort((a, b) => {
-        const scopeDiff = (premiumOrder[a.premiumScope] ?? 99) - (premiumOrder[b.premiumScope] ?? 99);
-
-        if (scopeDiff !== 0) {
-            return scopeDiff;
-        }
-
-        return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-    });
-
-    const summary = items.reduce((acc, item) => {
-        acc.guildCount += 1;
-
-        if (item.premiumScope === 'server') {
-            acc.serverPremiumCount += 1;
-        } else if (item.premiumScope === 'partial') {
-            acc.partialPremiumCount += 1;
-        } else {
-            acc.freeCount += 1;
-        }
-
-        acc.premiumRoleCount += item.premiumRoles.length;
-        acc.premiumUserCount += item.premiumUsers.length;
-        return acc;
-    }, {
-        guildCount: PREMIUM_ACCESS_ENABLED ? 0 : ctx.client.guilds.cache.size,
-        serverPremiumCount: 0,
-        partialPremiumCount: 0,
-        freeCount: 0,
-        premiumRoleCount: 0,
-        premiumUserCount: 0
-    });
+    const summary = {
+        guildCount: ctx.client.guilds.cache.size
+    };
 
     const storage = ctx.helpers.getDatabaseBackupStatus
         ? ctx.helpers.getDatabaseBackupStatus()
@@ -3586,7 +3157,7 @@ async function automodAction(ctx, guild, actor, body, session = null) {
     const hasPremiumPatch = Object.keys(body || {}).some(key => AUTOMOD_PREMIUM_BODY_KEYS.has(key));
 
     if (hasPremiumPatch && !advanced) {
-        throw createHttpError(402, 'This action is reserved for Sentinel Premium.');
+        throw createHttpError(403, 'This Sentinel action is not available on this server.');
     }
 
     if (action === 'set-automod-settings') {
@@ -3921,7 +3492,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         );
 
         if (!quota.unlimited && quota.used >= quota.limit) {
-            throw createHttpError(402, `Quota gratuit atteint : ${quota.limit} embeds actifs.`);
+            throw createHttpError(403, `Limite technique atteinte : ${quota.limit} embeds actifs.`);
         }
 
         let data;
@@ -4182,7 +3753,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
                 );
 
                 if (!quota.unlimited && quota.used >= quota.limit) {
-                    throw createHttpError(402, `Le gratuit permet ${quota.limit} panneau de dossiers par serveur.`);
+                    throw createHttpError(403, `Limite technique atteinte : ${quota.limit} panneau de dossiers par serveur.`);
                 }
 
                 message = await channel.send({
@@ -4413,14 +3984,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
 async function executeGlobalCriticalAction(ctx, request) {
     try {
         let message;
-        if (request.actionType === 'premium-access') {
-            if (!PREMIUM_ACCESS_ENABLED) {
-                throw createHttpError(409, 'Cette attribution est suspendue.');
-            }
-            message = await manageCreatorPremiumAccess(ctx, {
-                user: { id: request.requestedByUserId }
-            }, request.payload);
-        } else if (request.actionType === 'restore-backup') {
+        if (request.actionType === 'restore-backup') {
             const restore = await ctx.helpers.restoreManagedDatabaseBackup(request.payload.fileName);
             message = `Restauration de ${restore.backupFile} préparée. Copie de sécurité : ${restore.safetyBackupFile}. Sentinel va redémarrer.`;
         } else if (request.actionType === 'official-update') {
@@ -4987,10 +4551,6 @@ async function handleApi(req, res, ctx, url) {
         throw createHttpError(405, 'Method not allowed.');
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/billing/webhook') {
-        throw createHttpError(404, 'Not found.');
-    }
-
     if (!SAFE_METHODS.has(req.method)) {
         requireTrustedMutationOrigin(req);
     }
@@ -5111,14 +4671,8 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
-    const billingMatch = /^\/api\/guilds\/(\d{17,20})\/billing\/(checkout|portal)$/.exec(url.pathname);
-    if (req.method === 'POST' && billingMatch) {
-        throw createHttpError(404, 'Not found.');
-    }
-
     if (req.method === 'GET' && url.pathname === '/api/guilds') {
         const oauthGuilds = await getOauthGuilds(session);
-        const hasPremiumSubscription = await hasDashboardPremiumSubscription(ctx, session);
         const siteAccess = await getSiteAccess(ctx, session.user.id);
         const guilds = [];
         const oauthGuildIds = new Set(oauthGuilds.map(guild => guild.id));
@@ -5140,8 +4694,7 @@ async function handleApi(req, res, ctx, url) {
             const installed = ctx.client.guilds.cache.has(oauthGuild.id);
             const oauthManage = userCanManageOauthGuild(oauthGuild);
             let memberAccess = false;
-            let advanced = ctx.helpers.isAdvancedGuild(oauthGuild.id)
-                || hasPremiumSubscription;
+            let advanced = ctx.helpers.isAdvancedGuild(oauthGuild.id);
 
             if (installed) {
                 const guild = ctx.client.guilds.cache.get(oauthGuild.id);
@@ -5152,8 +4705,7 @@ async function handleApi(req, res, ctx, url) {
                 }
 
                 memberAccess = member ? ctx.helpers.hasCommandRoleAccess(member) : false;
-                advanced = hasDirectAdvancedAccess(ctx, oauthGuild.id, member)
-                    || hasPremiumSubscription;
+                advanced = hasDirectAdvancedAccess(ctx, oauthGuild.id, member);
             }
 
             if (!oauthManage && !memberAccess && !siteAccess.canViewSitePanel) {
@@ -5367,10 +4919,6 @@ async function handleApi(req, res, ctx, url) {
             overview: await buildCreatorPremiumOverview(ctx, session)
         });
         return;
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/creator/premium-access') {
-        throw createHttpError(404, 'Not found.');
     }
 
     if (req.method === 'POST' && url.pathname === '/api/creator/site-staff') {
@@ -5739,7 +5287,6 @@ function serveStatic(req, res, url) {
         membre: 'membre.html',
         fonctionnalites: 'fonctionnalites.html',
         commandes: 'commandes.html',
-        premium: 'premium.html',
         securite: 'securite.html',
         installation: 'installation.html',
         pourquoi: 'pourquoi.html',

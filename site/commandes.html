@@ -51,12 +51,16 @@
           <h2>Service</h2>
           <ul>
             <li><code>/mes-heures</code><span>Voir ses heures</span></li>
-            <li><code>/historique-service</code><span>Voir ses 5 dernières sessions</span></li>
+            <li><code>/historique-service</code><span>Consulter l’historique complet d’un membre</span></li>
             <li><code>/en-service</code><span>Voir les agents actifs</span></li>
-            <li><code>/top-service</code><span>Voir le top 10</span></li>
+            <li><code>/top-service</code><span>Voir le classement général</span></li>
+            <li><code>/heures</code><span>Consulter le registre d’un membre</span></li>
+            <li><code>/top-semaine</code><span>Voir le classement des sept derniers jours</span></li>
+            <li><code>/resume-service</code><span>Afficher le bilan complet</span></li>
             <li><code>/paie-semaine</code><span>Voir la paie RP estimée et l’état payé/non payé</span></li>
             <li><code>/paie-archive</code><span>Archiver la paie RP de la semaine</span></li>
             <li><code>/reset-heures</code><span>Réinitialiser une personne, même par ID</span></li>
+            <li><code>/reset-heures-all</code><span>Préparer la remise à zéro générale sécurisée</span></li>
           </ul>
         </article>
 
@@ -68,10 +72,11 @@
             <li><code>/config-autorole</code><span>Définir le rôle donné automatiquement à l’arrivée</span></li>
             <li><code>/config-logs</code><span>Définir le salon de logs par ID</span></li>
             <li><code>/config-statut</code><span>Choisir séparément le panneau d’état, le salon des nouveautés, son test et le rôle à prévenir</span></li>
-            <li><code>/config-paie</code><span>Définir le montant horaire global de la paie RP</span></li>
+            <li><code>/config-paie</code><span>Définir le montant horaire global ou propre à un rôle</span></li>
             <li><code>/config-permissions</code><span>Définir les rôles autorisés</span></li>
             <li><code>/config-voir</code><span>Vérifier la configuration</span></li>
             <li><code>/paie-marquer</code><span>Cocher une ligne de paie en payé ou non payé</span></li>
+            <li><code>/paie-ajustement</code><span>Ajouter une prime, une retenue ou une correction RP</span></li>
             <li><code>/aide</code><span>Afficher le tutoriel dans Discord</span></li>
             <li><code>/dashboard</code><span>Ouvrir le dashboard web</span></li>
             <li><code>/support</code><span>Recevoir les liens officiels et le serveur support</span></li>
@@ -87,7 +92,15 @@
             <li><code>/expulser</code><span>Expulser un membre présent</span></li>
             <li><code>/bannir</code><span>Bannir par membre ou ID</span></li>
             <li><code>/purge</code><span>Supprimer des messages récents</span></li>
-            <li><code>/sanctions</code><span>Voir les 10 derniers cas</span></li>
+            <li><code>/sanctions</code><span>Voir les dossiers disciplinaires</span></li>
+            <li><code>/cas</code><span>Consulter un dossier précis</span></li>
+            <li><code>/modifier-cas</code><span>Corriger la raison d’un dossier</span></li>
+            <li><code>/supprimer-cas</code><span>Retirer un dossier invalide</span></li>
+            <li><code>/unwarn</code><span>Annuler un avertissement précis</span></li>
+            <li><code>/profil-mod</code><span>Voir le profil disciplinaire complet</span></li>
+            <li><code>/tempban</code><span>Bannir temporairement</span></li>
+            <li><code>/unban</code><span>Lever un bannissement par ID</span></li>
+            <li><code>/lock · /unlock · /slowmode</code><span>Gérer rapidement un salon</span></li>
             <li><code>/embed</code><span>Créer, modifier ou supprimer une annonce Sentinel</span></li>
           </ul>
         </article>
@@ -104,10 +117,11 @@
             <li><code>/dossier-prendre</code><span>Se déclarer responsable du dossier actuel</span></li>
             <li><code>/dossier-statut</code><span>Corriger le statut visible du dossier actuel</span></li>
             <li><code>/dossier-fermer</code><span>Clôturer le dossier actuel et envoyer le compte rendu</span></li>
+            <li><code>/dossier-reouvrir</code><span>Réouvrir un dossier encore conservé</span></li>
             <li><code>/dossier-ajouter</code><span>Ajouter un intervenant</span></li>
             <li><code>/dossier-retirer</code><span>Retirer un intervenant</span></li>
             <li><code>/dossier-compte-rendu</code><span>Générer le compte rendu</span></li>
-            <li><code>Capacité</code><span>5 dossiers ouverts et 10 dossiers récents visibles</span></li>
+            <li><code>Capacité</code><span>Panneaux, dossiers ouverts et historique sans quota de formule</span></li>
           </ul>
         </article>
 

@@ -22,23 +22,21 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 - Dashboard : configuration du serveur, actions rapides, audit, suivi des services, sanctions, dossiers et annonces.
 - Langues : français et anglais, avec un choix propre à chaque serveur.
 
-## Version gratuite
+## Fonctionnalités incluses
 
 Sentinel comprend :
 
 - panneau de service ;
 - heures personnelles ;
-- historique personnel limité ;
-- classement global limité au top 10 ;
-- paie RP hebdomadaire avec suivi payé/non payé ;
-- modération essentielle ;
+- historique complet et classements avancés ;
+- paie RP hebdomadaire avec taux par rôle, ajustements, suivi payé/non payé et archives ;
+- modération complète, sanctions temporaires, verrouillage de salons et escalade automatique ;
 - rôle automatique à l'arrivée des membres ;
-- consultation simple des sanctions ;
-- 2 embeds actifs, modifiables sans limite ;
-- 1 panneau de dossiers ;
-- 5 dossiers ouverts en même temps ;
-- 10 derniers dossiers visibles ;
-- rôles responsables par nature de dossier, file d’attente, filtres essentiels, archivage complet vérifié et clôture motivée.
+- consultation et correction complète des sanctions ;
+- embeds actifs sans quota, modifiables sans limite ;
+- panneaux et dossiers sans quota de formule ;
+- formulaires personnalisés, réponses préparées, routage, recherche et statistiques de dossiers ;
+- exports, rapports automatiques, annonces programmées, mode d’essai et validation Sentinel.
 
 ## Espace personnel
 
@@ -68,7 +66,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-autorole` | `/autorole-config` | Définir le rôle automatique d'arrivée |
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
 | `/config-statut` | `/status-channel` | Séparer l’état technique, les nouveautés et le rôle à prévenir |
-| `/config-paie` | `/payroll-config` | Définir le montant horaire global de la paie RP |
+| `/config-paie` | `/payroll-config` | Définir le montant horaire global ou propre à un rôle |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
 | `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
@@ -79,15 +77,26 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/paie-semaine` | `/weekly-payroll` | Voir la paie RP de la semaine |
 | `/paie-historique` | `/payroll-history` | Retrouver les archives et le suivi des anciennes paies RP |
 | `/paie-archive` | `/payroll-archive` | Archiver la paie RP de la semaine |
+| `/paie-ajustement` | `/payroll-adjustment` | Ajouter une prime, une retenue ou une correction RP |
 | `/reset-heures` | `/reset-hours` | Remettre les heures d'une personne à zéro |
+| `/reset-heures-all` | `/reset-hours-all` | Préparer la remise à zéro générale sécurisée |
+| `/heures` | `/hours` | Consulter le registre d’un membre |
+| `/top-semaine` | `/top-week` | Voir le classement des sept derniers jours |
+| `/resume-service` | `/summary` | Afficher le bilan complet du serveur |
 | `/avertir` | `/warn` | Ajouter un avertissement |
 | `/timeout` | `/timeout` | Mettre un membre en timeout |
 | `/expulser` | `/kick` | Expulser un membre |
 | `/bannir` | `/ban` | Bannir un membre ou un ID Discord |
 | `/purge` | `/clear` | Supprimer des messages récents |
 | `/sanctions` | `/mod-cases` | Voir les sanctions récentes |
+| `/cas` | `/case` | Consulter un dossier disciplinaire précis |
+| `/profil-mod` | `/mod-profile` | Voir le profil disciplinaire complet |
+| `/tempban` | `/tempban` | Bannir temporairement un utilisateur |
+| `/unban` | `/unban` | Lever un bannissement par ID |
+| `/lock`, `/unlock`, `/slowmode` | identiques | Gérer rapidement un salon |
 | `/embed` | `/embed` | Gérer les annonces Sentinel |
 | `/dossier-panel` | `/ticket-panel` | Publier le panneau de tickets |
+| `/dossier-reouvrir` | `/reopen-ticket` | Réouvrir un dossier encore conservé |
 
 La liste complète et les explications détaillées sont disponibles sur le site.
 
@@ -99,7 +108,7 @@ La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauv
 
 La Console fondateur contient le Centre de maintenance : capacité du volume, répartition de la base, alertes à 60 %, 75 % et 90 %, croissance anormale, suivi SQLite/site/Discord, copies protégées, archives froides et registre des médias d'embeds. Les images importées sont validées, redimensionnées et converties en WebP, puis dédupliquées par SHA-256. Une référence orpheline passe 30 jours en corbeille avant suppression locale ou distante. Les téléchargements, contrôles manuels et restaurations sont autorisés côté serveur uniquement au fondateur avec une session Discord récente. Une restauration crée d'abord une copie de sécurité vérifiée puis est appliquée au redémarrage.
 
-Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Le quota média par serveur est réglable avec `EMBED_MEDIA_FREE_QUOTA_MB`.
+Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Le quota média par serveur est réglable avec `EMBED_MEDIA_QUOTA_MB`.
 
 Un bucket privé peut utiliser `DASHBOARD_URL/media` comme base publique. Sentinel valide alors l'empreinte demandée dans SQLite et diffuse uniquement l'objet WebP correspondant, avec cache immuable, sans révéler les identifiants S3 ni permettre de parcourir le bucket.
 

@@ -43,9 +43,9 @@ test('founder MFA encrypts setup, blocks TOTP replay, and consumes recovery code
 test('critical actions require a different authorized decision maker', () => {
     const request = governance.createCriticalAction({
         scope: 'global',
-        actionType: 'premium-access',
-        payload: { action: 'add', target: 'server', guildId: '100000000000000003' },
-        summary: 'Accorder le Premium',
+        actionType: 'database-restore',
+        payload: { backupFile: 'sentinel-backup.db' },
+        summary: 'Restaurer une sauvegarde',
         requestedByUserId: founderId
     });
     assert.equal(request.status, 'pending');

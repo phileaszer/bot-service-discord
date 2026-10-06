@@ -29,14 +29,6 @@ function getAdvancedGuildId() {
     return /^\d{17,20}$/.test(guildId) ? guildId : null;
 }
 
-const REFERENCE_OPERATION_COMMAND_NAMES = new Set([
-    'ping',
-    'diagnostic',
-    'sync-service',
-    'sync-sentinel',
-    'maj-sentinel'
-]);
-
 const publicCommands = [
     command('aide', 'help', 'Affiche le guide de demarrage de Sentinel.', 'Shows the Sentinel getting started guide.'),
 
@@ -171,6 +163,21 @@ const publicCommands = [
                 .setDescriptionLocalizations(en('Displayed currency or unit, for example $, SA$, or credits'))
                 .setMaxLength(8)
                 .setRequired(false)
+        )
+        .addRoleOption(option =>
+            option
+                .setName('role')
+                .setDescription('Role avec un taux horaire specifique')
+                .setDescriptionLocalizations(en('Role with a specific hourly rate'))
+                .setRequired(false)
+        )
+        .addBooleanOption(option =>
+            option
+                .setName('retirer')
+                .setNameLocalizations(en('remove'))
+                .setDescription('Retirer le taux specifique de ce role')
+                .setDescriptionLocalizations(en('Remove this role specific rate'))
+                .setRequired(false)
         ),
 
     command('config-permissions', 'config-permissions', 'Configure les roles autorises a gerer le bot.', 'Configures roles allowed to manage the bot.')
@@ -205,6 +212,55 @@ const publicCommands = [
                 .setNameLocalizations(en('week'))
                 .setDescription('Lundi de la semaine, format AAAA-MM-JJ. Vide = dernières archives')
                 .setDescriptionLocalizations(en('Week Monday, YYYY-MM-DD. Empty = latest archives'))
+                .setRequired(false)
+        ),
+
+    command('paie-ajustement', 'payroll-adjustment', 'Ajoute une prime, une retenue ou une correction de paie RP.', 'Adds a bonus, deduction, or correction to RP payroll.')
+        .addStringOption(option =>
+            option
+                .setName('type')
+                .setDescription('Type d ajustement')
+                .setDescriptionLocalizations(en('Adjustment type'))
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Prime', name_localizations: en('Bonus'), value: 'bonus' },
+                    { name: 'Retenue', name_localizations: en('Deduction'), value: 'deduction' },
+                    { name: 'Correction', name_localizations: en('Correction'), value: 'correction' }
+                )
+        )
+        .addNumberOption(option =>
+            option
+                .setName('montant')
+                .setNameLocalizations(en('amount'))
+                .setDescription('Montant positif de l ajustement')
+                .setDescriptionLocalizations(en('Positive adjustment amount'))
+                .setMinValue(0.01)
+                .setMaxValue(100000000)
+                .setRequired(true)
+        )
+        .addUserOption(option =>
+            option
+                .setName('membre')
+                .setNameLocalizations(en('member'))
+                .setDescription('Membre concerne')
+                .setDescriptionLocalizations(en('Target member'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('utilisateur_id')
+                .setNameLocalizations(en('user_id'))
+                .setDescription('ID Discord si la personne n est plus sur le serveur')
+                .setDescriptionLocalizations(en('Discord ID if the person is no longer on the server'))
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option
+                .setName('raison')
+                .setNameLocalizations(en('reason'))
+                .setDescription('Raison courte')
+                .setDescriptionLocalizations(en('Short reason'))
+                .setMaxLength(240)
                 .setRequired(false)
         ),
 
@@ -543,8 +599,8 @@ const publicCommands = [
             subcommand
                 .setName('supprimer')
                 .setNameLocalizations(en('delete'))
-                .setDescription('Supprime un embed Sentinel et libere son emplacement gratuit')
-                .setDescriptionLocalizations(en('Deletes a Sentinel embed and frees its free slot'))
+                .setDescription('Supprime un embed Sentinel et libere son emplacement')
+                .setDescriptionLocalizations(en('Deletes a Sentinel embed and frees its slot'))
                 .addChannelOption(option =>
                     option
                         .setName('salon')
@@ -614,6 +670,8 @@ const publicCommands = [
         ),
 
     command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the current Sentinel dossier.'),
+
+    command('dossier-reouvrir', 'reopen-ticket', 'Reouvre un dossier Sentinel encore conserve.', 'Reopens a retained Sentinel dossier.'),
 
     command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel dossier.')
         .addUserOption(option =>
@@ -907,23 +965,25 @@ const advancedCommands = [
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-const referenceOperationCommands = advancedCommands.filter(item => REFERENCE_OPERATION_COMMAND_NAMES.has(item.name));
+const globalCommands = Array.from(
+    new Map([...publicCommands, ...advancedCommands].map(item => [item.name, item])).values()
+);
 
 (async () => {
     try {
         const advancedGuildId = getAdvancedGuildId();
 
-        console.log('Enregistrement global des commandes publiques localisees...');
+        console.log('Enregistrement global de toutes les commandes Sentinel...');
 
         await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: publicCommands.map(item => item.toJSON()) }
+            { body: globalCommands.map(item => item.toJSON()) }
         );
 
-        console.log('Commandes publiques localisees enregistrees avec succes.');
+        console.log(`${globalCommands.length} commandes Sentinel enregistrees globalement.`);
 
         if (advancedGuildId) {
-            console.log('Enregistrement des commandes avancees localisees sur le serveur configure...');
+            console.log('Suppression des anciens doublons propres au serveur configure...');
 
             try {
                 await rest.put(
@@ -931,20 +991,20 @@ const referenceOperationCommands = advancedCommands.filter(item => REFERENCE_OPE
                         process.env.CLIENT_ID,
                         advancedGuildId
                     ),
-                    { body: referenceOperationCommands.map(item => item.toJSON()) }
+                    { body: [] }
                 );
 
-                console.log('Commandes avancees localisees enregistrees sur le serveur configure.');
+                console.log('Les anciennes commandes locales ont ete retirees.');
             } catch (error) {
                 if (error.code === 50001) {
-                    console.warn('Impossible de deployer les commandes avancees : Sentinel n a pas acces au serveur GUILD_ID configure.');
+                    console.warn('Impossible de nettoyer les anciennes commandes locales : Sentinel n a pas acces au serveur GUILD_ID configure.');
                     console.warn('Invite Sentinel comme bot sur ce serveur, puis relance npm run deploy:commands.');
                 } else {
                     throw error;
                 }
             }
         } else {
-            console.log('Aucun GUILD_ID configure. Les commandes avancees ne sont pas deployees.');
+            console.log('Aucun GUILD_ID configure : aucun doublon local a nettoyer.');
         }
     } catch (error) {
         console.error(error);

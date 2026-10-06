@@ -31,7 +31,7 @@ async function deleteSafely(resource, reason) {
     await resource.delete(reason).catch(() => null);
 }
 
-async function runDiscordStagingValidation(client, options = {}) {
+async function runDiscordStagingValidation(client) {
     const config = stagingValidationConfig();
     if (!config.enabled) {
         if (config.required) throw new Error('SENTINEL_STAGING_GUILD_ID est obligatoire pour la validation bloquante.');
@@ -179,16 +179,6 @@ async function runDiscordStagingValidation(client, options = {}) {
                 label: 'Sanctions réelles de préproduction non activées',
                 ok: true,
                 detail: 'Active SENTINEL_STAGING_REAL_ACTIONS avec deux comptes de test dédiés pour ce contrôle.'
-            });
-        }
-
-        if (typeof options.verifyPremiumIsolation === 'function') {
-            const premium = await options.verifyPremiumIsolation(guild, role);
-            checks.push({
-                key: 'premium-isolation',
-                label: 'Accès Premium isolé sur le serveur de test',
-                ok: Boolean(premium?.ok),
-                detail: premium?.detail || null
             });
         }
 

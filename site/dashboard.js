@@ -7,7 +7,6 @@ let selectedGuildId = null;
 let currentState = null;
 let currentSettings = null;
 let activeDashboardTab = 'overview';
-let dashboardPlanMode = 'free';
 let tooltipHost = null;
 let tooltipPinned = false;
 let tooltipElement = null;
@@ -386,14 +385,6 @@ function dashboardErrorMessage(input) {
   if (language === 'en') {
     const firstFix = currentState?.diagnostics?.fixes?.[0] || null;
 
-    if (/^Quota gratuit atteint/.test(message || '')) {
-      return `${message}\nFix: delete an existing embed from “Announcements”.`;
-    }
-
-    if (/^Le gratuit permet/.test(message || '')) {
-      return `${message}\nFix: keep the current panel or delete the old one before publishing another.`;
-    }
-
     const translated = {
       'Login required.': 'Log in with Discord to use the dashboard.',
       'Sentinel is not installed on this server.': 'Invite Sentinel to this server before using the dashboard.',
@@ -402,7 +393,6 @@ function dashboardErrorMessage(input) {
       'You do not have permission to manage Sentinel dossiers on this server.': 'You do not have a responsible role to manage Sentinel tickets on this server.',
       'You do not have permission for this moderation action.': 'Your Discord role cannot perform this moderation action.',
       'Sentinel does not have the required Discord permission.': 'Sentinel does not have the required Discord permission.',
-      'This action is reserved for Sentinel Premium.': 'This action is currently unavailable.',
       'Founder access is required.': 'Only the founder can use this command.',
       'Site staff access is required.': 'This panel is reserved for the founder and site staff.',
       'Invalid site staff action.': 'Invalid site staff action.',
@@ -480,7 +470,6 @@ function dashboardErrorMessage(input) {
       'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
       'Sentinel embed not found.': 'Choose the channel where the embed is posted, then paste the message ID. If the Discord message was deleted, its slot will be freed.',
       'This channel is not a Sentinel dossier.': 'Choose an open Sentinel ticket channel.',
-      'This action is reserved for Sentinel Premium.': 'Use one of the available Sentinel actions.',
       'Founder access is required.': 'Only the founder can change this access.',
       'Site staff access is required.': 'Ask the founder to add your Discord account as site staff.',
       'Invalid site staff action.': 'Choose add or remove.',
@@ -495,14 +484,6 @@ function dashboardErrorMessage(input) {
     return resolution ? `${base}\nFix: ${resolution}` : base;
   }
 
-  if (/^Quota gratuit atteint/.test(message || '')) {
-    return `${message}\nÀ faire : supprime un embed existant depuis “Annonces”.`;
-  }
-
-  if (/^Le gratuit permet/.test(message || '')) {
-    return `${message}\nÀ faire : garde le panneau actuel ou supprime l’ancien avant d’en publier un autre.`;
-  }
-
   const translated = {
     'Login required.': 'Connecte-toi avec Discord pour utiliser le dashboard.',
     'Sentinel is not installed on this server.': 'Sentinel doit être invité comme bot sur ce serveur avant d’utiliser le dashboard.',
@@ -511,7 +492,6 @@ function dashboardErrorMessage(input) {
     'You do not have permission to manage Sentinel dossiers on this server.': 'Tu n’as pas de rôle responsable pour gérer les tickets Sentinel sur ce serveur.',
     'You do not have permission for this moderation action.': 'Tu n’as pas la permission Discord nécessaire pour cette sanction.',
     'Sentinel does not have the required Discord permission.': 'Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
-    'This action is reserved for Sentinel Premium.': 'Cette action est indisponible pour le moment.',
     'Founder access is required.': 'Seul le fondateur peut faire cette action.',
     'Site staff access is required.': 'Ce panneau est réservé au fondateur et au staff site.',
     'Invalid site staff action.': 'Action staff site invalide.',
@@ -592,7 +572,6 @@ function dashboardErrorMessage(input) {
     'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
     'Sentinel embed not found.': 'Choisis le salon où se trouve l’embed, puis colle l’ID du message. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
     'This channel is not a Sentinel dossier.': 'Choisis un salon de ticket Sentinel ouvert.',
-    'This action is reserved for Sentinel Premium.': 'Utilise une des actions Sentinel disponibles.',
     'Founder access is required.': 'Connecte-toi avec le compte Discord fondateur pour modifier cet accès.',
     'Site staff access is required.': 'Demande au fondateur d’ajouter ton compte Discord au staff site.',
     'Invalid site staff action.': 'Choisis ajouter ou retirer.',
@@ -1654,102 +1633,6 @@ function renderServerHome(state, premiumBadge) {
   `;
 }
 
-function premiumNavigationCards() {
-  const modules = [
-    ['service', 'Service et paie', 'Taux par grade, ajustements, archives longues et synchronisation.'],
-    ['dossiers', 'Dossiers', 'Panneaux illimités, catégories dédiées et suivi étendu.'],
-    ['moderation', 'Sécurité', 'Veille renforcée, sanctions avancées et protection automatique.'],
-    ['embeds', 'Annonces', 'Créations illimitées et gestion complète des médias.'],
-    ['audit', 'Historique', 'Filtres avancés, recherche individuelle et journal étendu.'],
-    ['operations', 'Pilotage', 'Exports, rapports automatiques, essais sans effet et validations.']
-  ];
-
-  return `
-    <div class="premium-module-grid">
-      ${modules.map(([tab, title, description]) => `
-        <article class="premium-module-card">
-          <span>Module Premium</span>
-          <strong>${escapeHtml(title)}</strong>
-          <p>${escapeHtml(description)}</p>
-          <button class="button button-small" type="button" data-dashboard-tab="${escapeHtml(tab)}">Ouvrir</button>
-        </article>
-      `).join('')}
-    </div>
-  `;
-}
-
-function renderPremiumHome(state, premiumBadge) {
-  const payrollArchives = state.payrollArchives?.totalCount || 0;
-  const managedEmbeds = state.customEmbeds?.items?.length || 0;
-  const openDossiers = state.dossiers?.openCount || 0;
-
-  return `
-    <section class="dashboard-panel premium-view-panel premium-home-panel">
-      <div class="dashboard-command-bar">
-        <div>
-          <p class="eyebrow">Espace Premium</p>
-          <h2>${escapeHtml(state.guild.name)}</h2>
-          <p class="muted">Seuls les outils réservés au Premium sont affichés dans cette vue.</p>
-        </div>
-        <div class="command-bar-status">${premiumBadge}</div>
-      </div>
-      <div class="dashboard-metrics premium-view-metrics">
-        <article><span>Archives de paie</span><strong>${escapeHtml(payrollArchives)}</strong></article>
-        <article><span>Annonces gérées</span><strong>${escapeHtml(managedEmbeds)}</strong></article>
-        <article><span>Dossiers ouverts</span><strong>${escapeHtml(openDossiers)}</strong></article>
-        <article><span>Protection</span><strong>Renforcée</strong></article>
-      </div>
-      ${guildBillingPanel(state)}
-      ${notificationCenter(state, true)}
-      ${premiumNavigationCards()}
-    </section>
-  `;
-}
-
-function renderPremiumSetupPanel(state, premiumBadge) {
-  return `
-    <section class="dashboard-panel premium-view-panel">
-      <div class="panel-heading row-heading">
-        <div>
-          <p class="eyebrow">Mise en place Premium</p>
-          <h2>Préparer les modules avancés</h2>
-          <p class="muted">Cette page ne présente que les espaces réservés au Premium. Les réglages généraux restent dans leur espace dédié.</p>
-        </div>
-        ${premiumBadge}
-      </div>
-      ${premiumNavigationCards()}
-    </section>
-  `;
-}
-
-function renderPremiumConfigurationPanel(state, premiumBadge) {
-  const premiumStatus = [
-    ['Accès Premium', state.advanced ? 'Actif' : 'Inactif'],
-    ['Panneaux dossiers', state.dossiers?.panelQuota?.unlimited ? 'Illimités' : 'Non disponible'],
-    ['Annonces Sentinel', state.customEmbeds?.quota?.unlimited ? 'Illimitées' : 'Non disponible'],
-    ['Historique avancé', state.advanced ? 'Disponible' : 'Non disponible']
-  ];
-
-  return `
-    <section class="dashboard-panel premium-view-panel">
-      <div class="panel-heading row-heading">
-        <div>
-          <p class="eyebrow">Réglages Premium</p>
-          <h2>Modules avancés</h2>
-          <p class="muted">Les configurations Premium sont rangées dans leur module afin de ne pas se mélanger aux réglages gratuits.</p>
-        </div>
-        ${premiumBadge}
-      </div>
-      <dl class="config-summary-list premium-config-summary">
-        ${premiumStatus.map(([label, value]) => `
-          <div class="config-summary-row is-ready"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
-        `).join('')}
-      </dl>
-      ${premiumNavigationCards()}
-    </section>
-  `;
-}
-
 function dashboardPath(state) {
   const status = dashboardConfigStatus(state);
   const preset = currentServerPreset(state);
@@ -2357,14 +2240,14 @@ function payrollCopy() {
         currencyLabel: 'Currency / unit',
         currencyHelp: 'Short label displayed after the amount, for example $, €, credits, or SA$.',
         update: 'Update pay settings',
-        roleRates: 'Premium role rates',
+        roleRates: 'Role rates',
         roleRatesHelp: 'A member uses the highest configured rate among their current Discord roles. If no role matches, Sentinel uses the global rate.',
         roleLabel: 'Discord role',
         roleRateLabel: 'Role hourly amount',
         setRoleRate: 'Save role rate',
         removeRoleRate: 'Remove',
         roleRatesEmpty: 'No specific role rate yet.',
-        adjustments: 'Premium adjustments',
+        adjustments: 'Adjustments',
         adjustmentsHelp: 'Add a bonus, deduction, or correction for the current week without changing the recorded hours.',
         userId: 'User ID',
         type: 'Type',
@@ -2420,7 +2303,7 @@ function payrollCopy() {
         paidBy: 'Paid by',
         empty: 'No service time recorded for the current week.',
         note: 'This is an internal RP tracking tool. Sentinel does not process real payments.',
-        premiumOnly: 'Premium option'
+        premiumOnly: 'Advanced option'
       }
     : {
         eyebrow: 'Paie RP',
@@ -2431,14 +2314,14 @@ function payrollCopy() {
         currencyLabel: 'Devise / unité',
         currencyHelp: 'Texte court affiché après le montant, par exemple $, €, crédits ou SA$.',
         update: 'Mettre à jour la paie',
-        roleRates: 'Taux par rôle Premium',
+        roleRates: 'Taux par rôle',
         roleRatesHelp: 'Un membre utilise le meilleur taux configuré parmi ses rôles Discord actuels. Si aucun rôle ne correspond, Sentinel utilise le taux global.',
         roleLabel: 'Rôle Discord',
         roleRateLabel: 'Montant par heure du rôle',
         setRoleRate: 'Enregistrer le taux',
         removeRoleRate: 'Retirer',
         roleRatesEmpty: 'Aucun taux spécifique configuré pour le moment.',
-        adjustments: 'Ajustements Premium',
+        adjustments: 'Ajustements',
         adjustmentsHelp: 'Ajoute une prime, une retenue ou une correction sur la semaine en cours sans modifier les heures enregistrées.',
         userId: 'ID utilisateur',
         type: 'Type',
@@ -2494,7 +2377,7 @@ function payrollCopy() {
         paidBy: 'Payé par',
         empty: 'Aucune heure de service enregistrée sur la semaine en cours.',
         note: 'Ce suivi reste interne au RP. Sentinel ne traite aucun paiement réel.',
-        premiumOnly: 'Option Premium'
+        premiumOnly: 'Option avancée'
       };
 }
 
@@ -2895,15 +2778,13 @@ function renderPremiumPayrollPanel(state, premiumBadge, premiumTag) {
   };
   const copy = payrollCopy();
   const roleOptions = optionList(state.roles || [], null, copy.roleLabel);
-  const payrollArchives = state.payrollArchives || { totalCount: 0, hasMore: false, items: [] };
-
   return `
     <section class="dashboard-panel payroll-panel premium-view-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Paie Premium</p>
-          <h2>Règles avancées et archives</h2>
-          <p class="muted">Taux propres à chaque grade, corrections individuelles et historique étendu des règlements.</p>
+          <p class="eyebrow">Règles de paie RP</p>
+          <h2>Taux par grade et ajustements</h2>
+          <p class="muted">Applique des taux propres à chaque grade et consigne les primes, retenues ou corrections.</p>
         </div>
         ${premiumBadge}
       </div>
@@ -2933,7 +2814,6 @@ function renderPremiumPayrollPanel(state, premiumBadge, premiumTag) {
           ${payrollAdjustmentList(payroll, copy)}
         </article>
       </div>
-      ${payrollArchiveHistory(payrollArchives, copy)}
     </section>
   `;
 }
@@ -3024,9 +2904,9 @@ function renderPremiumServicePanel(state, premiumBadge, premiumTag) {
     <section class="dashboard-panel inline-premium-panel premium-view-panel" id="service">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Registre Premium</p>
-          <h2>Registres avancés</h2>
-          <p class="muted">Ces options servent aux équipes qui ont besoin de bilans complets et d’exports.</p>
+          <p class="eyebrow">Intendance</p>
+          <h2>Registre complet</h2>
+          <p class="muted">Synchronisation, bilans et outils d’export pour toute l’équipe.</p>
         </div>
         ${premiumBadge}
       </div>
@@ -3044,20 +2924,12 @@ function renderPremiumServicePanel(state, premiumBadge, premiumTag) {
 }
 
 function renderServicePanel(state, premiumBadge, premiumTag) {
-  return isPremiumPlanVisible(state)
-    ? renderPremiumServicePanel(state, premiumBadge, premiumTag)
-    : renderFreeServicePanel(state);
+  return `${renderFreeServicePanel(state)}${renderPremiumServicePanel(state, premiumBadge, premiumTag)}`;
 }
 
-function customEmbedQuota(state, mode = 'free') {
+function customEmbedQuota(state) {
   const quota = state.customEmbeds?.quota;
   const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
-
-  if (mode === 'premium') {
-    return language === 'en'
-      ? 'Premium: unlimited Sentinel embeds, creations, edits, and media.'
-      : 'Premium : embeds Sentinel, créations, modifications et médias sans limite.';
-  }
 
   if (!quota) {
     return language === 'en' ? 'Quota unavailable' : 'Quota indisponible';
@@ -3065,8 +2937,8 @@ function customEmbedQuota(state, mode = 'free') {
 
   if (quota.unlimited) {
     return language === 'en'
-      ? 'Creation, editing, and deletion tools are available.'
-      : 'Les outils de création, modification et suppression sont disponibles.';
+      ? 'Unlimited creations, edits, deletions, and media.'
+      : 'Créations, modifications, suppressions et médias sans limite.';
   }
 
   return language === 'en'
@@ -3097,43 +2969,24 @@ function customEmbedList(state) {
 }
 
 function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge) {
-  const premiumMode = isPremiumPlanVisible(state);
-  const freeEmbedLimit = 2;
-  const displayState = premiumMode ? state : {
-    ...state,
-    customEmbeds: {
-      ...(state.customEmbeds || {}),
-      items: (state.customEmbeds?.items || []).slice(0, freeEmbedLimit),
-      quota: {
-        unlimited: false,
-        limit: freeEmbedLimit,
-        used: Math.min(state.customEmbeds?.items?.length || 0, freeEmbedLimit),
-        remaining: Math.max(freeEmbedLimit - (state.customEmbeds?.items?.length || 0), 0)
-      }
-    }
-  };
-  const modeLabel = premiumMode ? 'Studio étendu' : 'Annonces Sentinel';
-  const title = premiumMode ? 'Embeds Sentinel illimités' : 'Embeds Sentinel';
-  const createHelp = premiumMode
-    ? 'Publie une annonce Premium sous l’identité de Sentinel, sans limite d’embeds actifs.'
-    : 'Publie une annonce sous l’identité de Sentinel dans le quota du serveur.';
-  const deleteHelp = premiumMode
-    ? 'Supprime un embed Premium géré par Sentinel avec son ID de message.'
-    : 'Supprime un embed géré par Sentinel et libère un emplacement.';
+  const modeLabel = 'Studio d’annonces';
+  const title = 'Embeds Sentinel';
+  const createHelp = 'Publie une annonce sous l’identité de Sentinel, avec image ou miniature importée depuis ton appareil.';
+  const deleteHelp = 'Supprime un embed géré par Sentinel avec son ID de message.';
 
   return `
-    <section class="dashboard-panel module-panel announcements-panel${premiumMode ? ' premium-view-panel' : ''}" id="embeds">
+    <section class="dashboard-panel module-panel announcements-panel" id="embeds">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">${escapeHtml(modeLabel)}</p>
           <h2>${escapeHtml(title)}</h2>
-          <p class="muted">${escapeHtml(customEmbedQuota(displayState, premiumMode ? 'premium' : 'free'))}</p>
+          <p class="muted">${escapeHtml(customEmbedQuota(state))}</p>
         </div>
         ${premiumBadge}
       </div>
       <div class="form-grid module-form-grid">
         <form data-action-form="custom-embed-create">
-          ${labelHelp(premiumMode ? 'Créer une annonce Premium' : 'Créer un embed Sentinel', createHelp)}
+          ${labelHelp('Créer un embed Sentinel', createHelp)}
           <select name="channelId">${channelOptions}</select>
           <input name="title" placeholder="Titre" maxlength="256" required>
           <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
@@ -3145,10 +2998,10 @@ function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge)
           ${fileUploadControl('thumbnailFile', 'Miniature', 'Aucune miniature sélectionnée', 'Importer')}
           <p class="form-hint">PNG, JPG, WebP ou GIF, 8 Mo maximum au total. Sentinel optimise automatiquement les images en WebP.</p>
           <input name="footer" placeholder="Footer optionnel">
-          <button class="button" type="submit">${premiumMode ? 'Publier sans limite' : 'Envoyer l’embed'}</button>
+          <button class="button" type="submit">Publier l’embed</button>
         </form>
         <form data-action-form="custom-embed-edit">
-          ${labelHelp(premiumMode ? 'Modifier une annonce Premium' : 'Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message.')}
+          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message.')}
           <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <input name="title" placeholder="Nouveau titre">
@@ -3169,8 +3022,8 @@ function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge)
           <button class="button button-ghost" type="submit">Supprimer</button>
         </form>
         <article class="inline-form">
-          ${labelHelp(premiumMode ? 'Embeds étendus gérés' : 'Embeds gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard.')}
-          ${customEmbedList(displayState)}
+          ${labelHelp('Embeds gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard.')}
+          ${customEmbedList(state)}
         </article>
       </div>
     </section>
@@ -3214,15 +3067,9 @@ function dossierPriorityLabel(priority) {
   return labels[priority] || 'Normal';
 }
 
-function dossierQuotaText(state, mode = 'free') {
+function dossierQuotaText(state) {
   const quota = state.dossiers?.panelQuota;
   const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
-
-  if (mode === 'premium') {
-    return language === 'en'
-      ? 'Premium: unlimited panels, longer history, and advanced settings.'
-      : 'Premium : panneaux illimités, historique long et réglages avancés.';
-  }
 
   if (!quota) {
     return language === 'en' ? 'Quota unavailable' : 'Quota indisponible';
@@ -3230,8 +3077,8 @@ function dossierQuotaText(state, mode = 'free') {
 
   if (quota.unlimited) {
     return language === 'en'
-      ? 'One standard reception panel and essential ticket tracking.'
-      : 'Un bureau d’accueil standard et le suivi essentiel des dossiers.';
+      ? 'Unlimited reception panels, complete history, forms, routing, and prepared replies.'
+      : 'Bureaux illimités, historique complet, formulaires, routage et réponses préparées.';
   }
 
   return language === 'en'
@@ -3347,7 +3194,7 @@ function dossierPremiumSettings(state, premiumTag) {
 
   return `
     <article class="inline-form dossier-premium-settings">
-      ${labelHelp('Catégories par type', 'Option Premium : envoie chaque type de dossier dans une catégorie Discord différente, par exemple recrutement dans une catégorie staff dédiée.', ` ${premiumTag}`)}
+      ${labelHelp('Catégories par type', 'Envoie chaque type de dossier dans une catégorie Discord différente, par exemple recrutement dans une catégorie staff dédiée.')}
       <div class="dossier-category-grid">
         ${types.map(([type, label]) => {
           const setting = dossierSettingForType(state, type);
@@ -3893,53 +3740,38 @@ function dossierList(state) {
 }
 
 function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumBadge, premiumTag) {
-  const premiumMode = isPremiumPlanVisible(state);
-  const displayState = premiumMode ? state : {
-    ...state,
-    advanced: false,
-    dossiers: {
-      ...(state.dossiers || {}),
-      historyLimit: 10,
-      items: (state.dossiers?.items || []).slice(0, 10)
-    }
-  };
-
   return `
-    <section class="dashboard-panel module-panel dossiers-panel${premiumMode ? ' premium-view-panel' : ''}" id="dossiers">
+    <section class="dashboard-panel module-panel dossiers-panel" id="dossiers">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">${premiumMode ? 'Dossiers Premium' : 'Dossiers Sentinel'}</p>
-          <h2>${premiumMode ? 'Bureau avancé et suivi étendu' : 'Bureau d’accueil et suivi'}</h2>
-          <p class="muted">${premiumMode
-            ? 'Panneaux illimités, catégories par demande et historique étendu pour les équipes organisées.'
-            : 'Un membre ouvre une demande privée, puis l’équipe autorisée la suit depuis son salon réservé.'}</p>
+          <p class="eyebrow">Dossiers Sentinel</p>
+          <h2>Bureau d’accueil et suivi complet</h2>
+          <p class="muted">Un membre ouvre une demande privée, puis l’équipe autorisée la suit, la route et l’archive depuis son salon réservé.</p>
         </div>
-        ${premiumMode ? premiumBadge : `<span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>`}
+        <span class="status-badge">${escapeHtml(state.dossiers?.openCount || 0)} ouvert(s)</span>
       </div>
       ${dossierPermissionAlert(state)}
       <div class="dashboard-alert is-ready dossier-quota-alert">
-        <strong>${premiumMode ? 'Capacité étendue' : 'Capacité du serveur'}</strong>
-        <p>${escapeHtml(dossierQuotaText(state, premiumMode ? 'premium' : 'free'))}</p>
+        <strong>Capacité du serveur</strong>
+        <p>${escapeHtml(dossierQuotaText(state))}</p>
       </div>
       <div class="form-grid module-form-grid">
         <form data-action-form="publish-dossier-panel">
           ${labelHelp(
-            premiumMode ? 'Publier un bureau étendu' : 'Publier le bureau d’accueil',
-            premiumMode ? 'Publie un nouveau panneau de dossiers sans limite de panneaux actifs.' : 'Publie le panneau de demandes privées.'
+            'Publier le bureau d’accueil',
+            'Publie un nouveau panneau de demandes privées.'
           )}
           <select name="channelId">${channelOptions}</select>
-          <button class="button" type="submit">${premiumMode ? 'Publier sans limite' : 'Publier le bureau'}</button>
+          <button class="button" type="submit">Publier le bureau</button>
         </form>
         <form data-action-form="repair-dossier-panels" class="inline-form dossier-repair-form">
           ${labelHelp('Vérifier les bureaux', 'Contrôle les panneaux Discord et libère automatiquement les références qui ont été supprimées.')}
           <button class="button button-ghost" type="submit">Réparer le registre des panneaux</button>
         </form>
-        ${premiumMode ? '' : `
-          <article class="inline-form dossier-explain-card">
-            ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.')}
-            <p>Les responsables peuvent répondre, ajouter des intervenants, prendre le dossier en charge, corriger son statut, générer un compte rendu et le clôturer.</p>
-          </article>
-        `}
+        <article class="inline-form dossier-explain-card">
+          ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.')}
+          <p>Les responsables peuvent répondre, ajouter des intervenants, prendre le dossier en charge, corriger son statut, générer un compte rendu et le clôturer.</p>
+        </article>
         <article class="inline-form dossier-explain-card">
           ${labelHelp('Accès général aux dossiers', 'Ces rôles voient toutes les catégories, sauf celles que tu limites à des rôles précis plus bas.')}
           <p class="form-hint">Les rôles ajoutés ici voient tous les dossiers qui ne possèdent pas de restriction particulière.</p>
@@ -3950,19 +3782,17 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
           ${dossierRoleList(state)}
         </article>
         ${dossierTypeRolesSettings(state)}
-        ${premiumMode ? dossierStatsPanel(state, premiumTag) : ''}
-        ${premiumMode ? dossierPremiumSettings(state, premiumTag) : ''}
-        ${premiumMode ? dossierTemplatesPanel(state, premiumTag) : ''}
+        ${dossierStatsPanel(state, '')}
+        ${dossierPremiumSettings(state, '')}
+        ${dossierTemplatesPanel(state, '')}
         <article class="inline-form dossier-list-card">
-          ${labelHelp(premiumMode ? 'Historique Premium' : 'Dossiers récents', premiumMode
-            ? 'Retrouve l’historique étendu des dossiers et affine la liste avec les filtres avancés.'
-            : 'Retrouve les dossiers récents de ce serveur et clôture ceux qui sont encore ouverts.')}
+          ${labelHelp('Historique des dossiers', 'Retrouve tout l’historique visible et affine la liste avec les filtres complets.')}
           <div class="dossier-view-switch" role="group" aria-label="Affichage des dossiers">
             <button class="button button-small${dossierViewMode === 'board' ? '' : ' button-ghost'}" type="button" data-dossier-view="board">Colonnes</button>
             <button class="button button-small${dossierViewMode === 'table' ? '' : ' button-ghost'}" type="button" data-dossier-view="table">Tableau</button>
           </div>
-          ${dossierFiltersPanel(displayState)}
-          ${dossierList(displayState)}
+          ${dossierFiltersPanel(state)}
+          ${dossierList(state)}
         </article>
       </div>
     </section>
@@ -4502,8 +4332,8 @@ function automodSecurityOverview(state, settings, words) {
 
 function automodFreePanel(state) {
   const settings = automodSettings(state);
-  const words = (state.automod?.words || []).slice(0, settings.freeWordLimit);
-  const wordLimit = settings.freeWordLimit;
+  const wordLimit = state.advanced ? settings.premiumWordLimit : settings.freeWordLimit;
+  const words = (state.automod?.words || []).slice(0, wordLimit);
   const freeState = {
     ...state,
     automod: {
@@ -4533,15 +4363,15 @@ function automodFreePanel(state) {
         <div class="automod-control-grid">
           <div>
             ${labelHelp('Réponse lexique', 'Mesure appliquée quand un mot surveillé est détecté.')}
-            <select name="forbiddenWordsAction">${automodActionOptions(settings.forbiddenWordsAction, false)}</select>
+            <select name="forbiddenWordsAction">${automodActionOptions(settings.forbiddenWordsAction, true)}</select>
           </div>
           <div>
             ${labelHelp('Réponse invitations', 'Mesure appliquée quand une invitation est détectée.')}
-            <select name="inviteAction">${automodActionOptions(settings.inviteAction, false)}</select>
+            <select name="inviteAction">${automodActionOptions(settings.inviteAction, true)}</select>
           </div>
           <div>
             ${labelHelp('Réponse rafale', 'Mesure appliquée quand le seuil de rafale est dépassé.')}
-            <select name="spamAction">${automodActionOptions(settings.spamAction, false)}</select>
+            <select name="spamAction">${automodActionOptions(settings.spamAction, true)}</select>
           </div>
           <div>
             ${labelHelp('Seuil de rafale', 'Nombre de messages tolérés dans la fenêtre de surveillance.')}
@@ -4553,7 +4383,7 @@ function automodFreePanel(state) {
           </div>
           <div>
             ${labelHelp('Durée de silence', 'Durée du silence automatique en secondes.')}
-            <input name="spamTimeoutSeconds" type="number" min="30" max="3600" value="${escapeHtml(Math.min(Number(settings.spamTimeoutSeconds) || 600, 3600))}">
+            <input name="spamTimeoutSeconds" type="number" min="30" max="2419200" value="${escapeHtml(Number(settings.spamTimeoutSeconds) || 600)}">
           </div>
         </div>
         <button class="button" type="submit">Enregistrer la garde</button>
@@ -4586,8 +4416,8 @@ function automodPremiumPanel(state, premiumTag) {
     <article class="inline-form automod-card automod-card-wide premium-roadmap">
       <div class="panel-mini-heading">
         <div>
-          <p class="eyebrow">Garde Premium</p>
-          <h3>Veille renforcée ${premiumTag}</h3>
+          <p class="eyebrow">Garde renforcée</p>
+          <h3>Veille automatique</h3>
           <p class="muted">Majuscules abusives, mentions massives, récidives et arrivée groupée.</p>
         </div>
       </div>
@@ -4651,16 +4481,6 @@ function automodPremiumPanel(state, premiumTag) {
 }
 
 function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
-  const freeModerationState = {
-    ...state,
-    advanced: false,
-    moderationCases: {
-      ...(state.moderationCases || {}),
-      limit: 10,
-      items: (state.moderationCases?.items || []).slice(0, 10)
-    }
-  };
-
   return `
     <section class="dashboard-panel module-panel moderation-panel" id="moderation">
       <div class="panel-heading row-heading">
@@ -4725,8 +4545,8 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
         </form>
         <article class="inline-form moderation-cases-note">
           ${labelHelp('Registre disciplinaire', 'Affiche les dernières mesures enregistrées sur ce serveur.')}
-          ${moderationCaseFilters(freeModerationState)}
-          ${moderationCaseList(freeModerationState)}
+          ${moderationCaseFilters(state)}
+          ${moderationCaseList(state)}
         </article>
       </div>
     </section>
@@ -4768,12 +4588,12 @@ function warningEscalationPanel(state, premiumTag) {
 function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premiumTag) {
   const pendingCritical = (state.criticalActions || []).filter(item => item.status === 'pending');
   return `
-    <section class="dashboard-panel premium-panel module-panel premium-view-panel" id="moderation">
+    <section class="dashboard-panel module-panel" id="moderation-tools">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Sécurité Premium</p>
+          <p class="eyebrow">Outils de sécurité</p>
           <h2>Veille renforcée</h2>
-          <p class="muted">Sanctions avancées, protection automatique renforcée et actions de crise.</p>
+          <p class="muted">Sanctions complètes, protection automatique et actions de crise.</p>
         </div>
         ${premiumBadge}
       </div>
@@ -4843,9 +4663,7 @@ function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premi
 }
 
 function renderModerationPanel(state, channelOptions, autoRoleOptions, premiumBadge, premiumTag) {
-  return isPremiumPlanVisible(state)
-    ? renderPremiumModerationPanel(state, channelOptions, premiumBadge, premiumTag)
-    : renderFreeModerationPanel(state, channelOptions, autoRoleOptions);
+  return `${renderFreeModerationPanel(state, channelOptions, autoRoleOptions)}${renderPremiumModerationPanel(state, channelOptions, premiumBadge, '')}`;
 }
 
 function profileDossierList(dossiers) {
@@ -5164,24 +4982,10 @@ function validationHistory(state) {
 }
 
 function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) {
-  const premiumMode = isPremiumPlanVisible(state);
-
-  if (!premiumMode) {
-    return `
-      <section class="dashboard-panel module-panel operations-panel">
-        <div class="panel-heading row-heading">
-          <div><p class="eyebrow">Suivi Sentinel</p><h2>Centre de notifications</h2><p class="muted">Les urgences du serveur sont réunies dans cette vue.</p></div>
-          <span class="status-badge">Sentinel</span>
-        </div>
-        ${notificationCenter(state)}
-      </section>
-    `;
-  }
-
   return `
-    <section class="dashboard-panel module-panel operations-panel premium-view-panel">
+    <section class="dashboard-panel module-panel operations-panel">
       <div class="panel-heading row-heading">
-        <div><p class="eyebrow">Pilotage Premium</p><h2>Rapports, programmation et banc d’essai</h2><p class="muted">Prépare, vérifie et automatise sans mélanger ces outils avec les fonctions gratuites.</p></div>
+        <div><p class="eyebrow">Pilotage Sentinel</p><h2>Notifications, rapports et banc d’essai</h2><p class="muted">Retrouve les urgences, prépare les rapports et vérifie les automatisations depuis une seule vue.</p></div>
         ${premiumBadge}
       </div>
       ${notificationCenter(state)}
@@ -5230,7 +5034,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
         </article>
 
         <article class="inline-form operation-card operation-card-wide">
-          <div class="panel-mini-heading"><div><h3>Mode d’essai ${premiumTag}</h3><p class="muted">Chaque test est journalisé et ne modifie aucun membre, salon ou paiement.</p></div></div>
+          <div class="panel-mini-heading"><div><h3>Mode d’essai ${premiumTag}</h3><p class="muted">Chaque test est journalisé et ne modifie aucun membre, salon ou registre de paie RP.</p></div></div>
           <div class="simulation-grid">
             <form data-action-form="run-simulation"><input type="hidden" name="kind" value="automod"><textarea name="content" placeholder="Message à tester" required></textarea><button class="button" type="submit">Tester la garde</button></form>
             <form data-action-form="run-simulation"><input type="hidden" name="kind" value="dossier"><select name="type"><option value="support">Support</option><option value="report">Signalement</option><option value="recruitment">Recrutement</option><option value="partnership">Partenariat</option><option value="other">Autre</option></select><button class="button" type="submit">Tester le routage</button></form>
@@ -5250,10 +5054,6 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
 }
 
 function renderAuditPanel(state) {
-  if (!isPremiumPlanVisible(state)) {
-    return renderFreeAuditPanel(state);
-  }
-
   const auditLogs = state.auditLogs || {};
   const canViewGlobal = Boolean(auditLogs.canViewGlobal);
   const currentScope = canViewGlobal ? auditScope : 'server';
@@ -5271,7 +5071,7 @@ function renderAuditPanel(state) {
           <h2>Journal des actions</h2>
           <p class="muted">Chaque ligne indique qui a agi, depuis où, sur quoi, et si l’action a réussi.</p>
         </div>
-        <span class="premium-badge">Premium sécurité</span>
+        <span class="status-badge">Historique complet</span>
       </div>
       ${globalLookupPanel(state)}
       <div class="audit-overview">
@@ -5325,49 +5125,6 @@ function renderAuditPanel(state) {
       </div>
       ${auditLogList(state)}
     </section>
-  `;
-}
-
-function premiumScopeLabel(scope) {
-  if (scope === 'server') return 'Premium serveur';
-  if (scope === 'partial') return 'Premium partiel';
-  return 'Gratuit';
-}
-
-function premiumScopeReady(scope) {
-  return scope === 'server' || scope === 'partial';
-}
-
-function premiumNameList(items = [], emptyText = 'Aucun', options = {}) {
-  if (!items.length) {
-    return `<span class="muted">${escapeHtml(emptyText)}</span>`;
-  }
-
-  const target = options.target || null;
-  const guildId = options.guildId || null;
-  const canManage = canManageFounderPanel();
-
-  return `
-    <ul class="compact-list founder-premium-list">
-      ${items.map((item) => `
-        <li class="${item.exists === false || item.inGuild === false ? 'is-warning' : ''}">
-          <span>
-            <strong>${escapeHtml(item.name || item.tag || item.username || item.id)}</strong>
-            <small><code>${escapeHtml(item.id)}</code>${item.inGuild === false ? ' - hors serveur' : ''}${item.exists === false ? ' - supprimé sur Discord' : ''}</small>
-          </span>
-          ${target && canManage ? `
-            <button
-              class="button button-small button-ghost"
-              type="button"
-              data-creator-premium-click
-              data-action="remove"
-              data-target="${escapeHtml(target)}"
-              ${target === 'role' ? `data-guild-id="${escapeHtml(guildId)}" data-role-id="${escapeHtml(item.id)}"` : `data-user-id="${escapeHtml(item.id)}"`}
-            >Retirer</button>
-          ` : ''}
-        </li>
-      `).join('')}
-    </ul>
   `;
 }
 
@@ -5545,7 +5302,7 @@ function founderStoragePanel(overview) {
             <div><span>Liens actifs</span><strong>${escapeHtml(media.activeCount || 0)}</strong></div>
             <div><span>En corbeille</span><strong>${escapeHtml((media.trashCount || 0) + (media.orphanObjectCount || 0))}</strong></div>
             <div><span>Hébergés uniquement par Discord</span><strong>${escapeHtml(media.remoteOnlyCount || 0)}</strong></div>
-            <div><span>Quota par serveur</span><strong>${escapeHtml(formatStorageBytes(media.freeQuotaBytes))}</strong></div>
+            <div><span>Quota par serveur</span><strong>${escapeHtml(formatStorageBytes(media.quotaBytes))}</strong></div>
           </div>
         </section>
         <section class="maintenance-section">
@@ -5635,26 +5392,6 @@ function criticalActionsPanel(overview) {
   `;
 }
 
-function founderBillingPanel(overview) {
-  const billing = overview?.billing;
-  if (!billing) return '';
-  const money = (amount, currency = 'eur') => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: String(currency || 'eur').toUpperCase() }).format((Number(amount) || 0) / 100);
-  return `
-    <section class="founder-storage-panel" aria-label="Suivi des abonnements Premium">
-      <div class="panel-heading row-heading"><div><p class="eyebrow">Facturation Premium</p><h3>Abonnements, factures et remboursements</h3><p class="muted">Les droits sont synchronisés par les événements signés du prestataire.</p></div>${statusBadge(billing.status?.enabled ? `Stripe ${billing.status.mode}` : 'À configurer', Boolean(billing.status?.enabled))}</div>
-      <div class="dashboard-metrics dashboard-kpis">
-        <article class="dashboard-kpi"><span>Abonnements suivis</span><strong>${escapeHtml(billing.subscriptions?.length || 0)}</strong></article>
-        <article class="dashboard-kpi"><span>Factures</span><strong>${escapeHtml(billing.invoices?.length || 0)}</strong></article>
-        <article class="dashboard-kpi"><span>Remboursements</span><strong>${escapeHtml(billing.refunds?.length || 0)}</strong></article>
-        <article class="dashboard-kpi"><span>Événements en échec</span><strong>${escapeHtml(billing.failedEvents?.length || 0)}</strong></article>
-      </div>
-      <div class="maintenance-file-list">
-        ${(billing.invoices || []).slice(0, 12).map(invoice => `<div class="maintenance-file-row"><span><strong>${escapeHtml(invoice.guildId || 'Serveur non rattaché')} · ${escapeHtml(money(invoice.amountPaid || invoice.amountDue, invoice.currency))}</strong><small>${escapeHtml(invoice.status)} · ${escapeHtml(formatAuditDate(invoice.createdAt))}</small></span>${invoice.hostedInvoiceUrl ? `<a class="button button-small button-ghost" href="${escapeHtml(invoice.hostedInvoiceUrl)}" target="_blank" rel="noopener">Facture</a>` : ''}</div>`).join('') || '<p class="muted">Aucune facture synchronisée.</p>'}
-      </div>
-    </section>
-  `;
-}
-
 function founderOfficialUpdatePanel(overview) {
   if (!overview?.access?.isFounder) return '';
   return `
@@ -5669,21 +5406,6 @@ function founderOfficialUpdatePanel(overview) {
         <button class="button" type="submit">Soumettre à validation</button>
       </form>
     </section>
-  `;
-}
-
-function guildBillingPanel(state) {
-  const billing = state?.billing;
-  if (!billing) return '';
-  const subscription = billing.subscription;
-  const canStartCheckout = !subscription || ['canceled', 'incomplete_expired'].includes(subscription.status);
-  const status = subscription?.entitled ? 'Premium actif' : (subscription?.status || 'Aucun abonnement');
-  return `
-    <article class="home-block">
-      <div class="home-block-heading"><div><p class="eyebrow">Abonnement</p><h3>${escapeHtml(status)}</h3></div>${statusBadge(status, Boolean(subscription?.entitled))}</div>
-      <p class="muted">${subscription?.currentPeriodEnd ? `Période actuelle jusqu’au ${escapeHtml(formatAuditDate(subscription.currentPeriodEnd))}.` : 'L’activation et le retrait du Premium sont synchronisés automatiquement après paiement.'}</p>
-      ${(canStartCheckout ? billing.enabled : billing.portalConfigured) ? `<button class="button button-small" type="button" data-billing-action="${canStartCheckout ? 'checkout' : 'portal'}">${canStartCheckout ? 'Passer au Premium' : 'Gérer l’abonnement'}</button>` : '<span class="muted">Paiement en cours de configuration.</span>'}
-    </article>
   `;
 }
 
@@ -5704,131 +5426,6 @@ function creatorStaffManagePanel(overview) {
       </form>
     ` : ''}
     ${siteStaffList(overview)}
-  `;
-}
-
-function creatorPremiumGuildOptions(overview) {
-  return (overview?.guilds || [])
-    .map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`)
-    .join('');
-}
-
-function creatorPremiumManagePanel(overview) {
-  const guildOptions = creatorPremiumGuildOptions(overview);
-  const canManage = canManageFounderPanel();
-
-  return `
-    <datalist id="creator-premium-guilds">
-      ${guildOptions}
-    </datalist>
-    <div class="founder-console-note">
-      <strong>Attribution rapide</strong>
-      <span>${canManage
-        ? 'Accorde ou retire un accès Premium à un serveur entier, à un grade d’un serveur, ou à une personne précise.'
-        : 'Vue lecture seule : les attributions Premium restent réservées au fondateur.'}</span>
-    </div>
-    ${canManage ? `
-    <div class="creator-premium-actions">
-      <form class="creator-premium-form" data-creator-premium-form>
-        <input type="hidden" name="target" value="server">
-        ${labelHelp('Accès serveur', 'Accorde ou retire le Premium complet sur un serveur Sentinel avec son ID.')}
-        <div class="creator-premium-row">
-          <select name="action">
-            <option value="add">Ajouter</option>
-            <option value="remove">Retirer</option>
-          </select>
-          <input name="guildId" list="creator-premium-guilds" placeholder="ID serveur" required>
-          <button class="button button-small" type="submit">Appliquer</button>
-        </div>
-      </form>
-      <form class="creator-premium-form" data-creator-premium-form>
-        <input type="hidden" name="target" value="role">
-        ${labelHelp('Accès par grade', 'Accorde ou retire un grade Premium sur un serveur où Sentinel est installé.')}
-        <div class="creator-premium-row">
-          <select name="action">
-            <option value="add">Ajouter</option>
-            <option value="remove">Retirer</option>
-          </select>
-          <input name="guildId" list="creator-premium-guilds" placeholder="ID serveur" required>
-          <input name="roleId" placeholder="ID rôle" required>
-          <button class="button button-small" type="submit">Appliquer</button>
-        </div>
-      </form>
-      <form class="creator-premium-form" data-creator-premium-form>
-        <input type="hidden" name="target" value="user">
-        ${labelHelp('Accès personnel', 'Accorde un accès Premium global à un ID, ou retire son Premium partout.')}
-        <div class="creator-premium-row">
-          <select name="action">
-            <option value="add">Ajouter</option>
-            <option value="remove">Retirer partout</option>
-          </select>
-          <input name="userId" placeholder="ID utilisateur" required>
-          <input name="guildId" list="creator-premium-guilds" placeholder="Serveur rattachement optionnel">
-          <button class="button button-small" type="submit">Appliquer</button>
-        </div>
-      </form>
-    </div>
-    ` : ''}
-  `;
-}
-
-function founderPremiumGuildRows(overview) {
-  const guildItems = overview?.guilds || [];
-
-  if (!guildItems.length) {
-    return '<p class="muted">Aucun serveur Sentinel trouvé pour le moment.</p>';
-  }
-
-  return `
-    <div class="table-shell founder-premium-table-shell">
-      <table class="dashboard-table founder-premium-table">
-        <thead>
-          <tr>
-            <th>Poste</th>
-            <th>Accès</th>
-            <th>Motif</th>
-            <th>Grades Premium</th>
-            <th>Personnes Premium</th>
-            <th>Contrôle</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${guildItems.map((guild) => `
-            <tr class="premium-row-${escapeHtml(guild.premiumScope || 'none')}">
-              <td>
-                <strong>${escapeHtml(guild.name)}</strong>
-                <small><code>${escapeHtml(guild.id)}</code>${guild.memberCount ? ` - ${escapeHtml(guild.memberCount)} membres` : ''}</small>
-              </td>
-              <td>${statusBadge(premiumScopeLabel(guild.premiumScope), premiumScopeReady(guild.premiumScope), guild.premiumScope === 'server' ? 'is-site' : '')}</td>
-              <td>
-                ${guild.reasons?.length
-                  ? `<ul class="compact-list founder-reason-list">${guild.reasons.map((reason) => `<li><span>${escapeHtml(reason)}</span></li>`).join('')}</ul>`
-                  : '<span class="muted">Aucun accès Premium actif.</span>'}
-                ${guild.referenceStaffRoles?.length
-                  ? `<small>Grades de régie auto : ${guild.referenceStaffRoles.map((role) => escapeHtml(role.name || role.id)).join(', ')}</small>`
-                  : ''}
-              </td>
-              <td>${premiumNameList(guild.premiumRoles, 'Aucun grade Premium', { target: 'role', guildId: guild.id })}</td>
-              <td>${premiumNameList(guild.premiumUsers, 'Aucune personne Premium', { target: 'user' })}</td>
-              <td>
-                ${!canManageFounderPanel()
-                  ? '<span class="muted">Lecture seule</span>'
-                  : guild.configuredPremium && !guild.manualPremium
-                  ? '<span class="muted">Accès fixe</span>'
-                  : `<button
-                      class="button button-small ${guild.manualPremium ? 'button-ghost' : ''}"
-                      type="button"
-                      data-creator-premium-click
-                      data-action="${guild.manualPremium ? 'remove' : 'add'}"
-                      data-target="server"
-                      data-guild-id="${escapeHtml(guild.id)}"
-                    >${guild.manualPremium ? 'Retirer accès' : 'Accorder accès'}</button>`}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
   `;
 }
 
@@ -6007,24 +5604,6 @@ function availableDashboardTabs(state = currentState) {
   return DASHBOARD_TABS.filter((tab) => tab.id !== 'founder' || canShowFounderTab(state));
 }
 
-function canUsePremiumPlan(state = currentState) {
-  return false;
-}
-
-function isPremiumPlanVisible(state = currentState) {
-  return false;
-}
-
-function ensureDashboardPlanMode(state = currentState) {
-  if (!canUsePremiumPlan(state)) {
-    dashboardPlanMode = 'free';
-  }
-}
-
-function renderDashboardPlanToggle(state) {
-  return '';
-}
-
 function renderDashboardTabs(state, premiumBadge) {
   const tabs = availableDashboardTabs(state);
   const activeTab = tabs.find((tab) => tab.id === activeDashboardTab) || tabs[0] || DASHBOARD_TABS[0];
@@ -6050,7 +5629,6 @@ function renderDashboardTabs(state, premiumBadge) {
       <div class="control-status">
         ${syncBadge}
         ${premiumBadge}
-        ${renderDashboardPlanToggle(state)}
         <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
       </div>
       <nav class="dashboard-tab-groups" aria-label="Sections du dashboard">
@@ -6109,7 +5687,6 @@ function renderDashboard() {
   }
 
   const state = currentState;
-  ensureDashboardPlanMode(state);
   const tabs = availableDashboardTabs(state);
 
   if (!tabs.some((tab) => tab.id === activeDashboardTab)) {
@@ -6126,22 +5703,17 @@ function renderDashboard() {
   const getStatusChannelOptions = () => (optionMarkup.statusChannels ??= optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut'));
   const getUpdatesChannelOptions = () => (optionMarkup.updatesChannels ??= optionList(state.channels, state.config.updatesChannelId, 'Choisir le salon des nouveautés'));
   const getUpdatesRoleOptions = () => (optionMarkup.updatesRoles ??= optionList(state.roles, state.config.updatesPingRoleId, 'Choisir un rôle à prévenir'));
-  const premiumMode = isPremiumPlanVisible(state);
   const premiumBadge = '<span class="status-badge">Sentinel</span>';
   const premiumTag = '';
 
   main.innerHTML = `
     ${renderDashboardTabs(state, premiumBadge)}
-    <div class="dashboard-tab-stage ${premiumMode ? 'is-plan-premium' : 'is-plan-free'}">
-      ${tabPanel('overview', () => premiumMode ? renderPremiumHome(state, premiumBadge) : renderServerHome(state, premiumBadge))}
+    <div class="dashboard-tab-stage is-plan-free">
+      ${tabPanel('overview', () => renderServerHome(state, premiumBadge))}
 
-      ${tabPanel('setup', () => premiumMode
-        ? renderPremiumSetupPanel(state, premiumBadge)
-        : renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions(), getUpdatesChannelOptions()))}
+      ${tabPanel('setup', () => renderSetupAssistant(state, getRoleOptions(), getCommandRoleOptions(), getChannelOptions(), getUpdatesChannelOptions()))}
 
-      ${tabPanel('configuration', () => premiumMode
-        ? renderPremiumConfigurationPanel(state, premiumBadge)
-        : renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions(), getUpdatesChannelOptions(), getUpdatesRoleOptions()))}
+      ${tabPanel('configuration', () => renderConfigurationHub(state, getChannelOptions(), getStatusChannelOptions(), getUpdatesChannelOptions(), getUpdatesRoleOptions()))}
 
       ${tabPanel('service', () => renderServicePanel(state, premiumBadge, premiumTag))}
 
@@ -6221,40 +5793,6 @@ async function loadCreatorPremiumOverview(button = null, { silent = false } = {}
     creatorOverviewLoading = false;
     setLoading(button, false);
     renderDashboard();
-  }
-}
-
-async function manageCreatorPremiumAccess(data, button = null) {
-  if (!canViewPremiumOverview) return;
-
-  setLoading(button, true);
-
-  try {
-    const payload = await api('/api/creator/premium-access', {
-      method: 'POST',
-      body: JSON.stringify({ ...data, mfaCode: founderMfaCode })
-    });
-
-    creatorOverview = payload.overview || creatorOverview;
-    founderMfaCode = '';
-    currentSiteAccess = creatorOverview?.access || currentSiteAccess;
-    canViewPremiumOverview = Boolean(creatorOverview?.canView);
-
-    await loadGuilds().catch(() => {});
-
-    if (selectedGuildId) {
-      await refreshGuildState().catch(() => {
-        renderDashboard();
-      });
-    } else {
-      renderDashboard();
-    }
-
-    toast(payload.message || 'Accès Premium mis à jour.');
-  } catch (error) {
-    toast(dashboardErrorMessage(error), 'error');
-  } finally {
-    setLoading(button, false);
   }
 }
 
@@ -6351,19 +5889,6 @@ async function submitOfficialUpdate(data, button = null) {
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
-    setLoading(button, false);
-  }
-}
-
-async function openBilling(action, button = null) {
-  if (!selectedGuildId || !['checkout', 'portal'].includes(action)) return;
-  setLoading(button, true);
-  try {
-    const payload = await api(`/api/guilds/${selectedGuildId}/billing/${action}`, { method: 'POST', body: '{}' });
-    if (!payload.url || !String(payload.url).startsWith('https://')) throw new Error('Lien de paiement invalide.');
-    window.location.assign(payload.url);
-  } catch (error) {
-    toast(dashboardErrorMessage(error), 'error');
     setLoading(button, false);
   }
 }
@@ -6621,10 +6146,6 @@ function attachDashboardHandlers() {
     }, button));
   });
 
-  $$('[data-billing-action]').forEach((button) => {
-    button.addEventListener('click', () => openBilling(button.dataset.billingAction, button));
-  });
-
   $$('[data-guild-critical-action]').forEach((button) => {
     button.addEventListener('click', () => runAction(button.dataset.guildCriticalAction, {
       requestId: button.dataset.requestId
@@ -6651,26 +6172,6 @@ function attachDashboardHandlers() {
   $$('[data-refresh-creator-premium]').forEach((button) => {
     button.addEventListener('click', () => {
       loadCreatorPremiumOverview(button);
-    });
-  });
-
-  $$('[data-creator-premium-form]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const button = $('button[type="submit"]', form);
-      manageCreatorPremiumAccess(formData(form), button);
-    });
-  });
-
-  $$('[data-creator-premium-click]').forEach((button) => {
-    button.addEventListener('click', () => {
-      manageCreatorPremiumAccess({
-        action: button.dataset.action,
-        target: button.dataset.target,
-        guildId: button.dataset.guildId || '',
-        roleId: button.dataset.roleId || '',
-        userId: button.dataset.userId || ''
-      }, button);
     });
   });
 
@@ -6712,20 +6213,6 @@ function attachDashboardHandlers() {
     const button = $('button[type="submit"]', form);
     const data = formData(form);
     manageCreatorMaintenance({ action: 'restore-backup', ...data }, button);
-  });
-
-  $$('[data-dashboard-plan]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const nextPlan = button.dataset.dashboardPlan === 'premium' ? 'premium' : 'free';
-
-      if (nextPlan === 'premium' && !canUsePremiumPlan()) {
-        toast('Le mode Premium est réservé aux serveurs ou comptes Premium.', 'error');
-        return;
-      }
-
-      dashboardPlanMode = nextPlan;
-      renderDashboard();
-    });
   });
 
   $$('[data-notification-key]').forEach((button) => {
@@ -7061,12 +6548,6 @@ async function bootstrap() {
       renderDashboard();
     }
 
-    const billingResult = new URLSearchParams(window.location.search).get('billing');
-    if (billingResult) {
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('billing');
-      window.history.replaceState({}, '', cleanUrl);
-    }
   } catch (error) {
     currentUser = null;
     csrfToken = null;
