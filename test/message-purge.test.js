@@ -22,6 +22,19 @@ function collection(messages) {
     return new Collection(messages.map(item => [item.id, item]));
 }
 
+function overwrite(id, type, allow, deny) {
+    return {
+        id,
+        type,
+        allow: { bitfield: BigInt(allow) },
+        deny: { bitfield: BigInt(deny) }
+    };
+}
+
+function overwriteCache(items = []) {
+    return new Collection(items.map(item => [item.id, item]));
+}
+
 test('limited purge also deletes selected messages older than 14 days', async () => {
     const recentA = message('1', 1);
     const recentB = message('2', 2);
@@ -43,9 +56,15 @@ test('limited purge also deletes selected messages older than 14 days', async ()
 
 test('complete purge recreates the channel and deletes the original once', async () => {
     const calls = [];
+    const permissions = [
+        overwrite('guild', 0, 1024, 2048),
+        overwrite('staff-role', 0, 3072, 0),
+        overwrite('member', 1, 4096, 8192)
+    ];
     const replacement = {
         id: 'replacement',
         rawPosition: 4,
+        permissionOverwrites: { cache: overwriteCache(permissions) },
         setPosition: async () => calls.push('position'),
         delete: async () => calls.push('replacement-delete')
     };
@@ -55,6 +74,7 @@ test('complete purge recreates the channel and deletes the original once', async
         rawPosition: 4,
         defaultAutoArchiveDuration: 1440,
         defaultThreadRateLimitPerUser: 10,
+        permissionOverwrites: { cache: overwriteCache(permissions) },
         clone: async options => {
             calls.push(['clone', options]);
             return replacement;
@@ -67,6 +87,11 @@ test('complete purge recreates the channel and deletes the original once', async
     assert.equal(result, replacement);
     assert.equal(calls[0][0], 'clone');
     assert.equal(calls[0][1].position, 4);
+    assert.deepEqual(calls[0][1].permissionOverwrites, [
+        { id: 'guild', type: 0, allow: 1024n, deny: 2048n },
+        { id: 'staff-role', type: 0, allow: 3072n, deny: 0n },
+        { id: 'member', type: 1, allow: 4096n, deny: 8192n }
+    ]);
     assert.equal(calls.at(-1), 'original-delete');
     assert.equal(calls.filter(call => call === 'original-delete').length, 1);
     assert.equal(calls.includes('replacement-delete'), false);
@@ -78,8 +103,10 @@ test('complete purge cleans up its clone when Discord keeps the original channel
         type: ChannelType.GuildText,
         name: 'general',
         rawPosition: 4,
+        permissionOverwrites: { cache: overwriteCache() },
         clone: async () => ({
             rawPosition: 4,
+            permissionOverwrites: { cache: overwriteCache() },
             delete: async () => {
                 replacementDeleted += 1;
             }
@@ -93,6 +120,38 @@ test('complete purge cleans up its clone when Discord keeps the original channel
         recreateChannelForPurge(channel),
         error => error.channelReplacementFailed === true
     );
+    assert.equal(replacementDeleted, 1);
+});
+
+test('complete purge keeps the original when one permission differs', async () => {
+    let originalDeleted = 0;
+    let replacementDeleted = 0;
+    const sourcePermissions = [overwrite('staff-role', 0, 3072, 0)];
+    const channel = {
+        type: ChannelType.GuildText,
+        name: 'general',
+        rawPosition: 4,
+        permissionOverwrites: { cache: overwriteCache(sourcePermissions) },
+        clone: async () => ({
+            rawPosition: 4,
+            permissionOverwrites: {
+                cache: overwriteCache([overwrite('staff-role', 0, 1024, 0)])
+            },
+            delete: async () => {
+                replacementDeleted += 1;
+            }
+        }),
+        delete: async () => {
+            originalDeleted += 1;
+        }
+    };
+
+    await assert.rejects(
+        recreateChannelForPurge(channel),
+        error => error.channelPermissionRestoreFailed === true
+            && error.channelReplacementFailed === true
+    );
+    assert.equal(originalDeleted, 0);
     assert.equal(replacementDeleted, 1);
 });
 

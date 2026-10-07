@@ -165,6 +165,37 @@ function canRecreateChannelForPurge(channel) {
     );
 }
 
+function snapshotPermissionOverwrites(channel) {
+    const cache = channel?.permissionOverwrites?.cache;
+    if (!cache || typeof cache.values !== 'function') {
+        const error = new TypeError('Discord permission overwrites are unavailable for this channel.');
+        error.channelPermissionSnapshotFailed = true;
+        throw error;
+    }
+
+    return Array.from(cache.values()).map(overwrite => ({
+        id: overwrite.id,
+        type: overwrite.type,
+        allow: BigInt(overwrite.allow?.bitfield ?? overwrite.allow ?? 0),
+        deny: BigInt(overwrite.deny?.bitfield ?? overwrite.deny ?? 0)
+    }));
+}
+
+function hasExactPermissionOverwrites(channel, expected) {
+    const cache = channel?.permissionOverwrites?.cache;
+    if (!cache || cache.size !== expected.length) {
+        return false;
+    }
+
+    return expected.every(overwrite => {
+        const restored = cache.get(overwrite.id);
+        return restored
+            && restored.type === overwrite.type
+            && BigInt(restored.allow?.bitfield ?? restored.allow ?? 0) === overwrite.allow
+            && BigInt(restored.deny?.bitfield ?? restored.deny ?? 0) === overwrite.deny;
+    });
+}
+
 async function recreateChannelForPurge(channel, reason = 'Vidage complet Sentinel après archive vérifiée') {
     if (!canRecreateChannelForPurge(channel)) {
         const error = new TypeError('This Discord channel cannot be recreated for a complete purge.');
@@ -173,15 +204,23 @@ async function recreateChannelForPurge(channel, reason = 'Vidage complet Sentine
     }
 
     let replacement = null;
+    const permissionOverwrites = snapshotPermissionOverwrites(channel);
 
     try {
         replacement = await channel.clone({
             name: channel.name,
             position: channel.rawPosition,
+            permissionOverwrites,
             defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration,
             defaultThreadRateLimitPerUser: channel.defaultThreadRateLimitPerUser,
             reason
         });
+
+        if (!hasExactPermissionOverwrites(replacement, permissionOverwrites)) {
+            const error = new Error('Discord did not restore every channel permission overwrite.');
+            error.channelPermissionRestoreFailed = true;
+            throw error;
+        }
 
         if (typeof replacement.setPosition === 'function'
             && Number.isFinite(channel.rawPosition)
@@ -264,7 +303,9 @@ module.exports = {
     canBulkDelete,
     canRecreateChannelForPurge,
     fetchMessagesForPurge,
+    hasExactPermissionOverwrites,
     purgeFetchedChannelMessages,
     purgeChannelMessages,
-    recreateChannelForPurge
+    recreateChannelForPurge,
+    snapshotPermissionOverwrites
 };
