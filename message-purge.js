@@ -92,14 +92,13 @@ async function fetchMessagesForPurge(channel, options = {}) {
         const requested = Math.min(Math.max(Number(options.count) || 1, 1), BULK_DELETE_LIMIT);
         const batch = await fetchMessageBatch(channel, { limit: requested });
         const fetched = Array.from(batch.values());
-        const messages = fetched.filter(message => canBulkDelete(message));
 
         return {
             mode,
             requested,
             scanned: fetched.length,
-            skippedOld: fetched.length - messages.length,
-            messages
+            skippedOld: 0,
+            messages: fetched
         };
     }
 
@@ -157,7 +156,7 @@ async function purgeFetchedChannelMessages(channel, snapshot) {
             outcome = await deleteMessageBatch(
                 channel,
                 messages.slice(offset, offset + BULK_DELETE_LIMIT),
-                { includeOld: mode === 'all' }
+                { includeOld: true }
             );
         } catch (error) {
             error.purgeResult = { ...result };

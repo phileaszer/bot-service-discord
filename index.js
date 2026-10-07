@@ -13530,8 +13530,8 @@ async function handleModerationInteraction(interaction, commandName, language) {
                         ? `${amount} recent message(s) will be archived, verified, then deleted.`
                         : `${amount} message(s) récent(s) seront archivés, vérifiés, puis supprimés.`,
                     language === 'en'
-                        ? 'Messages older than 14 days are kept unless the complete-channel option is used.'
-                        : 'Les messages de plus de 14 jours sont conservés sauf avec l’option de vidage complet.'
+                        ? 'Selected messages older than 14 days are deleted individually after archival.'
+                        : 'Les messages sélectionnés de plus de 14 jours sont supprimés individuellement après archivage.'
                 ],
             payload: {
                 channelId: interaction.channel.id,

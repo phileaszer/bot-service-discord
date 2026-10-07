@@ -22,7 +22,7 @@ function collection(messages) {
     return new Collection(messages.map(item => [item.id, item]));
 }
 
-test('limited purge deletes recent messages and leaves messages older than 14 days', async () => {
+test('limited purge also deletes selected messages older than 14 days', async () => {
     const recentA = message('1', 1);
     const recentB = message('2', 2);
     const old = message('3', 20);
@@ -36,9 +36,9 @@ test('limited purge deletes recent messages and leaves messages older than 14 da
 
     const result = await purgeChannelMessages(channel, { mode: 'count', count: 3 });
 
-    assert.equal(result.deleted, 2);
-    assert.equal(result.skippedOld, 1);
-    assert.equal(old.deleteCalls, 0);
+    assert.equal(result.deleted, 3);
+    assert.equal(result.skippedOld, 0);
+    assert.equal(old.deleteCalls, 1);
 });
 
 test('complete purge deletes recent and old messages from the archived snapshot', async () => {
