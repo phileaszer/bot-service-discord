@@ -660,6 +660,15 @@
     'Permissions prêtes': 'Permissions ready',
     'Sentinel peut appliquer les actions prévues sur ce serveur.': 'Sentinel can perform the planned actions on this server.',
     'Voir tout': 'View all',
+    'Version actuelle': 'Current version',
+    'Une démonstration publique avant la formule définitive.': 'A public demonstration before the final offering.',
+    'Cette phase permet de tester Sentinel en conditions réelles, de corriger les problèmes et d’améliorer le service avec les communautés qui l’utilisent.': 'This phase lets communities test Sentinel in real conditions while issues are fixed and the service is improved.',
+    'Aujourd’hui': 'Today',
+    'Toutes les fonctions de cette version sont accessibles sans paiement pendant la démonstration.': 'Every feature in this version is available at no cost during the demonstration.',
+    'Plus tard': 'Later',
+    'Sentinel a vocation à devenir un service payant. La formule, les tarifs et le calendrier ne sont pas encore annoncés.': 'Sentinel is intended to become a paid service. The offering, pricing, and timeline have not been announced yet.',
+    'Avant tout changement': 'Before any change',
+    'Aucun abonnement ne sera activé automatiquement. Chaque serveur sera prévenu clairement et pourra décider de continuer ou non.': 'No subscription will be activated automatically. Every server will be notified clearly and can decide whether to continue.',
   });
 
   const placeholderEn = {

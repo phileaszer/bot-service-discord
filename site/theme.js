@@ -8,13 +8,17 @@
       actionWestern: 'Style Western',
       actionSentinel: 'Style Sentinel',
       currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
-      currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.'
+      currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.',
+      releaseTitle: 'Version de démonstration publique',
+      releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. Cette version a vocation à devenir payante plus tard. Aucun abonnement ni prélèvement n’est actif aujourd’hui ; les conditions seront annoncées clairement avant tout changement.'
     },
     en: {
       actionWestern: 'Western style',
       actionSentinel: 'Sentinel style',
       currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
-      currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.'
+      currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.',
+      releaseTitle: 'Public demonstration version',
+      releaseMessage: 'Sentinel is currently available at no cost so communities can try it. This version is intended to become a paid service later. No subscription or charge is active today; the terms will be announced clearly before any change.'
     }
   };
 
@@ -108,6 +112,44 @@
     updateButtons();
   }
 
+  function updateReleaseNotice() {
+    const notice = document.querySelector('[data-release-notice]');
+    if (!notice) return;
+
+    const text = labels[pageLanguage()];
+    const title = notice.querySelector('[data-release-title]');
+    const message = notice.querySelector('[data-release-message]');
+
+    notice.setAttribute('aria-label', text.releaseTitle);
+    if (title) title.textContent = text.releaseTitle;
+    if (message) message.textContent = text.releaseMessage;
+  }
+
+  function ensureReleaseNotice() {
+    const header = document.querySelector('.site-header');
+    if (!header || document.querySelector('[data-release-notice]')) {
+      updateReleaseNotice();
+      return;
+    }
+
+    const notice = document.createElement('aside');
+    notice.className = 'release-notice';
+    notice.dataset.releaseNotice = 'true';
+    notice.innerHTML = `
+      <div class="release-notice-inner">
+        <strong data-release-title></strong>
+        <p data-release-message></p>
+      </div>
+    `;
+    header.after(notice);
+    updateReleaseNotice();
+  }
+
+  function initializePageChrome() {
+    ensureButton();
+    ensureReleaseNotice();
+  }
+
   applyRootTheme(readTheme());
 
   document.addEventListener('click', (event) => {
@@ -119,12 +161,15 @@
   });
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureButton);
+    document.addEventListener('DOMContentLoaded', initializePageChrome);
   } else {
-    ensureButton();
+    initializePageChrome();
   }
 
-  window.addEventListener('sentinel:site-language-change', () => updateButtons());
+  window.addEventListener('sentinel:site-language-change', () => {
+    updateButtons();
+    updateReleaseNotice();
+  });
 
   window.SentinelTheme = {
     set: saveTheme,

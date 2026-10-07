@@ -1045,6 +1045,8 @@ function buildDashboardEmbed(guild, requester) {
                 '`2.` Choose the server.',
                 '`3.` Configure service, logs, embeds, moderation, and audit from one place.',
                 '',
+                '**Current release:** public demonstration. No subscription or charge is active today. Sentinel is intended to become a paid service later, with terms announced before any change.',
+                '',
                 dashboardUrl
             ].join('\n')
             : [
@@ -1053,6 +1055,8 @@ function buildDashboardEmbed(guild, requester) {
                 '`1.` Connecte-toi avec ton compte.',
                 '`2.` Choisis le serveur.',
                 '`3.` Prépare le service, le registre, les annonces, la sécurité et l’historique au même endroit.',
+                '',
+                '**Version actuelle :** démonstration publique. Aucun abonnement ni prélèvement n’est actif aujourd’hui. Sentinel a vocation à devenir payant plus tard, avec des conditions annoncées avant tout changement.',
                 '',
                 dashboardUrl
             ].join('\n'),
@@ -9421,7 +9425,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             {
                 name: 'Members',
                 value: [
-                    '`/my-hours`, `/history`, `/on-duty`, `/top-service` show free tracking.',
+                    '`/my-hours`, `/history`, `/on-duty`, `/top-service` show service tracking.',
                     'Text aliases: `!my-hours`, `!history`, `!on-duty`, `!top-service`.'
                 ].join('\n'),
                 inline: false
@@ -9429,10 +9433,10 @@ function buildLegacyHelpEmbed(guild, requester) {
             {
                 name: 'Moderation',
                 value: [
-                    'Free moderation: `/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
+                    'Moderation: `/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
                     '`/ban` can use a Discord ID when the user is no longer in the server.',
-                    '`/mod-cases` stays available as a limited view of the latest cases.',
-                    '`/embed create` sends an announcement as Sentinel. Free servers can keep 2 active embeds; edits are unlimited.',
+                    '`/mod-cases` shows the latest moderation cases.',
+                    '`/embed create` sends an announcement as Sentinel. Creation and edits are unlimited.',
                     'Text aliases: `!warn`, `!timeout`, `!untimeout`, `!kick`, `!ban`, `!clear`, `!mod-cases`.',
                     'Sentinel checks role hierarchy before applying a sanction.'
                 ].join('\n'),
@@ -9541,7 +9545,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/expulser membre raison` - expulser un membre',
         '`/bannir utilisateur ou utilisateur_id raison` - bannir, meme si la personne n est plus sur le serveur',
         '`/purge nombre` - supprimer jusqu a 100 messages recents',
-        '`/sanctions membre ou utilisateur_id` - consultation simple limitee aux 10 derniers cas',
+        '`/sanctions membre ou utilisateur_id` - consulter les dossiers disciplinaires',
         '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Sentinel',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
@@ -9671,6 +9675,10 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 title: 'Sentinel | Help',
                 description: 'Choose a section in the menu below. Each page is short so the guide stays readable on mobile.',
                 fields: [
+                    {
+                        name: 'Public demonstration version',
+                        value: 'Sentinel is currently available at no cost for testing. It is intended to become a paid service later. No subscription or charge is active today, and the terms will be announced before any change.'
+                    },
                     {
                         name: 'Recommended order',
                         value: [
@@ -9970,6 +9978,10 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             title: 'Sentinel | Briefing',
             description: 'Choisis une rubrique dans le registre ci-dessous. Chaque page reste courte pour une lecture rapide.',
             fields: [
+                {
+                    name: 'Version de démonstration publique',
+                    value: 'Sentinel est actuellement accessible sans paiement pour être testé en conditions réelles. Il a vocation à devenir payant plus tard. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les conditions seront annoncées avant tout changement.'
+                },
                 {
                     name: 'Ordre de mise en place',
                     value: [

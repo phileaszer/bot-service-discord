@@ -1,12 +1,18 @@
 # Conditions d'utilisation
 
-Dernière mise à jour : 1 août 2026
+Dernière mise à jour : 7 octobre 2026
 
 En utilisant Sentinel, vous acceptez les présentes conditions.
 
 ## Objet
 
 Sentinel est un bot Discord qui aide les serveurs à gérer les prises de service, la modération, les dossiers privés de support, les annonces et certaines actions depuis un dashboard web.
+
+## Version de démonstration et évolution tarifaire
+
+La version actuelle de Sentinel est mise à disposition comme démonstration publique, sans abonnement ni prélèvement actif. Cette phase sert à tester le service en conditions réelles et à préparer son fonctionnement définitif.
+
+Sentinel a vocation à devenir un service payant ultérieurement. Les tarifs, le calendrier et les conditions applicables seront annoncés clairement avant toute activation d’une offre payante. L’utilisation de la version actuelle ne constitue pas une souscription et n’autorise aucun prélèvement futur automatique.
 
 ## Utilisation du service
 
@@ -56,13 +62,19 @@ Pour toute question, utilisez le serveur support ou les moyens de contact indiqu
 
 # Terms of Service
 
-Last updated: August 1, 2026
+Last updated: October 7, 2026
 
 By using Sentinel, you agree to these terms.
 
 ## Purpose
 
 Sentinel is a Discord bot that helps servers manage duty tracking, moderation, private support tickets, announcements and selected actions from a web dashboard.
+
+## Demonstration version and future pricing
+
+The current Sentinel release is provided as a public demonstration, with no active subscription or charge. This phase is used to test the service in real conditions and prepare its final operation.
+
+Sentinel is intended to become a paid service later. Pricing, timing, and applicable terms will be announced clearly before any paid offering is activated. Using the current version does not create a subscription and does not authorize any automatic future charge.
 
 ## Use of the service
 

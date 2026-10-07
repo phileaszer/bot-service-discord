@@ -49,3 +49,19 @@ test('the complete feature set is free and the payment system is absent', () => 
     assert.equal(fs.existsSync(path.join(root, 'billing.js')), false);
     assert.equal(fs.existsSync(path.join(root, 'test', 'billing.test.js')), false);
 });
+
+test('the public demonstration and future paid service are explained clearly', () => {
+    const homeSource = read('site/index.html');
+    const themeSource = read('site/theme.js');
+    const termsSource = read('TERMS_OF_SERVICE.md');
+    const databaseSource = read('database/database.js');
+    const botSource = read('index.js');
+
+    assert.match(homeSource, /Une démonstration publique avant la formule définitive/);
+    assert.match(homeSource, /Aucun abonnement ne sera activé automatiquement/);
+    assert.match(themeSource, /Version de démonstration publique/);
+    assert.match(themeSource, /Aucun abonnement ni prélèvement n’est actif aujourd’hui/);
+    assert.match(termsSource, /ne constitue pas une souscription/);
+    assert.match(databaseSource, /sentinel-public-demo-2026-10-07/);
+    assert.match(botSource, /Sentinel a vocation à devenir payant plus tard/);
+});

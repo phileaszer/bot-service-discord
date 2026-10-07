@@ -905,6 +905,41 @@ db.prepare(`
     ].join('\n')
 );
 
+db.prepare(`
+    INSERT OR IGNORE INTO official_updates (
+        public_key,
+        title_fr,
+        body_fr,
+        title_en,
+        body_en,
+        source,
+        created_by_user_id,
+        is_public,
+        created_at,
+        published_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
+`).run(
+    'sentinel-public-demo-2026-10-07',
+    'Sentinel | Version de démonstration',
+    [
+        'La version actuelle de Sentinel est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
+        'Elle sert à tester le service en conditions réelles, corriger les problèmes et préparer la formule définitive.',
+        'Sentinel a vocation à devenir payant plus tard. Aucun abonnement, prélèvement ou achat n’est actif aujourd’hui.',
+        'Les tarifs, le calendrier et les conditions seront annoncés clairement avant tout changement afin que chaque serveur puisse décider de continuer ou non.'
+    ].join('\n'),
+    'Sentinel | Demonstration version',
+    [
+        'The current Sentinel release is a public demonstration: every feature is available at no cost during this phase.',
+        'It is used to test the service in real conditions, fix issues, and prepare the final offering.',
+        'Sentinel is intended to become a paid service later. No subscription, charge, or purchase is active today.',
+        'Pricing, timing, and terms will be announced clearly before any change so each server can decide whether to continue.'
+    ].join('\n'),
+    'information officielle',
+    '2026-10-07T00:00:00.000Z',
+    '2026-10-07T00:00:00.000Z'
+);
+
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
     .map(column => column.name);
 
