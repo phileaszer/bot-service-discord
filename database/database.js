@@ -172,6 +172,8 @@ CREATE TABLE IF NOT EXISTS message_purge_archives (
     deleted_count INTEGER NOT NULL DEFAULT 0,
     failed_count INTEGER NOT NULL DEFAULT 0,
     has_remaining INTEGER NOT NULL DEFAULT 0,
+    replacement_channel_id TEXT,
+    replacement_channel_name TEXT,
     status TEXT NOT NULL DEFAULT 'archived',
     created_at TEXT NOT NULL,
     completed_at TEXT
@@ -827,6 +829,17 @@ ON member_notification_deliveries (guild_id, user_id, attempted_at);
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
     .map(column => column.name);
+
+const messagePurgeArchiveColumns = db.prepare('PRAGMA table_info(message_purge_archives)').all()
+    .map(column => column.name);
+
+if (!messagePurgeArchiveColumns.includes('replacement_channel_id')) {
+    db.prepare('ALTER TABLE message_purge_archives ADD COLUMN replacement_channel_id TEXT').run();
+}
+
+if (!messagePurgeArchiveColumns.includes('replacement_channel_name')) {
+    db.prepare('ALTER TABLE message_purge_archives ADD COLUMN replacement_channel_name TEXT').run();
+}
 
 if (!guildConfigColumns.includes('language')) {
     db.prepare("ALTER TABLE guild_configs ADD COLUMN language TEXT NOT NULL DEFAULT 'fr'").run();

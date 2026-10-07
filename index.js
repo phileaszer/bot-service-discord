@@ -53,8 +53,10 @@ const operations = require('./operations');
 const governance = require('./governance');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
 const {
+    canRecreateChannelForPurge,
     fetchMessagesForPurge,
-    purgeFetchedChannelMessages
+    purgeFetchedChannelMessages,
+    recreateChannelForPurge
 } = require('./message-purge');
 
 const client = new Client({
@@ -1949,13 +1951,19 @@ function clampNumber(value, min, max) {
     return Math.min(Math.max(Number(value) || min, min), max);
 }
 
-function hasPurgeChannelPermissions(guild, channel) {
+function hasPurgeChannelPermissions(guild, channel, mode = 'count') {
     const permissions = channel?.permissionsFor?.(guild?.members?.me);
-    return Boolean(permissions?.has([
+    const required = [
         PermissionsBitField.Flags.ViewChannel,
         PermissionsBitField.Flags.ReadMessageHistory,
         PermissionsBitField.Flags.ManageMessages
-    ]));
+    ];
+
+    if (mode === 'all') {
+        required.push(PermissionsBitField.Flags.ManageChannels);
+    }
+
+    return Boolean(permissions?.has(required));
 }
 
 function formatPurgeResult(result, language = 'fr') {
@@ -1966,6 +1974,12 @@ function formatPurgeResult(result, language = 'fr') {
         : '';
 
     if (result.mode === 'all') {
+        if (result.channelRecreated && result.replacementChannelId) {
+            return language === 'en'
+                ? `✅ Channel recreated and cleared instantly: **${result.deleted}** archived message(s). New channel: <#${result.replacementChannelId}>.${archiveNote}`
+                : `✅ Salon recréé et vidé instantanément : **${result.deleted}** message(s) archivé(s). Nouveau salon : <#${result.replacementChannelId}>.${archiveNote}`;
+        }
+
         if (result.failed > 0 || result.hasRemaining) {
             return `${t(language, 'moderationClearPartial', { count: result.deleted })}${archiveNote}`;
         }
@@ -1981,6 +1995,25 @@ function formatPurgeResult(result, language = 'fr') {
     return language === 'en'
         ? `${base} ${result.skippedOld} message(s) older than 14 days were left untouched. Use \`/clear all\` to clear the entire channel.${archiveNote}`
         : `${base} ${result.skippedOld} message(s) de plus de 14 jours ont été conservé(s). Utilise \`/purge tout\` pour vider entièrement le salon.${archiveNote}`;
+}
+
+async function sendTemporaryPurgeReplacementNotice(result, actor, language = 'fr') {
+    const channel = result?.replacementChannel;
+    if (!result?.channelRecreated || !channel?.isTextBased?.() || typeof channel.send !== 'function') {
+        return null;
+    }
+
+    const message = await channel.send({
+        content: `${actor ? `${actor} ` : ''}${formatPurgeResult(result, language)}`.trim(),
+        allowedMentions: actor?.id ? { users: [actor.id] } : { parse: [] }
+    }).catch(() => null);
+
+    if (message) {
+        const timer = setTimeout(() => message.delete().catch(() => {}), 15 * 1000);
+        timer.unref?.();
+    }
+
+    return message;
 }
 
 function mapGuildConfig(row) {
@@ -5152,6 +5185,8 @@ function mapMessagePurgeArchive(row) {
         deletedCount: Number(row.deleted_count || 0),
         failedCount: Number(row.failed_count || 0),
         hasRemaining: Boolean(row.has_remaining),
+        replacementChannelId: row.replacement_channel_id || null,
+        replacementChannelName: row.replacement_channel_name || null,
         status: row.status,
         createdAt: row.created_at,
         completedAt: row.completed_at || null
@@ -5191,6 +5226,8 @@ function completeMessagePurgeArchive(archiveId, result, status = 'completed') {
         SET deleted_count = ?,
             failed_count = ?,
             has_remaining = ?,
+            replacement_channel_id = ?,
+            replacement_channel_name = ?,
             status = ?,
             completed_at = ?
         WHERE id = ?
@@ -5198,6 +5235,8 @@ function completeMessagePurgeArchive(archiveId, result, status = 'completed') {
         Number(result?.deleted || 0),
         Number(result?.failed || 0),
         result?.hasRemaining ? 1 : 0,
+        result?.replacementChannelId || null,
+        result?.replacementChannelName || null,
         status,
         new Date().toISOString(),
         archiveId
@@ -7719,16 +7758,26 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
 
     if (confirmation.action === 'purge') {
         const channel = await guild.channels.fetch(payload.channelId).catch(() => null);
+        const mode = payload.mode === 'all' ? 'all' : 'count';
 
         if (!channel?.isTextBased?.() || typeof channel.bulkDelete !== 'function') {
             throw new Error(t(language, 'moderationNoChannel'));
         }
 
-        if (!hasPurgeChannelPermissions(guild, channel)) {
-            throw new Error(t(language, 'moderationPurgeChannelPermissionMissing'));
+        if (mode === 'all' && !canRecreateChannelForPurge(channel)) {
+            throw new Error(language === 'en'
+                ? 'Complete cleanup is only available in a standard text or announcement channel.'
+                : 'Le vidage complet est uniquement disponible dans un salon textuel ou un salon d’annonces standard.');
         }
 
-        const mode = payload.mode === 'all' ? 'all' : 'count';
+        if (!hasPurgeChannelPermissions(guild, channel, mode)) {
+            throw new Error(mode === 'all'
+                ? (language === 'en'
+                    ? 'Sentinel must also have Manage Channels to recreate this channel.'
+                    : 'Sentinel doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
+                : t(language, 'moderationPurgeChannelPermissionMissing'));
+        }
+
         const amount = mode === 'all' ? null : clampNumber(payload.amount, 1, 100);
         let result;
 
@@ -7751,6 +7800,11 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
                     ? `The archive could not be verified. No message was deleted. ${error.message || ''}`.trim()
                     : `L’archive n’a pas pu être vérifiée. Aucun message n’a été supprimé. ${error.message || ''}`.trim());
             }
+            if (error?.channelReplacementUnsupported || error?.channelReplacementFailed) {
+                throw new Error(language === 'en'
+                    ? 'The verified archive was kept, but Discord could not recreate the channel. The original channel was not purged.'
+                    : 'L’archive vérifiée a été conservée, mais Discord n’a pas pu recréer le salon. Le salon d’origine n’a pas été vidé.');
+            }
             throw new Error(getModerationActionFailureMessage(
                 error,
                 guild,
@@ -7766,14 +7820,16 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
             interaction.user.id,
             'clear',
             mode === 'all'
-                ? `Vidage complet demandé dans #${channel.name}. ${result.deleted} messages supprimés. Archive #${result.archive?.id || 'aucune'}.`
+                ? `Vidage complet demandé dans #${channel.name}. ${result.deleted} messages archivés. Salon recréé : ${result.replacementChannelId || 'inchangé'}. Archive #${result.archive?.id || 'aucune'}.`
                 : `${amount} messages demandés dans #${channel.name}. ${result.deleted} supprimés. Archive #${result.archive?.id || 'aucune'}.`,
             null
         );
 
-        if (getLogChannel(guild)?.id !== channel.id) {
-            await sendModerationLog(guild, interaction.user, caseData, `${channel}`, language);
+        const resultChannel = result.replacementChannel || channel;
+        if (getLogChannel(guild)?.id !== resultChannel.id) {
+            await sendModerationLog(guild, interaction.user, caseData, `${resultChannel}`, language);
         }
+        await sendTemporaryPurgeReplacementNotice(result, interaction.user, language);
         return formatPurgeResult(result, language);
     }
 
@@ -8746,7 +8802,12 @@ async function buildDiagnosticEmbed(guild, requester) {
                     diagnosticLine(botCanModerate, 'Timeout / fin-timeout', botCanModerate ? 'OK' : 'ajoute `Modérer les membres`'),
                     diagnosticLine(botCanKick, 'Expulsion', botCanKick ? 'OK' : 'ajoute `Expulser des membres`'),
                     diagnosticLine(botCanBan, 'Ban et unban par ID', botCanBan ? 'OK' : 'ajoute `Bannir des membres`'),
-                    diagnosticLine(botCanManageMessages, 'Purge', botCanManageMessages ? 'OK' : 'ajoute `Gérer les messages`')
+                    diagnosticLine(botCanManageMessages, 'Purge limitée', botCanManageMessages ? 'OK' : 'ajoute `Gérer les messages`'),
+                    diagnosticLine(
+                        botCanManageMessages && botCanManageChannels,
+                        'Purge complète',
+                        botCanManageMessages && botCanManageChannels ? 'OK' : 'ajoute `Gérer les messages` et `Gérer les salons`'
+                    )
                 ].join('\n'),
                 inline: false
             },
@@ -12254,6 +12315,105 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
     }
 }
 
+function migrateSentinelChannelReferences(guildId, oldChannelId, newChannelId) {
+    const migrate = db.transaction(() => {
+        const managedEmbeds = db.prepare(`
+            SELECT message_id
+            FROM custom_embeds
+            WHERE guild_id = ? AND channel_id = ?
+        `).all(guildId, oldChannelId);
+
+        for (const embed of managedEmbeds) {
+            markCustomEmbedMediaTrash(guildId, embed.message_id);
+        }
+
+        db.prepare(`
+            DELETE FROM custom_embeds
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(guildId, oldChannelId);
+        db.prepare(`
+            DELETE FROM sentinel_dossier_panels
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(guildId, oldChannelId);
+        db.prepare(`
+            UPDATE guild_configs
+            SET log_channel_id = CASE WHEN log_channel_id = ? THEN ? ELSE log_channel_id END,
+                status_channel_id = CASE WHEN status_channel_id = ? THEN ? ELSE status_channel_id END,
+                updates_channel_id = CASE WHEN updates_channel_id = ? THEN ? ELSE updates_channel_id END
+            WHERE guild_id = ?
+        `).run(
+            oldChannelId, newChannelId,
+            oldChannelId, newChannelId,
+            oldChannelId, newChannelId,
+            guildId
+        );
+        db.prepare(`
+            UPDATE sentinel_dossiers
+            SET channel_id = ?
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(newChannelId, guildId, oldChannelId);
+        db.prepare(`
+            UPDATE scheduled_announcements
+            SET channel_id = ?, updated_at = ?
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(newChannelId, new Date().toISOString(), guildId, oldChannelId);
+        db.prepare(`
+            UPDATE guild_report_schedules
+            SET channel_id = ?, updated_at = ?
+            WHERE guild_id = ? AND channel_id = ?
+        `).run(newChannelId, new Date().toISOString(), guildId, oldChannelId);
+
+        const automod = db.prepare(`
+            SELECT premium_ignored_channel_ids_json
+            FROM guild_automod_settings
+            WHERE guild_id = ?
+        `).get(guildId);
+        if (automod) {
+            const ignored = parseStoredJsonArray(automod.premium_ignored_channel_ids_json);
+            if (ignored.includes(oldChannelId)) {
+                const remapped = [...new Set(ignored.map(id => id === oldChannelId ? newChannelId : id))];
+                db.prepare(`
+                    UPDATE guild_automod_settings
+                    SET premium_ignored_channel_ids_json = ?, updated_at = ?
+                    WHERE guild_id = ?
+                `).run(JSON.stringify(remapped), new Date().toISOString(), guildId);
+            }
+        }
+
+        const pendingDeliveries = db.prepare(`
+            SELECT id, update_id
+            FROM official_update_deliveries
+            WHERE guild_id = ? AND channel_id = ? AND status IN ('pending', 'retrying')
+        `).all(guildId, oldChannelId);
+        for (const delivery of pendingDeliveries) {
+            const conflict = db.prepare(`
+                SELECT id
+                FROM official_update_deliveries
+                WHERE update_id = ? AND guild_id = ? AND channel_id = ?
+            `).get(delivery.update_id, guildId, newChannelId);
+            if (conflict) {
+                db.prepare(`
+                    UPDATE official_update_deliveries
+                    SET status = 'cancelled', last_error = ?, next_attempt_at = NULL, updated_at = ?
+                    WHERE id = ?
+                `).run('Salon remplacé lors d’un vidage complet Sentinel.', new Date().toISOString(), delivery.id);
+            } else {
+                db.prepare(`
+                    UPDATE official_update_deliveries
+                    SET channel_id = ?, updated_at = ?
+                    WHERE id = ?
+                `).run(newChannelId, new Date().toISOString(), delivery.id);
+            }
+        }
+
+        return {
+            removedManagedEmbeds: managedEmbeds.length
+        };
+    });
+
+    return migrate();
+}
+
 async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
     const snapshot = await fetchMessagesForPurge(channel, options);
 
@@ -12276,6 +12436,56 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
     } catch (error) {
         error.archiveFailed = true;
         throw error;
+    }
+
+    if (snapshot.mode === 'all') {
+        let replacement;
+
+        try {
+            replacement = await recreateChannelForPurge(
+                channel,
+                `Vidage complet Sentinel demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`
+            );
+        } catch (error) {
+            completeMessagePurgeArchive(archive.id, {
+                deleted: 0,
+                failed: snapshot.messages.length,
+                hasRemaining: true
+            }, 'recreation_failed');
+            throw error;
+        }
+
+        let migrationWarning = null;
+        try {
+            migrateSentinelChannelReferences(channel.guild.id, channel.id, replacement.id);
+        } catch (error) {
+            migrationWarning = error.message || String(error);
+            console.error('Migration des références après recréation du salon :', error);
+        }
+
+        const result = {
+            mode: 'all',
+            requested: null,
+            scanned: snapshot.messages.length,
+            deleted: snapshot.messages.length,
+            failed: 0,
+            alreadyGone: 0,
+            skippedOld: 0,
+            passes: 1,
+            hasRemaining: false,
+            channelRecreated: true,
+            oldChannelId: channel.id,
+            replacementChannelId: replacement.id,
+            replacementChannelName: replacement.name,
+            replacementChannel: replacement,
+            internalMigrationWarning: migrationWarning
+        };
+        completeMessagePurgeArchive(
+            archive.id,
+            result,
+            migrationWarning ? 'completed_with_warnings' : 'channel_recreated'
+        );
+        return { ...result, archive };
     }
 
     try {
@@ -13502,6 +13712,28 @@ async function handleModerationInteraction(interaction, commandName, language) {
             || (!purgeMode && Boolean(interaction.options.getBoolean('tout')));
         const requestedAmount = deleteAll ? null : interaction.options.getInteger('nombre');
 
+        if (deleteAll && !canRecreateChannelForPurge(interaction.channel)) {
+            await interaction.reply({
+                content: language === 'en'
+                    ? 'Complete cleanup is only available in a standard text or announcement channel.'
+                    : 'Le vidage complet est uniquement disponible dans un salon textuel ou un salon d’annonces standard.',
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (!hasPurgeChannelPermissions(interaction.guild, interaction.channel, deleteAll ? 'all' : 'count')) {
+            await interaction.reply({
+                content: deleteAll
+                    ? (language === 'en'
+                        ? 'Sentinel must also have Manage Channels to recreate this channel.'
+                        : 'Sentinel doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
+                    : t(language, 'moderationPurgeChannelPermissionMissing'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
         if (!deleteAll && !Number.isInteger(requestedAmount)) {
             await interaction.reply({
                 content: t(language, 'moderationPurgeAmountRequired'),
@@ -13519,11 +13751,11 @@ async function handleModerationInteraction(interaction, commandName, language) {
             details: deleteAll
                 ? [
                     language === 'en'
-                        ? 'Every message currently present in this channel will be archived, verified, then deleted.'
-                        : 'Tous les messages actuellement présents dans ce salon seront archivés, vérifiés, puis supprimés.',
+                        ? 'Every message will be archived, then the channel will be recreated empty and the original channel deleted.'
+                        : 'Tous les messages seront archivés, puis le salon sera recréé vide et le salon d’origine sera supprimé.',
                     language === 'en'
-                        ? 'Old messages and attachments are included. The operation may take several minutes and cannot be undone from Discord.'
-                        : 'Les anciens messages et les pièces jointes sont inclus. L’opération peut durer plusieurs minutes et ne peut pas être annulée depuis Discord.'
+                        ? 'The channel ID will change. Existing links, webhooks and threads will no longer work.'
+                        : 'L’identifiant du salon changera. Les anciens liens, webhooks et fils ne fonctionneront plus.'
                 ]
                 : [
                     language === 'en'
@@ -14430,10 +14662,26 @@ async function handleModerationMessage(message, language) {
         const confirmedAll = ['confirmer', 'confirm'].includes(String(args[2] || '').toLowerCase());
         const parsedAmount = Number.parseInt(args[1], 10);
 
+        if (deleteAll && !canRecreateChannelForPurge(message.channel)) {
+            await message.reply(language === 'en'
+                ? 'Complete cleanup is only available in a standard text or announcement channel.'
+                : 'Le vidage complet est uniquement disponible dans un salon textuel ou un salon d’annonces standard.');
+            return true;
+        }
+
+        if (!hasPurgeChannelPermissions(message.guild, message.channel, deleteAll ? 'all' : 'count')) {
+            await message.reply(deleteAll
+                ? (language === 'en'
+                    ? 'Sentinel must also have Manage Channels to recreate this channel.'
+                    : 'Sentinel doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
+                : t(language, 'moderationPurgeChannelPermissionMissing'));
+            return true;
+        }
+
         if (deleteAll && !confirmedAll) {
             await message.reply(language === 'en'
-                ? '⚠️ This archives and deletes every message in the channel, including messages older than 14 days. Type `!clear all confirm` to continue.'
-                : '⚠️ Cette action archive puis supprime tous les messages du salon, y compris ceux de plus de 14 jours. Écris `!purge tout confirmer` pour continuer.');
+                ? '⚠️ This archives everything, recreates the channel empty, then deletes the original. Its ID changes and old links, webhooks and threads break. Type `!clear all confirm` to continue.'
+                : '⚠️ Cette action archive tout, recrée le salon vide, puis supprime l’original. Son identifiant change et les anciens liens, webhooks et fils sont rompus. Écris `!purge tout confirmer` pour continuer.');
             return true;
         }
 
@@ -14466,6 +14714,12 @@ async function handleModerationMessage(message, language) {
                     : `L’archive n’a pas pu être vérifiée. Aucun message n’a été supprimé. ${error.message || ''}`.trim());
                 return true;
             }
+            if (error?.channelReplacementUnsupported || error?.channelReplacementFailed) {
+                await message.reply(language === 'en'
+                    ? 'The verified archive was kept, but Discord could not recreate the channel. The original channel was not purged.'
+                    : 'L’archive vérifiée a été conservée, mais Discord n’a pas pu recréer le salon. Le salon d’origine n’a pas été vidé.');
+                return true;
+            }
             await message.reply(getModerationActionFailureMessage(
                 error,
                 message.guild,
@@ -14482,15 +14736,18 @@ async function handleModerationMessage(message, language) {
             message.author.id,
             'clear',
             deleteAll
-                ? `Vidage complet demandé dans #${message.channel.name}. ${result.deleted} messages supprimés. Archive #${result.archive?.id || 'aucune'}.`
+                ? `Vidage complet demandé dans #${message.channel.name}. ${result.deleted} messages archivés. Salon recréé : ${result.replacementChannelId || 'inchangé'}. Archive #${result.archive?.id || 'aucune'}.`
                 : `${amount} messages demandés dans #${message.channel.name}. ${result.deleted} supprimés. Archive #${result.archive?.id || 'aucune'}.`,
             null
         );
 
-        if (getLogChannel(message.guild)?.id !== message.channel.id) {
-            await sendModerationLog(message.guild, message.author, caseData, `${message.channel}`, language);
+        const resultChannel = result.replacementChannel || message.channel;
+        if (getLogChannel(message.guild)?.id !== resultChannel.id) {
+            await sendModerationLog(message.guild, message.author, caseData, `${resultChannel}`, language);
         }
-        const confirmation = await message.channel.send(formatPurgeResult(result, language)).catch(() => null);
+        const confirmation = result.channelRecreated
+            ? await sendTemporaryPurgeReplacementNotice(result, message.author, language)
+            : await resultChannel.send(formatPurgeResult(result, language)).catch(() => null);
         if (deleteAll && confirmation) {
             setTimeout(() => confirmation.delete().catch(() => {}), 10 * 1000);
         }

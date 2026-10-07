@@ -4485,8 +4485,10 @@ function messagePurgeArchiveHistory(state) {
   const statusLabels = {
     archived: 'Archive prête',
     completed: 'Suppression terminée',
+    channel_recreated: 'Salon recréé',
     completed_with_warnings: 'À vérifier',
-    delete_failed: 'Suppression interrompue'
+    delete_failed: 'Suppression interrompue',
+    recreation_failed: 'Recréation interrompue'
   };
 
   return `
@@ -4498,7 +4500,8 @@ function messagePurgeArchiveHistory(state) {
           <div class="operation-row">
             <div>
               <span>${escapeHtml(formatAuditDate(archive.createdAt))} · #${escapeHtml(archive.channelName)}</span>
-              <strong>${escapeHtml(archive.messageCount)} message(s) · ${escapeHtml(archive.deletedCount)} supprimé(s)</strong>
+              <strong>${escapeHtml(archive.messageCount)} message(s) · ${escapeHtml(archive.deletedCount)} retiré(s)</strong>
+              ${archive.replacementChannelId ? `<small>Nouveau salon : #${escapeHtml(archive.replacementChannelName || archive.channelName)} · ID ${escapeHtml(archive.replacementChannelId)}</small>` : ''}
               <small>Archive #${escapeHtml(archive.id)} · ${escapeHtml(formatStorageBytes(archive.archiveSize))} · ${escapeHtml(statusLabels[archive.status] || archive.status)}</small>
             </div>
             <a class="button button-small button-ghost" href="/api/guilds/${encodeURIComponent(state.guild.id)}/message-purge-archives/${encodeURIComponent(archive.id)}" download>Télécharger</a>
@@ -4567,7 +4570,7 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
           <button class="button" type="submit">Bannir</button>
         </form>
         <form data-action-form="purge" data-purge-form>
-          ${labelHelp('Archiver et nettoyer un salon', 'Sentinel crée et vérifie une archive privée avant toute suppression. Le mode complet traite aussi les messages de plus de 14 jours.')}
+          ${labelHelp('Archiver et nettoyer un salon', 'Sentinel crée et vérifie une archive privée avant toute suppression. Le mode complet recrée ensuite le salon vide.')}
           <select name="channelId">${channelOptions}</select>
           <select name="mode">
             <option value="count">Supprimer un nombre précis</option>
@@ -4581,10 +4584,10 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
           <div class="purge-mode-field purge-mode-danger" data-purge-all-field hidden>
             <span>Confirmation du vidage complet</span>
             <input name="confirmation" maxlength="10" autocomplete="off" placeholder="Écrire VIDER">
-            <small>Tous les messages présents seront archivés, puis supprimés, y compris ceux de plus de 14 jours.</small>
+            <small>Le salon sera recréé vide, puis l’original sera supprimé. Son ID changera et les anciens liens, webhooks et fils seront rompus.</small>
           </div>
           <p class="muted">Si l’archive ne peut pas être créée et vérifiée, aucun message n’est supprimé.</p>
-          <button class="button button-danger" type="submit">Archiver puis supprimer</button>
+          <button class="button button-danger" type="submit">Archiver puis nettoyer</button>
         </form>
         ${messagePurgeArchiveHistory(state)}
         <article class="inline-form moderation-cases-note">

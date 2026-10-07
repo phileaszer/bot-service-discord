@@ -1,9 +1,13 @@
-const { Collection } = require('discord.js');
+const { ChannelType, Collection } = require('discord.js');
 
 const BULK_DELETE_LIMIT = 100;
 const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 const BULK_DELETE_SAFETY_MS = 60 * 1000;
 const OLD_MESSAGE_DELETE_CONCURRENCY = 5;
+const RECREATABLE_CHANNEL_TYPES = new Set([
+    ChannelType.GuildText,
+    ChannelType.GuildAnnouncement
+]);
 
 function isUnknownMessageError(error) {
     return Number(error?.code || error?.rawError?.code || 0) === 10008;
@@ -152,6 +156,51 @@ async function fetchMessagesForPurge(channel, options = {}) {
     };
 }
 
+function canRecreateChannelForPurge(channel) {
+    return Boolean(
+        channel
+        && RECREATABLE_CHANNEL_TYPES.has(channel.type)
+        && typeof channel.clone === 'function'
+        && typeof channel.delete === 'function'
+    );
+}
+
+async function recreateChannelForPurge(channel, reason = 'Vidage complet Sentinel après archive vérifiée') {
+    if (!canRecreateChannelForPurge(channel)) {
+        const error = new TypeError('This Discord channel cannot be recreated for a complete purge.');
+        error.channelReplacementUnsupported = true;
+        throw error;
+    }
+
+    let replacement = null;
+
+    try {
+        replacement = await channel.clone({
+            name: channel.name,
+            position: channel.rawPosition,
+            defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration,
+            defaultThreadRateLimitPerUser: channel.defaultThreadRateLimitPerUser,
+            reason
+        });
+
+        if (typeof replacement.setPosition === 'function'
+            && Number.isFinite(channel.rawPosition)
+            && replacement.rawPosition !== channel.rawPosition) {
+            await replacement.setPosition(channel.rawPosition, { reason });
+        }
+
+        await channel.delete(reason);
+        return replacement;
+    } catch (error) {
+        if (replacement && typeof replacement.delete === 'function') {
+            await replacement.delete('Annulation du vidage complet Sentinel').catch(() => {});
+        }
+
+        error.channelReplacementFailed = true;
+        throw error;
+    }
+}
+
 async function purgeFetchedChannelMessages(channel, snapshot) {
     const mode = snapshot?.mode === 'all' ? 'all' : 'count';
     const messages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
@@ -198,6 +247,12 @@ async function purgeChannelMessages(channel, options = {}) {
         throw new TypeError('A Discord text channel with message history is required.');
     }
 
+    if (options.mode === 'all') {
+        const error = new Error('Complete purge must use the verified archive and channel recreation workflow.');
+        error.completePurgeArchiveRequired = true;
+        throw error;
+    }
+
     const snapshot = await fetchMessagesForPurge(channel, options);
     return purgeFetchedChannelMessages(channel, snapshot);
 }
@@ -207,7 +262,9 @@ module.exports = {
     BULK_DELETE_MAX_AGE_MS,
     OLD_MESSAGE_DELETE_CONCURRENCY,
     canBulkDelete,
+    canRecreateChannelForPurge,
     fetchMessagesForPurge,
     purgeFetchedChannelMessages,
-    purgeChannelMessages
+    purgeChannelMessages,
+    recreateChannelForPurge
 };

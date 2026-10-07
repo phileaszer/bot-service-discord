@@ -2,9 +2,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { Collection } = require('discord.js');
+const { ChannelType, Collection } = require('discord.js');
 
-const { purgeChannelMessages } = require('../message-purge');
+const { purgeChannelMessages, recreateChannelForPurge } = require('../message-purge');
 
 function message(id, ageDays = 0) {
     return {
@@ -41,61 +41,72 @@ test('limited purge also deletes selected messages older than 14 days', async ()
     assert.equal(old.deleteCalls, 1);
 });
 
-test('complete purge deletes recent and old messages from the archived snapshot', async () => {
-    const recent = message('10', 1);
-    const old = message('11', 30);
-    let fetchCall = 0;
+test('complete purge recreates the channel and deletes the original once', async () => {
+    const calls = [];
+    const replacement = {
+        id: 'replacement',
+        rawPosition: 4,
+        setPosition: async () => calls.push('position'),
+        delete: async () => calls.push('replacement-delete')
+    };
     const channel = {
-        isTextBased: () => true,
-        messages: {
-            fetch: async () => {
-                fetchCall += 1;
-                return fetchCall === 1 ? collection([recent, old]) : collection([]);
-            }
+        type: ChannelType.GuildText,
+        name: 'general',
+        rawPosition: 4,
+        defaultAutoArchiveDuration: 1440,
+        defaultThreadRateLimitPerUser: 10,
+        clone: async options => {
+            calls.push(['clone', options]);
+            return replacement;
         },
-        bulkDelete: async messages => messages
+        delete: async () => calls.push('original-delete')
     };
 
-    const result = await purgeChannelMessages(channel, { mode: 'all' });
+    const result = await recreateChannelForPurge(channel, 'test purge');
 
-    assert.equal(result.deleted, 2);
-    assert.equal(result.skippedOld, 0);
-    assert.equal(result.hasRemaining, false);
-    assert.equal(recent.deleteCalls, 1);
-    assert.equal(old.deleteCalls, 1);
+    assert.equal(result, replacement);
+    assert.equal(calls[0][0], 'clone');
+    assert.equal(calls[0][1].position, 4);
+    assert.equal(calls.at(-1), 'original-delete');
+    assert.equal(calls.filter(call => call === 'original-delete').length, 1);
+    assert.equal(calls.includes('replacement-delete'), false);
 });
 
-test('complete purge removes old messages in controlled concurrent groups', async () => {
-    let activeDeletes = 0;
-    let maxConcurrentDeletes = 0;
-    const oldMessages = Array.from({ length: 12 }, (_, index) => ({
-        id: `old-${index}`,
-        createdTimestamp: Date.now() - 30 * 24 * 60 * 60 * 1000,
-        deletable: true,
-        async delete() {
-            activeDeletes += 1;
-            maxConcurrentDeletes = Math.max(maxConcurrentDeletes, activeDeletes);
-            await new Promise(resolve => setTimeout(resolve, 5));
-            activeDeletes -= 1;
+test('complete purge cleans up its clone when Discord keeps the original channel', async () => {
+    let replacementDeleted = 0;
+    const channel = {
+        type: ChannelType.GuildText,
+        name: 'general',
+        rawPosition: 4,
+        clone: async () => ({
+            rawPosition: 4,
+            delete: async () => {
+                replacementDeleted += 1;
+            }
+        }),
+        delete: async () => {
+            throw new Error('Discord refused deletion');
         }
-    }));
-    let fetchCall = 0;
+    };
+
+    await assert.rejects(
+        recreateChannelForPurge(channel),
+        error => error.channelReplacementFailed === true
+    );
+    assert.equal(replacementDeleted, 1);
+});
+
+test('the low-level purge helper cannot bypass the verified archive workflow', async () => {
     const channel = {
         isTextBased: () => true,
-        messages: {
-            fetch: async () => {
-                fetchCall += 1;
-                return fetchCall === 1 ? collection(oldMessages) : collection([]);
-            }
-        },
+        messages: { fetch: async () => collection([]) },
         bulkDelete: async messages => messages
     };
 
-    const result = await purgeChannelMessages(channel, { mode: 'all' });
-
-    assert.equal(result.deleted, oldMessages.length);
-    assert.ok(maxConcurrentDeletes > 1);
-    assert.ok(maxConcurrentDeletes <= 5);
+    await assert.rejects(
+        purgeChannelMessages(channel, { mode: 'all' }),
+        error => error.completePurgeArchiveRequired === true
+    );
 });
 
 test('Sentinel verifies an archive before deleting dashboard or Discord messages', () => {
@@ -114,14 +125,17 @@ test('Sentinel verifies an archive before deleting dashboard or Discord messages
         botSource.indexOf('async function archiveDossierChannel')
     );
     const archiveCall = workflow.indexOf('archive = await archiveMessagePurgeSnapshot');
-    const deleteCall = workflow.indexOf('const result = await purgeFetchedChannelMessages');
+    const recreateCall = workflow.indexOf('replacement = await recreateChannelForPurge');
 
-    assert.ok(archiveCall >= 0 && deleteCall > archiveCall);
+    assert.ok(archiveCall >= 0 && recreateCall > archiveCall);
+    assert.match(workflow, /if \(snapshot\.mode === 'all'\)[\s\S]*recreateChannelForPurge/);
+    assert.match(workflow, /migrateSentinelChannelReferences\(channel\.guild\.id, channel\.id, replacement\.id\)/);
+    assert.match(workflow, /'channel_recreated'/);
     assert.match(workflow, /error\.archiveFailed = true/);
     assert.match(workflow, /activeMessagePurges\.has\(operationKey\)/);
     assert.match(workflow, /finally\s*{\s*activeMessagePurges\.delete\(operationKey\)/);
     assert.match(dashboardSource, /toLocaleUpperCase\('fr'\) !== 'VIDER'/);
-    assert.match(botSource, /getLogChannel\(guild\)\?\.id !== channel\.id/);
+    assert.match(botSource, /getLogChannel\(guild\)\?\.id !== resultChannel\.id/);
     assert.match(dashboardSource, /getLogChannel\(guild\)\?\.id !== channel\.id/);
     assert.match(dashboardClientSource, /data-purge-all-field/);
     assert.match(purgeCommandSource, /\.setName\('messages'\)[\s\S]*\.setName\('nombre'\)[\s\S]*\.setRequired\(true\)/);

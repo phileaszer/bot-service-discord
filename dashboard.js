@@ -3370,6 +3370,13 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
         const mode = body.mode === 'all' ? 'all' : 'count';
         const count = mode === 'all' ? null : Math.min(Math.max(Number(body.count) || 1, 1), 100);
 
+        if (mode === 'all') {
+            requireBotPermission(guild, PermissionsBitField.Flags.ManageChannels, language);
+            requireBotChannelPermissions(guild, channel, [
+                PermissionsBitField.Flags.ManageChannels
+            ], language);
+        }
+
         if (mode === 'all' && String(body.confirmation || '').trim().toLocaleUpperCase('fr') !== 'VIDER') {
             throw createHttpError(400, 'Confirmation de vidage incorrecte.', {
                 fix: 'Écris exactement VIDER dans le champ de confirmation.'
@@ -3395,12 +3402,17 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
                     fix: error.message || 'Vérifie le stockage et les pièces jointes, puis réessaie.'
                 });
             }
+            if (error?.channelReplacementUnsupported || error?.channelReplacementFailed) {
+                throw createHttpError(409, 'L’archive a été conservée, mais Discord n’a pas pu recréer le salon.', {
+                    fix: 'Vérifie la permission « Gérer les salons » et utilise un salon textuel ou d’annonces standard.'
+                });
+            }
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageMessages, language);
         }
 
         const archiveLabel = result.archive?.id ? `Archive #${result.archive.id}` : 'Aucune archive nécessaire';
         const reason = mode === 'all'
-            ? `Vidage complet de #${channel.name}. ${result.deleted} messages supprimés. ${archiveLabel}.`
+            ? `Vidage complet de #${channel.name}. ${result.deleted} messages archivés. Salon recréé : #${result.replacementChannelName || channel.name} (${result.replacementChannelId || 'inchangé'}). ${archiveLabel}.`
             : `${count} messages demandés dans #${channel.name}. ${result.deleted} supprimés. ${archiveLabel}.`;
         const caseData = ctx.helpers.addModerationCase(guild.id, null, actor.id, 'clear', reason, null);
         if (ctx.helpers.getLogChannel(guild)?.id !== channel.id) {
@@ -3412,9 +3424,16 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
             : '';
 
         if (language === 'en') {
+            if (result.channelRecreated) {
+                return `${result.deleted} message(s) archived. The channel was recreated empty: <#${result.replacementChannelId}>.${result.archive?.id ? ` Verified archive #${result.archive.id}.` : ''}`;
+            }
             return warning
                 ? `${result.deleted} message(s) deleted, but the channel still contains messages.${result.archive?.id ? ` Verified archive #${result.archive.id}.` : ''}`
                 : `${result.deleted} message(s) deleted.${result.archive?.id ? ` Verified archive #${result.archive.id}.` : ''}`;
+        }
+
+        if (result.channelRecreated) {
+            return `${result.deleted} message(s) archivé(s). Le salon a été recréé vide : <#${result.replacementChannelId}>.${archiveMessage}`;
         }
 
         return warning
