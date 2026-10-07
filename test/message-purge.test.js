@@ -96,5 +96,7 @@ test('Sentinel verifies an archive before deleting dashboard or Discord messages
     assert.doesNotMatch(purgeCommandSource, /\.addBooleanOption/);
     assert.match(botSource, /writePurgeAttachmentEntry\(gzip, attachment, totalAttachmentBytes\)/);
     assert.match(botSource, /readTarEntryFromGzipFile\(stagingArchivePath, 'manifest\.json'\)/);
+    assert.match(botSource, /createTarHeader\(attachment\.archiveFile, archivedSize\)/);
+    assert.doesNotMatch(botSource, /responseSize !== declaredSize/);
     assert.match(databaseSource, /CREATE TABLE IF NOT EXISTS message_purge_archives/);
 });

@@ -11720,7 +11720,10 @@ async function downloadArchiveAttachment(attachment, currentTotalBytes) {
     const timeout = setTimeout(() => controller.abort(), DOSSIER_ARCHIVE_FETCH_TIMEOUT_MS);
 
     try {
-        const response = await fetch(attachment.url, { signal: controller.signal });
+        const response = await fetch(attachment.url, {
+            signal: controller.signal,
+            headers: { 'accept-encoding': 'identity' }
+        });
 
         if (!response.ok) {
             throw new Error(`Téléchargement refusé (${response.status}).`);
@@ -11877,12 +11880,20 @@ async function writePurgeAttachmentEntry(stream, attachment, currentTotalBytes) 
             throw new Error(`Téléchargement de ${displayName} refusé (${response.status}).`);
         }
 
-        const responseSize = Number(response.headers.get('content-length') || declaredSize);
-        if (Number.isFinite(responseSize) && responseSize !== declaredSize) {
-            throw new Error(`La taille reçue pour ${displayName} ne correspond pas à Discord.`);
+        const responseSize = Number.parseInt(response.headers.get('content-length') || '', 10);
+        const archivedSize = Number.isSafeInteger(responseSize) && responseSize >= 0
+            ? responseSize
+            : declaredSize;
+
+        if (archivedSize > MESSAGE_PURGE_ARCHIVE_MAX_ATTACHMENT_BYTES) {
+            throw new Error(`La pièce jointe ${displayName} dépasse ${Math.floor(MESSAGE_PURGE_ARCHIVE_MAX_ATTACHMENT_BYTES / 1024 / 1024)} Mo.`);
         }
 
-        await writeTarStreamChunk(stream, createTarHeader(attachment.archiveFile, declaredSize));
+        if (currentTotalBytes + archivedSize > MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES) {
+            throw new Error(`Les pièces jointes dépassent ${Math.floor(MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES / 1024 / 1024)} Mo au total.`);
+        }
+
+        await writeTarStreamChunk(stream, createTarHeader(attachment.archiveFile, archivedSize));
         const hash = crypto.createHash('sha256');
         let bytes = 0;
 
@@ -11890,16 +11901,16 @@ async function writePurgeAttachmentEntry(stream, attachment, currentTotalBytes) 
             const buffer = Buffer.from(chunk);
             bytes += buffer.length;
 
-            if (bytes > declaredSize || currentTotalBytes + bytes > MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES) {
-                throw new Error(`La taille reçue pour ${displayName} dépasse la taille annoncée.`);
+            if (bytes > archivedSize || currentTotalBytes + bytes > MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES) {
+                throw new Error(`La taille reçue pour ${displayName} dépasse la capacité d’archivage.`);
             }
 
             hash.update(buffer);
             await writeTarStreamChunk(stream, buffer);
         }
 
-        if (bytes !== declaredSize) {
-            throw new Error(`La pièce jointe ${displayName} est incomplète (${bytes}/${declaredSize} octets).`);
+        if (bytes !== archivedSize) {
+            throw new Error(`La pièce jointe ${displayName} est incomplète (${bytes}/${archivedSize} octets).`);
         }
 
         const padding = (512 - (bytes % 512)) % 512;
