@@ -155,6 +155,28 @@ CREATE TABLE IF NOT EXISTS moderation_cases (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS message_purge_archives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    channel_name TEXT NOT NULL,
+    actor_user_id TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    requested_count INTEGER,
+    archive_path TEXT NOT NULL UNIQUE,
+    archive_sha256 TEXT NOT NULL,
+    archive_size INTEGER NOT NULL DEFAULT 0,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    attachment_count INTEGER NOT NULL DEFAULT 0,
+    embed_count INTEGER NOT NULL DEFAULT 0,
+    deleted_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    has_remaining INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'archived',
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS moderation_tempbans (
     guild_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -677,6 +699,9 @@ ON moderation_cases (guild_id, target_user_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_moderation_cases_guild_created
 ON moderation_cases (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_message_purge_archives_guild_created
+ON message_purge_archives (guild_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_moderation_tempbans_expires
 ON moderation_tempbans (expires_at);

@@ -89,7 +89,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/timeout` | `/timeout` | Mettre un membre en timeout |
 | `/expulser` | `/kick` | Expulser un membre |
 | `/bannir` | `/ban` | Bannir un membre ou un ID Discord |
-| `/purge` | `/clear` | Supprimer des messages récents |
+| `/purge` | `/clear` | Archiver puis supprimer jusqu’à 100 messages ou vider entièrement un salon |
 | `/sanctions` | `/mod-cases` | Voir les sanctions récentes |
 | `/cas` | `/case` | Consulter un dossier disciplinaire précis |
 | `/profil-mod` | `/mod-profile` | Voir le profil disciplinaire complet |
@@ -101,6 +101,8 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/dossier-reouvrir` | `/reopen-ticket` | Réouvrir un dossier encore conservé |
 
 La liste complète et les explications détaillées sont disponibles sur le site.
+
+Avant toute suppression, Sentinel crée et vérifie une archive contenant les messages concernés, leurs auteurs, dates, embeds, réactions et pièces jointes. `/purge nombre:25` traite un nombre précis de messages récents. `/purge tout:true` parcourt aussi les messages de plus de 14 jours et vide le salon sans en changer l’identifiant. Si l’archive ne peut pas être confirmée, aucun message n’est supprimé. Les archives sont téléchargeables depuis le dashboard uniquement par les responsables autorisés à gérer les messages.
 
 ## Stockage et sauvegardes
 

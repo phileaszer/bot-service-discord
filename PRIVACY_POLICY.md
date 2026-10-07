@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-Dernière mise à jour : 3 octobre 2026
+Dernière mise à jour : 7 octobre 2026
 
 Cette politique explique quelles données Sentinel collecte, pourquoi elles sont utilisées et comment elles sont conservées.
 
@@ -16,6 +16,7 @@ Sentinel collecte uniquement les données nécessaires à son fonctionnement :
 - sanctions de modération, raisons, durées, modérateurs et utilisateurs concernés ;
 - dossiers/tickets : type, sujet, description, statut, priorité, salon associé, demandeur, intervenants et dates ;
 - comptes rendus ou transcriptions générés volontairement dans les dossiers/tickets ;
+- archives créées avant une suppression de messages demandée par une personne autorisée, avec le contenu concerné, les auteurs, les dates, les références, les mentions, les embeds, les réactions, les composants, les stickers, les pièces jointes et les données de vérification d’intégrité ;
 - annonces créées, brouillons et programmations d’envoi avec les embeds Sentinel ;
 - profil Discord utilisé pour le dashboard : identifiant, nom, avatar et serveurs accessibles ;
 - préférences du site et de notification, comme la langue choisie et les catégories activées ;
@@ -33,7 +34,7 @@ Sentinel ne collecte pas :
 - les adresses e-mail Discord ;
 - les messages privés ;
 - les conversations vocales ;
-- le contenu général des messages d'un serveur, sauf lorsqu'une action volontaire du bot le nécessite, par exemple une purge, une sanction ou une transcription de dossier.
+- le contenu général des messages d'un serveur, sauf lorsqu'une action volontaire du bot le nécessite, par exemple une suppression avec archivage préalable, une sanction ou une transcription de dossier.
 
 ## Utilisation des données
 
@@ -52,6 +53,7 @@ Les données sont utilisées pour :
 - afficher les serveurs administrables par l'utilisateur connecté ;
 - sécuriser les sessions du dashboard ;
 - garder un journal clair des actions réalisées depuis Discord ou depuis le site.
+- préserver une trace vérifiée avant une suppression de messages demandée, puis permettre son téléchargement aux seuls responsables autorisés à gérer les messages du serveur.
 
 ## Partage des données
 
@@ -68,6 +70,8 @@ Les données sont conservées tant que le bot est utilisé sur le serveur concer
 Certaines informations peuvent être supprimées ou remises à zéro par les personnes autorisées du serveur avec les commandes prévues par Sentinel.
 
 Les sessions dashboard expirent automatiquement.
+
+Les archives de messages supprimés sont conservées avec les données du serveur tant que Sentinel y est utilisé ou jusqu’à une demande de suppression autorisée. Leur téléchargement est réservé aux responsables qui disposent de l’accès de modération nécessaire sur le serveur concerné.
 
 ## Suppression des données
 
@@ -93,7 +97,7 @@ Pour toute question concernant la confidentialité, utilisez le serveur support 
 
 # Privacy Policy
 
-Last updated: October 3, 2026
+Last updated: October 7, 2026
 
 This policy explains what data Sentinel collects, why it is used and how it is retained.
 
@@ -109,6 +113,7 @@ Sentinel only collects data required for its features:
 - moderation cases, reasons, durations, moderators and affected users;
 - tickets: type, subject, description, status, priority, related channel, requester, participants and dates;
 - summaries or transcripts voluntarily generated in tickets;
+- archives created before an authorized message deletion, including the affected content, authors, dates, references, mentions, embeds, reactions, components, stickers, attachments and integrity metadata;
 - announcements created with Sentinel embeds;
 - Discord dashboard profile: ID, username, avatar and accessible servers;
 - website preferences, such as selected language;
@@ -125,7 +130,7 @@ Sentinel does not collect:
 - Discord email addresses;
 - private messages;
 - voice conversations;
-- general server message content, except when a deliberate bot action requires it, such as clearing messages, creating a moderation case or generating a ticket transcript.
+- general server message content, except when a deliberate bot action requires it, such as an archived message deletion, a moderation case or a ticket transcript.
 
 ## Use of data
 
@@ -142,6 +147,7 @@ Data is used to:
 - display servers the connected user can manage;
 - secure dashboard sessions;
 - keep a clear audit log of actions performed from Discord or from the website.
+- preserve a verified record before a requested message deletion and make it downloadable only to staff authorized to manage messages in the relevant server.
 
 ## Data sharing
 
@@ -158,6 +164,8 @@ Data is kept as long as the bot is used on the relevant server or as long as it 
 Some data can be deleted or reset by authorized server members using Sentinel commands.
 
 Dashboard sessions expire automatically.
+
+Deleted-message archives are kept with the server data while Sentinel is used there or until an authorized deletion request is completed. Downloads are restricted to staff with the required moderation access on the relevant server.
 
 ## Data deletion
 

@@ -4480,6 +4480,35 @@ function automodPremiumPanel(state, premiumTag) {
   `;
 }
 
+function messagePurgeArchiveHistory(state) {
+  const archives = Array.isArray(state.messagePurgeArchives) ? state.messagePurgeArchives : [];
+  const statusLabels = {
+    archived: 'Archive prête',
+    completed: 'Suppression terminée',
+    completed_with_warnings: 'À vérifier',
+    delete_failed: 'Suppression interrompue'
+  };
+
+  return `
+    <article class="inline-form purge-archive-history">
+      ${labelHelp('Archives des nettoyages', 'Chaque suppression est précédée d’une archive vérifiée contenant les messages, auteurs, dates, embeds et pièces jointes.')}
+      <p class="muted">Les archives restent privées et ne sont téléchargeables que par le personnel autorisé à gérer les messages.</p>
+      <div class="operation-list">
+        ${archives.length ? archives.map((archive) => `
+          <div class="operation-row">
+            <div>
+              <span>${escapeHtml(formatAuditDate(archive.createdAt))} · #${escapeHtml(archive.channelName)}</span>
+              <strong>${escapeHtml(archive.messageCount)} message(s) · ${escapeHtml(archive.deletedCount)} supprimé(s)</strong>
+              <small>Archive #${escapeHtml(archive.id)} · ${escapeHtml(formatStorageBytes(archive.archiveSize))} · ${escapeHtml(statusLabels[archive.status] || archive.status)}</small>
+            </div>
+            <a class="button button-small button-ghost" href="/api/guilds/${encodeURIComponent(state.guild.id)}/message-purge-archives/${encodeURIComponent(archive.id)}" download>Télécharger</a>
+          </div>
+        `).join('') : '<p class="muted">Aucun nettoyage archivé pour ce serveur.</p>'}
+      </div>
+    </article>
+  `;
+}
+
 function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
   return `
     <section class="dashboard-panel module-panel moderation-panel" id="moderation">
@@ -4537,12 +4566,27 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
           <input name="deleteDays" type="number" min="0" max="7" placeholder="Jours messages">
           <button class="button" type="submit">Bannir</button>
         </form>
-        <form data-action-form="purge">
-          ${labelHelp('Nettoyer un salon', 'Supprime un nombre défini de messages récents dans le salon choisi.')}
+        <form data-action-form="purge" data-purge-form>
+          ${labelHelp('Archiver et nettoyer un salon', 'Sentinel crée et vérifie une archive privée avant toute suppression. Le mode complet traite aussi les messages de plus de 14 jours.')}
           <select name="channelId">${channelOptions}</select>
-          <input name="count" type="number" min="1" max="100" value="10">
-          <button class="button" type="submit">Purger</button>
+          <select name="mode">
+            <option value="count">Supprimer un nombre précis</option>
+            <option value="all">Vider entièrement le salon</option>
+          </select>
+          <div class="purge-mode-field" data-purge-count-field>
+            <span>Nombre de messages récents</span>
+            <input name="count" type="number" min="1" max="100" value="10" required>
+            <small>De 1 à 100 messages récents.</small>
+          </div>
+          <div class="purge-mode-field purge-mode-danger" data-purge-all-field hidden>
+            <span>Confirmation du vidage complet</span>
+            <input name="confirmation" maxlength="10" autocomplete="off" placeholder="Écrire VIDER">
+            <small>Tous les messages présents seront archivés, puis supprimés, y compris ceux de plus de 14 jours.</small>
+          </div>
+          <p class="muted">Si l’archive ne peut pas être créée et vérifiée, aucun message n’est supprimé.</p>
+          <button class="button button-danger" type="submit">Archiver puis supprimer</button>
         </form>
+        ${messagePurgeArchiveHistory(state)}
         <article class="inline-form moderation-cases-note">
           ${labelHelp('Registre disciplinaire', 'Affiche les dernières mesures enregistrées sur ce serveur.')}
           ${moderationCaseFilters(state)}
@@ -6118,6 +6162,26 @@ async function loadUserProfile(userId, button = null) {
 }
 
 function attachDashboardHandlers() {
+  $$('[data-purge-form]').forEach((form) => {
+    const mode = form.elements.mode;
+    const countField = $('[data-purge-count-field]', form);
+    const allField = $('[data-purge-all-field]', form);
+    const countInput = form.elements.count;
+    const confirmationInput = form.elements.confirmation;
+    const updatePurgeMode = () => {
+      const deletesAll = mode?.value === 'all';
+      countField.hidden = deletesAll;
+      allField.hidden = !deletesAll;
+      countInput.disabled = deletesAll;
+      countInput.required = !deletesAll;
+      confirmationInput.disabled = !deletesAll;
+      confirmationInput.required = deletesAll;
+    };
+
+    mode?.addEventListener('change', updatePurgeMode);
+    updatePurgeMode();
+  });
+
   $('[data-founder-mfa-code]')?.addEventListener('input', (event) => {
     founderMfaCode = String(event.currentTarget.value || '').trim();
   });

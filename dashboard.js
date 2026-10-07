@@ -2958,6 +2958,9 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             limit: moderationCaseLimit,
             items: moderationCases.map(item => mapModerationCase(ctx, item))
         },
+        messagePurgeArchives: ctx.helpers.getMessagePurgeArchives
+            ? ctx.helpers.getMessagePurgeArchives(guild.id, 20)
+            : [],
         automod: {
             settings: automodSettings,
             words: automodWords,
@@ -3364,18 +3367,59 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
             PermissionsBitField.Flags.ReadMessageHistory,
             PermissionsBitField.Flags.ManageMessages
         ], language);
-        const count = Math.min(Math.max(Number(body.count) || 1, 1), 100);
-        let deleted;
+        const mode = body.mode === 'all' ? 'all' : 'count';
+        const count = mode === 'all' ? null : Math.min(Math.max(Number(body.count) || 1, 1), 100);
+
+        if (mode === 'all' && String(body.confirmation || '').trim().toLocaleUpperCase('fr') !== 'VIDER') {
+            throw createHttpError(400, 'Confirmation de vidage incorrecte.', {
+                fix: 'Écris exactement VIDER dans le champ de confirmation.'
+            });
+        }
+
+        let result;
 
         try {
-            deleted = await channel.bulkDelete(count, true);
+            result = await ctx.helpers.archiveAndPurgeChannelMessages(channel, {
+                mode,
+                count,
+                actor: actor.user,
+                language
+            });
         } catch (error) {
+            if (error?.status) throw error;
+            if (error?.purgeBusy) {
+                throw createHttpError(409, 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+            }
+            if (error?.archiveFailed) {
+                throw createHttpError(409, 'Archive impossible. Aucun message n’a été supprimé.', {
+                    fix: error.message || 'Vérifie le stockage et les pièces jointes, puis réessaie.'
+                });
+            }
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageMessages, language);
         }
 
-        const caseData = ctx.helpers.addModerationCase(guild.id, null, actor.id, 'clear', `${count} messages demandes dans #${channel.name}`, null);
-        await ctx.helpers.sendModerationLog(guild, actor.user, caseData, `${channel}`, language);
-        return `${deleted.size} message(s) supprime(s).`;
+        const archiveLabel = result.archive?.id ? `Archive #${result.archive.id}` : 'Aucune archive nécessaire';
+        const reason = mode === 'all'
+            ? `Vidage complet de #${channel.name}. ${result.deleted} messages supprimés. ${archiveLabel}.`
+            : `${count} messages demandés dans #${channel.name}. ${result.deleted} supprimés. ${archiveLabel}.`;
+        const caseData = ctx.helpers.addModerationCase(guild.id, null, actor.id, 'clear', reason, null);
+        if (ctx.helpers.getLogChannel(guild)?.id !== channel.id) {
+            await ctx.helpers.sendModerationLog(guild, actor.user, caseData, `${channel}`, language);
+        }
+        const warning = result.failed > 0 || result.hasRemaining;
+        const archiveMessage = result.archive?.id
+            ? ` Archive vérifiée #${result.archive.id}.`
+            : '';
+
+        if (language === 'en') {
+            return warning
+                ? `${result.deleted} message(s) deleted, but the channel still contains messages.${result.archive?.id ? ` Verified archive #${result.archive.id}.` : ''}`
+                : `${result.deleted} message(s) deleted.${result.archive?.id ? ` Verified archive #${result.archive.id}.` : ''}`;
+        }
+
+        return warning
+            ? `${result.deleted} message(s) supprimé(s), mais le salon contient encore des messages.${archiveMessage}`
+            : `${result.deleted} message(s) supprimé(s).${archiveMessage}`;
     }
 
     if (['lock', 'unlock', 'slowmode'].includes(action)) {
@@ -4977,6 +5021,24 @@ async function handleApi(req, res, ctx, url) {
         if (!isCreatorUser(session.user.id)
             && !ctx.helpers.memberCanManageDossier?.(member, file.dossier.type)) {
             throw createHttpError(403, 'Tu n’es pas responsable de cette nature de dossier.');
+        }
+
+        streamPrivateFile(res, {
+            fullPath: file.path,
+            fileName: file.name,
+            contentType: file.mimeType
+        });
+        return;
+    }
+
+    const purgeArchiveMatch = /^\/api\/guilds\/(\d{17,20})\/message-purge-archives\/(\d+)$/.exec(url.pathname);
+    if (req.method === 'GET' && purgeArchiveMatch) {
+        const { guild, member } = await getDashboardAccess(ctx, session, purgeArchiveMatch[1]);
+        requireModerationAccess(ctx, member, PermissionsBitField.Flags.ManageMessages, ctx.helpers.getGuildLanguage(guild.id));
+        const file = ctx.helpers.getMessagePurgeArchiveFile?.(guild.id, Number(purgeArchiveMatch[2]));
+
+        if (!file) {
+            throw createHttpError(404, 'Archive de suppression introuvable ou non vérifiée.');
         }
 
         streamPrivateFile(res, {

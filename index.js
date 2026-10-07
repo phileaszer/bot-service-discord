@@ -51,6 +51,10 @@ const { startDashboardServer } = require('./dashboard');
 const operations = require('./operations');
 const governance = require('./governance');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
+const {
+    fetchMessagesForPurge,
+    purgeFetchedChannelMessages
+} = require('./message-purge');
 
 const client = new Client({
     intents: [
@@ -83,6 +87,12 @@ const DOSSIER_PANEL_CLICK_COOLDOWN_MS = 8 * 1000;
 const DOSSIER_CREATE_COOLDOWN_MS = 90 * 1000;
 const DOSSIER_ARCHIVE_DIR = process.env.DOSSIER_ARCHIVE_DIR
     || path.join(path.dirname(process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db')), 'dossier-archives');
+const MESSAGE_PURGE_ARCHIVE_DIR = process.env.MESSAGE_PURGE_ARCHIVE_DIR
+    || path.join(
+        path.dirname(process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db')),
+        'cold-archives',
+        'message-purges'
+    );
 const DOSSIER_ARCHIVE_MAX_ATTACHMENT_BYTES = Math.max(
     Number.parseInt(process.env.DOSSIER_ARCHIVE_MAX_ATTACHMENT_MB || '25', 10),
     1
@@ -427,6 +437,7 @@ const I18N = {
         confirmationExpired: '⏳ Confirmation expirée. Relance la commande si nécessaire.',
         confirmationCancelled: '✅ Action annulée.',
         confirmPurge: 'Purge de messages',
+        confirmPurgeAll: 'Vidage complet du salon',
         confirmBan: 'Bannissement',
         confirmKick: 'Expulsion',
         confirmResetUser: 'Réinitialisation des heures',
@@ -475,6 +486,10 @@ const I18N = {
         moderationTempbanExpiredReason: 'Expiration automatique du ban temporaire #{caseId}.',
         moderationTempbanActive: 'ℹ️ Un ban temporaire est déjà programmé pour cet utilisateur jusqu’à {expiresAt}. La nouvelle commande le remplace.',
         moderationClear: '✅ **{count}** message(s) supprimé(s).',
+        moderationClearAll: '✅ Salon vidé : **{count}** message(s) supprimé(s), anciens messages compris.',
+        moderationClearPartial: '⚠️ **{count}** message(s) supprimé(s), mais certains messages n’ont pas pu être retirés. Consulte les logs et vérifie le salon.',
+        moderationPurgeAmountRequired: '❌ Indique un nombre de 1 à 100, ou active l’option `tout` pour vider entièrement le salon.',
+        moderationPurgeChannelPermissionMissing: '❌ Sentinel doit pouvoir voir ce salon, consulter son historique et gérer ses messages.',
         moderationCasesEmpty: 'Aucune sanction enregistrée pour {member}.',
         moderationFailed: '❌ L’action de modération a échoué.\nVérifie que Sentinel a la bonne permission Discord et que son rôle est placé au-dessus de la cible. Tu peux aussi lancer `/diagnostic`.',
         moderationNoChannel: '❌ Cette commande doit être utilisée dans un salon textuel.',
@@ -664,6 +679,7 @@ const I18N = {
         confirmationExpired: '⏳ Confirmation expired. Run the command again if needed.',
         confirmationCancelled: '✅ Action cancelled.',
         confirmPurge: 'Message purge',
+        confirmPurgeAll: 'Complete channel cleanup',
         confirmBan: 'Ban',
         confirmKick: 'Kick',
         confirmResetUser: 'Hours reset',
@@ -712,6 +728,10 @@ const I18N = {
         moderationTempbanExpiredReason: 'Automatic expiration of temporary ban #{caseId}.',
         moderationTempbanActive: 'ℹ️ A temporary ban is already scheduled for this user until {expiresAt}. The new command replaces it.',
         moderationClear: '✅ **{count}** message(s) deleted.',
+        moderationClearAll: '✅ Channel cleared: **{count}** message(s) deleted, including old messages.',
+        moderationClearPartial: '⚠️ **{count}** message(s) deleted, but some messages could not be removed. Check the logs and the channel.',
+        moderationPurgeAmountRequired: '❌ Provide a number from 1 to 100, or enable the `all` option to clear the entire channel.',
+        moderationPurgeChannelPermissionMissing: '❌ Sentinel must be able to view this channel, read its history, and manage its messages.',
         moderationCasesEmpty: 'No moderation case recorded for {member}.',
         moderationFailed: '❌ Moderation action failed.\nCheck that Sentinel has the right Discord permission and that its role is above the target. You can also run `/diagnostic`.',
         moderationNoChannel: '❌ This command must be used in a text channel.',
@@ -1914,6 +1934,40 @@ function getAdvancedUnavailableMessage(language = 'fr', commandName = null) {
 
 function clampNumber(value, min, max) {
     return Math.min(Math.max(Number(value) || min, min), max);
+}
+
+function hasPurgeChannelPermissions(guild, channel) {
+    const permissions = channel?.permissionsFor?.(guild?.members?.me);
+    return Boolean(permissions?.has([
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.ReadMessageHistory,
+        PermissionsBitField.Flags.ManageMessages
+    ]));
+}
+
+function formatPurgeResult(result, language = 'fr') {
+    const archiveNote = result.archive?.id
+        ? (language === 'en'
+            ? ` Verified archive #${result.archive.id} was created before deletion.`
+            : ` L’archive vérifiée #${result.archive.id} a été créée avant la suppression.`)
+        : '';
+
+    if (result.mode === 'all') {
+        if (result.failed > 0 || result.hasRemaining) {
+            return `${t(language, 'moderationClearPartial', { count: result.deleted })}${archiveNote}`;
+        }
+
+        return `${t(language, 'moderationClearAll', { count: result.deleted })}${archiveNote}`;
+    }
+
+    const base = t(language, 'moderationClear', { count: result.deleted });
+    if (result.skippedOld === 0) {
+        return `${base}${archiveNote}`;
+    }
+
+    return language === 'en'
+        ? `${base} ${result.skippedOld} message(s) older than 14 days were left untouched. Use \`/clear all:true\` to clear the entire channel.${archiveNote}`
+        : `${base} ${result.skippedOld} message(s) de plus de 14 jours ont été conservé(s). Utilise \`/purge tout:true\` pour vider entièrement le salon.${archiveNote}`;
 }
 
 function mapGuildConfig(row) {
@@ -5065,6 +5119,92 @@ function deleteCustomEmbedRecord(guildId, messageId) {
     `).run(guildId, messageId).changes > 0;
 }
 
+function mapMessagePurgeArchive(row) {
+    if (!row) return null;
+
+    return {
+        id: Number(row.id),
+        guildId: row.guild_id,
+        channelId: row.channel_id,
+        channelName: row.channel_name,
+        actorUserId: row.actor_user_id,
+        mode: row.mode,
+        requestedCount: row.requested_count == null ? null : Number(row.requested_count),
+        archivePath: row.archive_path,
+        archiveSha256: row.archive_sha256,
+        archiveSize: Number(row.archive_size || 0),
+        messageCount: Number(row.message_count || 0),
+        attachmentCount: Number(row.attachment_count || 0),
+        embedCount: Number(row.embed_count || 0),
+        deletedCount: Number(row.deleted_count || 0),
+        failedCount: Number(row.failed_count || 0),
+        hasRemaining: Boolean(row.has_remaining),
+        status: row.status,
+        createdAt: row.created_at,
+        completedAt: row.completed_at || null
+    };
+}
+
+function createMessagePurgeArchiveRecord(data) {
+    const result = db.prepare(`
+        INSERT INTO message_purge_archives (
+            guild_id, channel_id, channel_name, actor_user_id, mode, requested_count,
+            archive_path, archive_sha256, archive_size, message_count,
+            attachment_count, embed_count, status, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'archived', ?)
+    `).run(
+        data.guildId,
+        data.channelId,
+        data.channelName,
+        data.actorUserId,
+        data.mode,
+        data.requestedCount,
+        data.archivePath,
+        data.archiveSha256,
+        data.archiveSize,
+        data.messageCount,
+        data.attachmentCount,
+        data.embedCount,
+        data.createdAt
+    );
+
+    return Number(result.lastInsertRowid);
+}
+
+function completeMessagePurgeArchive(archiveId, result, status = 'completed') {
+    db.prepare(`
+        UPDATE message_purge_archives
+        SET deleted_count = ?,
+            failed_count = ?,
+            has_remaining = ?,
+            status = ?,
+            completed_at = ?
+        WHERE id = ?
+    `).run(
+        Number(result?.deleted || 0),
+        Number(result?.failed || 0),
+        result?.hasRemaining ? 1 : 0,
+        status,
+        new Date().toISOString(),
+        archiveId
+    );
+}
+
+function getMessagePurgeArchives(guildId, limit = 20) {
+    return db.prepare(`
+        SELECT *
+        FROM message_purge_archives
+        WHERE guild_id = ?
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT ?
+    `).all(guildId, clampNumber(limit, 1, 100)).map(mapMessagePurgeArchive).map(({
+        archivePath,
+        archiveSha256,
+        ...archive
+    }) => archive);
+}
+
 function addModerationCase(guildId, targetUserId, moderatorUserId, action, reason, duration = null) {
     const result = db.prepare(`
         INSERT INTO moderation_cases (
@@ -7571,13 +7711,33 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
             throw new Error(t(language, 'moderationNoChannel'));
         }
 
-        const amount = clampNumber(payload.amount, 1, 100);
-        let deleted;
+        if (!hasPurgeChannelPermissions(guild, channel)) {
+            throw new Error(t(language, 'moderationPurgeChannelPermissionMissing'));
+        }
+
+        const mode = payload.mode === 'all' ? 'all' : 'count';
+        const amount = mode === 'all' ? null : clampNumber(payload.amount, 1, 100);
+        let result;
 
         try {
-            deleted = await channel.bulkDelete(amount, true);
+            result = await archiveAndPurgeChannelMessages(channel, {
+                mode,
+                count: amount,
+                actor: interaction.user,
+                language
+            });
         } catch (error) {
             console.error('Erreur purge confirmee :', error);
+            if (error?.purgeBusy) {
+                throw new Error(language === 'en'
+                    ? 'A Sentinel cleanup is already running in this channel.'
+                    : 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+            }
+            if (error?.archiveFailed) {
+                throw new Error(language === 'en'
+                    ? `The archive could not be verified. No message was deleted. ${error.message || ''}`.trim()
+                    : `L’archive n’a pas pu être vérifiée. Aucun message n’a été supprimé. ${error.message || ''}`.trim());
+            }
             throw new Error(getModerationActionFailureMessage(
                 error,
                 guild,
@@ -7592,12 +7752,16 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
             null,
             interaction.user.id,
             'clear',
-            `${amount} messages demandés dans #${channel.name}`,
+            mode === 'all'
+                ? `Vidage complet demandé dans #${channel.name}. ${result.deleted} messages supprimés. Archive #${result.archive?.id || 'aucune'}.`
+                : `${amount} messages demandés dans #${channel.name}. ${result.deleted} supprimés. Archive #${result.archive?.id || 'aucune'}.`,
             null
         );
 
-        await sendModerationLog(guild, interaction.user, caseData, `${channel}`, language);
-        return t(language, 'moderationClear', { count: deleted.size });
+        if (getLogChannel(guild)?.id !== channel.id) {
+            await sendModerationLog(guild, interaction.user, caseData, `${channel}`, language);
+        }
+        return formatPurgeResult(result, language);
     }
 
     if (confirmation.action === 'ban') {
@@ -9544,7 +9708,8 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/fin-timeout membre raison` - retirer un timeout',
         '`/expulser membre raison` - expulser un membre',
         '`/bannir utilisateur ou utilisateur_id raison` - bannir, meme si la personne n est plus sur le serveur',
-        '`/purge nombre` - supprimer jusqu a 100 messages recents',
+        '`/purge nombre` - archiver puis supprimer jusqu a 100 messages recents',
+        '`/purge tout:true` - archiver puis vider tous les messages du salon, anciens messages compris',
         '`/sanctions membre ou utilisateur_id` - consulter les dossiers disciplinaires',
         '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Sentinel',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
@@ -9887,6 +10052,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Moderation actions',
                         value: [
                             '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
+                            '`/clear count:...` archives and deletes recent messages. `/clear all:true` archives and clears the entire channel, including old messages.',
                             '`/autorole-config` can give a role automatically when a member joins.',
                             '`/ban` can use a Discord ID when the user is no longer in the server.',
                             '`/mod-cases` shows a limited view of the latest cases.'
@@ -10190,6 +10356,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     name: 'Mesures disponibles',
                     value: [
                         '`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`.',
+                        '`/purge nombre:...` archive et supprime les messages récents. `/purge tout:true` archive puis vide entièrement le salon, anciens messages compris.',
                         '`/config-autorole` peut donner un grade automatiquement quand un membre rejoint.',
                         '`/bannir` peut utiliser un ID si la personne n’est plus sur le serveur.',
                         '`/sanctions` affiche une vue simple des derniers dossiers disciplinaires.'
@@ -10967,6 +11134,7 @@ const dossierPanelClickCooldowns = new Map();
 const dossierCreateCooldowns = new Map();
 const buttonActionCooldowns = new Map();
 const pendingSensitiveConfirmations = new Map();
+const activeMessagePurges = new Set();
 const longServiceAlertedKeys = new Set();
 
 const SENTINEL_GENERAL_CHANNELS = {
@@ -11524,7 +11692,7 @@ function safeArchiveFileName(value, fallback = 'piece-jointe') {
         .slice(0, 64) || fallback;
 }
 
-async function downloadDossierAttachment(attachment, currentTotalBytes) {
+async function downloadArchiveAttachment(attachment, currentTotalBytes) {
     const declaredSize = Number(attachment.size || 0);
 
     if (declaredSize > DOSSIER_ARCHIVE_MAX_ATTACHMENT_BYTES) {
@@ -11532,7 +11700,7 @@ async function downloadDossierAttachment(attachment, currentTotalBytes) {
     }
 
     if (currentTotalBytes + declaredSize > DOSSIER_ARCHIVE_MAX_TOTAL_BYTES) {
-        throw new Error('Les pièces jointes du dossier dépassent la capacité d’archivage autorisée.');
+        throw new Error('Les pièces jointes dépassent la capacité d’archivage autorisée.');
     }
 
     const controller = new AbortController();
@@ -11675,6 +11843,241 @@ function dossierMessageToArchive(message) {
     };
 }
 
+function buildMessagePurgeTranscript(channel, details, messages, language = 'fr') {
+    const header = language === 'en'
+        ? [
+            'Sentinel message deletion archive',
+            `Server: ${channel.guild.name} (${channel.guild.id})`,
+            `Channel: #${channel.name} (${channel.id})`,
+            `Requested by: ${details.actorTag || details.actorUserId} (${details.actorUserId})`,
+            `Mode: ${details.mode === 'all' ? 'complete channel' : `${details.requestedCount} recent messages`}`,
+            `Archived: ${details.createdAt}`,
+            `Messages: ${messages.length}`
+        ]
+        : [
+            'Archive Sentinel de suppression de messages',
+            `Serveur : ${channel.guild.name} (${channel.guild.id})`,
+            `Salon : #${channel.name} (${channel.id})`,
+            `Demandé par : ${details.actorTag || details.actorUserId} (${details.actorUserId})`,
+            `Mode : ${details.mode === 'all' ? 'salon complet' : `${details.requestedCount} messages récents`}`,
+            `Archivé : ${details.createdAt}`,
+            `Messages : ${messages.length}`
+        ];
+    const lines = messages.map(message => {
+        const additions = [
+            ...(message.attachments || []).map(file => `[pièce jointe: ${file.name || file.id}]`),
+            ...((message.embeds || []).length ? [`[${message.embeds.length} contenu(s) intégré(s)]`] : [])
+        ];
+        const content = [message.content, ...additions].filter(Boolean).join(' ') || '[message sans texte]';
+        return `[${message.createdAt}] ${message.author?.tag || message.author?.id || 'inconnu'}: ${content.replace(/\s+/g, ' ')}`;
+    });
+
+    return [...header, '', ...lines].join('\n');
+}
+
+function resolveMessagePurgeArchivePath(relativePath) {
+    const root = path.resolve(MESSAGE_PURGE_ARCHIVE_DIR);
+    const resolved = path.resolve(root, String(relativePath || ''));
+
+    if (!relativePath || (resolved !== root && !resolved.startsWith(`${root}${path.sep}`))) {
+        return null;
+    }
+
+    return resolved;
+}
+
+function getMessagePurgeArchiveFile(guildId, archiveId) {
+    const archive = mapMessagePurgeArchive(db.prepare(`
+        SELECT * FROM message_purge_archives WHERE guild_id = ? AND id = ?
+    `).get(guildId, archiveId));
+    const filePath = resolveMessagePurgeArchivePath(archive?.archivePath);
+
+    if (!archive || !filePath || !fs.existsSync(filePath)) {
+        return null;
+    }
+
+    const buffer = fs.readFileSync(filePath);
+    const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+
+    if (!archive.archiveSha256 || sha256 !== archive.archiveSha256) {
+        return null;
+    }
+
+    return {
+        path: filePath,
+        name: `sentinel-messages-${archive.channelId}-${archive.id}.tar.gz`,
+        mimeType: 'application/gzip',
+        size: buffer.length,
+        archive
+    };
+}
+
+async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 'fr') {
+    const discordMessages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
+    const messages = discordMessages
+        .map(dossierMessageToArchive)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const createdAt = new Date().toISOString();
+    const archiveKey = `${channel.id}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const relativeDirectory = path.join(String(channel.guild.id), archiveKey);
+    const finalDirectory = path.resolve(MESSAGE_PURGE_ARCHIVE_DIR, relativeDirectory);
+    const stagingDirectory = `${finalDirectory}.staging-${crypto.randomBytes(6).toString('hex')}`;
+    const tarFiles = [];
+    let totalAttachmentBytes = 0;
+    let attachmentCount = 0;
+
+    await fs.promises.mkdir(stagingDirectory, { recursive: true });
+
+    try {
+        for (const message of messages) {
+            for (const attachment of message.attachments) {
+                const fileName = `${attachment.id}-${safeArchiveFileName(attachment.name)}`;
+                const result = await downloadArchiveAttachment(attachment, totalAttachmentBytes);
+                totalAttachmentBytes += result.bytes;
+                attachmentCount += 1;
+                attachment.archiveFile = path.posix.join('pieces-jointes', fileName);
+                attachment.sha256 = result.sha256;
+                attachment.archivedSize = result.bytes;
+                tarFiles.push({ name: attachment.archiveFile, data: result.buffer });
+            }
+        }
+
+        const details = {
+            actorUserId: actor?.id || String(actor || 'unknown'),
+            actorTag: actor?.tag || actor?.username || null,
+            mode: snapshot.mode,
+            requestedCount: snapshot.requested,
+            createdAt
+        };
+        const manifest = {
+            version: 1,
+            type: 'sentinel-message-purge',
+            createdAt,
+            guild: { id: channel.guild.id, name: channel.guild.name },
+            channel: { id: channel.id, name: channel.name, topic: channel.topic || null },
+            requestedBy: { id: details.actorUserId, tag: details.actorTag },
+            mode: snapshot.mode,
+            requestedCount: snapshot.requested,
+            counts: {
+                messages: messages.length,
+                attachments: attachmentCount,
+                embeds: messages.reduce((sum, message) => sum + message.embeds.length, 0)
+            },
+            messages
+        };
+        const transcript = buildMessagePurgeTranscript(channel, details, messages, language);
+        const archiveName = 'messages.tar.gz';
+        const archiveBuffer = zlib.gzipSync(createTarBuffer([
+            { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
+            { name: 'compte-rendu.txt', data: Buffer.from(transcript, 'utf8') },
+            ...tarFiles
+        ]), { level: 9 });
+
+        await fs.promises.writeFile(path.join(stagingDirectory, archiveName), archiveBuffer, { flag: 'wx' });
+        await fs.promises.mkdir(path.dirname(finalDirectory), { recursive: true });
+        await fs.promises.rename(stagingDirectory, finalDirectory);
+
+        const archivePath = path.join(finalDirectory, archiveName);
+        const savedArchive = await fs.promises.readFile(archivePath);
+        const archiveSha256 = crypto.createHash('sha256').update(savedArchive).digest('hex');
+        const verifiedManifest = readTarEntry(zlib.gunzipSync(savedArchive), 'manifest.json');
+
+        if (!verifiedManifest) {
+            throw new Error('L’archive créée ne contient pas son manifeste.');
+        }
+
+        const parsedManifest = JSON.parse(verifiedManifest.toString('utf8'));
+        if (parsedManifest.counts?.messages !== messages.length) {
+            throw new Error('Le contrôle du nombre de messages archivés a échoué.');
+        }
+
+        const archivePathRelative = path.relative(MESSAGE_PURGE_ARCHIVE_DIR, archivePath);
+        const archiveId = createMessagePurgeArchiveRecord({
+            guildId: channel.guild.id,
+            channelId: channel.id,
+            channelName: channel.name,
+            actorUserId: details.actorUserId,
+            mode: snapshot.mode,
+            requestedCount: snapshot.requested,
+            archivePath: archivePathRelative,
+            archiveSha256,
+            archiveSize: savedArchive.length,
+            messageCount: messages.length,
+            attachmentCount,
+            embedCount: manifest.counts.embeds,
+            createdAt
+        });
+
+        return {
+            id: archiveId,
+            relativePath: archivePathRelative,
+            sha256: archiveSha256,
+            size: savedArchive.length,
+            messageCount: messages.length,
+            attachmentCount,
+            embedCount: manifest.counts.embeds,
+            createdAt
+        };
+    } catch (error) {
+        await fs.promises.rm(stagingDirectory, { recursive: true, force: true }).catch(() => {});
+        await fs.promises.rm(finalDirectory, { recursive: true, force: true }).catch(() => {});
+        throw error;
+    }
+}
+
+async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
+    const snapshot = await fetchMessagesForPurge(channel, options);
+
+    if (snapshot.messages.length === 0) {
+        return {
+            ...(await purgeFetchedChannelMessages(channel, snapshot)),
+            archive: null
+        };
+    }
+
+    let archive;
+
+    try {
+        archive = await archiveMessagePurgeSnapshot(
+            channel,
+            snapshot,
+            options.actor,
+            options.language || 'fr'
+        );
+    } catch (error) {
+        error.archiveFailed = true;
+        throw error;
+    }
+
+    try {
+        const result = await purgeFetchedChannelMessages(channel, snapshot);
+        const status = result.failed > 0 || result.hasRemaining ? 'completed_with_warnings' : 'completed';
+        completeMessagePurgeArchive(archive.id, result, status);
+        return { ...result, archive };
+    } catch (error) {
+        completeMessagePurgeArchive(archive.id, error.purgeResult || {}, 'delete_failed');
+        throw error;
+    }
+}
+
+async function archiveAndPurgeChannelMessages(channel, options = {}) {
+    const operationKey = `${channel.guild.id}:${channel.id}`;
+
+    if (activeMessagePurges.has(operationKey)) {
+        const error = new Error('Un nettoyage Sentinel est déjà en cours dans ce salon.');
+        error.purgeBusy = true;
+        throw error;
+    }
+
+    activeMessagePurges.add(operationKey);
+
+    try {
+        return await archiveAndPurgeChannelMessagesUnlocked(channel, options);
+    } finally {
+        activeMessagePurges.delete(operationKey);
+    }
+}
+
 function buildDossierTranscriptFromMessages(channel, dossier, messages, language = 'fr') {
     const createdAt = dossier?.createdAt || dossier?.created_at || null;
     const closedAt = dossier?.closedAt || dossier?.closed_at || null;
@@ -11740,7 +12143,7 @@ async function archiveDossierChannel(channel, dossier, language = 'fr') {
         for (const message of messages) {
             for (const attachment of message.attachments) {
                 const fileName = `${attachment.id}-${safeArchiveFileName(attachment.name)}`;
-                const result = await downloadDossierAttachment(attachment, totalAttachmentBytes);
+                const result = await downloadArchiveAttachment(attachment, totalAttachmentBytes);
                 totalAttachmentBytes += result.bytes;
                 attachmentCount += 1;
                 attachment.archiveFile = path.posix.join('pieces-jointes', fileName);
@@ -12857,23 +13260,52 @@ async function handleModerationInteraction(interaction, commandName, language) {
             return true;
         }
 
-        const amount = clampNumber(interaction.options.getInteger('nombre'), 1, 100);
+        if (!hasPurgeChannelPermissions(interaction.guild, interaction.channel)) {
+            await interaction.reply({
+                content: t(language, 'moderationPurgeChannelPermissionMissing'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const deleteAll = Boolean(interaction.options.getBoolean('tout'));
+        const requestedAmount = interaction.options.getInteger('nombre');
+
+        if (!deleteAll && !Number.isInteger(requestedAmount)) {
+            await interaction.reply({
+                content: t(language, 'moderationPurgeAmountRequired'),
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        const amount = deleteAll ? null : clampNumber(requestedAmount, 1, 100);
 
         await requestSensitiveConfirmation(interaction, {
             action: 'purge',
-            actionLabel: t(language, 'confirmPurge'),
+            actionLabel: t(language, deleteAll ? 'confirmPurgeAll' : 'confirmPurge'),
             targetLabel: `${interaction.channel}`,
-            details: [
-                language === 'en'
-                    ? `${amount} recent message(s) will be deleted if Discord allows it.`
-                    : `${amount} message(s) récent(s) seront supprimés si Discord les autorise.`,
-                language === 'en'
-                    ? 'Messages older than 14 days cannot be removed by bulk purge.'
-                    : 'Les messages de plus de 14 jours ne peuvent pas être supprimés par purge groupée.'
-            ],
+            details: deleteAll
+                ? [
+                    language === 'en'
+                        ? 'Every message currently present in this channel will be archived, verified, then deleted.'
+                        : 'Tous les messages actuellement présents dans ce salon seront archivés, vérifiés, puis supprimés.',
+                    language === 'en'
+                        ? 'Old messages and attachments are included. The operation may take several minutes and cannot be undone from Discord.'
+                        : 'Les anciens messages et les pièces jointes sont inclus. L’opération peut durer plusieurs minutes et ne peut pas être annulée depuis Discord.'
+                ]
+                : [
+                    language === 'en'
+                        ? `${amount} recent message(s) will be archived, verified, then deleted.`
+                        : `${amount} message(s) récent(s) seront archivés, vérifiés, puis supprimés.`,
+                    language === 'en'
+                        ? 'Messages older than 14 days are kept unless the complete-channel option is used.'
+                        : 'Les messages de plus de 14 jours sont conservés sauf avec l’option de vidage complet.'
+                ],
             payload: {
                 channelId: interaction.channel.id,
-                amount
+                amount,
+                mode: deleteAll ? 'all' : 'count'
             },
             language
         });
@@ -13758,13 +14190,51 @@ async function handleModerationMessage(message, language) {
             return true;
         }
 
-        const amount = clampNumber(args[1], 1, 100);
-        let deleted;
+        if (!hasPurgeChannelPermissions(message.guild, message.channel)) {
+            await message.reply(t(language, 'moderationPurgeChannelPermissionMissing'));
+            return true;
+        }
+
+        const deleteAll = ['tout', 'all'].includes(String(args[1] || '').toLowerCase());
+        const confirmedAll = ['confirmer', 'confirm'].includes(String(args[2] || '').toLowerCase());
+        const parsedAmount = Number.parseInt(args[1], 10);
+
+        if (deleteAll && !confirmedAll) {
+            await message.reply(language === 'en'
+                ? '⚠️ This archives and deletes every message in the channel, including messages older than 14 days. Type `!clear all confirm` to continue.'
+                : '⚠️ Cette action archive puis supprime tous les messages du salon, y compris ceux de plus de 14 jours. Écris `!purge tout confirmer` pour continuer.');
+            return true;
+        }
+
+        if (!deleteAll && (!Number.isInteger(parsedAmount) || parsedAmount < 1 || parsedAmount > 100)) {
+            await message.reply(t(language, 'moderationPurgeAmountRequired'));
+            return true;
+        }
+
+        const amount = deleteAll ? null : parsedAmount;
+        let result;
 
         try {
-            deleted = await message.channel.bulkDelete(amount, true);
+            result = await archiveAndPurgeChannelMessages(message.channel, {
+                mode: deleteAll ? 'all' : 'count',
+                count: amount,
+                actor: message.author,
+                language
+            });
         } catch (error) {
             console.error('Erreur purge texte :', error);
+            if (error?.purgeBusy) {
+                await message.reply(language === 'en'
+                    ? 'A Sentinel cleanup is already running in this channel.'
+                    : 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+                return true;
+            }
+            if (error?.archiveFailed) {
+                await message.reply(language === 'en'
+                    ? `The archive could not be verified. No message was deleted. ${error.message || ''}`.trim()
+                    : `L’archive n’a pas pu être vérifiée. Aucun message n’a été supprimé. ${error.message || ''}`.trim());
+                return true;
+            }
             await message.reply(getModerationActionFailureMessage(
                 error,
                 message.guild,
@@ -13780,12 +14250,19 @@ async function handleModerationMessage(message, language) {
             null,
             message.author.id,
             'clear',
-            `${amount} messages demandés dans #${message.channel.name}`,
+            deleteAll
+                ? `Vidage complet demandé dans #${message.channel.name}. ${result.deleted} messages supprimés. Archive #${result.archive?.id || 'aucune'}.`
+                : `${amount} messages demandés dans #${message.channel.name}. ${result.deleted} supprimés. Archive #${result.archive?.id || 'aucune'}.`,
             null
         );
 
-        await sendModerationLog(message.guild, message.author, caseData, `${message.channel}`, language);
-        await message.channel.send(t(language, 'moderationClear', { count: deleted.size })).catch(() => {});
+        if (getLogChannel(message.guild)?.id !== message.channel.id) {
+            await sendModerationLog(message.guild, message.author, caseData, `${message.channel}`, language);
+        }
+        const confirmation = await message.channel.send(formatPurgeResult(result, language)).catch(() => null);
+        if (deleteAll && confirmation) {
+            setTimeout(() => confirmation.delete().catch(() => {}), 10 * 1000);
+        }
         return true;
     }
 
@@ -14434,6 +14911,7 @@ client.once(Events.ClientReady, async () => {
             addWarningWithEscalation,
             addSession,
             addWeeklyPayAdjustment,
+            archiveAndPurgeChannelMessages,
             archiveWeeklyPayroll,
             buildCustomAnnouncementEmbed,
             buildCustomEmbedData,
@@ -14493,6 +14971,8 @@ client.once(Events.ClientReady, async () => {
             getAutomodWords,
             getRecentAutomodEvents,
             getModerationCases,
+            getMessagePurgeArchiveFile,
+            getMessagePurgeArchives,
             getModerationCase,
             getGuildPaySettings,
             getRecentDossiers,

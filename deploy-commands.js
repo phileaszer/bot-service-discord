@@ -421,17 +421,25 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('purge', 'clear', 'Supprime des messages recents.', 'Deletes recent messages.')
+    command('purge', 'clear', 'Archive puis supprime des messages ou vide tout le salon.', 'Archives then deletes messages or clears the channel.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
         .addIntegerOption(option =>
             option
                 .setName('nombre')
                 .setNameLocalizations(en('count'))
-                .setDescription('Nombre de messages a supprimer')
-                .setDescriptionLocalizations(en('Number of messages to delete'))
+                .setDescription('Nombre de messages recents a archiver puis supprimer')
+                .setDescriptionLocalizations(en('Number of recent messages to archive then delete'))
                 .setMinValue(1)
                 .setMaxValue(100)
-                .setRequired(true)
+                .setRequired(false)
+        )
+        .addBooleanOption(option =>
+            option
+                .setName('tout')
+                .setNameLocalizations(en('all'))
+                .setDescription('Archiver puis supprimer tous les messages du salon')
+                .setDescriptionLocalizations(en('Archive then delete every message in the channel'))
+                .setRequired(false)
         ),
 
     command('sanctions', 'mod-cases', 'Affiche les sanctions d un membre.', 'Shows a member moderation cases.')
