@@ -12,7 +12,7 @@ Sentinel est un bot Discord qui aide les serveurs à gérer les prises de servic
 
 La version actuelle de Sentinel est mise à disposition comme démonstration publique, sans abonnement ni prélèvement actif. Cette phase sert à tester le service en conditions réelles et à préparer son fonctionnement définitif.
 
-Sentinel a vocation à devenir un service payant ultérieurement. Les tarifs, le calendrier et les conditions applicables seront annoncés clairement avant toute activation d’une offre payante. L’utilisation de la version actuelle ne constitue pas une souscription et n’autorise aucun prélèvement futur automatique.
+Certaines fonctions avancées de Sentinel pourront devenir payantes ultérieurement. Il n’est pas prévu de rendre l’ensemble du site ou toutes les fonctions payants : une partie gratuite restera accessible. Les fonctions concernées, les tarifs, le calendrier et les conditions applicables seront annoncés clairement avant toute activation d’une offre payante. L’utilisation de la version actuelle ne constitue pas une souscription et n’autorise aucun prélèvement futur automatique.
 
 ## Utilisation du service
 
@@ -74,7 +74,7 @@ Sentinel is a Discord bot that helps servers manage duty tracking, moderation, p
 
 The current Sentinel release is provided as a public demonstration, with no active subscription or charge. This phase is used to test the service in real conditions and prepare its final operation.
 
-Sentinel is intended to become a paid service later. Pricing, timing, and applicable terms will be announced clearly before any paid offering is activated. Using the current version does not create a subscription and does not authorize any automatic future charge.
+Some advanced Sentinel features may become paid features later. The entire website and all features are not intended to become paid: a free part of Sentinel will remain available. The affected features, pricing, timing, and applicable terms will be announced clearly before any paid offering is activated. Using the current version does not create a subscription and does not authorize any automatic future charge.
 
 ## Use of the service
 

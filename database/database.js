@@ -924,20 +924,73 @@ db.prepare(`
     'Sentinel | Version de démonstration',
     [
         'La version actuelle de Sentinel est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
-        'Elle sert à tester le service en conditions réelles, corriger les problèmes et préparer la formule définitive.',
-        'Sentinel a vocation à devenir payant plus tard. Aucun abonnement, prélèvement ou achat n’est actif aujourd’hui.',
-        'Les tarifs, le calendrier et les conditions seront annoncés clairement avant tout changement afin que chaque serveur puisse décider de continuer ou non.'
+        'Elle sert à tester le service en conditions réelles, corriger les problèmes et préparer la suite.',
+        'À l’avenir, seules certaines options avancées pourront devenir payantes. Une partie gratuite de Sentinel restera disponible.',
+        'Aucun abonnement, prélèvement ou achat n’est actif aujourd’hui. Les fonctions concernées, les tarifs et les conditions seront annoncés clairement avant tout changement.'
     ].join('\n'),
     'Sentinel | Demonstration version',
     [
         'The current Sentinel release is a public demonstration: every feature is available at no cost during this phase.',
-        'It is used to test the service in real conditions, fix issues, and prepare the final offering.',
-        'Sentinel is intended to become a paid service later. No subscription, charge, or purchase is active today.',
-        'Pricing, timing, and terms will be announced clearly before any change so each server can decide whether to continue.'
+        'It is used to test the service in real conditions, fix issues, and prepare what comes next.',
+        'Only some advanced features may become paid later. A free part of Sentinel will remain available.',
+        'No subscription, charge, or purchase is active today. The affected features, pricing, and terms will be announced clearly before any change.'
     ].join('\n'),
     'information officielle',
     '2026-10-07T00:00:00.000Z',
     '2026-10-07T00:00:00.000Z'
+);
+
+db.prepare(`
+    UPDATE official_updates
+    SET body_fr = ?, body_en = ?
+    WHERE public_key = ?
+`).run(
+    [
+        'La version actuelle de Sentinel est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
+        'Elle sert à tester le service en conditions réelles, corriger les problèmes et préparer la suite.',
+        'À l’avenir, seules certaines options avancées pourront devenir payantes. Une partie gratuite de Sentinel restera disponible.',
+        'Aucun abonnement, prélèvement ou achat n’est actif aujourd’hui. Les fonctions concernées, les tarifs et les conditions seront annoncés clairement avant tout changement.'
+    ].join('\n'),
+    [
+        'The current Sentinel release is a public demonstration: every feature is available at no cost during this phase.',
+        'It is used to test the service in real conditions, fix issues, and prepare what comes next.',
+        'Only some advanced features may become paid later. A free part of Sentinel will remain available.',
+        'No subscription, charge, or purchase is active today. The affected features, pricing, and terms will be announced clearly before any change.'
+    ].join('\n'),
+    'sentinel-public-demo-2026-10-07'
+);
+
+db.prepare(`
+    INSERT OR IGNORE INTO official_updates (
+        public_key,
+        title_fr,
+        body_fr,
+        title_en,
+        body_en,
+        source,
+        created_by_user_id,
+        is_public,
+        created_at,
+        published_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
+`).run(
+    'sentinel-public-demo-scope-2026-10-07',
+    'Sentinel | Précision sur la démonstration',
+    [
+        'Sentinel n’a pas vocation à devenir entièrement payant.',
+        'À l’avenir, seules certaines options avancées pourront devenir payantes. Le site et les fonctions essentielles conserveront une partie accessible gratuitement.',
+        'Aucun abonnement ni prélèvement n’est actif aujourd’hui. Les fonctions concernées et leurs conditions seront annoncées avant tout changement.'
+    ].join('\n'),
+    'Sentinel | Demonstration clarification',
+    [
+        'Sentinel is not intended to become entirely paid.',
+        'Only some advanced features may become paid later. The website and essential features will keep a part available at no cost.',
+        'No subscription or charge is active today. The affected features and their terms will be announced before any change.'
+    ].join('\n'),
+    'information officielle',
+    '2026-10-07T11:25:00.000Z',
+    '2026-10-07T11:25:00.000Z'
 );
 
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()

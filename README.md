@@ -2,7 +2,7 @@
 
 Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs RP et les équipes staff qui veulent gérer leurs prises de service, leur modération et leurs demandes depuis un même endroit.
 
-> **Version de démonstration publique :** toutes les fonctions de cette version sont actuellement accessibles sans paiement afin de tester Sentinel en conditions réelles. Le service a vocation à devenir payant plus tard. Aucun abonnement ni prélèvement n’est actif aujourd’hui ; les tarifs, le calendrier et les conditions seront annoncés avant tout changement.
+> **Version de démonstration publique :** toutes les fonctions de cette version sont actuellement accessibles sans paiement afin de tester Sentinel en conditions réelles. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite de Sentinel restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.
 
 ## Liens utiles
 

@@ -10,7 +10,7 @@
       currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
       currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.',
       releaseTitle: 'Version de démonstration publique',
-      releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. Cette version a vocation à devenir payante plus tard. Aucun abonnement ni prélèvement n’est actif aujourd’hui ; les conditions seront annoncées clairement avant tout changement.'
+      releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
     },
     en: {
       actionWestern: 'Western style',
@@ -18,7 +18,7 @@
       currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
       currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.',
       releaseTitle: 'Public demonstration version',
-      releaseMessage: 'Sentinel is currently available at no cost so communities can try it. This version is intended to become a paid service later. No subscription or charge is active today; the terms will be announced clearly before any change.'
+      releaseMessage: 'Sentinel is currently available at no cost so communities can try it. Some advanced features may become paid later, but a free part will remain available. No subscription or charge is active today, and the details will be announced before any change.'
     }
   };
 

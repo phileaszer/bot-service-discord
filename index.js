@@ -1045,7 +1045,7 @@ function buildDashboardEmbed(guild, requester) {
                 '`2.` Choose the server.',
                 '`3.` Configure service, logs, embeds, moderation, and audit from one place.',
                 '',
-                '**Current release:** public demonstration. No subscription or charge is active today. Sentinel is intended to become a paid service later, with terms announced before any change.',
+                '**Current release:** public demonstration. No subscription or charge is active today. Some advanced features may become paid later, but a free part of Sentinel will remain available. The details will be announced before any change.',
                 '',
                 dashboardUrl
             ].join('\n')
@@ -1056,7 +1056,7 @@ function buildDashboardEmbed(guild, requester) {
                 '`2.` Choisis le serveur.',
                 '`3.` Prépare le service, le registre, les annonces, la sécurité et l’historique au même endroit.',
                 '',
-                '**Version actuelle :** démonstration publique. Aucun abonnement ni prélèvement n’est actif aujourd’hui. Sentinel a vocation à devenir payant plus tard, avec des conditions annoncées avant tout changement.',
+                '**Version actuelle :** démonstration publique. Aucun abonnement ni prélèvement n’est actif aujourd’hui. Certaines options avancées pourront devenir payantes plus tard, mais une partie gratuite de Sentinel restera disponible. Les détails seront annoncés avant tout changement.',
                 '',
                 dashboardUrl
             ].join('\n'),
@@ -9677,7 +9677,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 fields: [
                     {
                         name: 'Public demonstration version',
-                        value: 'Sentinel is currently available at no cost for testing. It is intended to become a paid service later. No subscription or charge is active today, and the terms will be announced before any change.'
+                        value: 'Sentinel is currently available at no cost for testing. Some advanced features may become paid later, but a free part of Sentinel will remain available. No subscription or charge is active today, and the details will be announced before any change.'
                     },
                     {
                         name: 'Recommended order',
@@ -9980,7 +9980,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             fields: [
                 {
                     name: 'Version de démonstration publique',
-                    value: 'Sentinel est actuellement accessible sans paiement pour être testé en conditions réelles. Il a vocation à devenir payant plus tard. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les conditions seront annoncées avant tout changement.'
+                    value: 'Sentinel est actuellement accessible sans paiement pour être testé en conditions réelles. Certaines options avancées pourront devenir payantes plus tard, mais une partie gratuite de Sentinel restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
                 },
                 {
                     name: 'Ordre de mise en place',
