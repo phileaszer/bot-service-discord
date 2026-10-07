@@ -65,6 +65,39 @@ test('complete purge deletes recent and old messages from the archived snapshot'
     assert.equal(old.deleteCalls, 1);
 });
 
+test('complete purge removes old messages in controlled concurrent groups', async () => {
+    let activeDeletes = 0;
+    let maxConcurrentDeletes = 0;
+    const oldMessages = Array.from({ length: 12 }, (_, index) => ({
+        id: `old-${index}`,
+        createdTimestamp: Date.now() - 30 * 24 * 60 * 60 * 1000,
+        deletable: true,
+        async delete() {
+            activeDeletes += 1;
+            maxConcurrentDeletes = Math.max(maxConcurrentDeletes, activeDeletes);
+            await new Promise(resolve => setTimeout(resolve, 5));
+            activeDeletes -= 1;
+        }
+    }));
+    let fetchCall = 0;
+    const channel = {
+        isTextBased: () => true,
+        messages: {
+            fetch: async () => {
+                fetchCall += 1;
+                return fetchCall === 1 ? collection(oldMessages) : collection([]);
+            }
+        },
+        bulkDelete: async messages => messages
+    };
+
+    const result = await purgeChannelMessages(channel, { mode: 'all' });
+
+    assert.equal(result.deleted, oldMessages.length);
+    assert.ok(maxConcurrentDeletes > 1);
+    assert.ok(maxConcurrentDeletes <= 5);
+});
+
 test('Sentinel verifies an archive before deleting dashboard or Discord messages', () => {
     const root = path.resolve(__dirname, '..');
     const botSource = fs.readFileSync(path.join(root, 'index.js'), 'utf8');

@@ -3,6 +3,7 @@ const { Collection } = require('discord.js');
 const BULK_DELETE_LIMIT = 100;
 const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 const BULK_DELETE_SAFETY_MS = 60 * 1000;
+const OLD_MESSAGE_DELETE_CONCURRENCY = 5;
 
 function isUnknownMessageError(error) {
     return Number(error?.code || error?.rawError?.code || 0) === 10008;
@@ -33,6 +34,25 @@ async function deleteOneMessage(message) {
 
         return { deleted: 0, failed: 1, alreadyGone: 0 };
     }
+}
+
+async function deleteMessagesIndividually(messages, concurrency = OLD_MESSAGE_DELETE_CONCURRENCY) {
+    const result = { deleted: 0, failed: 0, alreadyGone: 0 };
+    const batchSize = Math.max(1, Math.min(Number(concurrency) || 1, OLD_MESSAGE_DELETE_CONCURRENCY));
+
+    for (let offset = 0; offset < messages.length; offset += batchSize) {
+        const outcomes = await Promise.all(
+            messages.slice(offset, offset + batchSize).map(deleteOneMessage)
+        );
+
+        for (const outcome of outcomes) {
+            result.deleted += outcome.deleted;
+            result.failed += outcome.failed;
+            result.alreadyGone += outcome.alreadyGone;
+        }
+    }
+
+    return result;
 }
 
 async function deleteMessageBatch(channel, messages, { includeOld = false } = {}) {
@@ -67,12 +87,10 @@ async function deleteMessageBatch(channel, messages, { includeOld = false } = {}
     }
 
     if (includeOld) {
-        for (const message of old) {
-            const single = await deleteOneMessage(message);
-            result.deleted += single.deleted;
-            result.failed += single.failed;
-            result.alreadyGone += single.alreadyGone;
-        }
+        const individual = await deleteMessagesIndividually(old);
+        result.deleted += individual.deleted;
+        result.failed += individual.failed;
+        result.alreadyGone += individual.alreadyGone;
     }
 
     return result;
@@ -187,6 +205,7 @@ async function purgeChannelMessages(channel, options = {}) {
 module.exports = {
     BULK_DELETE_LIMIT,
     BULK_DELETE_MAX_AGE_MS,
+    OLD_MESSAGE_DELETE_CONCURRENCY,
     canBulkDelete,
     fetchMessagesForPurge,
     purgeFetchedChannelMessages,
