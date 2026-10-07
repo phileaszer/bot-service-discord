@@ -71,6 +71,11 @@ test('Sentinel verifies an archive before deleting dashboard or Discord messages
     const dashboardSource = fs.readFileSync(path.join(root, 'dashboard.js'), 'utf8');
     const dashboardClientSource = fs.readFileSync(path.join(root, 'site', 'dashboard.js'), 'utf8');
     const databaseSource = fs.readFileSync(path.join(root, 'database', 'database.js'), 'utf8');
+    const commandSource = fs.readFileSync(path.join(root, 'deploy-commands.js'), 'utf8');
+    const purgeCommandSource = commandSource.slice(
+        commandSource.indexOf("command('purge'"),
+        commandSource.indexOf("command('sanctions'")
+    );
     const workflow = botSource.slice(
         botSource.indexOf('async function archiveAndPurgeChannelMessages'),
         botSource.indexOf('async function archiveDossierChannel')
@@ -86,5 +91,10 @@ test('Sentinel verifies an archive before deleting dashboard or Discord messages
     assert.match(botSource, /getLogChannel\(guild\)\?\.id !== channel\.id/);
     assert.match(dashboardSource, /getLogChannel\(guild\)\?\.id !== channel\.id/);
     assert.match(dashboardClientSource, /data-purge-all-field/);
+    assert.match(purgeCommandSource, /\.setName\('messages'\)[\s\S]*\.setName\('nombre'\)[\s\S]*\.setRequired\(true\)/);
+    assert.match(purgeCommandSource, /\.addSubcommand\(subcommand =>[\s\S]*\.setName\('tout'\)/);
+    assert.doesNotMatch(purgeCommandSource, /\.addBooleanOption/);
+    assert.match(botSource, /writePurgeAttachmentEntry\(gzip, attachment, totalAttachmentBytes\)/);
+    assert.match(botSource, /readTarEntryFromGzipFile\(stagingArchivePath, 'manifest\.json'\)/);
     assert.match(databaseSource, /CREATE TABLE IF NOT EXISTS message_purge_archives/);
 });

@@ -423,23 +423,28 @@ const publicCommands = [
 
     command('purge', 'clear', 'Archive puis supprime des messages ou vide tout le salon.', 'Archives then deletes messages or clears the channel.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-        .addIntegerOption(option =>
-            option
-                .setName('nombre')
-                .setNameLocalizations(en('count'))
-                .setDescription('Nombre de messages recents a archiver puis supprimer')
-                .setDescriptionLocalizations(en('Number of recent messages to archive then delete'))
-                .setMinValue(1)
-                .setMaxValue(100)
-                .setRequired(false)
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('messages')
+                .setDescription('Archiver puis supprimer un nombre precis de messages recents')
+                .setDescriptionLocalizations(en('Archive then delete a specific number of recent messages'))
+                .addIntegerOption(option =>
+                    option
+                        .setName('nombre')
+                        .setNameLocalizations(en('count'))
+                        .setDescription('Nombre de messages recents a archiver puis supprimer')
+                        .setDescriptionLocalizations(en('Number of recent messages to archive then delete'))
+                        .setMinValue(1)
+                        .setMaxValue(100)
+                        .setRequired(true)
+                )
         )
-        .addBooleanOption(option =>
-            option
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('tout')
                 .setNameLocalizations(en('all'))
                 .setDescription('Archiver puis supprimer tous les messages du salon')
                 .setDescriptionLocalizations(en('Archive then delete every message in the channel'))
-                .setRequired(false)
         ),
 
     command('sanctions', 'mod-cases', 'Affiche les sanctions d un membre.', 'Shows a member moderation cases.')

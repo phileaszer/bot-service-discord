@@ -102,7 +102,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 
 La liste complète et les explications détaillées sont disponibles sur le site.
 
-Avant toute suppression, Sentinel crée et vérifie une archive contenant les messages concernés, leurs auteurs, dates, embeds, réactions et pièces jointes. `/purge nombre:25` traite un nombre précis de messages récents. `/purge tout:true` parcourt aussi les messages de plus de 14 jours et vide le salon sans en changer l’identifiant. Si l’archive ne peut pas être confirmée, aucun message n’est supprimé. Les archives sont téléchargeables depuis le dashboard uniquement par les responsables autorisés à gérer les messages.
+Avant toute suppression, Sentinel crée et vérifie une archive contenant les messages concernés, leurs auteurs, dates, embeds, réactions et pièces jointes. `/purge messages nombre:25` traite un nombre précis de messages récents. `/purge tout` ne demande aucun nombre, parcourt aussi les messages de plus de 14 jours et vide le salon sans en changer l’identifiant. Si l’archive ne peut pas être confirmée, aucun message n’est supprimé. Les archives sont téléchargeables depuis le dashboard uniquement par les responsables autorisés à gérer les messages.
 
 ## Stockage et sauvegardes
 

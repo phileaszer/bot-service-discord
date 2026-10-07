@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const { pipeline } = require('stream/promises');
 
 const {
     Client,
@@ -104,6 +105,18 @@ const DOSSIER_ARCHIVE_MAX_TOTAL_BYTES = Math.max(
 const DOSSIER_ARCHIVE_FETCH_TIMEOUT_MS = Math.max(
     Number.parseInt(process.env.DOSSIER_ARCHIVE_FETCH_TIMEOUT_SECONDS || '30', 10),
     5
+) * 1000;
+const MESSAGE_PURGE_ARCHIVE_MAX_ATTACHMENT_BYTES = Math.max(
+    Number.parseInt(process.env.MESSAGE_PURGE_ARCHIVE_MAX_ATTACHMENT_MB || '400', 10),
+    25
+) * 1024 * 1024;
+const MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES = Math.max(
+    Number.parseInt(process.env.MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_MB || '400', 10),
+    50
+) * 1024 * 1024;
+const MESSAGE_PURGE_ARCHIVE_FETCH_TIMEOUT_MS = Math.max(
+    Number.parseInt(process.env.MESSAGE_PURGE_ARCHIVE_FETCH_TIMEOUT_SECONDS || '300', 10),
+    30
 ) * 1000;
 const DOSSIER_RETENTION_HOURS = Math.min(Math.max(
     Number.parseInt(process.env.DOSSIER_RETENTION_HOURS || process.env.DOSSIER_PREMIUM_RETENTION_HOURS || '24', 10),
@@ -488,7 +501,7 @@ const I18N = {
         moderationClear: '✅ **{count}** message(s) supprimé(s).',
         moderationClearAll: '✅ Salon vidé : **{count}** message(s) supprimé(s), anciens messages compris.',
         moderationClearPartial: '⚠️ **{count}** message(s) supprimé(s), mais certains messages n’ont pas pu être retirés. Consulte les logs et vérifie le salon.',
-        moderationPurgeAmountRequired: '❌ Indique un nombre de 1 à 100, ou active l’option `tout` pour vider entièrement le salon.',
+        moderationPurgeAmountRequired: '❌ Utilise `/purge messages` avec un nombre de 1 à 100, ou `/purge tout` pour vider entièrement le salon.',
         moderationPurgeChannelPermissionMissing: '❌ Sentinel doit pouvoir voir ce salon, consulter son historique et gérer ses messages.',
         moderationCasesEmpty: 'Aucune sanction enregistrée pour {member}.',
         moderationFailed: '❌ L’action de modération a échoué.\nVérifie que Sentinel a la bonne permission Discord et que son rôle est placé au-dessus de la cible. Tu peux aussi lancer `/diagnostic`.',
@@ -730,7 +743,7 @@ const I18N = {
         moderationClear: '✅ **{count}** message(s) deleted.',
         moderationClearAll: '✅ Channel cleared: **{count}** message(s) deleted, including old messages.',
         moderationClearPartial: '⚠️ **{count}** message(s) deleted, but some messages could not be removed. Check the logs and the channel.',
-        moderationPurgeAmountRequired: '❌ Provide a number from 1 to 100, or enable the `all` option to clear the entire channel.',
+        moderationPurgeAmountRequired: '❌ Use `/clear messages` with a number from 1 to 100, or `/clear all` to clear the entire channel.',
         moderationPurgeChannelPermissionMissing: '❌ Sentinel must be able to view this channel, read its history, and manage its messages.',
         moderationCasesEmpty: 'No moderation case recorded for {member}.',
         moderationFailed: '❌ Moderation action failed.\nCheck that Sentinel has the right Discord permission and that its role is above the target. You can also run `/diagnostic`.',
@@ -1966,8 +1979,8 @@ function formatPurgeResult(result, language = 'fr') {
     }
 
     return language === 'en'
-        ? `${base} ${result.skippedOld} message(s) older than 14 days were left untouched. Use \`/clear all:true\` to clear the entire channel.${archiveNote}`
-        : `${base} ${result.skippedOld} message(s) de plus de 14 jours ont été conservé(s). Utilise \`/purge tout:true\` pour vider entièrement le salon.${archiveNote}`;
+        ? `${base} ${result.skippedOld} message(s) older than 14 days were left untouched. Use \`/clear all\` to clear the entire channel.${archiveNote}`
+        : `${base} ${result.skippedOld} message(s) de plus de 14 jours ont été conservé(s). Utilise \`/purge tout\` pour vider entièrement le salon.${archiveNote}`;
 }
 
 function mapGuildConfig(row) {
@@ -9708,8 +9721,8 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/fin-timeout membre raison` - retirer un timeout',
         '`/expulser membre raison` - expulser un membre',
         '`/bannir utilisateur ou utilisateur_id raison` - bannir, meme si la personne n est plus sur le serveur',
-        '`/purge nombre` - archiver puis supprimer jusqu a 100 messages recents',
-        '`/purge tout:true` - archiver puis vider tous les messages du salon, anciens messages compris',
+        '`/purge messages nombre:...` - archiver puis supprimer jusqu a 100 messages recents',
+        '`/purge tout` - archiver puis vider tous les messages du salon, anciens messages compris',
         '`/sanctions membre ou utilisateur_id` - consulter les dossiers disciplinaires',
         '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Sentinel',
         'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
@@ -10052,7 +10065,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         name: 'Moderation actions',
                         value: [
                             '`/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
-                            '`/clear count:...` archives and deletes recent messages. `/clear all:true` archives and clears the entire channel, including old messages.',
+                            '`/clear messages count:...` archives and deletes recent messages. `/clear all` archives and clears the entire channel, including old messages.',
                             '`/autorole-config` can give a role automatically when a member joins.',
                             '`/ban` can use a Discord ID when the user is no longer in the server.',
                             '`/mod-cases` shows a limited view of the latest cases.'
@@ -10356,7 +10369,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     name: 'Mesures disponibles',
                     value: [
                         '`/avertir`, `/timeout`, `/fin-timeout`, `/expulser`, `/bannir`, `/purge`.',
-                        '`/purge nombre:...` archive et supprime les messages récents. `/purge tout:true` archive puis vide entièrement le salon, anciens messages compris.',
+                        '`/purge messages nombre:...` archive et supprime les messages récents. `/purge tout` archive puis vide entièrement le salon, anciens messages compris.',
                         '`/config-autorole` peut donner un grade automatiquement quand un membre rejoint.',
                         '`/bannir` peut utiliser un ID si la personne n’est plus sur le serveur.',
                         '`/sanctions` affiche une vue simple des derniers dossiers disciplinaires.'
@@ -11739,25 +11752,30 @@ function writeTarOctal(buffer, offset, length, value) {
     writeTarText(buffer, offset, length, `${octal}\0`);
 }
 
+function createTarHeader(name, size) {
+    const header = Buffer.alloc(512, 0);
+    writeTarText(header, 0, 100, name);
+    writeTarOctal(header, 100, 8, 0o644);
+    writeTarOctal(header, 108, 8, 0);
+    writeTarOctal(header, 116, 8, 0);
+    writeTarOctal(header, 124, 12, size);
+    writeTarOctal(header, 136, 12, Math.floor(Date.now() / 1000));
+    header.fill(0x20, 148, 156);
+    header[156] = '0'.charCodeAt(0);
+    writeTarText(header, 257, 6, 'ustar');
+    writeTarText(header, 263, 2, '00');
+    const checksum = header.reduce((sum, byte) => sum + byte, 0);
+    const checksumText = checksum.toString(8).padStart(6, '0');
+    writeTarText(header, 148, 8, `${checksumText}\0 `);
+    return header;
+}
+
 function createTarBuffer(files) {
     const parts = [];
 
     for (const file of files) {
         const data = Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data);
-        const header = Buffer.alloc(512, 0);
-        writeTarText(header, 0, 100, file.name);
-        writeTarOctal(header, 100, 8, 0o644);
-        writeTarOctal(header, 108, 8, 0);
-        writeTarOctal(header, 116, 8, 0);
-        writeTarOctal(header, 124, 12, data.length);
-        writeTarOctal(header, 136, 12, Math.floor(Date.now() / 1000));
-        header.fill(0x20, 148, 156);
-        header[156] = '0'.charCodeAt(0);
-        writeTarText(header, 257, 6, 'ustar');
-        writeTarText(header, 263, 2, '00');
-        const checksum = header.reduce((sum, byte) => sum + byte, 0);
-        const checksumText = checksum.toString(8).padStart(6, '0');
-        writeTarText(header, 148, 8, `${checksumText}\0 `);
+        const header = createTarHeader(file.name, data.length);
         parts.push(header, data);
 
         const padding = (512 - (data.length % 512)) % 512;
@@ -11793,6 +11811,189 @@ function readTarEntry(tarBuffer, requestedName) {
     }
 
     return null;
+}
+
+async function writeTarStreamChunk(stream, chunk) {
+    if (stream.destroyed) {
+        throw new Error('Le flux de l’archive a été interrompu.');
+    }
+
+    if (stream.write(chunk)) {
+        return;
+    }
+
+    await new Promise((resolve, reject) => {
+        const onDrain = () => {
+            cleanup();
+            resolve();
+        };
+        const onError = error => {
+            cleanup();
+            reject(error);
+        };
+        const cleanup = () => {
+            stream.off('drain', onDrain);
+            stream.off('error', onError);
+        };
+        stream.once('drain', onDrain);
+        stream.once('error', onError);
+    });
+}
+
+async function writeTarBufferEntry(stream, name, data) {
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    await writeTarStreamChunk(stream, createTarHeader(name, buffer.length));
+    await writeTarStreamChunk(stream, buffer);
+    const padding = (512 - (buffer.length % 512)) % 512;
+
+    if (padding) {
+        await writeTarStreamChunk(stream, Buffer.alloc(padding, 0));
+    }
+}
+
+async function writePurgeAttachmentEntry(stream, attachment, currentTotalBytes) {
+    const declaredSize = Number(attachment.size || 0);
+    const displayName = attachment.name || attachment.id;
+
+    if (!Number.isSafeInteger(declaredSize) || declaredSize < 0) {
+        throw new Error(`La taille de la pièce jointe ${displayName} est invalide.`);
+    }
+
+    if (declaredSize > MESSAGE_PURGE_ARCHIVE_MAX_ATTACHMENT_BYTES) {
+        throw new Error(`La pièce jointe ${displayName} dépasse ${Math.floor(MESSAGE_PURGE_ARCHIVE_MAX_ATTACHMENT_BYTES / 1024 / 1024)} Mo.`);
+    }
+
+    if (currentTotalBytes + declaredSize > MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES) {
+        throw new Error(`Les pièces jointes dépassent ${Math.floor(MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES / 1024 / 1024)} Mo au total.`);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MESSAGE_PURGE_ARCHIVE_FETCH_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(attachment.url, { signal: controller.signal });
+
+        if (!response.ok || !response.body) {
+            throw new Error(`Téléchargement de ${displayName} refusé (${response.status}).`);
+        }
+
+        const responseSize = Number(response.headers.get('content-length') || declaredSize);
+        if (Number.isFinite(responseSize) && responseSize !== declaredSize) {
+            throw new Error(`La taille reçue pour ${displayName} ne correspond pas à Discord.`);
+        }
+
+        await writeTarStreamChunk(stream, createTarHeader(attachment.archiveFile, declaredSize));
+        const hash = crypto.createHash('sha256');
+        let bytes = 0;
+
+        for await (const chunk of response.body) {
+            const buffer = Buffer.from(chunk);
+            bytes += buffer.length;
+
+            if (bytes > declaredSize || currentTotalBytes + bytes > MESSAGE_PURGE_ARCHIVE_MAX_TOTAL_BYTES) {
+                throw new Error(`La taille reçue pour ${displayName} dépasse la taille annoncée.`);
+            }
+
+            hash.update(buffer);
+            await writeTarStreamChunk(stream, buffer);
+        }
+
+        if (bytes !== declaredSize) {
+            throw new Error(`La pièce jointe ${displayName} est incomplète (${bytes}/${declaredSize} octets).`);
+        }
+
+        const padding = (512 - (bytes % 512)) % 512;
+        if (padding) {
+            await writeTarStreamChunk(stream, Buffer.alloc(padding, 0));
+        }
+
+        return {
+            bytes,
+            sha256: hash.digest('hex')
+        };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function hashArchiveFile(filePath) {
+    const hash = crypto.createHash('sha256');
+
+    for await (const chunk of fs.createReadStream(filePath)) {
+        hash.update(chunk);
+    }
+
+    return hash.digest('hex');
+}
+
+async function readTarEntryFromGzipFile(filePath, requestedName, maxEntryBytes = 64 * 1024 * 1024) {
+    const source = fs.createReadStream(filePath);
+    const gunzip = zlib.createGunzip();
+    const stream = source.pipe(gunzip);
+    let pending = Buffer.alloc(0);
+    let entry = null;
+    let collected = [];
+    let collectedBytes = 0;
+
+    try {
+        for await (const chunk of stream) {
+            pending = pending.length ? Buffer.concat([pending, chunk]) : Buffer.from(chunk);
+
+            while (true) {
+                if (!entry) {
+                    if (pending.length < 512) break;
+                    const header = pending.subarray(0, 512);
+                    pending = pending.subarray(512);
+                    const name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/, '');
+
+                    if (!name) return null;
+
+                    const sizeText = header.subarray(124, 136).toString('ascii').replace(/\0.*$/, '').trim();
+                    const size = Number.parseInt(sizeText || '0', 8);
+                    entry = {
+                        name,
+                        remaining: size,
+                        padding: (512 - (size % 512)) % 512
+                    };
+
+                    if (name === requestedName && size > maxEntryBytes) {
+                        throw new Error('Le manifeste de l’archive est anormalement volumineux.');
+                    }
+                }
+
+                if (entry.remaining > 0) {
+                    if (pending.length === 0) break;
+                    const take = Math.min(entry.remaining, pending.length);
+
+                    if (entry.name === requestedName) {
+                        const part = pending.subarray(0, take);
+                        collected.push(part);
+                        collectedBytes += part.length;
+                    }
+
+                    pending = pending.subarray(take);
+                    entry.remaining -= take;
+                    if (entry.remaining > 0) break;
+                }
+
+                if (pending.length < entry.padding) break;
+                pending = pending.subarray(entry.padding);
+
+                if (entry.name === requestedName) {
+                    return Buffer.concat(collected, collectedBytes);
+                }
+
+                entry = null;
+                collected = [];
+                collectedBytes = 0;
+            }
+        }
+
+        return null;
+    } finally {
+        source.destroy();
+        gunzip.destroy();
+    }
 }
 
 function dossierMessageToArchive(message) {
@@ -11886,7 +12087,7 @@ function resolveMessagePurgeArchivePath(relativePath) {
     return resolved;
 }
 
-function getMessagePurgeArchiveFile(guildId, archiveId) {
+async function getMessagePurgeArchiveFile(guildId, archiveId) {
     const archive = mapMessagePurgeArchive(db.prepare(`
         SELECT * FROM message_purge_archives WHERE guild_id = ? AND id = ?
     `).get(guildId, archiveId));
@@ -11896,8 +12097,7 @@ function getMessagePurgeArchiveFile(guildId, archiveId) {
         return null;
     }
 
-    const buffer = fs.readFileSync(filePath);
-    const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+    const sha256 = await hashArchiveFile(filePath);
 
     if (!archive.archiveSha256 || sha256 !== archive.archiveSha256) {
         return null;
@@ -11907,7 +12107,7 @@ function getMessagePurgeArchiveFile(guildId, archiveId) {
         path: filePath,
         name: `sentinel-messages-${archive.channelId}-${archive.id}.tar.gz`,
         mimeType: 'application/gzip',
-        size: buffer.length,
+        size: Number((await fs.promises.stat(filePath)).size || 0),
         archive
     };
 }
@@ -11922,26 +12122,16 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
     const relativeDirectory = path.join(String(channel.guild.id), archiveKey);
     const finalDirectory = path.resolve(MESSAGE_PURGE_ARCHIVE_DIR, relativeDirectory);
     const stagingDirectory = `${finalDirectory}.staging-${crypto.randomBytes(6).toString('hex')}`;
-    const tarFiles = [];
+    const archiveName = 'messages.tar.gz';
+    const stagingArchivePath = path.join(stagingDirectory, archiveName);
     let totalAttachmentBytes = 0;
     let attachmentCount = 0;
+    let archivePipeline = null;
+    let gzip = null;
 
     await fs.promises.mkdir(stagingDirectory, { recursive: true });
 
     try {
-        for (const message of messages) {
-            for (const attachment of message.attachments) {
-                const fileName = `${attachment.id}-${safeArchiveFileName(attachment.name)}`;
-                const result = await downloadArchiveAttachment(attachment, totalAttachmentBytes);
-                totalAttachmentBytes += result.bytes;
-                attachmentCount += 1;
-                attachment.archiveFile = path.posix.join('pieces-jointes', fileName);
-                attachment.sha256 = result.sha256;
-                attachment.archivedSize = result.bytes;
-                tarFiles.push({ name: attachment.archiveFile, data: result.buffer });
-            }
-        }
-
         const details = {
             actorUserId: actor?.id || String(actor || 'unknown'),
             actorTag: actor?.tag || actor?.username || null,
@@ -11949,6 +12139,28 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
             requestedCount: snapshot.requested,
             createdAt
         };
+        const transcript = buildMessagePurgeTranscript(channel, details, messages, language);
+        gzip = zlib.createGzip({ level: 9 });
+        archivePipeline = pipeline(
+            gzip,
+            fs.createWriteStream(stagingArchivePath, { flags: 'wx', mode: 0o600 })
+        );
+        archivePipeline.catch(() => {});
+
+        await writeTarBufferEntry(gzip, 'compte-rendu.txt', Buffer.from(transcript, 'utf8'));
+
+        for (const message of messages) {
+            for (const attachment of message.attachments) {
+                const fileName = `${attachment.id}-${safeArchiveFileName(attachment.name)}`;
+                attachment.archiveFile = path.posix.join('pieces-jointes', fileName);
+                const result = await writePurgeAttachmentEntry(gzip, attachment, totalAttachmentBytes);
+                totalAttachmentBytes += result.bytes;
+                attachmentCount += 1;
+                attachment.sha256 = result.sha256;
+                attachment.archivedSize = result.bytes;
+            }
+        }
+
         const manifest = {
             version: 1,
             type: 'sentinel-message-purge',
@@ -11965,32 +12177,36 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
             },
             messages
         };
-        const transcript = buildMessagePurgeTranscript(channel, details, messages, language);
-        const archiveName = 'messages.tar.gz';
-        const archiveBuffer = zlib.gzipSync(createTarBuffer([
-            { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
-            { name: 'compte-rendu.txt', data: Buffer.from(transcript, 'utf8') },
-            ...tarFiles
-        ]), { level: 9 });
+        await writeTarBufferEntry(
+            gzip,
+            'manifest.json',
+            Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')
+        );
+        await writeTarStreamChunk(gzip, Buffer.alloc(1024, 0));
+        gzip.end();
+        await archivePipeline;
 
-        await fs.promises.writeFile(path.join(stagingDirectory, archiveName), archiveBuffer, { flag: 'wx' });
-        await fs.promises.mkdir(path.dirname(finalDirectory), { recursive: true });
-        await fs.promises.rename(stagingDirectory, finalDirectory);
-
-        const archivePath = path.join(finalDirectory, archiveName);
-        const savedArchive = await fs.promises.readFile(archivePath);
-        const archiveSha256 = crypto.createHash('sha256').update(savedArchive).digest('hex');
-        const verifiedManifest = readTarEntry(zlib.gunzipSync(savedArchive), 'manifest.json');
-
+        const verifiedManifest = await readTarEntryFromGzipFile(stagingArchivePath, 'manifest.json');
         if (!verifiedManifest) {
             throw new Error('L’archive créée ne contient pas son manifeste.');
         }
 
         const parsedManifest = JSON.parse(verifiedManifest.toString('utf8'));
-        if (parsedManifest.counts?.messages !== messages.length) {
-            throw new Error('Le contrôle du nombre de messages archivés a échoué.');
+        if (parsedManifest.counts?.messages !== messages.length
+            || parsedManifest.counts?.attachments !== attachmentCount) {
+            throw new Error('Le contrôle du contenu archivé a échoué.');
         }
 
+        const archiveSha256 = await hashArchiveFile(stagingArchivePath);
+        const archiveSize = Number((await fs.promises.stat(stagingArchivePath)).size || 0);
+        if (!archiveSize || !archiveSha256) {
+            throw new Error('Le contrôle d’intégrité de l’archive a échoué.');
+        }
+
+        await fs.promises.mkdir(path.dirname(finalDirectory), { recursive: true });
+        await fs.promises.rename(stagingDirectory, finalDirectory);
+
+        const archivePath = path.join(finalDirectory, archiveName);
         const archivePathRelative = path.relative(MESSAGE_PURGE_ARCHIVE_DIR, archivePath);
         const archiveId = createMessagePurgeArchiveRecord({
             guildId: channel.guild.id,
@@ -12001,7 +12217,7 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
             requestedCount: snapshot.requested,
             archivePath: archivePathRelative,
             archiveSha256,
-            archiveSize: savedArchive.length,
+            archiveSize,
             messageCount: messages.length,
             attachmentCount,
             embedCount: manifest.counts.embeds,
@@ -12012,13 +12228,15 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
             id: archiveId,
             relativePath: archivePathRelative,
             sha256: archiveSha256,
-            size: savedArchive.length,
+            size: archiveSize,
             messageCount: messages.length,
             attachmentCount,
             embedCount: manifest.counts.embeds,
             createdAt
         };
     } catch (error) {
+        gzip?.destroy(error);
+        await archivePipeline?.catch(() => {});
         await fs.promises.rm(stagingDirectory, { recursive: true, force: true }).catch(() => {});
         await fs.promises.rm(finalDirectory, { recursive: true, force: true }).catch(() => {});
         throw error;
@@ -13268,8 +13486,10 @@ async function handleModerationInteraction(interaction, commandName, language) {
             return true;
         }
 
-        const deleteAll = Boolean(interaction.options.getBoolean('tout'));
-        const requestedAmount = interaction.options.getInteger('nombre');
+        const purgeMode = interaction.options.getSubcommand(false);
+        const deleteAll = purgeMode === 'tout'
+            || (!purgeMode && Boolean(interaction.options.getBoolean('tout')));
+        const requestedAmount = deleteAll ? null : interaction.options.getInteger('nombre');
 
         if (!deleteAll && !Number.isInteger(requestedAmount)) {
             await interaction.reply({

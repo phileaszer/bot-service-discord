@@ -5035,7 +5035,7 @@ async function handleApi(req, res, ctx, url) {
     if (req.method === 'GET' && purgeArchiveMatch) {
         const { guild, member } = await getDashboardAccess(ctx, session, purgeArchiveMatch[1]);
         requireModerationAccess(ctx, member, PermissionsBitField.Flags.ManageMessages, ctx.helpers.getGuildLanguage(guild.id));
-        const file = ctx.helpers.getMessagePurgeArchiveFile?.(guild.id, Number(purgeArchiveMatch[2]));
+        const file = await ctx.helpers.getMessagePurgeArchiveFile?.(guild.id, Number(purgeArchiveMatch[2]));
 
         if (!file) {
             throw createHttpError(404, 'Archive de suppression introuvable ou non vérifiée.');
