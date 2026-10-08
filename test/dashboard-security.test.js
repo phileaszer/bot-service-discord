@@ -47,3 +47,16 @@ test('founder console exposes staging readiness without Discord identifiers', ()
     assert.match(frontend, /Aucun identifiant sensible n’est affiché ici/);
     assert.doesNotMatch(frontend, /staging\.guildId|staging\.moderationMemberId|staging\.banTargetId/);
 });
+
+test('dashboard sections use persistent internal summaries instead of one long page', () => {
+    const frontend = read('site/dashboard.js');
+    const styles = read('site/styles.css');
+    assert.match(frontend, /const DASHBOARD_SUBTABS = \{/);
+    for (const tab of ['overview', 'setup', 'configuration', 'service', 'dossiers', 'moderation', 'embeds', 'audit', 'operations', 'founder']) {
+        assert.match(frontend, new RegExp(`\\n  ${tab}: \\[`));
+    }
+    assert.match(frontend, /function applyDashboardSubtabs\(root = document\)/);
+    assert.match(frontend, /activeDashboardSubtabs\[parent\] = button\.dataset\.dashboardSubtab/);
+    assert.match(styles, /\.dashboard-subtabs[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
+    assert.match(styles, /:root\[data-theme="western"\] \.dashboard-subnav/);
+});

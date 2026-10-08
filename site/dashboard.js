@@ -7,6 +7,7 @@ let selectedGuildId = null;
 let currentState = null;
 let currentSettings = null;
 let activeDashboardTab = 'overview';
+const activeDashboardSubtabs = {};
 let tooltipHost = null;
 let tooltipPinned = false;
 let tooltipElement = null;
@@ -1954,7 +1955,7 @@ function repairCenterPanel(state) {
   const report = state.repairCenter;
   const issues = report?.issues || [];
   return `
-    <div class="command-roles">
+    <div class="command-roles repair-center-panel">
       <div class="panel-heading row-heading"><div><p class="eyebrow">Contrôle automatique</p><h3>Centre de réparation</h3><p class="muted">Repère les rôles, salons, panneaux et programmations qui ne correspondent plus à Discord.</p></div>${report ? statusBadge(issues.length ? `${issues.length} à corriger` : 'Tout est en ordre', !issues.length) : statusBadge('À contrôler', false)}</div>
       ${issues.length ? `<div class="operation-list">${issues.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></div>${item.repairable ? '<span class="status-badge">Réparable</span>' : ''}</div>`).join('')}</div>` : `<p class="muted">${report ? 'Aucune référence cassée détectée lors du dernier contrôle.' : 'Aucun contrôle n’a encore été lancé.'}</p>`}
       <div class="split-actions">
@@ -1970,7 +1971,7 @@ function privacyCenterPanel(state) {
   const requests = state.privacy?.requests || [];
   const canExport = Boolean(state.viewerAccess?.isGuildOwner || state.siteAccess?.isFounder);
   return `
-    <div class="command-roles">
+    <div class="command-roles privacy-center-panel">
       <div class="panel-heading"><p class="eyebrow">Données du serveur</p><h3>Conservation et confidentialité</h3><p class="muted">Le propriétaire peut récupérer une copie des données ou demander leur suppression contrôlée.</p></div>
       <form data-action-form="set-data-retention" class="operation-form-grid">
         <label><span>Journaux d’auto-modération</span><input name="automodDays" type="number" min="30" max="3650" value="${escapeHtml(retention.automodDays || 365)}"><small>jours</small></label>
@@ -2065,7 +2066,7 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions, upd
         <h3>Suivi des annonces ${helpTip('Chaque envoi affiche son état, le nombre d’essais et son dernier résultat.')}</h3>
         ${officialUpdateHistory(state)}
       </div>
-      <div class="command-roles">
+      <div class="command-roles staff-permissions-panel">
         <h3>Permissions staff ${helpTip('Liste des rôles qui peuvent gérer Sentinel. Pour ajouter un rôle, utilise l’étape 4 de l’assistant.')}</h3>
         <div class="role-chip-row">${commandRoleList(state)}</div>
         <button class="button button-small" type="button" data-dashboard-tab="setup">Gérer dans l’assistant</button>
@@ -2912,7 +2913,7 @@ function renderFreeServicePanel(state) {
 
     ${renderPayrollPanel(state)}
 
-    <section class="dashboard-panel">
+    <section class="dashboard-panel service-actions-panel">
       <div class="panel-heading">
         <p class="eyebrow">Régie</p>
         <h2>Actions de service</h2>
@@ -5091,7 +5092,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
       </div>
       ${notificationCenter(state)}
       <div class="operations-grid">
-        <article class="inline-form operation-card">
+        <article class="inline-form operation-card" data-operation-section="reports">
           <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Télécharge un registre complet dans le format voulu.</p></div></div>
           <div class="report-download-grid">
             ${['service', 'payroll', 'dossiers', 'moderation'].map(kind => `
@@ -5104,7 +5105,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
           </div>
         </article>
 
-        <article class="inline-form operation-card">
+        <article class="inline-form operation-card" data-operation-section="reports">
           <div class="panel-mini-heading"><div><h3>Rapports automatiques ${premiumTag}</h3><p class="muted">Envoi hebdomadaire ou mensuel dans un salon Discord.</p></div></div>
           <form data-action-form="save-report-schedule" class="operation-form-grid">
             <select name="reportKind"><option value="service">Services</option><option value="payroll">Paie RP</option><option value="dossiers">Dossiers</option><option value="moderation">Modération</option></select>
@@ -5116,7 +5117,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
           ${reportScheduleList(state)}
         </article>
 
-        <article class="inline-form operation-card operation-card-wide">
+        <article class="inline-form operation-card operation-card-wide" data-operation-section="announcements">
           <div class="panel-mini-heading"><div><h3>Annonces programmées ${premiumTag}</h3><p class="muted">Enregistre un brouillon, contrôle son aperçu et choisis une répétition.</p></div></div>
           <div class="scheduled-announcement-editor">
             <form data-action-form="save-scheduled-announcement" data-scheduled-editor class="operation-form-grid">
@@ -5134,7 +5135,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
           ${scheduledAnnouncementList(state)}
         </article>
 
-        <article class="inline-form operation-card operation-card-wide">
+        <article class="inline-form operation-card operation-card-wide" data-operation-section="testing">
           <div class="panel-mini-heading"><div><h3>Mode d’essai ${premiumTag}</h3><p class="muted">Chaque test est journalisé et ne modifie aucun membre, salon ou registre de paie RP.</p></div></div>
           <div class="simulation-grid">
             <form data-action-form="run-simulation"><input type="hidden" name="kind" value="automod"><textarea name="content" placeholder="Message à tester" required></textarea><button class="button" type="submit">Tester la garde</button></form>
@@ -5145,7 +5146,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
           ${simulationHistory(state)}
         </article>
 
-        <article class="inline-form operation-card operation-card-wide">
+        <article class="inline-form operation-card operation-card-wide" data-operation-section="testing">
           <div class="panel-mini-heading"><div><h3>Validation Sentinel ${premiumTag}</h3><p class="muted">Contrôle l’intégrité, les permissions, les rôles supprimés et l’isolation des accès.</p></div><button class="button" type="button" data-operation-action="run-validation">Lancer le contrôle</button></div>
           ${validationHistory(state)}
         </article>
@@ -5559,21 +5560,23 @@ function founderOfficialUpdatePanel(overview) {
 
 function creatorStaffManagePanel(overview) {
   return `
-    <div class="founder-console-note">
-      <strong>Accès de régie</strong>
-      <span>L’accès exige les deux validations : ajout par le fondateur dans la Régie et rôle staff sur le Discord Sentinel. Seul le fondateur peut modifier ces accès.</span>
-    </div>
-    ${canManageFounderPanel() ? `
-      <form class="creator-premium-form creator-staff-form" data-creator-staff-form>
-        <input type="hidden" name="action" value="add">
-        ${labelHelp('Ajouter un staff site', 'La personne doit déjà être sur le Discord Sentinel et y posséder un rôle staff configuré. Utilise son ID Discord numérique complet.')}
-        <div class="creator-premium-row">
-          <input name="userId" placeholder="ID utilisateur Discord" required>
-          <button class="button button-small" type="submit">Ajouter staff</button>
-        </div>
-      </form>
-    ` : ''}
-    ${siteStaffList(overview)}
+    <section class="founder-storage-panel" aria-label="Accès staff Sentinel">
+      <div class="founder-console-note">
+        <strong>Accès de régie</strong>
+        <span>L’accès exige les deux validations : ajout par le fondateur dans la Régie et rôle staff sur le Discord Sentinel. Seul le fondateur peut modifier ces accès.</span>
+      </div>
+      ${canManageFounderPanel() ? `
+        <form class="creator-premium-form creator-staff-form" data-creator-staff-form>
+          <input type="hidden" name="action" value="add">
+          ${labelHelp('Ajouter un staff site', 'La personne doit déjà être sur le Discord Sentinel et y posséder un rôle staff configuré. Utilise son ID Discord numérique complet.')}
+          <div class="creator-premium-row">
+            <input name="userId" placeholder="ID utilisateur Discord" required>
+            <button class="button button-small" type="submit">Ajouter staff</button>
+          </div>
+        </form>
+      ` : ''}
+      ${siteStaffList(overview)}
+    </section>
   `;
 }
 
@@ -5724,6 +5727,122 @@ const DASHBOARD_TAB_GROUPS = [
   }
 ];
 
+const DASHBOARD_SUBTABS = {
+  overview: [
+    { id: 'summary', label: 'Synthèse', description: 'État du jour et notifications', selectors: ['.today-grid', '.notification-center'] },
+    { id: 'path', label: 'Parcours', description: 'Étapes et outils disponibles', selectors: ['.dashboard-path', '.plan-scope-grid'] },
+    { id: 'details', label: 'Détails', description: 'Configuration, alertes et actions', selectors: ['.server-home-grid'] }
+  ],
+  setup: [
+    { id: 'base', label: 'Base', description: 'Langue et rôle de service', selectors: ['.setup-steps > .setup-step:nth-child(1)', '.setup-steps > .setup-step:nth-child(2)'] },
+    { id: 'channels', label: 'Salons et accès', description: 'Logs, staff et nouveautés', selectors: ['.setup-steps > .setup-step:nth-child(3)', '.setup-steps > .setup-step:nth-child(4)', '.setup-steps > .setup-step:nth-child(5)'] },
+    { id: 'profile', label: 'Profil', description: 'Conseils adaptés au serveur', selectors: ['.server-preset-panel', '.setup-footer'] }
+  ],
+  configuration: [
+    { id: 'general', label: 'Général', description: 'Réglages et panneaux Discord', selectors: ['.config-hub-grid'] },
+    { id: 'updates', label: 'Nouveautés', description: 'Livraison des annonces officielles', selectors: ['.official-update-history'] },
+    { id: 'access', label: 'Accès et réparation', description: 'Rôles staff et références Discord', selectors: ['.staff-permissions-panel', '.repair-center-panel'] },
+    { id: 'privacy', label: 'Données', description: 'Conservation, export et suppression', selectors: ['.privacy-center-panel'] }
+  ],
+  service: [
+    { id: 'attendance', label: 'Présences', description: 'Agents actifs et registres', selectors: ['.service-overview-panel'] },
+    { id: 'payroll', label: 'Paie RP', description: 'Semaine, règlements et archives', selectors: ['.payroll-panel'] },
+    { id: 'actions', label: 'Actions', description: 'Ouverture, clôture et synchronisation', selectors: ['.service-actions-panel', '.inline-premium-panel'] }
+  ],
+  dossiers: [
+    { id: 'desk', label: 'Bureau', description: 'Publication et état des panneaux', selectors: ['.dossier-permission-alert', '.dossier-quota-alert', '[data-action-form="publish-dossier-panel"]', '.dossier-repair-form'] },
+    { id: 'access', label: 'Confidentialité', description: 'Responsables et accès par catégorie', selectors: ['.dossier-explain-card', '.dossier-type-roles'] },
+    { id: 'workflow', label: 'Traitement', description: 'Formulaires, réponses et délais', selectors: ['.dossier-premium-settings', '.dossier-templates-panel', '.dossier-stats-panel'] },
+    { id: 'registry', label: 'Registre', description: 'File d’attente et historique', selectors: ['.dossier-list-card'] }
+  ],
+  moderation: [
+    { id: 'automod', label: 'Protection', description: 'Permissions, arrivée et garde automatique', selectors: ['.diagnostics-panel', '.moderation-note', '.automod-card'] },
+    { id: 'sanctions', label: 'Sanctions', description: 'Mesures et registre disciplinaire', selectors: ['[data-action-form="warn"]', '[data-action-form="timeout"]', '[data-action-form="untimeout"]', '[data-action-form="kick"]', '[data-action-form="ban"]', '[data-action-form="tempban"]', '[data-action-form="unban"]', '[data-action-form="edit-case"]', '[data-action-form="delete-case"]', '[data-action-form="unwarn"]', '.moderation-cases-note'] },
+    { id: 'channels', label: 'Salons', description: 'Nettoyage, verrouillage et archives', selectors: ['[data-action-form="purge"]', '[data-action-form="lock"]', '[data-action-form="unlock"]', '[data-action-form="slowmode"]', '.purge-archive-history'] },
+    { id: 'critical', label: 'Actions critiques', description: 'Remise à zéro et validations', selectors: ['[data-action-form="reset-guild"]', '#moderation-tools > .maintenance-file-list'] }
+  ],
+  embeds: [
+    { id: 'create', label: 'Créer', description: 'Nouvelle annonce Sentinel', selectors: ['[data-action-form="custom-embed-create"]'] },
+    { id: 'edit', label: 'Modifier', description: 'Texte, couleur et médias', selectors: ['[data-action-form="custom-embed-edit"]'] },
+    { id: 'manage', label: 'Gérer', description: 'Liste et suppression', selectors: ['[data-action-form="custom-embed-delete"]', '.announcements-panel .inline-form'] }
+  ],
+  audit: [
+    { id: 'journal', label: 'Journal', description: 'Filtres et actions enregistrées', selectors: ['.audit-overview', '[data-audit-filter]', '.audit-scope-note', '.audit-table-shell'] },
+    { id: 'member', label: 'Recherche membre', description: 'Historique consolidé par ID', selectors: ['.global-lookup-panel'] }
+  ],
+  operations: [
+    { id: 'alerts', label: 'Notifications', description: 'Points qui demandent une action', selectors: ['.operations-panel > .notification-center'] },
+    { id: 'reports', label: 'Rapports', description: 'Exports et envois automatiques', selectors: ['[data-operation-section="reports"]'] },
+    { id: 'announcements', label: 'Programmation', description: 'Brouillons et annonces planifiées', selectors: ['[data-operation-section="announcements"]'] },
+    { id: 'testing', label: 'Essais', description: 'Simulations et validation Sentinel', selectors: ['[data-operation-section="testing"]'] }
+  ],
+  founder: [
+    { id: 'security', label: 'Sécurité', description: 'Double protection et validations', selectors: ['[aria-label="Double sécurité fondatrice"]', '[aria-label="Validations critiques"]'] },
+    { id: 'publishing', label: 'Publication', description: 'Annonce globale protégée', selectors: ['[aria-label="Annonce globale Sentinel"]'] },
+    { id: 'health', label: 'Surveillance', description: 'Incidents, tâches et préproduction', selectors: ['[aria-label="Surveillance Sentinel"]', '[aria-label="Préproduction Discord"]'] },
+    { id: 'storage', label: 'Données', description: 'Confidentialité, stockage et sauvegardes', selectors: ['[aria-label="Demandes de confidentialité"]', '[aria-label="Centre de maintenance Sentinel"]', '[aria-label="Stockage Sentinel"]'] },
+    { id: 'staff', label: 'Équipe', description: 'Accès de la régie', selectors: ['[aria-label="Accès staff Sentinel"]'] }
+  ]
+};
+
+function dashboardSubtabDefinitions(tabId) {
+  return DASHBOARD_SUBTABS[tabId] || [];
+}
+
+function renderDashboardSubtabSummary(tabId) {
+  const definitions = dashboardSubtabDefinitions(tabId);
+  if (!definitions.length) return '';
+  const selected = activeDashboardSubtabs[tabId] || definitions[0].id;
+  return `
+    <nav class="dashboard-subnav" aria-label="Sommaire de l’onglet">
+      <div class="dashboard-subnav-heading"><span>Sommaire</span><strong>${escapeHtml((DASHBOARD_TABS.find(tab => tab.id === tabId) || {}).title || tabId)}</strong></div>
+      <div class="dashboard-subtabs" role="tablist">
+        ${definitions.map(item => `
+          <button type="button" class="dashboard-subtab${item.id === selected ? ' is-active' : ''}" data-dashboard-subtab="${escapeHtml(item.id)}" data-dashboard-subtab-parent="${escapeHtml(tabId)}" role="tab" aria-selected="${item.id === selected ? 'true' : 'false'}">
+            <strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description)}</small>
+          </button>
+        `).join('')}
+      </div>
+    </nav>`;
+}
+
+function applyDashboardSubtabs(root = document) {
+  const tabId = activeDashboardTab;
+  const definitions = dashboardSubtabDefinitions(tabId);
+  const panel = $(`[data-dashboard-tab-panel="${tabId}"]`, root);
+  if (!panel || !definitions.length) return;
+
+  const matches = new Map(definitions.map(item => [item.id, item.selectors.flatMap(selector => $$(selector, panel))]));
+  const available = definitions.filter(item => (matches.get(item.id) || []).length > 0);
+  const selected = available.some(item => item.id === activeDashboardSubtabs[tabId])
+    ? activeDashboardSubtabs[tabId]
+    : (available[0]?.id || definitions[0].id);
+  activeDashboardSubtabs[tabId] = selected;
+
+  const allTargets = new Set(Array.from(matches.values()).flat());
+  allTargets.forEach(element => {
+    element.dataset.dashboardSubtabTarget = 'true';
+    element.hidden = true;
+  });
+  (matches.get(selected) || []).forEach(element => { element.hidden = false; });
+
+  $$('[data-dashboard-subtab]', panel).forEach(button => {
+    const availableButton = available.some(item => item.id === button.dataset.dashboardSubtab);
+    const active = button.dataset.dashboardSubtab === selected;
+    button.hidden = !availableButton;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  if (tabId === 'moderation') {
+    ['#moderation', '#moderation-tools'].forEach(selector => {
+      const container = $(selector, panel);
+      if (!container) return;
+      container.hidden = !(matches.get(selected) || []).some(element => container.contains(element));
+    });
+  }
+}
+
 function canShowFounderTab(state = currentState) {
   return Boolean(
     canViewPremiumOverview
@@ -5815,6 +5934,7 @@ function tabPanel(id, renderContent) {
 
   return `
     <section class="dashboard-tab-panel${isActive ? ' is-active' : ''}" data-dashboard-tab-panel="${id}" ${isActive ? '' : 'hidden'}>
+      ${isActive ? renderDashboardSubtabSummary(id) : ''}
       ${content}
     </section>
   `;
@@ -5899,6 +6019,7 @@ function renderDashboard() {
     </div>
   `;
 
+  applyDashboardSubtabs(main);
   attachDashboardHandlers();
   applyDeferredStyles(main);
 }
@@ -6358,6 +6479,15 @@ function attachDashboardHandlers() {
       if (nextTab === 'founder' && canViewPremiumOverview && !creatorOverview && !creatorOverviewLoading) {
         loadCreatorPremiumOverview(null, { silent: true });
       }
+    });
+  });
+
+  $$('[data-dashboard-subtab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const parent = button.dataset.dashboardSubtabParent;
+      if (parent !== activeDashboardTab) return;
+      activeDashboardSubtabs[parent] = button.dataset.dashboardSubtab;
+      applyDashboardSubtabs($('[data-dashboard-main]'));
     });
   });
 
