@@ -5488,6 +5488,29 @@ function founderRuntimePanel(overview) {
     </section>`;
 }
 
+function founderStagingPanel(overview) {
+  if (!overview?.access?.isFounder) return '';
+  const staging = overview.stagingValidation || {};
+  const identitiesReady = Boolean(staging.moderationMemberConfigured && staging.banTargetConfigured);
+  const ready = Boolean(staging.configured && identitiesReady);
+  return `
+    <section class="founder-storage-panel" aria-label="Préproduction Discord">
+      <div class="panel-heading row-heading">
+        <div><p class="eyebrow">Validation avant déploiement</p><h3>Préproduction Discord</h3><p class="muted">Les essais doivent être exécutés sur un serveur privé avec deux comptes dédiés. Aucun identifiant sensible n’est affiché ici.</p></div>
+        ${statusBadge(ready ? 'Prête' : 'Configuration incomplète', ready)}
+      </div>
+      <div class="dashboard-metrics dashboard-kpis founder-premium-kpis">
+        <article class="dashboard-kpi"><span>Serveur privé</span><strong>${staging.configured ? 'Configuré' : 'Manquant'}</strong><small>environnement isolé</small></article>
+        <article class="dashboard-kpi"><span>Comptes de test</span><strong>${identitiesReady ? 'Configurés' : 'Manquants'}</strong><small>sanction et bannissement</small></article>
+        <article class="dashboard-kpi"><span>Contrôle bloquant</span><strong>${staging.required ? 'Actif' : 'Inactif'}</strong><small>interdit un démarrage non validé</small></article>
+        <article class="dashboard-kpi"><span>Sanctions réelles</span><strong>${staging.realActions ? 'Actives' : 'Inactives'}</strong><small>uniquement sur comptes dédiés</small></article>
+      </div>
+      ${ready && staging.required && staging.realActions
+        ? '<p class="founder-console-note"><strong>Protection complète active</strong><span>Chaque démarrage exige désormais la validation Discord réelle configurée.</span></p>'
+        : '<p class="founder-console-note"><strong>Activation volontaire requise</strong><span>Renseigne le serveur privé et les deux comptes dédiés avant d’activer le contrôle bloquant et les sanctions réelles.</span></p>'}
+    </section>`;
+}
+
 function founderPrivacyPanel(overview) {
   if (!overview?.access?.isFounder) return '';
   const requests = overview.privacyRequests || [];
@@ -5589,6 +5612,7 @@ function renderFounderPremiumPanel() {
       ${criticalActionsPanel(overview)}
       ${founderOfficialUpdatePanel(overview)}
       ${founderRuntimePanel(overview)}
+      ${founderStagingPanel(overview)}
       ${founderPrivacyPanel(overview)}
       ${founderStoragePanel(overview)}
       ${creatorStaffManagePanel(overview)}

@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const db = require('./database/database');
 
 const GUILD_EXPORT_TABLES = [
@@ -200,7 +202,75 @@ function updateRetentionSettings(guildId, actorUserId, input) {
     return getRetentionSettings(guildId);
 }
 
+function removeManagedArchiveDirectory(filePath, resolver, rootDirectory) {
+    const resolved = resolver(filePath);
+    if (!resolved) return false;
+    const root = path.resolve(rootDirectory);
+    const directory = path.dirname(resolved);
+    if (directory === root || !directory.startsWith(`${root}${path.sep}`)) return false;
+    fs.rmSync(directory, { recursive: true, force: true });
+    return true;
+}
+
+function applyGuildDataRetentionPolicies(options = {}) {
+    const {
+        dossierArchiveDirectory,
+        purgeArchiveDirectory,
+        resolveDossierArchivePath,
+        resolveMessagePurgeArchivePath,
+        onError = () => {}
+    } = options;
+    if (!dossierArchiveDirectory || !purgeArchiveDirectory
+        || typeof resolveDossierArchivePath !== 'function'
+        || typeof resolveMessagePurgeArchivePath !== 'function') {
+        throw new Error('Configuration de rétention incomplète.');
+    }
+
+    const settings = db.prepare('SELECT * FROM guild_data_retention_settings').all();
+    const summary = { guilds: settings.length, automodEvents: 0, auditLogs: 0, purgeArchives: 0, dossierArchives: 0 };
+    const cutoff = days => new Date(Date.now() - Math.max(Number(days) || 30, 30) * 86400000).toISOString();
+
+    for (const setting of settings) {
+        summary.automodEvents += db.prepare('DELETE FROM guild_automod_events WHERE guild_id = ? AND created_at < ?')
+            .run(setting.guild_id, cutoff(setting.automod_days)).changes;
+        summary.auditLogs += db.prepare('DELETE FROM dashboard_audit_logs WHERE guild_id = ? AND created_at < ?')
+            .run(setting.guild_id, cutoff(setting.audit_days)).changes;
+
+        const purgeArchives = db.prepare(`
+            SELECT id, archive_path FROM message_purge_archives
+            WHERE guild_id = ? AND created_at < ?
+        `).all(setting.guild_id, cutoff(setting.purge_archive_days));
+        for (const archive of purgeArchives) {
+            try {
+                removeManagedArchiveDirectory(archive.archive_path, resolveMessagePurgeArchivePath, purgeArchiveDirectory);
+                summary.purgeArchives += db.prepare('DELETE FROM message_purge_archives WHERE guild_id = ? AND id = ?')
+                    .run(setting.guild_id, archive.id).changes;
+            } catch (error) {
+                onError('retention:purge-archive', error, { guildId: setting.guild_id, archiveId: archive.id });
+            }
+        }
+
+        const dossierArchives = db.prepare(`
+            SELECT id, archive_path FROM sentinel_dossiers
+            WHERE guild_id = ? AND archive_path IS NOT NULL AND archived_at < ?
+        `).all(setting.guild_id, cutoff(setting.dossier_archive_days));
+        for (const dossier of dossierArchives) {
+            try {
+                removeManagedArchiveDirectory(dossier.archive_path, resolveDossierArchivePath, dossierArchiveDirectory);
+                summary.dossierArchives += db.prepare(`
+                    UPDATE sentinel_dossiers SET archive_path = NULL, archive_sha256 = NULL,
+                        archive_size = NULL WHERE guild_id = ? AND id = ?
+                `).run(setting.guild_id, dossier.id).changes;
+            } catch (error) {
+                onError('retention:dossier-archive', error, { guildId: setting.guild_id, dossierId: dossier.id });
+            }
+        }
+    }
+    return summary;
+}
+
 module.exports = {
+    applyGuildDataRetentionPolicies,
     createGuildDataExport,
     createMemberDataExport,
     createPrivacyRequest,

@@ -2324,6 +2324,7 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             incidents: ctx.helpers.listIncidents?.({ status: 'open', limit: 100 }) || [],
             jobs: ctx.helpers.getJobHealth?.(50) || []
         },
+        stagingValidation: ctx.helpers.getStagingValidationStatus?.() || null,
         privacyRequests: siteAccess.isFounder
             ? (ctx.helpers.listPrivacyRequests?.({ status: 'pending', limit: 100 }) || [])
             : [],

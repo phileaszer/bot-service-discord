@@ -1663,7 +1663,13 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             archiveDirectory: DATABASE_COLD_ARCHIVE_DIR,
             enableIncrementalVacuum: DATABASE_INCREMENTAL_VACUUM_ENABLED
         });
-        const retention = applyGuildDataRetentionPolicies();
+        const retention = privacyCenter.applyGuildDataRetentionPolicies({
+            purgeArchiveDirectory: MESSAGE_PURGE_ARCHIVE_DIR,
+            dossierArchiveDirectory: DOSSIER_ARCHIVE_DIR,
+            resolveMessagePurgeArchivePath,
+            resolveDossierArchivePath,
+            onError: (source, error, context) => reportRuntimeIncident(source, error, context)
+        });
         const media = await scanCustomEmbedMediaOrphans(reason === 'startup' ? 25 : 100).catch(error => ({
             error: String(error.message || error).slice(0, 500),
             checked: 0,
@@ -1755,60 +1761,6 @@ function startDatabaseBackupSchedule() {
         });
     }, DATABASE_BACKUP_INTERVAL_MS);
     databaseBackupTimer.unref();
-}
-
-function removeManagedArchiveDirectory(filePath, resolver, rootDirectory) {
-    const resolved = resolver(filePath);
-    if (!resolved) return false;
-    const root = path.resolve(rootDirectory);
-    const directory = path.dirname(resolved);
-    if (directory === root || !directory.startsWith(`${root}${path.sep}`)) return false;
-    fs.rmSync(directory, { recursive: true, force: true });
-    return true;
-}
-
-function applyGuildDataRetentionPolicies() {
-    const settings = db.prepare('SELECT * FROM guild_data_retention_settings').all();
-    const summary = { guilds: settings.length, automodEvents: 0, auditLogs: 0, purgeArchives: 0, dossierArchives: 0 };
-
-    for (const setting of settings) {
-        const cutoff = days => new Date(Date.now() - Math.max(Number(days) || 30, 30) * 86400000).toISOString();
-        summary.automodEvents += db.prepare('DELETE FROM guild_automod_events WHERE guild_id = ? AND created_at < ?')
-            .run(setting.guild_id, cutoff(setting.automod_days)).changes;
-        summary.auditLogs += db.prepare('DELETE FROM dashboard_audit_logs WHERE guild_id = ? AND created_at < ?')
-            .run(setting.guild_id, cutoff(setting.audit_days)).changes;
-
-        const purgeArchives = db.prepare(`
-            SELECT id, archive_path FROM message_purge_archives
-            WHERE guild_id = ? AND created_at < ?
-        `).all(setting.guild_id, cutoff(setting.purge_archive_days));
-        for (const archive of purgeArchives) {
-            try {
-                removeManagedArchiveDirectory(archive.archive_path, resolveMessagePurgeArchivePath, MESSAGE_PURGE_ARCHIVE_DIR);
-                summary.purgeArchives += db.prepare('DELETE FROM message_purge_archives WHERE guild_id = ? AND id = ?')
-                    .run(setting.guild_id, archive.id).changes;
-            } catch (error) {
-                reportRuntimeIncident('retention:purge-archive', error, { guildId: setting.guild_id, archiveId: archive.id });
-            }
-        }
-
-        const dossierArchives = db.prepare(`
-            SELECT id, archive_path FROM sentinel_dossiers
-            WHERE guild_id = ? AND archive_path IS NOT NULL AND archived_at < ?
-        `).all(setting.guild_id, cutoff(setting.dossier_archive_days));
-        for (const dossier of dossierArchives) {
-            try {
-                removeManagedArchiveDirectory(dossier.archive_path, resolveDossierArchivePath, DOSSIER_ARCHIVE_DIR);
-                summary.dossierArchives += db.prepare(`
-                    UPDATE sentinel_dossiers SET archive_path = NULL, archive_sha256 = NULL,
-                        archive_size = NULL WHERE guild_id = ? AND id = ?
-                `).run(setting.guild_id, dossier.id).changes;
-            } catch (error) {
-                reportRuntimeIncident('retention:dossier-archive', error, { guildId: setting.guild_id, dossierId: dossier.id });
-            }
-        }
-    }
-    return summary;
 }
 
 function getDatabaseBackupStatus() {
@@ -15689,6 +15641,16 @@ client.once(Events.ClientReady, async () => {
             getServiceSummary,
             getSentinelSyncStatus,
             getSlashCommandStatus,
+            getStagingValidationStatus: () => {
+                const config = stagingValidationConfig();
+                return {
+                    configured: config.enabled,
+                    required: config.required,
+                    realActions: config.realActions,
+                    moderationMemberConfigured: Boolean(config.moderationMemberId),
+                    banTargetConfigured: Boolean(config.banTargetId)
+                };
+            },
             getTemporaryBan,
             getWarningEscalationSettings: operations.getWarningEscalationSettings,
             getWarningEscalationEvents: operations.getWarningEscalationEvents,

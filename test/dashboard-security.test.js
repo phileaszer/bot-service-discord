@@ -38,3 +38,12 @@ test('obsolete reset copy is removed and the new modules are syntax-checked', ()
         assert.match(packageSource, new RegExp(`node --check ${file.replace('.', '\\.')}`));
     }
 });
+
+test('founder console exposes staging readiness without Discord identifiers', () => {
+    const backend = read('dashboard.js');
+    const frontend = read('site/dashboard.js');
+    assert.match(backend, /stagingValidation: ctx\.helpers\.getStagingValidationStatus/);
+    assert.match(frontend, /function founderStagingPanel\(overview\)/);
+    assert.match(frontend, /Aucun identifiant sensible n’est affiché ici/);
+    assert.doesNotMatch(frontend, /staging\.guildId|staging\.moderationMemberId|staging\.banTargetId/);
+});

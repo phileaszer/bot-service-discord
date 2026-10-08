@@ -98,6 +98,70 @@ test('privacy exports remain scoped and retention settings are bounded', () => {
     }).id, request.id);
 });
 
+test('guild retention removes expired rows and only managed archive directories', () => {
+    const expiredAt = '2020-01-01T00:00:00.000Z';
+    const purgeRoot = path.join(testDirectory, 'purge-archives');
+    const dossierRoot = path.join(testDirectory, 'dossier-archives');
+    const purgeRelativePath = path.join(guildId, 'purge-old', 'archive.json.gz');
+    const dossierRelativePath = path.join(guildId, 'dossier-old', 'archive.json.gz');
+    const purgeFile = path.join(purgeRoot, purgeRelativePath);
+    const dossierFile = path.join(dossierRoot, dossierRelativePath);
+    fs.mkdirSync(path.dirname(purgeFile), { recursive: true });
+    fs.mkdirSync(path.dirname(dossierFile), { recursive: true });
+    fs.writeFileSync(purgeFile, 'purge');
+    fs.writeFileSync(dossierFile, 'dossier');
+
+    db.prepare(`
+        INSERT INTO guild_automod_events (guild_id, user_id, rule, action, created_at)
+        VALUES (?, ?, 'spam', 'delete', ?)
+    `).run(guildId, userId, expiredAt);
+    db.prepare(`
+        INSERT INTO dashboard_audit_logs (
+            guild_id, actor_user_id, action, status, summary, created_at
+        ) VALUES (?, ?, 'test', 'success', 'Ancien journal', ?)
+    `).run(guildId, staffId, expiredAt);
+    const purgeId = Number(db.prepare(`
+        INSERT INTO message_purge_archives (
+            guild_id, channel_id, channel_name, actor_user_id, mode,
+            archive_path, archive_sha256, created_at
+        ) VALUES (?, '100000000000000160', 'archives', ?, 'all', ?, 'hash', ?)
+    `).run(guildId, staffId, purgeRelativePath, expiredAt).lastInsertRowid);
+    const dossierId = Number(db.prepare(`
+        INSERT INTO sentinel_dossiers (
+            guild_id, channel_id, owner_user_id, opener_user_id, type,
+            archive_path, archive_sha256, archived_at, created_at
+        ) VALUES (?, '100000000000000161', ?, ?, 'support', ?, 'hash', ?, ?)
+    `).run(guildId, userId, userId, dossierRelativePath, expiredAt, expiredAt).lastInsertRowid);
+
+    privacy.updateRetentionSettings(guildId, staffId, {
+        automodDays: 30,
+        auditDays: 30,
+        purgeArchiveDays: 30,
+        dossierArchiveDays: 30
+    });
+    const resolveWithin = root => relativePath => {
+        const resolved = path.resolve(root, String(relativePath || ''));
+        return resolved.startsWith(`${path.resolve(root)}${path.sep}`) ? resolved : null;
+    };
+    const summary = privacy.applyGuildDataRetentionPolicies({
+        purgeArchiveDirectory: purgeRoot,
+        dossierArchiveDirectory: dossierRoot,
+        resolveMessagePurgeArchivePath: resolveWithin(purgeRoot),
+        resolveDossierArchivePath: resolveWithin(dossierRoot)
+    });
+
+    assert.equal(summary.automodEvents, 1);
+    assert.equal(summary.auditLogs, 1);
+    assert.equal(summary.purgeArchives, 1);
+    assert.equal(summary.dossierArchives, 1);
+    assert.equal(fs.existsSync(path.dirname(purgeFile)), false);
+    assert.equal(fs.existsSync(path.dirname(dossierFile)), false);
+    assert.equal(db.prepare('SELECT id FROM message_purge_archives WHERE id = ?').get(purgeId), undefined);
+    const dossier = db.prepare('SELECT archive_path, archive_sha256 FROM sentinel_dossiers WHERE id = ?').get(dossierId);
+    assert.equal(dossier.archive_path, null);
+    assert.equal(dossier.archive_sha256, null);
+});
+
 test('repair center detects and safely clears deleted Discord references', async () => {
     db.prepare(`
         INSERT INTO guild_configs (guild_id, role_id, log_channel_id, language)
