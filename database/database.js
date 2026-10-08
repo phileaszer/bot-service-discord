@@ -69,6 +69,22 @@ CREATE TABLE IF NOT EXISTS service_sessions (
     duration INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS service_checkins (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    start_time INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'sending',
+    response TEXT,
+    prompt_count INTEGER NOT NULL DEFAULT 1,
+    dm_message_id TEXT,
+    prompted_at TEXT,
+    responded_at TEXT,
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id, start_time)
+);
+
 CREATE TABLE IF NOT EXISTS guild_pay_settings (
     guild_id TEXT PRIMARY KEY,
     hourly_rate REAL NOT NULL DEFAULT 0,
@@ -754,6 +770,9 @@ ON service_sessions (guild_id, date);
 
 CREATE INDEX IF NOT EXISTS idx_service_sessions_guild_user_date
 ON service_sessions (guild_id, user_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_service_checkins_status_updated
+ON service_checkins (status, updated_at);
 
 CREATE INDEX IF NOT EXISTS idx_weekly_payments_guild_week
 ON weekly_payments (guild_id, week_start);

@@ -55,6 +55,7 @@ const appeals = require('./appeals');
 const privacyCenter = require('./privacy-center');
 const repairCenter = require('./repair-center');
 const runtimeGuard = require('./runtime-guard');
+const serviceCheckins = require('./service-checkins');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
 const {
     canRecreateChannelForPurge,
@@ -469,7 +470,8 @@ const I18N = {
         serviceLogEndTitle: 'Sentinel | Fin de service',
         serviceLogLongTitle: 'Sentinel | Service prolongé',
         serviceLogLongDescription: '{member} est en service depuis **{duration}**.',
-        serviceLogLongHint: 'Pense à vérifier si ce service est volontaire ou si la personne a oublié de quitter.',
+        serviceLogLongHint: 'Une confirmation privée lui a été envoyée avec le choix de continuer ou de terminer.',
+        serviceLogLongDeliveryFailed: 'Le message privé n’a pas pu être remis. Sentinel réessaiera automatiquement.',
         serviceLogTarget: 'Agent',
         serviceLogSource: 'Source',
         serviceLogDuration: 'Durée',
@@ -711,7 +713,8 @@ const I18N = {
         serviceLogEndTitle: 'Sentinel | Service ended',
         serviceLogLongTitle: 'Sentinel | Long service',
         serviceLogLongDescription: '{member} has been on duty for **{duration}**.',
-        serviceLogLongHint: 'Check whether this service is intentional or if the person forgot to end it.',
+        serviceLogLongHint: 'A private confirmation was sent with the choice to continue or end the service.',
+        serviceLogLongDeliveryFailed: 'The direct message could not be delivered. Sentinel will retry automatically.',
         serviceLogTarget: 'Agent',
         serviceLogSource: 'Source',
         serviceLogDuration: 'Duration',
@@ -7558,7 +7561,8 @@ function buildServiceLogEmbed(guild, target, action, {
     source = null,
     actor = null,
     userId = null,
-    language = null
+    language = null,
+    checkinDelivered = true
 } = {}) {
     const activeLanguage = language || getGuildLanguage(guild.id);
     const targetLabel = formatServiceLogTarget(target, userId || target?.id, activeLanguage);
@@ -7575,7 +7579,7 @@ function buildServiceLogEmbed(guild, target, action, {
                     member: targetLabel,
                     duration: formatDuration(duration || 0)
                 }),
-                t(activeLanguage, 'serviceLogLongHint')
+                t(activeLanguage, checkinDelivered ? 'serviceLogLongHint' : 'serviceLogLongDeliveryFailed')
             ].join('\n')
             : (isEnd
                 ? t(activeLanguage, 'serviceLeftLog', {
@@ -7641,23 +7645,48 @@ async function sendServiceLog(guild, target, action, options = {}) {
 }
 
 function clearLongServiceAlert(guildId, userId) {
-    const prefix = `${guildId}:${userId}:`;
-
-    for (const key of longServiceAlertedKeys) {
-        if (key.startsWith(prefix)) {
-            longServiceAlertedKeys.delete(key);
-        }
-    }
+    serviceCheckins.clearForUser(guildId, userId);
 }
 
 function clearLongServiceAlertsForGuild(guildId) {
-    const prefix = `${guildId}:`;
+    serviceCheckins.clearForGuild(guildId);
+}
 
-    for (const key of longServiceAlertedKeys) {
-        if (key.startsWith(prefix)) {
-            longServiceAlertedKeys.delete(key);
-        }
-    }
+function buildLongServiceCheckinComponents(service) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(serviceCheckins.buildCustomId(service.guildId, service.userId, service.startTime, 'keep'))
+                .setLabel(service.language === 'en' ? 'Yes, continue' : 'Oui, continuer')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(serviceCheckins.buildCustomId(service.guildId, service.userId, service.startTime, 'end'))
+                .setLabel(service.language === 'en' ? 'No, end service' : 'Non, terminer')
+                .setStyle(ButtonStyle.Danger)
+        )
+    ];
+}
+
+function buildLongServiceCheckinEmbed(guild, user, service, language) {
+    const isEnglish = language === 'en';
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.warning,
+        title: isEnglish ? 'Sentinel | Service check' : 'Sentinel | Vérification de service',
+        description: isEnglish
+            ? [
+                `Your service on **${guild.name}** has been active for **${formatDuration(service.duration)}**.`,
+                '',
+                'Do you want to keep it active? Choose below. Ending it records the full elapsed time.'
+            ].join('\n')
+            : [
+                `Ton service sur **${guild.name}** est actif depuis **${formatDuration(service.duration)}**.`,
+                '',
+                'Souhaites-tu le garder actif ? Choisis ci-dessous. En le terminant, toute la durée écoulée sera enregistrée.'
+            ].join('\n'),
+        requester: user,
+        thumbnail: guild.iconURL(),
+        language
+    });
 }
 
 async function checkLongServiceAlerts() {
@@ -7669,24 +7698,151 @@ async function checkLongServiceAlerts() {
                 continue;
             }
 
-            const key = `${guild.id}:${service.userId}:${service.startTime}`;
-
-            if (longServiceAlertedKeys.has(key)) {
+            if (!serviceCheckins.claimPrompt(guild.id, service.userId, service.startTime)) {
                 continue;
             }
 
-            longServiceAlertedKeys.add(key);
             const member = await guild.members.fetch(service.userId).catch(() => null);
+            let delivered = false;
+            if (member) {
+                try {
+                    const message = await member.send({
+                        embeds: [buildLongServiceCheckinEmbed(guild, member.user, service, language)],
+                        components: buildLongServiceCheckinComponents({
+                            ...service,
+                            guildId: guild.id,
+                            language
+                        })
+                    });
+                    serviceCheckins.markPromptDelivered(guild.id, service.userId, service.startTime, message.id);
+                    delivered = true;
+                } catch (error) {
+                    serviceCheckins.markPromptFailed(guild.id, service.userId, service.startTime, error);
+                }
+            } else {
+                serviceCheckins.markPromptFailed(guild.id, service.userId, service.startTime, 'Membre Discord introuvable.');
+            }
 
-            await sendServiceLog(guild, member, 'long', {
-                duration: service.duration,
-                startTime: service.startTime,
-                userId: service.userId,
-                source: 'Sentinel',
-                language
-            });
+            const prompt = serviceCheckins.getActivePrompt(guild.id, service.userId, service.startTime).checkin;
+            if (delivered || Number(prompt?.prompt_count) === 1) {
+                await sendServiceLog(guild, member, 'long', {
+                    duration: service.duration,
+                    startTime: service.startTime,
+                    userId: service.userId,
+                    source: 'Sentinel',
+                    language,
+                    checkinDelivered: delivered
+                });
+            }
         }
     }
+}
+
+async function handleLongServiceCheckinButton(interaction) {
+    const parsed = serviceCheckins.parseCustomId(interaction.customId);
+    if (!parsed) return false;
+    if (interaction.user.id !== parsed.userId) {
+        await interaction.reply({ content: 'Cette vérification appartient à une autre personne.' }).catch(() => {});
+        return true;
+    }
+
+    const guild = client.guilds.cache.get(parsed.guildId);
+    const language = guild ? getGuildLanguage(guild.id) : 'fr';
+    const isEnglish = language === 'en';
+    const active = serviceCheckins.getActivePrompt(parsed.guildId, parsed.userId, parsed.startTime);
+    if (!guild || !active.active) {
+        await interaction.update({
+            content: isEnglish
+                ? 'This service is already closed or this confirmation has expired.'
+                : 'Ce service est déjà terminé ou cette confirmation a expiré.',
+            embeds: [],
+            components: []
+        }).catch(() => {});
+        return true;
+    }
+
+    if (parsed.action === 'keep') {
+        const confirmed = serviceCheckins.confirmContinuation(parsed.guildId, parsed.userId, parsed.startTime);
+        await interaction.update({
+            content: confirmed
+                ? (isEnglish ? 'Your service remains active.' : 'Ton service reste actif.')
+                : (isEnglish ? 'This confirmation has already been used.' : 'Cette confirmation a déjà été utilisée.'),
+            embeds: [],
+            components: []
+        });
+        return true;
+    }
+
+    await interaction.deferUpdate();
+    if (!serviceCheckins.claimEnd(parsed.guildId, parsed.userId, parsed.startTime)) {
+        await interaction.editReply({
+            content: isEnglish
+                ? 'This confirmation has already been used.'
+                : 'Cette confirmation a déjà été utilisée.',
+            embeds: [],
+            components: []
+        });
+        return true;
+    }
+    const member = await guild.members.fetch(parsed.userId).catch(() => null);
+    const role = getServiceRole(guild);
+    let removedRole = false;
+    let serviceEnded = false;
+    try {
+        if (member && role && member.roles.cache.has(role.id)) {
+            const manageError = getServiceRoleManageError(guild, role, language);
+            if (manageError) throw new Error(manageError);
+            await member.roles.remove(role);
+            removedRole = true;
+        }
+
+        const result = serviceCheckins.endService(parsed.guildId, parsed.userId, parsed.startTime);
+        if (!result) {
+            if (removedRole && member && role) await member.roles.add(role).catch(() => {});
+            serviceCheckins.releaseEnd(parsed.guildId, parsed.userId, parsed.startTime);
+            await interaction.editReply({
+                content: isEnglish
+                    ? 'This service is already closed or this confirmation has expired.'
+                    : 'Ce service est déjà terminé ou cette confirmation a expiré.',
+                embeds: [],
+                components: []
+            });
+            return true;
+        }
+        serviceEnded = true;
+
+        await sendServiceLog(guild, member || interaction.user, 'end', {
+            duration: result.duration,
+            totalTime: result.totalTime,
+            source: isEnglish ? 'Sentinel private confirmation' : 'Confirmation privée Sentinel',
+            language
+        });
+        clearLongServiceAlert(parsed.guildId, parsed.userId);
+        await interaction.editReply({
+            content: isEnglish
+                ? `Your service has ended. Recorded duration: **${formatDuration(result.duration)}**.`
+                : `Ton service est terminé. Durée enregistrée : **${formatDuration(result.duration)}**.`,
+            embeds: [],
+            components: []
+        });
+    } catch (error) {
+        if (!serviceEnded) {
+            if (removedRole && member && role) await member.roles.add(role).catch(() => {});
+            serviceCheckins.releaseEnd(parsed.guildId, parsed.userId, parsed.startTime);
+            await interaction.editReply({
+                content: isEnglish
+                    ? 'Sentinel could not end this service. It remains active; please try again from the service panel.'
+                    : 'Sentinel n’a pas pu terminer ce service. Il reste actif ; réessaie depuis le panneau de service.',
+                embeds: [],
+                components: []
+            }).catch(() => {});
+        }
+        reportRuntimeIncident('long-service-checkin', error, {
+            guildId: parsed.guildId,
+            userId: parsed.userId
+        });
+    }
+    return true;
 }
 
 async function closeDossierChannel(channel, actor, language = 'fr', details = {}) {
@@ -11254,7 +11410,6 @@ const dossierCreateCooldowns = new Map();
 const buttonActionCooldowns = new Map();
 const pendingSensitiveConfirmations = new Map();
 const activeMessagePurges = new Set();
-const longServiceAlertedKeys = new Set();
 
 const SENTINEL_GENERAL_CHANNELS = {
     fr: ['💬｜general'],
@@ -16001,6 +16156,11 @@ client.on(Events.InteractionCreate, async interaction => {
         && interaction.inGuild()
     ) {
         return handleSentinelButton(interaction, handleSentinelLanguageButton);
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('sentinel_service_checkin:')) {
+        await handleLongServiceCheckinButton(interaction);
+        return;
     }
 
     if (!interaction.inCachedGuild()) {

@@ -15,6 +15,7 @@ const appeals = require('../appeals');
 const privacy = require('../privacy-center');
 const repair = require('../repair-center');
 const runtime = require('../runtime-guard');
+const serviceCheckins = require('../service-checkins');
 
 const guildId = '100000000000000101';
 const userId = '100000000000000102';
@@ -36,6 +37,52 @@ test('persistent jobs use leases and idempotent execution claims', () => {
     assert.equal(runtime.claimJobExecution('digest', `${userId}-retry`, '2026-10-08'), true);
     runtime.completeJobExecution('digest', `${userId}-retry`, '2026-10-08', { error: 'temporary failure' });
     assert.equal(runtime.claimJobExecution('digest', `${userId}-retry`, '2026-10-08'), false);
+});
+
+test('long service check-ins are persistent and end a service exactly once', () => {
+    const checkinGuildId = '100000000000000121';
+    const checkinUserId = '100000000000000122';
+    const startTime = Date.now() - (9 * 60 * 60 * 1000);
+    db.prepare(`
+        INSERT INTO service_times (guild_id, user_id, total_time, start_time)
+        VALUES (?, ?, 2500, ?)
+    `).run(checkinGuildId, checkinUserId, startTime);
+
+    const customId = serviceCheckins.buildCustomId(checkinGuildId, checkinUserId, startTime, 'end');
+    assert.deepEqual(serviceCheckins.parseCustomId(customId), {
+        guildId: checkinGuildId,
+        userId: checkinUserId,
+        startTime,
+        action: 'end'
+    });
+    assert.equal(customId.length <= 100, true);
+    assert.equal(serviceCheckins.claimPrompt(checkinGuildId, checkinUserId, startTime), true);
+    assert.equal(serviceCheckins.claimPrompt(checkinGuildId, checkinUserId, startTime), false);
+    assert.equal(serviceCheckins.markPromptDelivered(checkinGuildId, checkinUserId, startTime, '100000000000000123'), true);
+
+    const endedAt = startTime + 123456;
+    assert.equal(serviceCheckins.claimEnd(checkinGuildId, checkinUserId, startTime), true);
+    assert.equal(serviceCheckins.claimEnd(checkinGuildId, checkinUserId, startTime), false);
+    const ended = serviceCheckins.endService(checkinGuildId, checkinUserId, startTime, endedAt);
+    assert.equal(ended.duration, 123456);
+    assert.equal(ended.totalTime, 125956);
+    assert.equal(serviceCheckins.endService(checkinGuildId, checkinUserId, startTime, endedAt), null);
+    const service = db.prepare('SELECT total_time, start_time FROM service_times WHERE guild_id = ? AND user_id = ?')
+        .get(checkinGuildId, checkinUserId);
+    assert.equal(service.total_time, 125956);
+    assert.equal(service.start_time, null);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM service_sessions WHERE guild_id = ? AND user_id = ?')
+        .get(checkinGuildId, checkinUserId).count, 1);
+
+    const keepUserId = '100000000000000124';
+    db.prepare('INSERT INTO service_times (guild_id, user_id, total_time, start_time) VALUES (?, ?, 0, ?)')
+        .run(checkinGuildId, keepUserId, startTime);
+    assert.equal(serviceCheckins.claimPrompt(checkinGuildId, keepUserId, startTime), true);
+    assert.equal(serviceCheckins.markPromptDelivered(checkinGuildId, keepUserId, startTime, '100000000000000125'), true);
+    assert.ok(serviceCheckins.confirmContinuation(checkinGuildId, keepUserId, startTime));
+    assert.equal(serviceCheckins.confirmContinuation(checkinGuildId, keepUserId, startTime), null);
+    assert.equal(db.prepare('SELECT start_time FROM service_times WHERE guild_id = ? AND user_id = ?')
+        .get(checkinGuildId, keepUserId).start_time, startTime);
 });
 
 test('runtime incidents receive a stable public identifier and can be resolved', () => {

@@ -7,6 +7,7 @@ const GUILD_EXPORT_TABLES = [
     'guild_configs',
     'service_times',
     'service_sessions',
+    'service_checkins',
     'guild_pay_settings',
     'weekly_payments',
     'guild_pay_role_settings',
