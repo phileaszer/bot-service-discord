@@ -138,6 +138,11 @@ const BUTTON_ACTION_COOLDOWN_MS = 3 * 1000;
 const SENSITIVE_CONFIRM_TIMEOUT_MS = 2 * 60 * 1000;
 const LONG_SERVICE_ALERT_HOURS = Math.max(Number.parseInt(process.env.LONG_SERVICE_ALERT_HOURS || '8', 10), 1);
 const LONG_SERVICE_ALERT_MS = LONG_SERVICE_ALERT_HOURS * 60 * 60 * 1000;
+const LONG_SERVICE_AUTO_CLOSE_HOURS = Math.max(
+    Number.parseInt(process.env.LONG_SERVICE_AUTO_CLOSE_HOURS || '24', 10),
+    LONG_SERVICE_ALERT_HOURS + 1
+);
+const LONG_SERVICE_AUTO_CLOSE_MS = LONG_SERVICE_AUTO_CLOSE_HOURS * 60 * 60 * 1000;
 const LONG_SERVICE_ALERT_INTERVAL_MS = Math.max(
     Number.parseInt(process.env.LONG_SERVICE_ALERT_INTERVAL_MINUTES || '10', 10),
     2
@@ -7676,12 +7681,12 @@ function buildLongServiceCheckinEmbed(guild, user, service, language) {
             ? [
                 `Your service on **${guild.name}** has been active for **${formatDuration(service.duration)}**.`,
                 '',
-                'Do you want to keep it active? Choose below. Ending it records the full elapsed time.'
+                `Do you want to keep it active? Choose below. Without a manual end, Sentinel will close it automatically after **${LONG_SERVICE_AUTO_CLOSE_HOURS} hours**.`
             ].join('\n')
             : [
                 `Ton service sur **${guild.name}** est actif depuis **${formatDuration(service.duration)}**.`,
                 '',
-                'Souhaites-tu le garder actif ? Choisis ci-dessous. En le terminant, toute la durée écoulée sera enregistrée.'
+                `Souhaites-tu le garder actif ? Choisis ci-dessous. Sans clôture manuelle, Sentinel le terminera automatiquement après **${LONG_SERVICE_AUTO_CLOSE_HOURS} heures**.`
             ].join('\n'),
         requester: user,
         thumbnail: guild.iconURL(),
@@ -7689,11 +7694,68 @@ function buildLongServiceCheckinEmbed(guild, user, service, language) {
     });
 }
 
+function buildAutomaticServiceClosureEmbed(guild, user, result, language) {
+    const isEnglish = language === 'en';
+    return createSentinelEmbed({
+        color: SENTINEL_COLORS.warning,
+        title: isEnglish ? 'Sentinel | Service ended' : 'Sentinel | Service terminé',
+        description: isEnglish
+            ? `Your service on **${guild.name}** reached the ${LONG_SERVICE_AUTO_CLOSE_HOURS}-hour limit and was ended automatically. **${formatDuration(result.duration)}** was recorded.`
+            : `Ton service sur **${guild.name}** a atteint la limite de ${LONG_SERVICE_AUTO_CLOSE_HOURS} heures et a été terminé automatiquement. Une durée de **${formatDuration(result.duration)}** a été enregistrée.`,
+        requester: user,
+        thumbnail: guild.iconURL(),
+        language
+    });
+}
+
+async function closeLongServiceAutomatically(guild, service, language) {
+    const cutoff = Number(service.startTime) + LONG_SERVICE_AUTO_CLOSE_MS;
+    const result = serviceCheckins.automaticallyEndService(guild.id, service.userId, service.startTime, cutoff);
+    if (!result) return false;
+
+    const member = await guild.members.fetch(service.userId).catch(() => null);
+    const role = getServiceRole(guild);
+    if (member && role && member.roles.cache.has(role.id)) {
+        try {
+            const manageError = getServiceRoleManageError(guild, role, language);
+            if (manageError) throw new Error(manageError);
+            await member.roles.remove(role);
+        } catch (error) {
+            reportRuntimeIncident('long-service-auto-close-role', error, {
+                guildId: guild.id,
+                userId: service.userId,
+                roleId: role.id
+            });
+        }
+    }
+
+    await sendServiceLog(guild, member, 'end', {
+        duration: result.duration,
+        totalTime: result.totalTime,
+        source: language === 'en'
+            ? `Automatic ${LONG_SERVICE_AUTO_CLOSE_HOURS}-hour limit`
+            : `Limite automatique de ${LONG_SERVICE_AUTO_CLOSE_HOURS} heures`,
+        language
+    });
+
+    const recipient = member?.user || await client.users.fetch(service.userId).catch(() => null);
+    if (recipient) {
+        await recipient.send({
+            embeds: [buildAutomaticServiceClosureEmbed(guild, recipient, result, language)]
+        }).catch(() => {});
+    }
+    return true;
+}
+
 async function checkLongServiceAlerts() {
     for (const guild of client.guilds.cache.values()) {
         const language = getGuildLanguage(guild.id);
 
         for (const service of getActiveServices(guild.id)) {
+            if (service.duration >= LONG_SERVICE_AUTO_CLOSE_MS) {
+                await closeLongServiceAutomatically(guild, service, language);
+                continue;
+            }
             if (service.duration < LONG_SERVICE_ALERT_MS) {
                 continue;
             }

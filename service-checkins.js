@@ -141,6 +141,32 @@ function endService(guildId, userId, startTime, endedAt = Date.now()) {
     })();
 }
 
+function automaticallyEndService(guildId, userId, startTime, endedAt) {
+    return db.transaction(() => {
+        const service = db.prepare(`
+            SELECT total_time, start_time FROM service_times
+            WHERE guild_id = ? AND user_id = ? AND start_time = ?
+        `).get(guildId, userId, startTime);
+        if (!service) return null;
+        const safeEndedAt = Math.max(Number(endedAt) || Date.now(), Number(startTime));
+        const duration = safeEndedAt - Number(startTime);
+        const totalTime = (Number(service.total_time) || 0) + duration;
+        const date = new Date(safeEndedAt).toISOString();
+        db.prepare(`
+            INSERT INTO service_sessions (guild_id, user_id, date, duration)
+            VALUES (?, ?, ?, ?)
+        `).run(guildId, userId, date, duration);
+        const updated = db.prepare(`
+            UPDATE service_times SET total_time = ?, start_time = NULL
+            WHERE guild_id = ? AND user_id = ? AND start_time = ?
+        `).run(totalTime, guildId, userId, startTime).changes;
+        if (!updated) throw new Error('Le service a changé pendant la clôture automatique.');
+        db.prepare('DELETE FROM service_checkins WHERE guild_id = ? AND user_id = ? AND start_time = ?')
+            .run(guildId, userId, startTime);
+        return { duration, totalTime, endedAt: safeEndedAt };
+    })();
+}
+
 function clearForUser(guildId, userId) {
     return db.prepare('DELETE FROM service_checkins WHERE guild_id = ? AND user_id = ?')
         .run(guildId, userId).changes;
@@ -151,6 +177,7 @@ function clearForGuild(guildId) {
 }
 
 module.exports = {
+    automaticallyEndService,
     buildCustomId,
     claimEnd,
     claimPrompt,

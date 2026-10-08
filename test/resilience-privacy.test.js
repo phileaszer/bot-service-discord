@@ -83,6 +83,32 @@ test('long service check-ins are persistent and end a service exactly once', () 
     assert.equal(serviceCheckins.confirmContinuation(checkinGuildId, keepUserId, startTime), null);
     assert.equal(db.prepare('SELECT start_time FROM service_times WHERE guild_id = ? AND user_id = ?')
         .get(checkinGuildId, keepUserId).start_time, startTime);
+
+    const automaticUserId = '100000000000000126';
+    const automaticStartTime = Date.now() - (30 * 60 * 60 * 1000);
+    const automaticCutoff = automaticStartTime + (24 * 60 * 60 * 1000);
+    db.prepare('INSERT INTO service_times (guild_id, user_id, total_time, start_time) VALUES (?, ?, 5000, ?)')
+        .run(checkinGuildId, automaticUserId, automaticStartTime);
+    assert.equal(serviceCheckins.claimPrompt(checkinGuildId, automaticUserId, automaticStartTime), true);
+    assert.equal(serviceCheckins.markPromptDelivered(checkinGuildId, automaticUserId, automaticStartTime, '100000000000000127'), true);
+    const automatic = serviceCheckins.automaticallyEndService(
+        checkinGuildId,
+        automaticUserId,
+        automaticStartTime,
+        automaticCutoff
+    );
+    assert.equal(automatic.duration, 24 * 60 * 60 * 1000);
+    assert.equal(automatic.totalTime, (24 * 60 * 60 * 1000) + 5000);
+    assert.equal(serviceCheckins.automaticallyEndService(
+        checkinGuildId,
+        automaticUserId,
+        automaticStartTime,
+        automaticCutoff
+    ), null);
+    assert.equal(db.prepare('SELECT start_time FROM service_times WHERE guild_id = ? AND user_id = ?')
+        .get(checkinGuildId, automaticUserId).start_time, null);
+    assert.equal(db.prepare('SELECT 1 FROM service_checkins WHERE guild_id = ? AND user_id = ?')
+        .get(checkinGuildId, automaticUserId), undefined);
 });
 
 test('runtime incidents receive a stable public identifier and can be resolved', () => {
