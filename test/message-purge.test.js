@@ -4,7 +4,13 @@ const path = require('node:path');
 const test = require('node:test');
 const { ChannelType, Collection } = require('discord.js');
 
-const { purgeChannelMessages, recreateChannelForPurge } = require('../message-purge');
+const {
+    freezeChannelForPurge,
+    hasSameMessageIds,
+    purgeChannelMessages,
+    recreateChannelForPurge,
+    snapshotPermissionOverwrites
+} = require('../message-purge');
 
 function message(id, ageDays = 0) {
     return {
@@ -153,6 +159,62 @@ test('complete purge keeps the original when one permission differs', async () =
     );
     assert.equal(originalDeleted, 0);
     assert.equal(replacementDeleted, 1);
+});
+
+test('complete purge keeps the original when the last message check changes', async () => {
+    let originalDeleted = 0;
+    let replacementDeleted = 0;
+    const channel = {
+        type: ChannelType.GuildText,
+        name: 'general',
+        rawPosition: 4,
+        permissionOverwrites: { cache: overwriteCache() },
+        clone: async () => ({
+            rawPosition: 4,
+            permissionOverwrites: { cache: overwriteCache() },
+            delete: async () => { replacementDeleted += 1; }
+        }),
+        delete: async () => { originalDeleted += 1; }
+    };
+
+    await assert.rejects(
+        recreateChannelForPurge(channel, 'test', null, async () => false),
+        error => error.archiveSnapshotChanged === true && error.channelReplacementFailed === true
+    );
+    assert.equal(originalDeleted, 0);
+    assert.equal(replacementDeleted, 1);
+});
+
+test('complete purge freezes every explicit sender without losing the original snapshot', async () => {
+    const permissions = [
+        overwrite('guild', 0, 1024n | 2048n, 0),
+        overwrite('staff-role', 0, 2048n, 4096n),
+        overwrite('member', 1, 2048n, 0)
+    ];
+    let applied = null;
+    const channel = {
+        guild: { id: 'guild', roles: { everyone: { id: 'guild' } } },
+        permissionOverwrites: {
+            cache: overwriteCache(permissions),
+            set: async value => { applied = value; }
+        }
+    };
+    const original = snapshotPermissionOverwrites(channel);
+
+    await freezeChannelForPurge(channel, original);
+
+    assert.equal(original[1].allow, 2048n);
+    assert.ok(applied.every(item => (item.allow & 2048n) === 0n));
+    assert.ok(applied.every(item => (item.deny & 2048n) === 2048n));
+});
+
+test('final purge verification detects a message received during archival', () => {
+    const first = { messages: [{ id: '1' }, { id: '2' }] };
+    const stable = { messages: [{ id: '2' }, { id: '1' }] };
+    const changed = { messages: [{ id: '1' }, { id: '2' }, { id: '3' }] };
+
+    assert.equal(hasSameMessageIds(first, stable), true);
+    assert.equal(hasSameMessageIds(first, changed), false);
 });
 
 test('the low-level purge helper cannot bypass the verified archive workflow', async () => {

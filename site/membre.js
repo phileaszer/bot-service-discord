@@ -45,9 +45,22 @@
     return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
   }
 
-  function warningList(warnings) {
+  function appealStatusLabel(status) {
+    return ({ pending: 'En cours d’examen', accepted: 'Révision acceptée', rejected: 'Révision refusée' })[status] || status;
+  }
+
+  function warningList(warnings, appeals, guildId) {
     if (!warnings.items.length) return '<p class="muted">Aucun avertissement visible.</p>';
-    return `<div class="member-list">${warnings.items.map(item => `<article><span>Cas #${escapeHtml(item.id)}</span><strong>${escapeHtml(item.reason || 'Aucune raison indiquée')}</strong><small>${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>`;
+    return `<div class="member-list">${warnings.items.map(item => {
+      const appeal = (appeals || []).find(candidate => Number(candidate.caseId) === Number(item.id));
+      return `<article><span>Cas #${escapeHtml(item.id)}</span><strong>${escapeHtml(item.reason || 'Aucune raison indiquée')}</strong><small>${escapeHtml(formatDate(item.createdAt))}</small>
+        ${appeal ? `<small><strong>${escapeHtml(appealStatusLabel(appeal.status))}</strong>${appeal.decision ? ` · ${escapeHtml(appeal.decision)}` : ''}</small>` : `
+          <form data-appeal data-guild-id="${escapeHtml(guildId)}" data-case-id="${escapeHtml(item.id)}" class="member-appeal-form">
+            <label><span>Demander une révision</span><textarea name="statement" minlength="20" maxlength="2000" placeholder="Explique calmement pourquoi cette sanction devrait être réexaminée." required></textarea></label>
+            <button class="button button-small button-ghost" type="submit">Envoyer la demande</button>
+          </form>`}
+      </article>`;
+    }).join('')}</div>`;
   }
 
   function dossierList(items) {
@@ -81,7 +94,7 @@
         <div class="member-detail-grid">
           <article class="inline-form"><h3>Mes derniers services</h3>${item.service.sessions.length ? `<div class="member-list">${item.service.sessions.map(session => `<article><strong>${escapeHtml(session.durationLabel)}</strong><small>${escapeHtml(formatDate(session.date))}</small></article>`).join('')}</div>` : '<p class="muted">Aucune session enregistrée.</p>'}</article>
           <article class="inline-form"><h3>Mes dossiers</h3>${dossierList(item.dossiers)}</article>
-          <article class="inline-form"><h3>Mon registre disciplinaire</h3>${warningList(item.warnings)}</article>
+          <article class="inline-form"><h3>Mon registre disciplinaire</h3>${warningList(item.warnings, item.appeals, item.guild.id)}</article>
           <article class="inline-form"><h3>Mes notifications</h3>${notificationList(item.notifications || [])}</article>
           <article class="inline-form"><h3>Historique des résumés Discord</h3>${digestHistory(item.digestHistory)}</article>
           <article class="inline-form"><h3>Alertes souhaitées</h3><form data-preferences data-guild-id="${escapeHtml(item.guild.id)}" class="member-preferences">
@@ -96,9 +109,11 @@
 
   function render() {
     const guilds = portal?.guilds || [];
-    content.innerHTML = guilds.length
+    const privacyRequests = portal?.privacyRequests || [];
+    const privacyPanel = `<section class="dashboard-panel member-guild-panel"><div class="panel-heading"><p class="eyebrow">Tes données Sentinel</p><h2>Confidentialité</h2><p class="muted">Télécharge une copie lisible de tes données ou demande leur suppression. Une suppression est toujours contrôlée avant exécution.</p></div><div class="member-detail-grid"><article class="inline-form"><h3>Copie de mes données</h3><a class="button button-small" href="/api/me/privacy/export">Télécharger l’export JSON</a></article><article class="inline-form"><h3>Demande de suppression</h3><form data-member-delete><label><span>Motif facultatif</span><textarea name="reason" maxlength="1000" placeholder="Précise les éléments concernés si nécessaire."></textarea></label><button class="button button-small button-ghost" type="submit">Envoyer la demande</button></form>${privacyRequests.length ? `<div class="member-list">${privacyRequests.map(item => `<article><span>${escapeHtml(item.requestKey)}</span><strong>${escapeHtml(item.status === 'pending' ? 'En cours de contrôle' : item.status)}</strong><small>${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>` : ''}</article></div></section>`;
+    content.innerHTML = privacyPanel + (guilds.length
       ? guilds.map(renderGuild).join('')
-      : '<div class="empty-state"><img src="assets/sentinel-mark.png" alt=""><h2>Aucun registre disponible</h2><p>Ton compte Discord n’est membre d’aucun serveur où Sentinel est installé.</p></div>';
+      : '<div class="empty-state"><img src="assets/sentinel-mark.png" alt=""><h2>Aucun registre disponible</h2><p>Ton compte Discord n’est membre d’aucun serveur où Sentinel est installé.</p></div>');
     document.querySelectorAll('[data-preferences]').forEach(form => {
       form.addEventListener('submit', async event => {
         event.preventDefault();
@@ -115,6 +130,33 @@
         } catch (error) { toast(error.message, 'error'); }
         finally { button.disabled = false; }
       });
+    });
+    document.querySelectorAll('[data-appeal]').forEach(form => {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        try {
+          await api('/api/me/appeals', { method: 'POST', body: JSON.stringify({ guildId: form.dataset.guildId, caseId: form.dataset.caseId, statement: form.elements.statement.value }) });
+          portal = (await api('/api/me/portal')).portal;
+          render();
+          toast('Demande de révision transmise.');
+        } catch (error) { toast(error.message, 'error'); }
+        finally { button.disabled = false; }
+      });
+    });
+    document.querySelector('[data-member-delete]')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      button.disabled = true;
+      try {
+        await api('/api/me/privacy/request-delete', { method: 'POST', body: JSON.stringify({ reason: form.elements.reason.value }) });
+        portal = (await api('/api/me/portal')).portal;
+        render();
+        toast('Demande de suppression enregistrée.');
+      } catch (error) { toast(error.message, 'error'); }
+      finally { button.disabled = false; }
     });
   }
 

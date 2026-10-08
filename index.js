@@ -51,12 +51,20 @@ const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
 const operations = require('./operations');
 const governance = require('./governance');
+const appeals = require('./appeals');
+const privacyCenter = require('./privacy-center');
+const repairCenter = require('./repair-center');
+const runtimeGuard = require('./runtime-guard');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
 const {
     canRecreateChannelForPurge,
+    freezeChannelForPurge,
     fetchMessagesForPurge,
+    hasSameMessageIds,
     purgeFetchedChannelMessages,
-    recreateChannelForPurge
+    recreateChannelForPurge,
+    restoreChannelPermissions,
+    snapshotPermissionOverwrites
 } = require('./message-purge');
 
 const client = new Client({
@@ -1563,6 +1571,30 @@ async function notifyFounderStorageAlerts(alerts) {
     return { sent, keys: sent ? pending.map(alert => alert.key) : [] };
 }
 
+async function notifyFounderRuntimeIncident(incident) {
+    if (!incident || incident.occurrenceCount !== 1 || !CREATOR_USER_IDS.size || !client.isReady()) return false;
+    const payload = {
+        embeds: [new EmbedBuilder()
+            .setColor(incident.severity === 'critical' ? SENTINEL_COLORS.danger : SENTINEL_COLORS.warning)
+            .setTitle(`Sentinel | Incident ${incident.incidentId}`)
+            .setDescription(String(incident.message || 'Erreur technique Sentinel').slice(0, 1500))
+            .addFields({ name: 'Origine', value: String(incident.source || 'runtime').slice(0, 1024) })
+            .setTimestamp()]
+    };
+    let sent = false;
+    for (const userId of CREATOR_USER_IDS) {
+        const user = await client.users.fetch(userId).catch(() => null);
+        if (user && await user.send(payload).then(() => true).catch(() => false)) sent = true;
+    }
+    return sent;
+}
+
+function reportRuntimeIncident(source, error, context = {}, severity = 'error') {
+    const incident = runtimeGuard.reportIncident(source, error, context, severity);
+    notifyFounderRuntimeIncident(incident).catch(() => {});
+    return incident;
+}
+
 function shouldCreateStartupBackup() {
     const latest = listDatabaseBackups(DATABASE_BACKUP_DIR)[0] || null;
 
@@ -1631,6 +1663,7 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             archiveDirectory: DATABASE_COLD_ARCHIVE_DIR,
             enableIncrementalVacuum: DATABASE_INCREMENTAL_VACUUM_ENABLED
         });
+        const retention = applyGuildDataRetentionPolicies();
         const media = await scanCustomEmbedMediaOrphans(reason === 'startup' ? 25 : 100).catch(error => ({
             error: String(error.message || error).slice(0, 500),
             checked: 0,
@@ -1645,6 +1678,7 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             compressedBackups: compression.compressedCount,
             reclaimedBackupBytes: compression.reclaimedBytes,
             backupVerification: verification,
+            retention,
             media
         };
 
@@ -1721,6 +1755,60 @@ function startDatabaseBackupSchedule() {
         });
     }, DATABASE_BACKUP_INTERVAL_MS);
     databaseBackupTimer.unref();
+}
+
+function removeManagedArchiveDirectory(filePath, resolver, rootDirectory) {
+    const resolved = resolver(filePath);
+    if (!resolved) return false;
+    const root = path.resolve(rootDirectory);
+    const directory = path.dirname(resolved);
+    if (directory === root || !directory.startsWith(`${root}${path.sep}`)) return false;
+    fs.rmSync(directory, { recursive: true, force: true });
+    return true;
+}
+
+function applyGuildDataRetentionPolicies() {
+    const settings = db.prepare('SELECT * FROM guild_data_retention_settings').all();
+    const summary = { guilds: settings.length, automodEvents: 0, auditLogs: 0, purgeArchives: 0, dossierArchives: 0 };
+
+    for (const setting of settings) {
+        const cutoff = days => new Date(Date.now() - Math.max(Number(days) || 30, 30) * 86400000).toISOString();
+        summary.automodEvents += db.prepare('DELETE FROM guild_automod_events WHERE guild_id = ? AND created_at < ?')
+            .run(setting.guild_id, cutoff(setting.automod_days)).changes;
+        summary.auditLogs += db.prepare('DELETE FROM dashboard_audit_logs WHERE guild_id = ? AND created_at < ?')
+            .run(setting.guild_id, cutoff(setting.audit_days)).changes;
+
+        const purgeArchives = db.prepare(`
+            SELECT id, archive_path FROM message_purge_archives
+            WHERE guild_id = ? AND created_at < ?
+        `).all(setting.guild_id, cutoff(setting.purge_archive_days));
+        for (const archive of purgeArchives) {
+            try {
+                removeManagedArchiveDirectory(archive.archive_path, resolveMessagePurgeArchivePath, MESSAGE_PURGE_ARCHIVE_DIR);
+                summary.purgeArchives += db.prepare('DELETE FROM message_purge_archives WHERE guild_id = ? AND id = ?')
+                    .run(setting.guild_id, archive.id).changes;
+            } catch (error) {
+                reportRuntimeIncident('retention:purge-archive', error, { guildId: setting.guild_id, archiveId: archive.id });
+            }
+        }
+
+        const dossierArchives = db.prepare(`
+            SELECT id, archive_path FROM sentinel_dossiers
+            WHERE guild_id = ? AND archive_path IS NOT NULL AND archived_at < ?
+        `).all(setting.guild_id, cutoff(setting.dossier_archive_days));
+        for (const dossier of dossierArchives) {
+            try {
+                removeManagedArchiveDirectory(dossier.archive_path, resolveDossierArchivePath, DOSSIER_ARCHIVE_DIR);
+                summary.dossierArchives += db.prepare(`
+                    UPDATE sentinel_dossiers SET archive_path = NULL, archive_sha256 = NULL,
+                        archive_size = NULL WHERE guild_id = ? AND id = ?
+                `).run(setting.guild_id, dossier.id).changes;
+            } catch (error) {
+                reportRuntimeIncident('retention:dossier-archive', error, { guildId: setting.guild_id, dossierId: dossier.id });
+            }
+        }
+    }
+    return summary;
 }
 
 function getDatabaseBackupStatus() {
@@ -7795,6 +7883,11 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
                     ? 'A Sentinel cleanup is already running in this channel.'
                     : 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
             }
+            if (error?.channelFreezeFailed) {
+                throw new Error(language === 'en'
+                    ? 'Sentinel could not freeze channel posting. Check Manage Channels and the Sentinel role position.'
+                    : 'Sentinel n’a pas pu figer les publications. Vérifie « Gérer les salons » et la position du rôle Sentinel.');
+            }
             if (error?.archiveFailed) {
                 throw new Error(language === 'en'
                     ? `The archive could not be verified. No message was deleted. ${error.message || ''}`.trim()
@@ -12415,9 +12508,39 @@ function migrateSentinelChannelReferences(guildId, oldChannelId, newChannelId) {
 }
 
 async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
-    const snapshot = await fetchMessagesForPurge(channel, options);
+    const completePurge = options.mode === 'all';
+    let originalPermissionOverwrites = null;
+    let permissionsFrozen = false;
+    let snapshot;
+
+    if (completePurge) {
+        originalPermissionOverwrites = snapshotPermissionOverwrites(channel);
+        try {
+            await freezeChannelForPurge(
+                channel,
+                originalPermissionOverwrites,
+                `Gel temporaire Sentinel demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`
+            );
+            permissionsFrozen = true;
+        } catch (error) {
+            error.channelFreezeFailed = true;
+            throw error;
+        }
+    }
+
+    try {
+        snapshot = await fetchMessagesForPurge(channel, options);
+    } catch (error) {
+        if (permissionsFrozen) {
+            await restoreChannelPermissions(channel, originalPermissionOverwrites).catch(() => {});
+        }
+        throw error;
+    }
 
     if (snapshot.messages.length === 0) {
+        if (permissionsFrozen) {
+            await restoreChannelPermissions(channel, originalPermissionOverwrites);
+        }
         return {
             ...(await purgeFetchedChannelMessages(channel, snapshot)),
             archive: null
@@ -12434,6 +12557,9 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
             options.language || 'fr'
         );
     } catch (error) {
+        if (permissionsFrozen) {
+            await restoreChannelPermissions(channel, originalPermissionOverwrites).catch(() => {});
+        }
         error.archiveFailed = true;
         throw error;
     }
@@ -12441,17 +12567,50 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
     if (snapshot.mode === 'all') {
         let replacement;
 
+        let finalSnapshot;
+        try {
+            finalSnapshot = await fetchMessagesForPurge(channel, { mode: 'all' });
+        } catch (error) {
+            completeMessagePurgeArchive(archive.id, {
+                deleted: 0,
+                failed: snapshot.messages.length,
+                hasRemaining: true
+            }, 'final_verification_failed');
+            await restoreChannelPermissions(channel, originalPermissionOverwrites).catch(() => {});
+            error.archiveFailed = true;
+            throw error;
+        }
+
+        if (!hasSameMessageIds(snapshot, finalSnapshot)) {
+            completeMessagePurgeArchive(archive.id, {
+                deleted: 0,
+                failed: finalSnapshot.messages.length,
+                hasRemaining: true
+            }, 'snapshot_changed');
+            await restoreChannelPermissions(channel, originalPermissionOverwrites).catch(() => {});
+            const error = new Error('Le contenu du salon a changé pendant l’archivage. Les permissions ont été restaurées et aucun message n’a été supprimé.');
+            error.archiveFailed = true;
+            error.archiveSnapshotChanged = true;
+            throw error;
+        }
+
         try {
             replacement = await recreateChannelForPurge(
                 channel,
-                `Vidage complet Sentinel demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`
+                `Vidage complet Sentinel demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`,
+                originalPermissionOverwrites,
+                async () => {
+                    const lastSnapshot = await fetchMessagesForPurge(channel, { mode: 'all' });
+                    return hasSameMessageIds(snapshot, lastSnapshot);
+                }
             );
         } catch (error) {
             completeMessagePurgeArchive(archive.id, {
                 deleted: 0,
                 failed: snapshot.messages.length,
                 hasRemaining: true
-            }, 'recreation_failed');
+            }, error.archiveSnapshotChanged ? 'snapshot_changed' : 'recreation_failed');
+            await restoreChannelPermissions(channel, originalPermissionOverwrites).catch(() => {});
             throw error;
         }
 
@@ -15120,6 +15279,7 @@ function getMemberPortalGuild(guild, userId) {
     }));
     const preferences = operations.getUserNotificationPreferences(guild.id, userId);
     const activeWarningCount = operations.getActiveWarningCount(guild.id, userId, warningSettings.windowDays);
+    const memberAppeals = appeals.getMemberAppeals(userId, guild.id, 50);
     const memberNotifications = [];
 
     if (preferences.serviceEnabled && service?.startTime) {
@@ -15180,6 +15340,7 @@ function getMemberPortalGuild(guild, userId) {
             expirationDays: warningSettings.windowDays,
             items: warnings.map(item => ({ id: item.id, action: item.action, reason: item.reason, duration: item.duration, createdAt: item.created_at }))
         },
+        appeals: memberAppeals,
         dossiers,
         notifications: memberNotifications,
         preferences,
@@ -15193,7 +15354,10 @@ async function getMemberPortal(userId) {
         const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
         if (member) guilds.push(getMemberPortalGuild(guild, userId));
     }
-    return { guilds };
+    return {
+        guilds,
+        privacyRequests: privacyCenter.listPrivacyRequests({ userId, limit: 25 })
+    };
 }
 
 function simulateGuildOperation(guild, actorUserId, kind, input = {}) {
@@ -15257,15 +15421,20 @@ let operationsCycleRunning = false;
 
 async function processMemberNotificationDigests() {
     for (const item of operations.getDueMemberDigests(50)) {
+        const executionKey = `${item.guildId}:${item.userId}`;
+        const scheduledFor = item.nextDigestAt || item.periodKey || 'digest';
+        if (!runtimeGuard.claimJobExecution('member-digest', executionKey, scheduledFor)) continue;
         const guild = client.guilds.cache.get(item.guildId);
         if (!guild) {
             operations.completeMemberDigest(item, { error: 'Serveur Discord introuvable.' });
+            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { error: 'Serveur Discord introuvable.' });
             continue;
         }
         const member = guild.members.cache.get(item.userId)
             || await guild.members.fetch(item.userId).catch(() => null);
         if (!member) {
             operations.completeMemberDigest(item, { error: 'Le membre ne fait plus partie du serveur.' });
+            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { error: 'Le membre ne fait plus partie du serveur.' });
             continue;
         }
         try {
@@ -15273,6 +15442,7 @@ async function processMemberNotificationDigests() {
             const notifications = portal.notifications.slice(0, 10);
             if (!notifications.length) {
                 operations.completeMemberDigest(item, { skipped: true, itemCount: 0 });
+                runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { skipped: true, itemCount: 0 });
                 continue;
             }
             const recipient = member.user || await client.users.fetch(item.userId);
@@ -15292,8 +15462,11 @@ async function processMemberNotificationDigests() {
                 allowedMentions: { parse: [] }
             });
             operations.completeMemberDigest(item, { messageId: message.id, itemCount: notifications.length });
+            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { messageId: message.id, itemCount: notifications.length });
         } catch (error) {
             operations.completeMemberDigest(item, { error: error.message || error });
+            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { error });
+            reportRuntimeIncident('member-digest', error, { guildId: item.guildId, userId: item.userId });
         }
     }
 }
@@ -15303,10 +15476,14 @@ async function processScheduledOperations() {
     operationsCycleRunning = true;
     try {
         for (const item of operations.getDueScheduledAnnouncements()) {
+            const executionKey = String(item.id);
+            const scheduledFor = item.nextRunAt || 'once';
+            if (!runtimeGuard.claimJobExecution('scheduled-announcement', executionKey, scheduledFor)) continue;
             const guild = client.guilds.cache.get(item.guildId);
             const channel = guild?.channels?.cache?.get(item.channelId);
             if (!guild || !channel?.isTextBased?.()) {
                 operations.completeScheduledAnnouncement(item, { error: 'Serveur ou salon Discord introuvable.' });
+                runtimeGuard.completeJobExecution('scheduled-announcement', executionKey, scheduledFor, { error: 'Serveur ou salon Discord introuvable.' });
                 continue;
             }
             try {
@@ -15316,16 +15493,23 @@ async function processScheduledOperations() {
                 });
                 addCustomEmbedRecord(guild.id, channel.id, message.id, item.createdByUserId, item);
                 operations.completeScheduledAnnouncement(item, { messageId: message.id });
+                runtimeGuard.completeJobExecution('scheduled-announcement', executionKey, scheduledFor, { messageId: message.id });
             } catch (error) {
                 operations.completeScheduledAnnouncement(item, { error: error.message || error });
+                runtimeGuard.completeJobExecution('scheduled-announcement', executionKey, scheduledFor, { error });
+                reportRuntimeIncident('scheduled-announcement', error, { guildId: item.guildId, announcementId: item.id });
             }
         }
 
         for (const item of operations.getDueReportSchedules()) {
+            const executionKey = String(item.id);
+            const scheduledFor = item.nextRunAt || 'once';
+            if (!runtimeGuard.claimJobExecution('scheduled-report', executionKey, scheduledFor)) continue;
             const guild = client.guilds.cache.get(item.guildId);
             const channel = guild?.channels?.cache?.get(item.channelId);
             if (!guild || !channel?.isTextBased?.()) {
                 operations.completeReportSchedule(item, { error: 'Serveur ou salon Discord introuvable.' });
+                runtimeGuard.completeJobExecution('scheduled-report', executionKey, scheduledFor, { error: 'Serveur ou salon Discord introuvable.' });
                 continue;
             }
             try {
@@ -15336,8 +15520,11 @@ async function processScheduledOperations() {
                     allowedMentions: { parse: [] }
                 });
                 operations.completeReportSchedule(item, { messageId: message.id });
+                runtimeGuard.completeJobExecution('scheduled-report', executionKey, scheduledFor, { messageId: message.id });
             } catch (error) {
                 operations.completeReportSchedule(item, { error: error.message || error });
+                runtimeGuard.completeJobExecution('scheduled-report', executionKey, scheduledFor, { error });
+                reportRuntimeIncident('scheduled-report', error, { guildId: item.guildId, scheduleId: item.id });
             }
         }
 
@@ -15350,7 +15537,9 @@ async function processScheduledOperations() {
 async function runStartupStagingValidation() {
     const config = stagingValidationConfig();
     try {
-        const result = await runDiscordStagingValidation(client);
+        const result = await runDiscordStagingValidation(client, {
+            verifyFreeAccess: guild => ADVANCED_FEATURES_FREE && isAdvancedGuild(guild.id)
+        });
         const checks = result.skipped
             ? [{ key: 'staging-disabled', label: 'Serveur de préproduction non configuré', ok: true }]
             : result.checks;
@@ -15368,6 +15557,23 @@ async function runStartupStagingValidation() {
         if (config.required) throw error;
         return { skipped: false, failed: true, guildId: config.guildId, checks };
     }
+}
+
+async function runPersistentBackgroundJob(jobKey, ttlMs, handler) {
+    return runtimeGuard.runLeasedJob(jobKey, {
+        ttlMs,
+        source: `background:${jobKey}`,
+        reporter: reportRuntimeIncident
+    }, handler);
+}
+
+async function scanAllGuildConfigurations() {
+    let scanned = 0;
+    for (const guild of client.guilds.cache.values()) {
+        await repairCenter.scanGuildConfiguration(guild, null);
+        scanned += 1;
+    }
+    return { scanned };
 }
 
 client.once(Events.ClientReady, async () => {
@@ -15399,6 +15605,7 @@ client.once(Events.ClientReady, async () => {
             addWarningWithEscalation,
             addSession,
             addWeeklyPayAdjustment,
+            applySafeGuildRepairs: repairCenter.applySafeGuildRepairs,
             archiveAndPurgeChannelMessages,
             archiveWeeklyPayroll,
             buildCustomAnnouncementEmbed,
@@ -15414,7 +15621,11 @@ client.once(Events.ClientReady, async () => {
             clearLongServiceAlertsForGuild,
             closeDossierChannel,
             closeDossierRecord,
+            createAppeal: appeals.createAppeal,
             createDossierTemplate,
+            createGuildDataExport: privacyCenter.createGuildDataExport,
+            createMemberDataExport: privacyCenter.createMemberDataExport,
+            createPrivacyRequest: privacyCenter.createPrivacyRequest,
             createUserIfMissing,
             deleteCustomEmbedRecord,
             deleteModerationCase,
@@ -15442,7 +15653,11 @@ client.once(Events.ClientReady, async () => {
             getDossierTemplates,
             getGuildConfig,
             getGuildLanguage,
+            getGuildAppeals: appeals.getGuildAppeals,
             getGuildOfficialUpdateHistory,
+            getGuildRepairReport: repairCenter.getGuildRepairReport,
+            getJobHealth: runtimeGuard.getJobHealth,
+            getMemberAppeals: appeals.getMemberAppeals,
             getMemberPortal,
             getMemberPortalGuild,
             getGuildPayRoleSettings,
@@ -15465,6 +15680,7 @@ client.once(Events.ClientReady, async () => {
             getGuildPaySettings,
             getRecentDossiers,
             getRecentModerationCases,
+            getRetentionSettings: privacyCenter.getRetentionSettings,
             getModerationTargetError,
             getCustomEmbedChannelError,
             getServiceRoleManageError,
@@ -15476,6 +15692,8 @@ client.once(Events.ClientReady, async () => {
             getTemporaryBan,
             getWarningEscalationSettings: operations.getWarningEscalationSettings,
             getWarningEscalationEvents: operations.getWarningEscalationEvents,
+            listIncidents: runtimeGuard.listIncidents,
+            listPrivacyRequests: privacyCenter.listPrivacyRequests,
             updateWarningEscalationSettings: operations.updateWarningEscalationSettings,
             getScheduledAnnouncements: operations.getScheduledAnnouncements,
             saveScheduledAnnouncement: operations.saveScheduledAnnouncement,
@@ -15512,6 +15730,7 @@ client.once(Events.ClientReady, async () => {
             runSentinelGuildValidation,
             simulateGuildOperation,
             recordDashboardRequestMetric,
+            reportIncident: reportRuntimeIncident,
             removeAutomodWord,
             removeDossierRole,
             removeDossierTypeRole,
@@ -15521,6 +15740,7 @@ client.once(Events.ClientReady, async () => {
             recordDossierPanel,
             resetGuild,
             resetUser,
+            resolveIncident: runtimeGuard.resolveIncident,
             sendModerationLog,
             sendOfficialUpdateTest,
             publishOfficialStatusUpdate,
@@ -15551,7 +15771,10 @@ client.once(Events.ClientReady, async () => {
             restoreManagedDatabaseBackup,
             runManualDatabaseMaintenance,
             scanCustomEmbedMediaOrphans,
+            scanGuildConfiguration: repairCenter.scanGuildConfiguration,
             searchDossierArchives,
+            updateRetentionSettings: privacyCenter.updateRetentionSettings,
+            decideAppeal: appeals.decideAppeal,
             verifyManagedDatabaseBackup
         }
     });
@@ -15583,7 +15806,7 @@ client.once(Events.ClientReady, async () => {
             ].join(' | '));
         }
 
-        await updateAllSentinelStatusPanels();
+        await runPersistentBackgroundJob('status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels);
         for (const guild of client.guilds.cache.values()) {
             await repairGuildOfficialUpdateReferences(guild, true).catch(error => {
                 console.error(`Réparation des salons d'annonces ${guild.id} :`, error);
@@ -15591,8 +15814,9 @@ client.once(Events.ClientReady, async () => {
         }
         const officialDistribution = await distributeLatestPublicOfficialUpdate();
         console.log(`Bulletin public Sentinel vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
-        await processExpiredTemporaryBans();
-        await processScheduledOperations();
+        await runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans);
+        await runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations);
+        await runPersistentBackgroundJob('repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations);
         for (const guild of client.guilds.cache.values()) {
             runSentinelGuildValidation(guild, 'startup');
         }
@@ -15600,36 +15824,30 @@ client.once(Events.ClientReady, async () => {
         console.error('Erreur synchronisation serveur Sentinel :', error);
     }
 
-    setInterval(refreshSlashCommandStatus, 6 * 60 * 60 * 1000);
-    setInterval(updateAllSentinelStatusPanels, 5 * 60 * 1000);
-    setInterval(processExpiredTemporaryBans, 60 * 1000);
-    setInterval(() => processScheduledOperations().catch(error => {
-        console.error('Traitements programmés Sentinel :', error);
-    }), OPERATIONS_INTERVAL_MS);
-    setInterval(() => processOfficialUpdateRetries().catch(error => {
-        console.error('Nouvelle tentative des annonces officielles Sentinel :', error);
-    }), 5 * 60 * 1000);
-    setInterval(checkLongServiceAlerts, LONG_SERVICE_ALERT_INTERVAL_MS);
-    setInterval(processDossierMaintenance, DOSSIER_MAINTENANCE_INTERVAL_MS);
-    setTimeout(checkLongServiceAlerts, 60 * 1000);
-    setTimeout(() => processDossierMaintenance().catch(error => {
-        console.error('Entretien dossiers Sentinel :', error);
-    }), 30 * 1000);
-    setTimeout(() => processOfficialUpdateRetries().catch(error => {
-        console.error('Première reprise des annonces officielles Sentinel :', error);
-    }), 60 * 1000);
+    setInterval(() => runPersistentBackgroundJob('slash-command-status', 30 * 60 * 1000, refreshSlashCommandStatus).catch(() => {}), 6 * 60 * 60 * 1000);
+    setInterval(() => runPersistentBackgroundJob('status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels).catch(() => {}), 5 * 60 * 1000);
+    setInterval(() => runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans).catch(() => {}), 60 * 1000);
+    setInterval(() => runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations).catch(() => {}), OPERATIONS_INTERVAL_MS);
+    setInterval(() => runPersistentBackgroundJob('official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 5 * 60 * 1000);
+    setInterval(() => runPersistentBackgroundJob('long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), LONG_SERVICE_ALERT_INTERVAL_MS);
+    setInterval(() => runPersistentBackgroundJob('dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), DOSSIER_MAINTENANCE_INTERVAL_MS);
+    setInterval(() => runPersistentBackgroundJob('repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations).catch(() => {}), 24 * 60 * 60 * 1000);
+    setTimeout(() => runPersistentBackgroundJob('long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), 60 * 1000);
+    setTimeout(() => runPersistentBackgroundJob('dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), 30 * 1000);
+    setTimeout(() => runPersistentBackgroundJob('official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 60 * 1000);
 });
 
 client.on(Events.Error, error => {
-    console.error('Erreur client Discord :', error);
+    reportRuntimeIncident('discord-client', error);
 });
 
 process.on('unhandledRejection', error => {
-    console.error('Promesse non geree :', error);
+    reportRuntimeIncident('unhandled-rejection', error);
 });
 
 process.on('uncaughtException', error => {
-    console.error('Exception non geree :', error);
+    reportRuntimeIncident('uncaught-exception', error, {}, 'critical');
+    setTimeout(() => process.exit(1), 1000).unref();
 });
 
 client.on(Events.GuildCreate, async guild => {

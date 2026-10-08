@@ -238,6 +238,17 @@
 .member-list span,
 .member-list small { color: var(--muted); }
 
+.member-appeal-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.member-appeal-form textarea { min-height: 92px; }
+.operation-row > .operation-form-grid { min-width: min(520px, 46vw); }
+
 .member-preferences {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -271,6 +282,7 @@
   .operation-form-grid,
   .simulation-grid,
   .member-preferences { grid-template-columns: 1fr; }
+  .operation-row > .operation-form-grid { min-width: 0; }
   .report-download-grid > div { grid-template-columns: 1fr repeat(3, minmax(0, 1fr)); }
   .report-download-grid .button { min-width: 0; padding-inline: 8px; }
 }

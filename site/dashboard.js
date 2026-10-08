@@ -1950,6 +1950,43 @@ function officialUpdateHistory(state) {
   `;
 }
 
+function repairCenterPanel(state) {
+  const report = state.repairCenter;
+  const issues = report?.issues || [];
+  return `
+    <div class="command-roles">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Contrôle automatique</p><h3>Centre de réparation</h3><p class="muted">Repère les rôles, salons, panneaux et programmations qui ne correspondent plus à Discord.</p></div>${report ? statusBadge(issues.length ? `${issues.length} à corriger` : 'Tout est en ordre', !issues.length) : statusBadge('À contrôler', false)}</div>
+      ${issues.length ? `<div class="operation-list">${issues.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></div>${item.repairable ? '<span class="status-badge">Réparable</span>' : ''}</div>`).join('')}</div>` : `<p class="muted">${report ? 'Aucune référence cassée détectée lors du dernier contrôle.' : 'Aucun contrôle n’a encore été lancé.'}</p>`}
+      <div class="split-actions">
+        <form data-action-form="scan-repairs"><button class="button button-small" type="submit">Contrôler maintenant</button></form>
+        <form data-action-form="apply-safe-repairs"><button class="button button-small button-ghost" type="submit" ${issues.some(item => item.repairable) ? '' : 'disabled'}>Réparer les références sûres</button></form>
+      </div>
+      ${report?.scannedAt ? `<small class="muted">Dernier contrôle : ${escapeHtml(formatAuditDate(report.scannedAt))}</small>` : ''}
+    </div>`;
+}
+
+function privacyCenterPanel(state) {
+  const retention = state.privacy?.retention || {};
+  const requests = state.privacy?.requests || [];
+  const canExport = Boolean(state.viewerAccess?.isGuildOwner || state.siteAccess?.isFounder);
+  return `
+    <div class="command-roles">
+      <div class="panel-heading"><p class="eyebrow">Données du serveur</p><h3>Conservation et confidentialité</h3><p class="muted">Le propriétaire peut récupérer une copie des données ou demander leur suppression contrôlée.</p></div>
+      <form data-action-form="set-data-retention" class="operation-form-grid">
+        <label><span>Journaux d’auto-modération</span><input name="automodDays" type="number" min="30" max="3650" value="${escapeHtml(retention.automodDays || 365)}"><small>jours</small></label>
+        <label><span>Historique des actions</span><input name="auditDays" type="number" min="30" max="3650" value="${escapeHtml(retention.auditDays || 365)}"><small>jours</small></label>
+        <label><span>Archives de nettoyage</span><input name="purgeArchiveDays" type="number" min="30" max="3650" value="${escapeHtml(retention.purgeArchiveDays || 365)}"><small>jours</small></label>
+        <label><span>Archives de dossiers</span><input name="dossierArchiveDays" type="number" min="30" max="3650" value="${escapeHtml(retention.dossierArchiveDays || 730)}"><small>jours</small></label>
+        <button class="button button-small" type="submit">Enregistrer les durées</button>
+      </form>
+      <div class="split-actions">
+        ${canExport ? `<a class="button button-small button-ghost" href="/api/guilds/${escapeHtml(state.guild.id)}/privacy/export">Exporter les données</a>` : '<span class="muted">Export complet réservé au propriétaire.</span>'}
+      </div>
+      ${state.viewerAccess?.isGuildOwner ? `<form data-action-form="request-guild-data-deletion" class="operation-form-grid"><label><span>Demande de suppression</span><textarea name="reason" maxlength="1000" placeholder="Explique la demande afin qu’elle puisse être contrôlée."></textarea></label><button class="button button-small button-ghost" type="submit">Envoyer la demande</button></form>` : ''}
+      ${requests.length ? `<div class="operation-list">${requests.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.requestKey)}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(formatAuditDate(item.createdAt))}</small></div></div>`).join('')}</div>` : ''}
+    </div>`;
+}
+
 function renderConfigurationHub(state, channelOptions, statusChannelOptions, updatesChannelOptions, updatesRoleOptions) {
   const status = dashboardConfigStatus(state);
   const statusChannelLabel = status.statusChannel ? `#${status.statusChannel.name}` : 'Aucun salon statut choisi';
@@ -2033,6 +2070,8 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions, upd
         <div class="role-chip-row">${commandRoleList(state)}</div>
         <button class="button button-small" type="button" data-dashboard-tab="setup">Gérer dans l’assistant</button>
       </div>
+      ${repairCenterPanel(state)}
+      ${privacyCenterPanel(state)}
       ${status.ready
         ? '<div class="dashboard-alert is-ready"><strong>Configuration prête</strong><p>Tu peux publier le panneau ou continuer avec les autres onglets.</p></div>'
         : '<div class="dashboard-alert is-warning"><strong>Configuration incomplète</strong><p>Termine l’assistant avant de publier le panneau pour éviter un bouton inutilisable.</p><button class="button button-small" type="button" data-dashboard-tab="setup">Ouvrir l’assistant</button></div>'}
@@ -4488,7 +4527,9 @@ function messagePurgeArchiveHistory(state) {
     channel_recreated: 'Salon recréé',
     completed_with_warnings: 'À vérifier',
     delete_failed: 'Suppression interrompue',
-    recreation_failed: 'Recréation interrompue'
+    recreation_failed: 'Recréation interrompue',
+    final_verification_failed: 'Contrôle final impossible',
+    snapshot_changed: 'Nouveau message détecté'
   };
 
   return `
@@ -4595,9 +4636,22 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
           ${moderationCaseFilters(state)}
           ${moderationCaseList(state)}
         </article>
+        ${moderationAppealsPanel(state)}
       </div>
     </section>
   `;
+}
+
+function moderationAppealsPanel(state) {
+  const items = state.moderationAppeals || [];
+  return `
+    <article class="inline-form moderation-cases-note">
+      <div class="panel-mini-heading"><div><p class="eyebrow">Demandes de révision</p><h3>Contestations des sanctions</h3><p class="muted">Chaque réponse est conservée et redevient visible dans l’espace personnel du membre.</p></div></div>
+      ${items.length ? `<div class="operation-list">${items.map(item => `
+        <div class="operation-row"><div><span>#${escapeHtml(item.id)} · sanction #${escapeHtml(item.caseId)} · membre ${escapeHtml(item.userId)}</span><strong>${escapeHtml(item.statement)}</strong><small>${escapeHtml(formatAuditDate(item.createdAt))}${item.decision ? ` · ${escapeHtml(item.decision)}` : ''}</small></div>
+        ${item.status === 'pending' ? `<form data-action-form="decide-appeal" class="operation-form-grid"><input type="hidden" name="appealId" value="${escapeHtml(item.id)}"><select name="status"><option value="accepted">Accepter la révision</option><option value="rejected">Refuser la révision</option></select><textarea name="decision" minlength="10" maxlength="2000" placeholder="Décision expliquée au membre" required></textarea><button class="button button-small" type="submit">Rendre la décision</button></form>` : statusBadge(item.status === 'accepted' ? 'Acceptée' : 'Refusée', item.status === 'accepted')}
+        </div>`).join('')}</div>` : '<p class="muted">Aucune contestation reçue.</p>'}
+    </article>`;
 }
 
 function warningEscalationPanel(state, premiumTag) {
@@ -5420,6 +5474,30 @@ function founderSecurityPanel(overview) {
   `;
 }
 
+function founderRuntimePanel(overview) {
+  const health = overview?.runtimeHealth || {};
+  const incidents = health.incidents || [];
+  const jobs = health.jobs || [];
+  return `
+    <section class="founder-storage-panel" aria-label="Surveillance Sentinel">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Surveillance</p><h3>Incidents et tâches automatiques</h3><p class="muted">Chaque erreur technique reçoit un identifiant stable. Les tâches persistantes indiquent leur dernier passage et évitent les doublons entre instances.</p></div>${statusBadge(incidents.length ? `${incidents.length} incident(s)` : 'Aucun incident ouvert', !incidents.length)}</div>
+      <div class="maintenance-grid">
+        <section class="maintenance-section"><h4>Incidents ouverts</h4><div class="operation-list">${incidents.length ? incidents.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.incidentId)} · ${escapeHtml(item.source)}</strong><small>${escapeHtml(item.message)} · ${escapeHtml(item.occurrenceCount)} occurrence(s) · ${escapeHtml(formatAuditDate(item.lastSeenAt))}</small></div>${overview?.access?.isFounder ? `<button class="button button-small button-ghost" type="button" data-resolve-incident="${escapeHtml(item.incidentId)}">Classer résolu</button>` : ''}</div>`).join('') : '<p class="muted">Aucun incident technique ouvert.</p>'}</div></section>
+        <section class="maintenance-section"><h4>Tâches persistantes</h4><div class="operation-list">${jobs.length ? jobs.slice(0, 30).map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.jobKey)}</strong><small>${escapeHtml(item.lastStatus || 'inconnue')} · ${item.lastFinishedAt ? escapeHtml(formatAuditDate(item.lastFinishedAt)) : 'premier passage en cours'}${item.lastError ? ` · ${escapeHtml(item.lastError)}` : ''}</small></div></div>`).join('') : '<p class="muted">Aucune tâche enregistrée.</p>'}</div></section>
+      </div>
+    </section>`;
+}
+
+function founderPrivacyPanel(overview) {
+  if (!overview?.access?.isFounder) return '';
+  const requests = overview.privacyRequests || [];
+  return `
+    <section class="founder-storage-panel" aria-label="Demandes de confidentialité">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Confidentialité</p><h3>Demandes de données</h3><p class="muted">Une demande n’efface jamais automatiquement la base. Elle doit être contrôlée avec les sauvegardes et les obligations de conservation avant exécution.</p></div>${statusBadge(requests.length ? `${requests.length} en attente` : 'Aucune demande', !requests.length)}</div>
+      <div class="operation-list">${requests.length ? requests.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.requestKey)} · ${escapeHtml(item.requestType === 'guild_delete' ? 'Serveur' : 'Membre')}</strong><small>${escapeHtml(item.guildId || item.subjectUserId || 'sans cible')} · demandé par ${escapeHtml(item.requestedByUserId)} · ${escapeHtml(formatAuditDate(item.createdAt))}</small>${item.reason ? `<small>${escapeHtml(item.reason)}</small>` : ''}</div></div>`).join('') : '<p class="muted">Aucune demande de suppression en attente.</p>'}</div>
+    </section>`;
+}
+
 function criticalActionsPanel(overview) {
   const actions = (overview?.criticalActions || []).filter((item) => item.actionType !== 'premium-access');
   if (!actions.length) return '';
@@ -5510,6 +5588,8 @@ function renderFounderPremiumPanel() {
       ${founderSecurityPanel(overview)}
       ${criticalActionsPanel(overview)}
       ${founderOfficialUpdatePanel(overview)}
+      ${founderRuntimePanel(overview)}
+      ${founderPrivacyPanel(overview)}
       ${founderStoragePanel(overview)}
       ${creatorStaffManagePanel(overview)}
       ${creatorOverviewLoading && !overview ? '<p class="muted">Lecture de la régie Sentinel...</p>' : ''}
@@ -5922,6 +6002,23 @@ async function manageCriticalAction(data, button = null) {
   }
 }
 
+async function resolveRuntimeIncident(incidentId, button = null) {
+  setLoading(button, true);
+  try {
+    const payload = await api('/api/creator/incidents', {
+      method: 'POST',
+      body: JSON.stringify({ incidentId })
+    });
+    creatorOverview = payload.overview || creatorOverview;
+    renderDashboard();
+    toast(payload.message || 'Incident classé comme résolu.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 async function submitOfficialUpdate(data, button = null) {
   setLoading(button, true);
   try {
@@ -6211,6 +6308,10 @@ function attachDashboardHandlers() {
       action: button.dataset.criticalAction,
       requestId: button.dataset.requestId
     }, button));
+  });
+
+  $$('[data-resolve-incident]').forEach((button) => {
+    button.addEventListener('click', () => resolveRuntimeIncident(button.dataset.resolveIncident, button));
   });
 
   $$('[data-guild-critical-action]').forEach((button) => {

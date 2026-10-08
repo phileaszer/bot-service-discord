@@ -5,6 +5,7 @@ const {
     EmbedBuilder,
     PermissionsBitField
 } = require('discord.js');
+const { recreateChannelForPurge } = require('./message-purge');
 
 function boolEnv(name, fallback = false) {
     const value = String(process.env[name] || '').trim().toLowerCase();
@@ -31,7 +32,7 @@ async function deleteSafely(resource, reason) {
     await resource.delete(reason).catch(() => null);
 }
 
-async function runDiscordStagingValidation(client) {
+async function runDiscordStagingValidation(client, options = {}) {
     const config = stagingValidationConfig();
     if (!config.enabled) {
         if (config.required) throw new Error('SENTINEL_STAGING_GUILD_ID est obligatoire pour la validation bloquante.');
@@ -142,6 +143,27 @@ async function runDiscordStagingValidation(client) {
         checks.push({ key: 'dossier-private', label: 'Dossier privé et routage de rôle', ok: Boolean(dossierChannel?.id && role?.id) });
         checks.push({ key: 'message-embed', label: 'Envoi message et embed', ok: Boolean(testMessage?.id && dossierMessage?.id) });
 
+        const originalValidationChannelId = validationChannel.id;
+        validationChannel = await recreateChannelForPurge(
+            validationChannel,
+            'Validation de la recréation sécurisée Sentinel'
+        );
+        checks.push({
+            key: 'channel-recreation',
+            label: 'Recréation de salon et permissions exactes',
+            ok: Boolean(validationChannel?.id && validationChannel.id !== originalValidationChannelId)
+        });
+
+        const freeAccessOk = typeof options.verifyFreeAccess === 'function'
+            ? Boolean(await options.verifyFreeAccess(guild))
+            : true;
+        checks.push({
+            key: 'free-access-suspended-premium',
+            label: 'Accès complet sans paiement pendant la démonstration',
+            ok: freeAccessOk,
+            detail: freeAccessOk ? null : 'Une restriction Premium ou de paiement est encore active.'
+        });
+
         if (config.realActions) {
             if (!config.moderationMemberId || !config.banTargetId) {
                 throw new Error('Les IDs de membre de timeout et de cible de bannissement sont obligatoires pour les actions réelles de préproduction.');
@@ -176,8 +198,8 @@ async function runDiscordStagingValidation(client) {
         } else {
             checks.push({
                 key: 'sanctions-live-skipped',
-                label: 'Sanctions réelles de préproduction non activées',
-                ok: true,
+                label: 'Sanctions réelles de préproduction',
+                ok: !config.required,
                 detail: 'Active SENTINEL_STAGING_REAL_ACTIONS avec deux comptes de test dédiés pour ce contrôle.'
             });
         }

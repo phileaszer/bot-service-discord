@@ -1,4 +1,4 @@
-const { ChannelType, Collection } = require('discord.js');
+const { ChannelType, Collection, PermissionsBitField } = require('discord.js');
 
 const BULK_DELETE_LIMIT = 100;
 const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -8,6 +8,17 @@ const RECREATABLE_CHANNEL_TYPES = new Set([
     ChannelType.GuildText,
     ChannelType.GuildAnnouncement
 ]);
+const PURGE_FREEZE_PERMISSIONS = [
+    PermissionsBitField.Flags.SendMessages,
+    PermissionsBitField.Flags.AddReactions,
+    PermissionsBitField.Flags.AttachFiles,
+    PermissionsBitField.Flags.CreatePublicThreads,
+    PermissionsBitField.Flags.CreatePrivateThreads,
+    PermissionsBitField.Flags.SendMessagesInThreads,
+    PermissionsBitField.Flags.SendVoiceMessages,
+    PermissionsBitField.Flags.UseApplicationCommands
+];
+const PURGE_FREEZE_BITS = PURGE_FREEZE_PERMISSIONS.reduce((bits, permission) => bits | permission, 0n);
 
 function isUnknownMessageError(error) {
     return Number(error?.code || error?.rawError?.code || 0) === 10008;
@@ -196,7 +207,53 @@ function hasExactPermissionOverwrites(channel, expected) {
     });
 }
 
-async function recreateChannelForPurge(channel, reason = 'Vidage complet Sentinel après archive vérifiée') {
+function buildFrozenPermissionOverwrites(channel, original) {
+    const overwrites = original.map(overwrite => ({
+        ...overwrite,
+        allow: overwrite.allow & ~PURGE_FREEZE_BITS,
+        deny: overwrite.deny | PURGE_FREEZE_BITS
+    }));
+    const everyoneId = channel?.guild?.roles?.everyone?.id || channel?.guild?.id;
+    if (everyoneId && !overwrites.some(overwrite => overwrite.id === everyoneId)) {
+        overwrites.push({
+            id: everyoneId,
+            type: 0,
+            allow: 0n,
+            deny: PURGE_FREEZE_BITS
+        });
+    }
+    return overwrites;
+}
+
+async function freezeChannelForPurge(channel, original, reason = 'Gel temporaire avant archivage Sentinel') {
+    if (!channel?.permissionOverwrites?.set) {
+        const error = new TypeError('Discord permission overwrites cannot be frozen for this channel.');
+        error.channelFreezeFailed = true;
+        throw error;
+    }
+    const frozen = buildFrozenPermissionOverwrites(channel, original);
+    await channel.permissionOverwrites.set(frozen, reason);
+    return frozen;
+}
+
+async function restoreChannelPermissions(channel, original, reason = 'Restauration après archivage Sentinel interrompu') {
+    if (!channel?.permissionOverwrites?.set) return false;
+    await channel.permissionOverwrites.set(original, reason);
+    return true;
+}
+
+function hasSameMessageIds(first, second) {
+    const firstIds = Array.isArray(first?.messages) ? first.messages.map(message => String(message.id)).sort() : [];
+    const secondIds = Array.isArray(second?.messages) ? second.messages.map(message => String(message.id)).sort() : [];
+    return firstIds.length === secondIds.length && firstIds.every((id, index) => id === secondIds[index]);
+}
+
+async function recreateChannelForPurge(
+    channel,
+    reason = 'Vidage complet Sentinel après archive vérifiée',
+    originalPermissionOverwrites = null,
+    verifyBeforeDelete = null
+) {
     if (!canRecreateChannelForPurge(channel)) {
         const error = new TypeError('This Discord channel cannot be recreated for a complete purge.');
         error.channelReplacementUnsupported = true;
@@ -204,7 +261,7 @@ async function recreateChannelForPurge(channel, reason = 'Vidage complet Sentine
     }
 
     let replacement = null;
-    const permissionOverwrites = snapshotPermissionOverwrites(channel);
+    const permissionOverwrites = originalPermissionOverwrites || snapshotPermissionOverwrites(channel);
 
     try {
         replacement = await channel.clone({
@@ -226,6 +283,12 @@ async function recreateChannelForPurge(channel, reason = 'Vidage complet Sentine
             && Number.isFinite(channel.rawPosition)
             && replacement.rawPosition !== channel.rawPosition) {
             await replacement.setPosition(channel.rawPosition, { reason });
+        }
+
+        if (typeof verifyBeforeDelete === 'function' && !await verifyBeforeDelete()) {
+            const error = new Error('Le contenu du salon a changé juste avant sa suppression.');
+            error.archiveSnapshotChanged = true;
+            throw error;
         }
 
         await channel.delete(reason);
@@ -302,10 +365,13 @@ module.exports = {
     OLD_MESSAGE_DELETE_CONCURRENCY,
     canBulkDelete,
     canRecreateChannelForPurge,
+    freezeChannelForPurge,
     fetchMessagesForPurge,
     hasExactPermissionOverwrites,
+    hasSameMessageIds,
     purgeFetchedChannelMessages,
     purgeChannelMessages,
     recreateChannelForPurge,
+    restoreChannelPermissions,
     snapshotPermissionOverwrites
 };

@@ -2320,6 +2320,13 @@ async function buildCreatorPremiumOverview(ctx, session = null) {
             ? governance.getFounderMfaStatus(session?.user?.id)
             : null,
         criticalActions: governance.listCriticalActions({ scope: 'global', limit: 50 }),
+        runtimeHealth: {
+            incidents: ctx.helpers.listIncidents?.({ status: 'open', limit: 100 }) || [],
+            jobs: ctx.helpers.getJobHealth?.(50) || []
+        },
+        privacyRequests: siteAccess.isFounder
+            ? (ctx.helpers.listPrivacyRequests?.({ status: 'pending', limit: 100 }) || [])
+            : [],
         staff: await getSiteStaffUsers(ctx),
         guilds: []
     };
@@ -2842,6 +2849,11 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
     const payroll = ctx.helpers.getWeeklyPayroll
         ? ctx.helpers.getWeeklyPayroll(guild.id, { language: config.language, guild })
         : null;
+    const canViewOperations = canManageGuild || siteAccess.canViewSitePanel;
+    const canReviewAppeals = Boolean(viewerMember && (
+        ctx.helpers.hasModerationAccess?.(viewerMember, PermissionsBitField.Flags.ManageMessages)
+        || canManageGuild
+    ));
 
     return {
         guild: {
@@ -2860,6 +2872,11 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             role: siteAccess.role
         },
         siteAccess,
+        viewerAccess: {
+            isGuildOwner: guild.ownerId === viewerUserId,
+            canManageGuild,
+            canReviewAppeals
+        },
         inviteUrl: getInviteUrl(ctx, guild.id),
         config: {
             ...config,
@@ -2972,6 +2989,20 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
                 ? ctx.helpers.getWarningEscalationEvents(guild.id, 25)
                 : []
         },
+        repairCenter: canViewOperations && ctx.helpers.getGuildRepairReport
+            ? ctx.helpers.getGuildRepairReport(guild.id)
+            : null,
+        privacy: canViewOperations ? {
+            retention: ctx.helpers.getRetentionSettings?.(guild.id) || null,
+            requests: ctx.helpers.listPrivacyRequests?.({ guildId: guild.id, limit: 25 }) || []
+        } : null,
+        moderationAppeals: canReviewAppeals && ctx.helpers.getGuildAppeals
+            ? ctx.helpers.getGuildAppeals(guild.id, { limit: 100 })
+            : [],
+        runtimeHealth: siteAccess.canViewSitePanel ? {
+            incidents: ctx.helpers.listIncidents?.({ status: 'open', limit: 50 }) || [],
+            jobs: ctx.helpers.getJobHealth?.(40) || []
+        } : null,
         notifications: viewerUserId && ctx.helpers.buildDashboardNotifications
             ? ctx.helpers.buildDashboardNotifications(guild.id, viewerUserId, {
                 payroll,
@@ -3396,6 +3427,11 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
             if (error?.status) throw error;
             if (error?.purgeBusy) {
                 throw createHttpError(409, 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+            }
+            if (error?.channelFreezeFailed) {
+                throw createHttpError(409, 'Sentinel n’a pas pu figer les publications dans ce salon.', {
+                    fix: 'Vérifie la permission « Gérer les salons » et la position du rôle Sentinel, puis réessaie.'
+                });
             }
             if (error?.archiveFailed) {
                 throw createHttpError(409, 'Archive impossible. Aucun message n’a été supprimé.', {
@@ -4599,6 +4635,57 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             : `Validation #${validation.id} terminée avec des points à corriger.`;
     }
 
+    if (action === 'scan-repairs') {
+        requireCommandAccess(ctx, member);
+        const report = await ctx.helpers.scanGuildConfiguration(guild, member.id);
+        return report.issues.length
+            ? `Contrôle terminé : ${report.issues.length} élément(s) à réparer.`
+            : 'Contrôle terminé : aucun réglage cassé détecté.';
+    }
+
+    if (action === 'apply-safe-repairs') {
+        requireCommandAccess(ctx, member);
+        const report = await ctx.helpers.applySafeGuildRepairs(guild, member.id);
+        return `Réparation terminée : ${report.repairs.length} référence(s) obsolète(s) retirée(s).`;
+    }
+
+    if (action === 'set-data-retention') {
+        requireCommandAccess(ctx, member);
+        ctx.helpers.updateRetentionSettings(guild.id, member.id, body);
+        return 'Durées de conservation enregistrées.';
+    }
+
+    if (action === 'request-guild-data-deletion') {
+        const siteAccess = await getSiteAccess(ctx, session?.user?.id);
+        if (guild.ownerId !== session?.user?.id && !siteAccess.isFounder) {
+            throw createHttpError(403, 'Seul le propriétaire du serveur peut demander cette suppression.');
+        }
+        const request = ctx.helpers.createPrivacyRequest({
+            requestType: 'guild_delete',
+            guildId: guild.id,
+            requestedByUserId: session.user.id,
+            reason: body.reason
+        });
+        return `Demande ${request.requestKey} enregistrée. Les données ne seront supprimées qu’après contrôle.`;
+    }
+
+    if (action === 'decide-appeal') {
+        requireModerationAccess(ctx, member, PermissionsBitField.Flags.ManageMessages, language);
+        let appeal;
+        try {
+            appeal = ctx.helpers.decideAppeal(
+                guild.id,
+                Number(body.appealId),
+                member.id,
+                String(body.status || ''),
+                body.decision
+            );
+        } catch (error) {
+            throw createHttpError(400, error.message || 'Cette contestation ne peut pas être traitée.');
+        }
+        return `Contestation #${appeal.id} traitée : ${appeal.status === 'accepted' ? 'acceptée' : 'refusée'}.`;
+    }
+
     return moderationAction(ctx, guild, member, body, session);
 }
 
@@ -4619,7 +4706,11 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/status') {
-        const incidents = getStatusListFromEnv('SENTINEL_STATUS_INCIDENTS');
+        const runtimeIncidents = ctx.helpers.listIncidents?.({ status: 'open', limit: 5 }) || [];
+        const incidents = [
+            ...getStatusListFromEnv('SENTINEL_STATUS_INCIDENTS'),
+            ...runtimeIncidents.map(item => `Incident technique ${item.incidentId} en cours d’analyse.`)
+        ];
         const maintenance = String(process.env.SENTINEL_STATUS_MAINTENANCE || '').trim() || null;
 
         json(res, 200, {
@@ -4734,6 +4825,50 @@ async function handleApi(req, res, ctx, url) {
         return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/me/privacy/export') {
+        const file = ctx.helpers.createMemberDataExport(session.user.id);
+        writeResponse(res, 200, {
+            'Content-Type': file.contentType,
+            'Content-Disposition': `attachment; filename="${file.fileName}"`,
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Length': file.buffer.length
+        }, file.buffer);
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/me/privacy/request-delete') {
+        const body = await parseBody(req);
+        const request = ctx.helpers.createPrivacyRequest({
+            requestType: 'member_delete',
+            subjectUserId: session.user.id,
+            requestedByUserId: session.user.id,
+            reason: body.reason
+        });
+        json(res, 200, { ok: true, request });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/me/appeals') {
+        const body = await parseBody(req);
+        const guildId = String(body.guildId || '');
+        const guild = ctx.client.guilds.cache.get(guildId);
+        const member = guild
+            ? guild.members.cache.get(session.user.id) || await guild.members.fetch(session.user.id).catch(() => null)
+            : null;
+        if (!guild || !member) {
+            throw createHttpError(403, 'Tu dois être membre de ce serveur pour contester une sanction.');
+        }
+        let appeal;
+        try {
+            appeal = ctx.helpers.createAppeal(guild.id, Number(body.caseId), session.user.id, body.statement);
+        } catch (error) {
+            throw createHttpError(400, error.message || 'La contestation n’a pas pu être enregistrée.');
+        }
+        json(res, 200, { ok: true, appeal });
+        return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/guilds') {
         const oauthGuilds = await getOauthGuilds(session);
         const siteAccess = await getSiteAccess(ctx, session.user.id);
@@ -4797,6 +4932,29 @@ async function handleApi(req, res, ctx, url) {
 
         json(res, 200, {
             ok: true,
+            overview: await buildCreatorPremiumOverview(ctx, session)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/incidents') {
+        await requireFounderAccess(session, { recentLogin: true });
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        const incidentId = String(body.incidentId || '').trim();
+        if (!ctx.helpers.resolveIncident(incidentId)) {
+            throw createHttpError(404, 'Incident introuvable ou déjà résolu.');
+        }
+        addSiteAccessAuditLog({
+            session,
+            body: { action: 'resolve-incident', incidentId },
+            status: 'success',
+            summary: `Incident ${incidentId} classé comme résolu.`,
+            kind: 'runtime_incident'
+        });
+        json(res, 200, {
+            ok: true,
+            message: `Incident ${incidentId} classé comme résolu.`,
             overview: await buildCreatorPremiumOverview(ctx, session)
         });
         return;
@@ -5025,6 +5183,24 @@ async function handleApi(req, res, ctx, url) {
                 siteAccess
             })
         });
+        return;
+    }
+
+    const guildPrivacyExportMatch = /^\/api\/guilds\/(\d{17,20})\/privacy\/export$/.exec(url.pathname);
+    if (req.method === 'GET' && guildPrivacyExportMatch) {
+        const { guild, oauthGuild, siteAccess } = await getDashboardAccess(ctx, session, guildPrivacyExportMatch[1]);
+        const isGuildOwner = guild.ownerId === session.user.id || Boolean(oauthGuild?.owner);
+        if (!isGuildOwner && !siteAccess.isFounder) {
+            throw createHttpError(403, 'Seul le propriétaire du serveur peut exporter toutes ses données.');
+        }
+        const file = ctx.helpers.createGuildDataExport(guild);
+        writeResponse(res, 200, {
+            'Content-Type': file.contentType,
+            'Content-Disposition': `attachment; filename="${file.fileName}"`,
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Length': file.buffer.length
+        }, file.buffer);
         return;
     }
 
@@ -5579,15 +5755,21 @@ async function handleRequest(req, res, ctx) {
         }
 
         const status = error.status || 500;
+        let incident = null;
 
         if (status >= 500) {
             console.error('Erreur dashboard :', error);
+            incident = ctx.helpers.reportIncident?.('dashboard', error, {
+                method: req.method,
+                route: url.pathname
+            }) || null;
         }
 
         if (url.pathname.startsWith('/api/')) {
             json(res, error.status || 500, {
                 ok: false,
                 error: status >= 500 ? 'Internal server error.' : (error.message || 'Internal server error.'),
+                ...(incident ? { incidentId: incident.incidentId } : {}),
                 ...(status < 500 ? (error.details || {}) : {})
             });
             return;

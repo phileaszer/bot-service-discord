@@ -657,6 +657,95 @@ CREATE TABLE IF NOT EXISTS member_notification_deliveries (
     UNIQUE (guild_id, user_id, period_key)
 );
 
+CREATE TABLE IF NOT EXISTS scheduled_job_leases (
+    job_key TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    leased_until INTEGER NOT NULL,
+    last_started_at TEXT NOT NULL,
+    last_finished_at TEXT,
+    last_status TEXT NOT NULL DEFAULT 'running',
+    last_error TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_job_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_type TEXT NOT NULL,
+    item_key TEXT NOT NULL,
+    scheduled_for TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'claimed',
+    result_json TEXT,
+    error_message TEXT,
+    claimed_at TEXT NOT NULL,
+    completed_at TEXT,
+    UNIQUE (job_type, item_key, scheduled_for)
+);
+
+CREATE TABLE IF NOT EXISTS runtime_incidents (
+    incident_id TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    source TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'error',
+    message TEXT NOT NULL,
+    context_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'open',
+    occurrence_count INTEGER NOT NULL DEFAULT 1,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    resolved_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS guild_repair_reports (
+    guild_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    issues_json TEXT NOT NULL DEFAULT '[]',
+    repairs_json TEXT NOT NULL DEFAULT '[]',
+    scanned_by_user_id TEXT,
+    scanned_at TEXT NOT NULL,
+    repaired_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS guild_data_retention_settings (
+    guild_id TEXT PRIMARY KEY,
+    automod_days INTEGER NOT NULL DEFAULT 365,
+    audit_days INTEGER NOT NULL DEFAULT 365,
+    purge_archive_days INTEGER NOT NULL DEFAULT 365,
+    dossier_archive_days INTEGER NOT NULL DEFAULT 365,
+    updated_by_user_id TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS data_privacy_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_key TEXT NOT NULL UNIQUE,
+    request_type TEXT NOT NULL,
+    guild_id TEXT,
+    subject_user_id TEXT,
+    requested_by_user_id TEXT NOT NULL,
+    reason TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    decision_note TEXT,
+    reviewed_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS moderation_appeals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    case_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    decision TEXT,
+    decided_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT,
+    UNIQUE (guild_id, case_id, user_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_service_times_guild_start
 ON service_times (guild_id, start_time);
 
@@ -824,6 +913,24 @@ ON critical_action_requests (scope, guild_id, status, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_member_notification_deliveries_user
 ON member_notification_deliveries (guild_id, user_id, attempted_at);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_job_executions_status
+ON scheduled_job_executions (job_type, status, claimed_at);
+
+CREATE INDEX IF NOT EXISTS idx_runtime_incidents_status_seen
+ON runtime_incidents (status, last_seen_at);
+
+CREATE INDEX IF NOT EXISTS idx_privacy_requests_status_created
+ON data_privacy_requests (status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_privacy_requests_guild
+ON data_privacy_requests (guild_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_moderation_appeals_guild_status
+ON moderation_appeals (guild_id, status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_moderation_appeals_user
+ON moderation_appeals (user_id, created_at);
 
 `);
 
