@@ -58,10 +58,10 @@ test('dashboard sections use persistent internal summaries instead of one long p
     assert.match(frontend, /function applyDashboardSubtabs\(root = document\)/);
     assert.match(frontend, /activeDashboardSubtabs\[parent\] = button\.dataset\.dashboardSubtab/);
     assert.match(frontend, /class="dashboard-primary-nav"/);
-    assert.match(frontend, /dashboard-nav-section-\$\{escapeHtml\(group\.id\)\}/);
     assert.match(frontend, /class="dashboard-nav-item/);
+    assert.doesNotMatch(frontend, /DASHBOARD_TAB_GROUPS|dashboard-nav-section/);
     assert.match(styles, /\.dashboard-subtabs[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
-    assert.match(styles, /\.dashboard-primary-nav[\s\S]*grid-template-columns:/);
-    assert.match(styles, /\.dashboard-nav-section-manage \.dashboard-nav-items/);
+    assert.match(styles, /\.dashboard-primary-nav[\s\S]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+    assert.doesNotMatch(styles, /\.dashboard-nav-section|\.dashboard-nav-heading/);
     assert.match(styles, /:root\[data-theme="western"\] \.dashboard-subnav/);
 });

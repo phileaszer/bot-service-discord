@@ -5701,33 +5701,10 @@ const DASHBOARD_TABS = [
   },
   {
     id: 'founder',
-    label: 'Régie',
-    eyebrow: 'Accès site',
+    label: 'Accès au site',
+    eyebrow: 'Régie',
     title: 'Régie Sentinel',
     description: 'Fonda, staff et maintenance'
-  }
-];
-
-const DASHBOARD_TAB_GROUPS = [
-  {
-    id: 'start',
-    label: 'Démarrer',
-    tabs: ['overview', 'setup', 'configuration']
-  },
-  {
-    id: 'manage',
-    label: 'Gérer',
-    tabs: ['service', 'dossiers', 'moderation', 'embeds']
-  },
-  {
-    id: 'monitor',
-    label: 'Contrôler',
-    tabs: ['audit', 'operations']
-  },
-  {
-    id: 'control-room',
-    label: 'Régie',
-    tabs: ['founder']
   }
 ];
 
@@ -5799,7 +5776,7 @@ function renderDashboardSubtabSummary(tabId) {
   const selected = activeDashboardSubtabs[tabId] || definitions[0].id;
   return `
     <nav class="dashboard-subnav" aria-label="Sommaire de l’onglet">
-      <div class="dashboard-subnav-heading"><span>Sommaire</span><strong>${escapeHtml((DASHBOARD_TABS.find(tab => tab.id === tabId) || {}).title || tabId)}</strong></div>
+      <div class="dashboard-subnav-heading"><span>Sommaire</span></div>
       <div class="dashboard-subtabs" role="tablist">
         ${definitions.map(item => `
           <button type="button" class="dashboard-subtab${item.id === selected ? ' is-active' : ''}" data-dashboard-subtab="${escapeHtml(item.id)}" data-dashboard-subtab-parent="${escapeHtml(tabId)}" role="tab" aria-selected="${item.id === selected ? 'true' : 'false'}">
@@ -5906,27 +5883,20 @@ function renderDashboardTabs(state, premiumBadge) {
         <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
       </div>
       <nav class="dashboard-primary-nav" aria-label="Sections du dashboard">
-        ${DASHBOARD_TAB_GROUPS.map((group) => `
-          <section class="dashboard-nav-section dashboard-nav-section-${escapeHtml(group.id)}" aria-label="${escapeHtml(group.label)}">
-            <span class="dashboard-nav-heading">${escapeHtml(group.label)}</span>
-            <div class="dashboard-nav-items">
-              ${group.tabs.map((tabId) => tabs.find((tab) => tab.id === tabId)).filter(Boolean).map((tab) => `
-                <button
-                  type="button"
-                  class="dashboard-nav-item${tab.id === activeDashboardTab ? ' is-active' : ''}"
-                  data-dashboard-tab="${tab.id}"
-                  aria-pressed="${tab.id === activeDashboardTab ? 'true' : 'false'}"
-                >
-                  <span class="dashboard-nav-kicker">${escapeHtml(tab.eyebrow)}</span>
-                  <span class="dashboard-nav-copy">
-                    <strong>${escapeHtml(tab.label)}</strong>
-                    <small>${escapeHtml(tab.description)}</small>
-                  </span>
-                </button>
-              `).join('')}
-            </div>
-          </section>
-        `).filter((markup) => markup.includes('data-dashboard-tab')).join('')}
+        ${tabs.map((tab) => `
+          <button
+            type="button"
+            class="dashboard-nav-item${tab.id === activeDashboardTab ? ' is-active' : ''}"
+            data-dashboard-tab="${tab.id}"
+            aria-pressed="${tab.id === activeDashboardTab ? 'true' : 'false'}"
+          >
+            <span class="dashboard-nav-kicker">${escapeHtml(tab.eyebrow)}</span>
+            <span class="dashboard-nav-copy">
+              <strong>${escapeHtml(tab.label)}</strong>
+              <small>${escapeHtml(tab.description)}</small>
+            </span>
+          </button>
+        `).join('')}
       </nav>
     </section>
   `;
