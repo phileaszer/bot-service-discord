@@ -5580,6 +5580,57 @@ function creatorStaffManagePanel(overview) {
   `;
 }
 
+function founderGuildInventoryPanel() {
+  const installedGuilds = guilds
+    .filter((guild) => guild.installed)
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+
+  return `
+    <section class="founder-storage-panel founder-guilds-panel" aria-label="Serveurs Sentinel">
+      <div class="panel-heading row-heading">
+        <div>
+          <p class="eyebrow">Parc Sentinel</p>
+          <h3>Serveurs équipés</h3>
+          <p class="muted">Tous les serveurs sur lesquels Sentinel est actuellement installé.</p>
+        </div>
+        <span class="status-badge is-ready">${escapeHtml(installedGuilds.length)} serveur(s)</span>
+      </div>
+      <label class="founder-guild-filter">
+        <span>Rechercher un serveur</span>
+        <input type="search" data-founder-guild-search placeholder="Nom ou ID Discord" autocomplete="off">
+      </label>
+      ${installedGuilds.length ? `
+        <div class="table-shell founder-guild-table-shell">
+          <table class="dashboard-table founder-guild-table">
+            <thead><tr><th>Serveur</th><th>État</th><th>Accès</th></tr></thead>
+            <tbody>
+              ${installedGuilds.map((guild) => {
+                const icon = safeDiscordImageUrl(guild.icon);
+                const searchValue = `${guild.name} ${guild.id}`.toLocaleLowerCase('fr');
+                const selected = guild.id === selectedGuildId;
+                return `
+                  <tr data-founder-guild-row data-founder-guild-search-value="${escapeHtml(searchValue)}">
+                    <td>
+                      <span class="founder-guild-identity">
+                        ${icon
+                          ? `<img src="${escapeHtml(icon)}" alt="">`
+                          : `<span class="founder-guild-fallback">${escapeHtml((guild.name || 'S').slice(0, 1).toUpperCase())}</span>`}
+                        <span><strong>${escapeHtml(guild.name)}</strong><small><code>${escapeHtml(guild.id)}</code></small></span>
+                      </span>
+                    </td>
+                    <td>${statusBadge('Sentinel actif', true)}</td>
+                    <td><button class="button button-small button-ghost" type="button" data-select-guild="${escapeHtml(guild.id)}" ${selected ? 'disabled' : ''}>${selected ? 'Serveur ouvert' : 'Ouvrir'}</button></td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <p class="muted founder-guild-empty" data-founder-guild-empty hidden>Aucun serveur ne correspond à cette recherche.</p>
+        </div>
+      ` : '<p class="muted">Aucun serveur Sentinel trouvé pour le moment.</p>'}
+    </section>
+  `;
+}
+
 function renderFounderPremiumPanel() {
   if (!canShowFounderTab()) {
     return '';
@@ -5611,6 +5662,7 @@ function renderFounderPremiumPanel() {
           <small>où Sentinel est installé</small>
         </article>
       </div>
+      ${founderGuildInventoryPanel()}
       ${founderSecurityPanel(overview)}
       ${criticalActionsPanel(overview)}
       ${founderOfficialUpdatePanel(overview)}
@@ -5758,6 +5810,7 @@ const DASHBOARD_SUBTABS = {
     { id: 'testing', label: 'Essais', description: 'Simulations et validation Sentinel', selectors: ['[data-operation-section="testing"]'] }
   ],
   founder: [
+    { id: 'servers', label: 'Serveurs', description: 'Parc équipé de Sentinel', selectors: ['[aria-label="Serveurs Sentinel"]'] },
     { id: 'security', label: 'Sécurité', description: 'Double protection et validations', selectors: ['[aria-label="Double sécurité fondatrice"]', '[aria-label="Validations critiques"]'] },
     { id: 'publishing', label: 'Publication', description: 'Annonce globale protégée', selectors: ['[aria-label="Annonce globale Sentinel"]'] },
     { id: 'health', label: 'Surveillance', description: 'Incidents, tâches et préproduction', selectors: ['[aria-label="Surveillance Sentinel"]', '[aria-label="Préproduction Discord"]'] },
@@ -6421,6 +6474,21 @@ function attachDashboardHandlers() {
     event.preventDefault();
     const form = event.currentTarget;
     submitOfficialUpdate(formData(form), $('button[type="submit"]', form));
+  });
+
+  $('[data-founder-guild-search]')?.addEventListener('input', (event) => {
+    const query = String(event.currentTarget.value || '').trim().toLocaleLowerCase('fr');
+    const rows = $$('[data-founder-guild-row]');
+    let visibleCount = 0;
+
+    rows.forEach((row) => {
+      const visible = !query || String(row.dataset.founderGuildSearchValue || '').includes(query);
+      row.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+
+    const empty = $('[data-founder-guild-empty]');
+    if (empty) empty.hidden = visibleCount > 0;
   });
 
   $$('[data-critical-action]').forEach((button) => {

@@ -3726,6 +3726,64 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+.founder-guild-filter {
+  display: grid;
+  max-width: 520px;
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.founder-guild-filter > span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.founder-guild-table {
+  min-width: 680px;
+}
+
+.founder-guild-table th:last-child,
+.founder-guild-table td:last-child {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.founder-guild-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.founder-guild-identity > img,
+.founder-guild-fallback {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(23, 231, 255, 0.22);
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+
+.founder-guild-fallback {
+  display: inline-grid;
+  place-items: center;
+  color: var(--cyan);
+  background: rgba(23, 231, 255, 0.08);
+  font-weight: 900;
+}
+
+.founder-guild-identity > span:last-child {
+  min-width: 0;
+}
+
+.founder-guild-empty {
+  margin: 16px;
+  text-align: center;
+}
+
 .founder-storage-panel {
   margin: 18px 0;
   padding: 18px 0;

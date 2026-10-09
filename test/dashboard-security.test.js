@@ -80,3 +80,13 @@ test('an overdue dossier receives only one successful reminder', () => {
     assert.doesNotMatch(source, /lastReminderAt[\s\S]{0,160}< 60 \* 60 \* 1000/);
     assert.match(source, /if \(reminderSent\) \{\s*markDossierReminder\(guild\.id, dossier\.channelId\)/);
 });
+
+test('the site control room lists every installed Sentinel server', () => {
+    const frontend = read('site/dashboard.js');
+    assert.match(frontend, /function founderGuildInventoryPanel\(\)/);
+    assert.match(frontend, /\.filter\(\(guild\) => guild\.installed\)/);
+    assert.match(frontend, /aria-label="Serveurs Sentinel"/);
+    assert.match(frontend, /data-founder-guild-search/);
+    assert.match(frontend, /data-select-guild="\$\{escapeHtml\(guild\.id\)\}"/);
+    assert.match(frontend, /\{ id: 'servers', label: 'Serveurs'/);
+});
