@@ -72,3 +72,11 @@ test('dashboard sections use persistent internal summaries instead of one long p
     assert.doesNotMatch(styles, /\.dashboard-nav-item\.is-active::after/);
     assert.match(styles, /:root\[data-theme="western"\] \.dashboard-subnav/);
 });
+
+test('an overdue dossier receives only one successful reminder', () => {
+    const source = read('index.js');
+    assert.match(source, /const reminderAlreadySent = Boolean\(dossier\.lastReminderAt\)/);
+    assert.match(source, /if \(!overdue \|\| reminderAlreadySent\)/);
+    assert.doesNotMatch(source, /lastReminderAt[\s\S]{0,160}< 60 \* 60 \* 1000/);
+    assert.match(source, /if \(reminderSent\) \{\s*markDossierReminder\(guild\.id, dossier\.channelId\)/);
+});

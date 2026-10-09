@@ -3830,10 +3830,9 @@ async function processDossierMaintenance() {
                 + (settings?.slaResolutionMinutes || 1440) * 60 * 1000;
             const overdue = (!dossier.firstStaffResponseAt && Date.now() > firstDeadline)
                 || Date.now() > resolutionDeadline;
-            const remindedRecently = dossier.lastReminderAt
-                && Date.now() - new Date(dossier.lastReminderAt).getTime() < 60 * 60 * 1000;
+            const reminderAlreadySent = Boolean(dossier.lastReminderAt);
 
-            if (!overdue || remindedRecently) {
+            if (!overdue || reminderAlreadySent) {
                 continue;
             }
 
@@ -3852,9 +3851,21 @@ async function processDossierMaintenance() {
             const recipients = dossier.referentUserId
                 ? `<@${dossier.referentUserId}>`
                 : (roleMentions || fallbackRoleMentions);
-            await channel.send(`${recipients ? `${recipients} ` : ''}Ce dossier demande une intervention : le délai prévu est dépassé.`)
-                .catch(() => {});
-            markDossierReminder(guild.id, dossier.channelId);
+            const reminderSent = await channel
+                .send(`${recipients ? `${recipients} ` : ''}Ce dossier demande une intervention : le délai prévu est dépassé.`)
+                .then(() => true)
+                .catch(error => {
+                    reportRuntimeIncident('dossier-overdue-reminder', error, {
+                        guildId: guild.id,
+                        channelId: dossier.channelId,
+                        dossierId: dossier.id
+                    });
+                    return false;
+                });
+
+            if (reminderSent) {
+                markDossierReminder(guild.id, dossier.channelId);
+            }
         }
     }
 }
