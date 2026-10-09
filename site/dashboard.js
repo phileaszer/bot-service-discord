@@ -5044,18 +5044,59 @@ function reportScheduleList(state) {
 
 function simulationHistory(state) {
   const items = state.simulations || [];
-  if (!items.length) return '<p class="muted">Aucun essai enregistré.</p>';
+  if (!items.length) return '<p class="muted simulation-empty">Aucun résultat enregistré pour le moment.</p>';
+
+  const labels = {
+    automod: 'Auto-modération',
+    dossier: 'Dossier',
+    payroll: 'Paie RP',
+    announcement: 'Annonce'
+  };
+  const actionLabels = {
+    none: 'aucune action',
+    delete: 'suppression du message',
+    warn: 'avertissement',
+    timeout: 'exclusion temporaire',
+    kick: 'exclusion du serveur',
+    ban: 'bannissement'
+  };
+  const resultSummary = (item) => {
+    const result = item.result || {};
+    if (item.kind === 'automod') {
+      return result.matched
+        ? `${result.detail || 'Règle détectée'} · Réponse prévue : ${actionLabels[result.action] || result.action || 'action configurée'}`
+        : (result.detail || 'Ce message serait autorisé.');
+    }
+    if (item.kind === 'dossier') {
+      const destination = result.categoryName || 'catégorie générale';
+      const roles = result.roleNames?.length ? result.roleNames.join(', ') : 'équipe générale';
+      return `Destination : ${destination} · Responsables : ${roles}`;
+    }
+    if (item.kind === 'payroll') {
+      return result.found
+        ? `${result.totalTimeLabel} · ${result.amountLabel} · ${result.paid ? 'déjà versée' : 'à verser'}`
+        : (result.detail || 'Aucune paie trouvée pour cette semaine.');
+    }
+    if (item.kind === 'announcement') {
+      return `Annonce valide · ${result.totalCharacters || 0} caractère(s)`;
+    }
+    return result.detail || 'Résultat enregistré.';
+  };
+
   return `
-    <div class="operation-list">
+    <div class="simulation-history">
+      <div class="panel-mini-heading"><div><h4>Derniers résultats</h4><p class="muted">Les contrôles restent consultables sans aucune action sur Discord.</p></div></div>
+      <div class="operation-list">
       ${items.map(item => `
         <article class="operation-row">
           <div>
-            <span>Essai #${escapeHtml(item.id)} · ${escapeHtml(item.kind)}</span>
-            <strong>${escapeHtml(item.result?.detail || item.result?.action || (item.result?.valid ? 'Configuration valide' : 'Résultat enregistré'))}</strong>
-            <small>${escapeHtml(formatAuditDate(item.createdAt))} · aucune action réelle</small>
+            <span>${escapeHtml(labels[item.kind] || 'Simulation')} · contrôle #${escapeHtml(item.id)}</span>
+            <strong>${escapeHtml(resultSummary(item))}</strong>
+            <small>${escapeHtml(formatAuditDate(item.createdAt))} · simulation uniquement</small>
           </div>
         </article>
       `).join('')}
+      </div>
     </div>
   `;
 }
@@ -5136,12 +5177,36 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
         </article>
 
         <article class="inline-form operation-card operation-card-wide" data-operation-section="testing">
-          <div class="panel-mini-heading"><div><h3>Mode d’essai ${premiumTag}</h3><p class="muted">Chaque test est journalisé et ne modifie aucun membre, salon ou registre de paie RP.</p></div></div>
+          <div class="panel-mini-heading row-heading"><div><h3>Simulations sans action ${premiumTag}</h3><p class="muted">Vérifie les réglages du serveur sans sanctionner, publier, créer de dossier ni enregistrer de paie.</p></div><span class="status-badge is-ready">Aucun effet sur Discord</span></div>
           <div class="simulation-grid">
-            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="automod"><textarea name="content" placeholder="Message à tester" required></textarea><button class="button" type="submit">Tester la garde</button></form>
-            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="dossier"><select name="type"><option value="support">Support</option><option value="report">Signalement</option><option value="recruitment">Recrutement</option><option value="partnership">Partenariat</option><option value="other">Autre</option></select><button class="button" type="submit">Tester le routage</button></form>
-            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="payroll"><input name="userId" placeholder="ID Discord" required><button class="button" type="submit">Tester une paie</button></form>
-            <form data-action-form="run-simulation"><input type="hidden" name="kind" value="announcement"><input name="title" placeholder="Titre" required><textarea name="description" placeholder="Message" required></textarea><input name="color" type="color" value="#2dd4bf"><button class="button" type="submit">Valider l’annonce</button></form>
+            <form class="simulation-test" data-action-form="run-simulation">
+              <input type="hidden" name="kind" value="automod">
+              <div class="simulation-test-heading"><span>01</span><div><h4>Auto-modération</h4><p>Indique la règle et la réponse qui s’appliqueraient à un message.</p></div></div>
+              <label><span>Message à analyser</span><textarea name="content" placeholder="Écris ici un exemple de message Discord" required></textarea></label>
+              <button class="button" type="submit">Simuler l’auto-modération</button>
+            </form>
+            <form class="simulation-test" data-action-form="run-simulation">
+              <input type="hidden" name="kind" value="dossier">
+              <div class="simulation-test-heading"><span>02</span><div><h4>Dossier privé</h4><p>Affiche la catégorie, les responsables et le formulaire prévus.</p></div></div>
+              <label><span>Nature du dossier</span><select name="type"><option value="support">Support</option><option value="report">Signalement</option><option value="recruitment">Recrutement</option><option value="partnership">Partenariat</option><option value="other">Autre</option></select></label>
+              <button class="button" type="submit">Vérifier le dossier</button>
+            </form>
+            <form class="simulation-test" data-action-form="run-simulation">
+              <input type="hidden" name="kind" value="payroll">
+              <div class="simulation-test-heading"><span>03</span><div><h4>Paie RP</h4><p>Calcule la ligne de paie de la semaine sans la marquer comme versée.</p></div></div>
+              <label><span>Membre concerné</span><input name="userId" placeholder="ID Discord du membre" inputmode="numeric" required></label>
+              <button class="button" type="submit">Calculer l’aperçu</button>
+            </form>
+            <form class="simulation-test" data-action-form="run-simulation">
+              <input type="hidden" name="kind" value="announcement">
+              <div class="simulation-test-heading"><span>04</span><div><h4>Annonce Discord</h4><p>Contrôle le contenu et la couleur de l’embed sans le publier.</p></div></div>
+              <div class="simulation-fields">
+                <label><span>Titre de l’annonce</span><input name="title" placeholder="Titre" required></label>
+                <label class="simulation-color"><span>Couleur</span><input name="color" type="color" value="#2dd4bf" aria-label="Couleur de l’annonce"></label>
+                <label class="simulation-message"><span>Message de l’annonce</span><textarea name="description" placeholder="Message" required></textarea></label>
+              </div>
+              <button class="button" type="submit">Contrôler l’annonce</button>
+            </form>
           </div>
           ${simulationHistory(state)}
         </article>

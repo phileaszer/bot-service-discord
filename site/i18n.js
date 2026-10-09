@@ -1682,6 +1682,35 @@
     'Contrôle final impossible': 'Final verification failed'
   });
 
+  Object.assign(en, {
+    'Simulations sans action': 'Safe simulations',
+    'Vérifie les réglages du serveur sans sanctionner, publier, créer de dossier ni enregistrer de paie.': 'Check the server settings without sanctioning, publishing, creating a dossier, or recording payroll.',
+    'Aucun effet sur Discord': 'No effect on Discord',
+    'Auto-modération': 'Auto-moderation',
+    'Indique la règle et la réponse qui s’appliqueraient à un message.': 'Shows the rule and response that would apply to a message.',
+    'Message à analyser': 'Message to analyze',
+    'Écris ici un exemple de message Discord': 'Write an example Discord message here',
+    'Simuler l’auto-modération': 'Simulate auto-moderation',
+    'Dossier privé': 'Private dossier',
+    'Affiche la catégorie, les responsables et le formulaire prévus.': 'Shows the planned category, responsible roles, and form.',
+    'Nature du dossier': 'Dossier type',
+    'Vérifier le dossier': 'Check the dossier',
+    'Paie RP': 'RP payroll',
+    'Calcule la ligne de paie de la semaine sans la marquer comme versée.': 'Calculates this week’s payroll line without marking it as paid.',
+    'Membre concerné': 'Member',
+    'ID Discord du membre': 'Member Discord ID',
+    'Calculer l’aperçu': 'Calculate preview',
+    'Annonce Discord': 'Discord announcement',
+    'Contrôle le contenu et la couleur de l’embed sans le publier.': 'Checks the embed content and color without publishing it.',
+    'Titre de l’annonce': 'Announcement title',
+    'Couleur de l’annonce': 'Announcement color',
+    'Message de l’annonce': 'Announcement message',
+    'Contrôler l’annonce': 'Check announcement',
+    'Derniers résultats': 'Latest results',
+    'Les contrôles restent consultables sans aucune action sur Discord.': 'The checks remain available without taking any action on Discord.',
+    'Aucun résultat enregistré pour le moment.': 'No results recorded yet.'
+  });
+
   let normalizedTranslations = null;
 
   function normalizeTranslationKey(value) {

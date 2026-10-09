@@ -100,3 +100,16 @@ test('every site page receives the public Sentinel creator credit', () => {
     assert.doesNotMatch(theme, /discord\.com\/users/);
     assert.match(theme, /document\.body\.append\(footer\)/);
 });
+
+test('the simulation bench explains each safe test and its result', () => {
+    const frontend = read('site/dashboard.js');
+    for (const label of ['Auto-modération', 'Dossier privé', 'Paie RP', 'Annonce Discord']) {
+        assert.match(frontend, new RegExp(label));
+    }
+    for (const action of ['Simuler l’auto-modération', 'Vérifier le dossier', 'Calculer l’aperçu', 'Contrôler l’annonce']) {
+        assert.match(frontend, new RegExp(action));
+    }
+    assert.match(frontend, /Aucun effet sur Discord/);
+    assert.match(frontend, /function simulationHistory\(state\)[\s\S]*Réponse prévue/);
+    assert.doesNotMatch(frontend, /Tester la garde|Tester le routage|Tester une paie/);
+});
