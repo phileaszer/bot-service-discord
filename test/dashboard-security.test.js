@@ -60,6 +60,11 @@ test('dashboard sections use persistent internal summaries instead of one long p
     assert.match(frontend, /class="dashboard-primary-nav"/);
     assert.match(frontend, /class="dashboard-nav-item/);
     assert.match(frontend, /eyebrow: 'Synthèse'/);
+    for (const title of ['Configuration', 'Modération', 'Annonces', 'Historique', 'Accès au site']) {
+        assert.match(frontend, new RegExp(`label: '${title}'[\\s\\S]{0,80}title: '${title}'`));
+    }
+    assert.match(frontend, /function renderDashboardTabs\(state\)/);
+    assert.doesNotMatch(frontend, /function renderDashboardTabs\(state, premiumBadge\)/);
     assert.doesNotMatch(frontend, /DASHBOARD_TAB_GROUPS|dashboard-nav-section/);
     assert.match(styles, /\.dashboard-subtabs[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
     assert.match(styles, /\.dashboard-primary-nav[\s\S]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);

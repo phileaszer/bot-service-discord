@@ -5652,7 +5652,7 @@ const DASHBOARD_TABS = [
   },
   {
     id: 'configuration',
-    label: 'Réglages',
+    label: 'Configuration',
     eyebrow: 'Base',
     title: 'Configuration',
     description: 'Langue, rôles et logs'
@@ -5675,21 +5675,21 @@ const DASHBOARD_TABS = [
     id: 'moderation',
     label: 'Modération',
     eyebrow: 'Sécurité',
-    title: 'Sanctions',
+    title: 'Modération',
     description: 'Sanctions, auto-rôle et permissions'
   },
   {
     id: 'embeds',
     label: 'Annonces',
     eyebrow: 'Messages',
-    title: 'Embeds et annonces',
+    title: 'Annonces',
     description: 'Messages propres sous Sentinel'
   },
   {
     id: 'audit',
     label: 'Historique',
     eyebrow: 'Traces',
-    title: 'Journal des actions',
+    title: 'Historique',
     description: 'Retrouver qui a fait quoi'
   },
   {
@@ -5703,7 +5703,7 @@ const DASHBOARD_TABS = [
     id: 'founder',
     label: 'Accès au site',
     eyebrow: 'Régie',
-    title: 'Régie Sentinel',
+    title: 'Accès au site',
     description: 'Fonda, staff et maintenance'
   }
 ];
@@ -5855,7 +5855,7 @@ function availableDashboardTabs(state = currentState) {
   return DASHBOARD_TABS.filter((tab) => tab.id !== 'founder' || canShowFounderTab(state));
 }
 
-function renderDashboardTabs(state, premiumBadge) {
+function renderDashboardTabs(state) {
   const tabs = availableDashboardTabs(state);
   const activeTab = tabs.find((tab) => tab.id === activeDashboardTab) || tabs[0] || DASHBOARD_TABS[0];
   const syncBadge = dashboardHydrating
@@ -5879,7 +5879,6 @@ function renderDashboardTabs(state, premiumBadge) {
       </div>
       <div class="control-status">
         ${syncBadge}
-        ${premiumBadge}
         <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
       </div>
       <nav class="dashboard-primary-nav" aria-label="Sections du dashboard">
@@ -5954,7 +5953,7 @@ function renderDashboard() {
   const premiumTag = '';
 
   main.innerHTML = `
-    ${renderDashboardTabs(state, premiumBadge)}
+    ${renderDashboardTabs(state)}
     <div class="dashboard-tab-stage is-plan-free">
       ${tabPanel('overview', () => renderServerHome(state, premiumBadge))}
 
