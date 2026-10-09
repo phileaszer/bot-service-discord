@@ -22,57 +22,72 @@
   }
 
   function renderUpdateBody(host, value) {
-    let list = null;
-    let section = null;
     const lines = String(value || '').replace(/\r/g, '').split('\n');
     const hasSections = lines.some((line) => /^#{2,3}\s+/.test(line.trim()));
 
-    if (hasSections) {
-      host.classList.add('official-update-body--sections');
+    if (!hasSections) {
+      lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+        if (!line) return;
+        const paragraph = document.createElement('p');
+        paragraph.textContent = line;
+        host.append(paragraph);
+      });
+      return false;
+    }
+
+    host.classList.add('official-update-body--sections');
+    const updateList = document.createElement('ul');
+    updateList.className = 'official-update-list';
+    let item = null;
+    let inlineDetails = [];
+
+    function flushInlineDetails() {
+      if (!item || inlineDetails.length === 0) return;
+      const details = document.createElement('p');
+      details.className = 'official-update-details';
+      details.textContent = `${inlineDetails.join(', ')}.`;
+      item.append(details);
+      inlineDetails = [];
     }
 
     lines.forEach((rawLine) => {
       const line = rawLine.trim();
 
-      if (!line) {
-        list = null;
-        return;
-      }
+      if (!line) return;
 
       const heading = line.match(/^#{2,3}\s+(.+)$/);
       if (heading) {
-        section = document.createElement('section');
-        section.className = 'official-update-section';
+        flushInlineDetails();
+        item = document.createElement('li');
+        item.className = 'official-update-item';
         const title = document.createElement('h3');
         title.textContent = heading[1];
-        section.append(title);
-        host.append(section);
-        list = null;
+        item.append(title);
+        updateList.append(item);
         return;
       }
 
-      const item = line.match(/^-\s+(.+)$/);
-      if (item) {
-        if (!list) {
-          list = document.createElement('ul');
-          (section || host).append(list);
-        }
-        const entry = document.createElement('li');
-        entry.textContent = item[1];
-        list.append(entry);
+      const detail = line.match(/^-\s+(.+)$/);
+      if (detail && item) {
+        inlineDetails.push(detail[1].replace(/[.;]\s*$/, ''));
         return;
       }
 
+      flushInlineDetails();
       const paragraph = document.createElement('p');
       paragraph.textContent = line;
-      if (hasSections && !section) {
+      if (!item) {
         paragraph.className = 'official-update-lead';
+        host.append(paragraph);
+      } else {
+        item.append(paragraph);
       }
-      (section || host).append(paragraph);
-      list = null;
     });
 
-    return hasSections;
+    flushInlineDetails();
+    host.append(updateList);
+    return true;
   }
 
   function createUpdate(update, language) {

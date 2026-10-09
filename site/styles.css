@@ -7828,15 +7828,11 @@ code {
 
 .official-update-body--sections {
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 34px;
   margin: 2px 0 0;
   line-height: 1.55;
 }
 
 .official-update-body--sections .official-update-lead {
-  grid-column: 1 / -1;
   margin: 0;
   padding: 0 0 18px;
   color: var(--text);
@@ -7844,33 +7840,47 @@ code {
   border-bottom: 1px solid var(--line);
 }
 
-.official-update-section {
+.official-update-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 34px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.official-update-item {
+  position: relative;
   min-width: 0;
-  padding: 18px 0 8px;
+  padding: 18px 0 14px 20px;
   border-bottom: 1px solid var(--line);
 }
 
-.official-update-section:last-child {
+.official-update-item::before {
+  content: "•";
+  position: absolute;
+  top: 16px;
+  left: 0;
+  color: var(--cyan);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.official-update-item:last-child {
   grid-column: 1 / -1;
   border-bottom: 0;
 }
 
-.official-update-body--sections .official-update-section h3 {
+.official-update-body--sections .official-update-item h3 {
   margin: 0 0 7px;
 }
 
-.official-update-body--sections .official-update-section p {
+.official-update-body--sections .official-update-item p {
   margin: 0 0 8px;
 }
 
-.official-update-body--sections .official-update-section ul {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px 24px;
-  margin: 7px 0 8px;
-}
-
-.official-update-body--sections .official-update-section:last-child ul {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.official-update-details {
+  color: var(--text);
 }
 
 @media (max-width: 700px) {
@@ -7895,17 +7905,12 @@ code {
     white-space: normal;
   }
 
-  .official-update-body--sections {
+  .official-update-list {
     grid-template-columns: 1fr;
   }
 
-  .official-update-section:last-child {
+  .official-update-item:last-child {
     grid-column: 1;
-  }
-
-  .official-update-body--sections .official-update-section ul,
-  .official-update-body--sections .official-update-section:last-child ul {
-    grid-template-columns: 1fr;
   }
 
   .official-update-body {
