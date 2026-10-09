@@ -127,5 +127,8 @@ test('the dashboard patch note is public, readable and delivered only through op
     assert.match(bot, /const officialDistribution = await distributeLatestPublicOfficialUpdate\(\)/);
     assert.match(updates, /function renderUpdateBody\(host, value\)/);
     assert.match(updates, /line\.match\(\/\^#\{2,3\}\\s\+\(\.\+\)\$\//);
+    assert.match(updates, /official-update-entry--structured/);
+    assert.match(updates, /official-update-section/);
+    assert.match(read('site/styles.css'), /\.official-update-body--sections[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     assert.doesNotMatch(status, /sentinel-dashboard-services-tests-2026-10-09/);
 });

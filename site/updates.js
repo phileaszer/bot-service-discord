@@ -23,8 +23,15 @@
 
   function renderUpdateBody(host, value) {
     let list = null;
+    let section = null;
+    const lines = String(value || '').replace(/\r/g, '').split('\n');
+    const hasSections = lines.some((line) => /^#{2,3}\s+/.test(line.trim()));
 
-    String(value || '').replace(/\r/g, '').split('\n').forEach((rawLine) => {
+    if (hasSections) {
+      host.classList.add('official-update-body--sections');
+    }
+
+    lines.forEach((rawLine) => {
       const line = rawLine.trim();
 
       if (!line) {
@@ -34,9 +41,12 @@
 
       const heading = line.match(/^#{2,3}\s+(.+)$/);
       if (heading) {
+        section = document.createElement('section');
+        section.className = 'official-update-section';
         const title = document.createElement('h3');
         title.textContent = heading[1];
-        host.append(title);
+        section.append(title);
+        host.append(section);
         list = null;
         return;
       }
@@ -45,7 +55,7 @@
       if (item) {
         if (!list) {
           list = document.createElement('ul');
-          host.append(list);
+          (section || host).append(list);
         }
         const entry = document.createElement('li');
         entry.textContent = item[1];
@@ -55,9 +65,14 @@
 
       const paragraph = document.createElement('p');
       paragraph.textContent = line;
-      host.append(paragraph);
+      if (hasSections && !section) {
+        paragraph.className = 'official-update-lead';
+      }
+      (section || host).append(paragraph);
       list = null;
     });
+
+    return hasSections;
   }
 
   function createUpdate(update, language) {
@@ -75,7 +90,10 @@
     date.textContent = formatDate(date.dateTime, language);
     title.textContent = language === 'en' && update.titleEn ? update.titleEn : update.titleFr;
     body.className = 'official-update-body';
-    renderUpdateBody(body, language === 'en' && update.bodyEn ? update.bodyEn : update.bodyFr);
+    const structured = renderUpdateBody(body, language === 'en' && update.bodyEn ? update.bodyEn : update.bodyFr);
+    if (structured) {
+      article.classList.add('official-update-entry--structured');
+    }
 
     meta.append(label, date);
     article.append(meta, title, body);
