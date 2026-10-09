@@ -128,9 +128,9 @@ test('the dashboard patch note is public, readable and delivered only through op
     assert.match(updates, /function renderUpdateBody\(host, value\)/);
     assert.match(updates, /line\.match\(\/\^#\{2,3\}\\s\+\(\.\+\)\$\//);
     assert.match(updates, /official-update-entry--structured/);
-    assert.match(updates, /official-update-list/);
-    assert.match(updates, /inlineDetails\.join\(', '\)/);
-    assert.doesNotMatch(updates, /official-update-section/);
-    assert.match(read('site/styles.css'), /\.official-update-list[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+    assert.match(updates, /official-update-section-list/);
+    assert.match(updates, /official-update-sublist/);
+    assert.doesNotMatch(updates, /inlineDetails/);
+    assert.match(read('site/styles.css'), /\.official-update-section-list,[\s\S]*\.official-update-sublist/);
     assert.doesNotMatch(status, /sentinel-dashboard-services-tests-2026-10-09/);
 });

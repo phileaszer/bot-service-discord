@@ -7840,47 +7840,42 @@ code {
   border-bottom: 1px solid var(--line);
 }
 
-.official-update-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 34px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.official-update-item {
-  position: relative;
-  min-width: 0;
-  padding: 18px 0 14px 20px;
+.official-update-section {
+  padding: 16px 0 14px;
   border-bottom: 1px solid var(--line);
 }
 
-.official-update-item::before {
-  content: "•";
-  position: absolute;
-  top: 16px;
-  left: 0;
-  color: var(--cyan);
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.official-update-item:last-child {
-  grid-column: 1 / -1;
+.official-update-section:last-child {
   border-bottom: 0;
 }
 
-.official-update-body--sections .official-update-item h3 {
-  margin: 0 0 7px;
-}
-
-.official-update-body--sections .official-update-item p {
+.official-update-body--sections .official-update-section h3 {
   margin: 0 0 8px;
+  color: var(--text);
+  font-size: 1.08rem;
 }
 
-.official-update-details {
-  color: var(--text);
+.official-update-section-list,
+.official-update-sublist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.official-update-section-list > li::marker,
+.official-update-sublist > li::marker {
+  color: var(--cyan);
+}
+
+.official-update-sublist {
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.official-update-section-list > li {
+  padding-left: 3px;
 }
 
 @media (max-width: 700px) {
@@ -7903,14 +7898,6 @@ code {
   .official-update-entry--structured .official-update-meta {
     justify-content: space-between;
     white-space: normal;
-  }
-
-  .official-update-list {
-    grid-template-columns: 1fr;
-  }
-
-  .official-update-item:last-child {
-    grid-column: 1;
   }
 
   .official-update-body {

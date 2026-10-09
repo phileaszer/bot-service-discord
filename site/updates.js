@@ -37,19 +37,9 @@
     }
 
     host.classList.add('official-update-body--sections');
-    const updateList = document.createElement('ul');
-    updateList.className = 'official-update-list';
-    let item = null;
-    let inlineDetails = [];
-
-    function flushInlineDetails() {
-      if (!item || inlineDetails.length === 0) return;
-      const details = document.createElement('p');
-      details.className = 'official-update-details';
-      details.textContent = `${inlineDetails.join(', ')}.`;
-      item.append(details);
-      inlineDetails = [];
-    }
+    let section = null;
+    let sectionList = null;
+    let lastEntry = null;
 
     lines.forEach((rawLine) => {
       const line = rawLine.trim();
@@ -58,35 +48,48 @@
 
       const heading = line.match(/^#{2,3}\s+(.+)$/);
       if (heading) {
-        flushInlineDetails();
-        item = document.createElement('li');
-        item.className = 'official-update-item';
+        section = document.createElement('section');
+        section.className = 'official-update-section';
         const title = document.createElement('h3');
         title.textContent = heading[1];
-        item.append(title);
-        updateList.append(item);
+        sectionList = document.createElement('ul');
+        sectionList.className = 'official-update-section-list';
+        section.append(title, sectionList);
+        host.append(section);
+        lastEntry = null;
         return;
       }
 
       const detail = line.match(/^-\s+(.+)$/);
-      if (detail && item) {
-        inlineDetails.push(detail[1].replace(/[.;]\s*$/, ''));
+      if (detail && sectionList) {
+        let target = sectionList;
+        if (lastEntry) {
+          let nested = lastEntry.querySelector(':scope > .official-update-sublist');
+          if (!nested) {
+            nested = document.createElement('ul');
+            nested.className = 'official-update-sublist';
+            lastEntry.append(nested);
+          }
+          target = nested;
+        }
+        const entry = document.createElement('li');
+        entry.textContent = detail[1];
+        target.append(entry);
         return;
       }
 
-      flushInlineDetails();
-      const paragraph = document.createElement('p');
-      paragraph.textContent = line;
-      if (!item) {
-        paragraph.className = 'official-update-lead';
-        host.append(paragraph);
+      if (!sectionList) {
+        const lead = document.createElement('p');
+        lead.className = 'official-update-lead';
+        lead.textContent = line;
+        host.append(lead);
       } else {
-        item.append(paragraph);
+        lastEntry = document.createElement('li');
+        lastEntry.textContent = line;
+        sectionList.append(lastEntry);
       }
     });
 
-    flushInlineDetails();
-    host.append(updateList);
     return true;
   }
 
