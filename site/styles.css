@@ -2541,16 +2541,6 @@ code {
   font-weight: 750;
 }
 
-.creator-credit code {
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.creator-credit:hover strong,
-.creator-credit:focus-visible strong {
-  color: var(--pink);
-}
-
 .site-footer-minimal {
   justify-content: center;
   text-align: center;
@@ -2562,11 +2552,6 @@ code {
 
 :root[data-theme="western"] .creator-credit strong {
   color: #efc578;
-}
-
-:root[data-theme="western"] .creator-credit:hover strong,
-:root[data-theme="western"] .creator-credit:focus-visible strong {
-  color: #a9bd82;
 }
 
 .site-footer div {

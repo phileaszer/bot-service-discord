@@ -96,7 +96,7 @@ test('every site page receives the public Sentinel creator credit', () => {
     assert.match(theme, /function ensureCreatorCredit\(\)/);
     assert.match(theme, /Fantomenale/);
     assert.match(theme, /Créatrice de Sentinel/);
-    assert.match(theme, /515991628448792604/);
-    assert.match(theme, /https:\/\/discord\.com\/users\/515991628448792604/);
+    assert.doesNotMatch(theme, /515991628448792604/);
+    assert.doesNotMatch(theme, /discord\.com\/users/);
     assert.match(theme, /document\.body\.append\(footer\)/);
 });

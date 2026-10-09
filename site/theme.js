@@ -10,7 +10,6 @@
       currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
       currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.',
       creatorRole: 'Créatrice de Sentinel',
-      creatorId: 'ID Discord',
       releaseTitle: 'Version de démonstration publique',
       releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
     },
@@ -20,7 +19,6 @@
       currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
       currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.',
       creatorRole: 'Creator of Sentinel',
-      creatorId: 'Discord ID',
       releaseTitle: 'Public demonstration version',
       releaseMessage: 'Sentinel is currently available at no cost so communities can try it. Some advanced features may become paid later, but a free part will remain available. No subscription or charge is active today, and the details will be announced before any change.'
     }
@@ -160,9 +158,7 @@
 
     const text = labels[pageLanguage()];
     const role = credit.querySelector('[data-creator-role]');
-    const idLabel = credit.querySelector('[data-creator-id-label]');
     if (role) role.textContent = text.creatorRole;
-    if (idLabel) idLabel.textContent = text.creatorId;
   }
 
   function ensureCreatorCredit() {
@@ -194,18 +190,14 @@
       footer.prepend(identity);
     }
 
-    const credit = document.createElement('a');
+    const credit = document.createElement('span');
     credit.className = 'creator-credit';
     credit.dataset.creatorCredit = 'true';
     credit.dataset.i18nIgnore = 'true';
-    credit.href = 'https://discord.com/users/515991628448792604';
-    credit.target = '_blank';
-    credit.rel = 'noopener noreferrer';
-    credit.setAttribute('aria-label', 'Fantomenale, créatrice de Sentinel, ID Discord 515991628448792604');
+    credit.setAttribute('aria-label', 'Fantomenale, créatrice de Sentinel');
     credit.innerHTML = `
       <strong>Fantomenale</strong>
       <small data-creator-role></small>
-      <code><span data-creator-id-label></span> : 515991628448792604</code>
     `;
     identity.append(credit);
     updateCreatorCredit();
