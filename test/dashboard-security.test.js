@@ -114,6 +114,24 @@ test('the simulation bench explains each safe test and its result', () => {
     assert.doesNotMatch(frontend, /Tester la garde|Tester le routage|Tester une paie/);
 });
 
+test('the personal register separates readable metrics, activity and notification preferences', () => {
+    const frontend = read('site/membre.js');
+    const styles = read('site/styles.css');
+    const page = read('site/membre.html');
+    assert.match(frontend, /class="member-metric is-cyan"/);
+    assert.match(frontend, /class="member-detail-columns"/);
+    assert.match(frontend, /class="member-detail-column"/);
+    assert.match(frontend, /class="member-preference-toggle"/);
+    assert.match(frontend, /class="member-switch"/);
+    assert.match(frontend, /function emptyMemberState\(message\)/);
+    assert.match(frontend, /Mes tickets/);
+    assert.match(styles, /\.member-preference-toggle input\[type="checkbox"\]/);
+    assert.match(styles, /\.member-preference-toggle input:checked \+ \.member-switch/);
+    assert.match(styles, /\.member-detail-columns[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+    assert.match(page, /styles\.css\?v=20261009-9/);
+    assert.match(page, /membre\.js\?v=20261009-3/);
+});
+
 test('the dashboard patch note is public, readable and delivered only through opted-in update channels', () => {
     const database = read('database/database.js');
     const bot = read('index.js');

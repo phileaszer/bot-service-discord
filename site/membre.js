@@ -49,8 +49,12 @@
     return ({ pending: 'En cours d’examen', accepted: 'Révision acceptée', rejected: 'Révision refusée' })[status] || status;
   }
 
+  function emptyMemberState(message) {
+    return `<div class="member-empty"><span aria-hidden="true">—</span><p>${escapeHtml(message)}</p></div>`;
+  }
+
   function warningList(warnings, appeals, guildId) {
-    if (!warnings.items.length) return '<p class="muted">Aucun avertissement visible.</p>';
+    if (!warnings.items.length) return emptyMemberState('Aucun avertissement visible.');
     return `<div class="member-list">${warnings.items.map(item => {
       const appeal = (appeals || []).find(candidate => Number(candidate.caseId) === Number(item.id));
       return `<article><span>Cas #${escapeHtml(item.id)}</span><strong>${escapeHtml(item.reason || 'Aucune raison indiquée')}</strong><small>${escapeHtml(formatDate(item.createdAt))}</small>
@@ -64,17 +68,17 @@
   }
 
   function dossierList(items) {
-    if (!items.length) return '<p class="muted">Aucun dossier ouvert avec Sentinel.</p>';
-    return `<div class="member-list">${items.map(item => `<article><span>Dossier #${escapeHtml(item.id)} · ${escapeHtml(item.type)}</span><strong>${escapeHtml(item.subject || 'Sans sujet')}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>`;
+    if (!items.length) return emptyMemberState('Aucun ticket ouvert avec Sentinel.');
+    return `<div class="member-list">${items.map(item => `<article><span>Ticket #${escapeHtml(item.id)} · ${escapeHtml(item.type)}</span><strong>${escapeHtml(item.subject || 'Sans sujet')}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>`;
   }
 
   function notificationList(items) {
-    if (!items.length) return '<p class="muted">Aucune alerte personnelle pour ce serveur.</p>';
+    if (!items.length) return emptyMemberState('Aucune notification pour ce serveur.');
     return `<div class="member-list">${items.map(item => `<article><span>${escapeHtml(item.title)}</span><strong>${escapeHtml(item.detail)}</strong>${item.createdAt ? `<small>${escapeHtml(formatDate(item.createdAt))}</small>` : ''}</article>`).join('')}</div>`;
   }
 
   function digestHistory(items) {
-    if (!items?.length) return '<p class="muted">Aucun résumé Discord envoyé pour le moment.</p>';
+    if (!items?.length) return emptyMemberState('Aucun résumé Discord envoyé pour le moment.');
     const labels = { delivered: 'Envoyé', empty: 'Aucune nouveauté', failed: 'Échec' };
     return `<div class="member-list">${items.map(item => `<article><span>${escapeHtml(labels[item.status] || item.status)}</span><strong>${escapeHtml(item.itemCount || 0)} information(s)</strong><small>${escapeHtml(formatDate(item.deliveredAt || item.attemptedAt))}${item.errorMessage ? ` · ${escapeHtml(item.errorMessage)}` : ''}</small></article>`).join('')}</div>`;
   }
@@ -82,26 +86,43 @@
   function renderGuild(item) {
     const icon = safeImage(item.guild.icon);
     const line = item.payroll.line;
+    const sessions = item.service.sessions || [];
+    const dossiers = item.dossiers || [];
+    const notifications = item.notifications || [];
+    const digests = item.digestHistory || [];
+    const preferences = [
+      ['serviceEnabled', 'Services', 'Début, fin et rappel de service'],
+      ['payrollEnabled', 'Paie RP', 'Relevé et versement de la semaine'],
+      ['dossierEnabled', 'Tickets', 'Réponse et changement de statut'],
+      ['moderationEnabled', 'Modération', 'Avertissement et décision du staff']
+    ];
     return `
       <section class="dashboard-panel member-guild-panel">
-        <div class="member-guild-heading">${icon ? `<img src="${escapeHtml(icon)}" alt="">` : '<span class="guild-fallback">S</span>'}<div><p class="eyebrow">Serveur Discord</p><h2>${escapeHtml(item.guild.name)}</h2></div></div>
-        <div class="dashboard-metrics member-metrics">
-          <article><span>Temps total</span><strong>${escapeHtml(item.service.totalTimeLabel)}</strong><small>${item.service.active ? 'En service' : 'Hors service'}</small></article>
-          <article><span>Sessions</span><strong>${escapeHtml(item.service.sessionCount)}</strong></article>
-          <article><span>Paie semaine</span><strong>${line ? escapeHtml(line.amountLabel) : 'Aucune'}</strong><small>${line ? (line.paid ? 'Payée' : 'À payer') : ''}</small></article>
-          <article><span>Avertissements actifs</span><strong>${escapeHtml(item.warnings.activeCount)}</strong><small>Expiration après ${escapeHtml(item.warnings.expirationDays)} jours</small></article>
+        <div class="member-guild-heading">
+          <div class="member-server-identity">${icon ? `<img src="${escapeHtml(icon)}" alt="">` : '<span class="guild-fallback">S</span>'}<div><p class="eyebrow">Serveur Discord</p><h2>${escapeHtml(item.guild.name)}</h2><p>Ton activité et tes informations personnelles sur ce serveur.</p></div></div>
+          <span class="member-sync-state"><i aria-hidden="true"></i>Données à jour</span>
         </div>
-        <div class="member-detail-grid">
-          <article class="inline-form"><h3>Mes derniers services</h3>${item.service.sessions.length ? `<div class="member-list">${item.service.sessions.map(session => `<article><strong>${escapeHtml(session.durationLabel)}</strong><small>${escapeHtml(formatDate(session.date))}</small></article>`).join('')}</div>` : '<p class="muted">Aucune session enregistrée.</p>'}</article>
-          <article class="inline-form"><h3>Mes dossiers</h3>${dossierList(item.dossiers)}</article>
-          <article class="inline-form"><h3>Mon registre disciplinaire</h3>${warningList(item.warnings, item.appeals, item.guild.id)}</article>
-          <article class="inline-form"><h3>Mes notifications</h3>${notificationList(item.notifications || [])}</article>
-          <article class="inline-form"><h3>Historique des résumés Discord</h3>${digestHistory(item.digestHistory)}</article>
-          <article class="inline-form"><h3>Alertes souhaitées</h3><form data-preferences data-guild-id="${escapeHtml(item.guild.id)}" class="member-preferences">
-            ${[['serviceEnabled', 'Services'], ['payrollEnabled', 'Paie RP'], ['dossierEnabled', 'Dossiers'], ['moderationEnabled', 'Modération']].map(([key, label]) => `<label><input type="checkbox" name="${key}" ${item.preferences[key] ? 'checked' : ''}><span>${label}</span></label>`).join('')}
-            <label><span>Résumé privé Discord</span><select name="digestFrequency"><option value="none" ${item.preferences.digestFrequency === 'none' ? 'selected' : ''}>Désactivé</option><option value="daily" ${item.preferences.digestFrequency === 'daily' ? 'selected' : ''}>Chaque jour</option><option value="weekly" ${item.preferences.digestFrequency === 'weekly' ? 'selected' : ''}>Chaque semaine</option></select></label>
-            <button class="button" type="submit">Enregistrer</button>
-          </form></article>
+        <div class="dashboard-metrics member-metrics">
+          <article class="member-metric is-cyan"><span>Temps total</span><strong>${escapeHtml(item.service.totalTimeLabel)}</strong><small>${item.service.active ? 'Service en cours' : 'Hors service'}</small></article>
+          <article class="member-metric is-mint"><span>Sessions</span><strong>${escapeHtml(item.service.sessionCount)}</strong><small>${Number(item.service.sessionCount) === 1 ? 'Session enregistrée' : 'Sessions enregistrées'}</small></article>
+          <article class="member-metric is-violet"><span>Paie de la semaine</span><strong>${line ? escapeHtml(line.amountLabel) : 'Aucune'}</strong><small>${line ? (line.paid ? 'Versement effectué' : 'Versement en attente') : 'Aucune paie enregistrée'}</small></article>
+          <article class="member-metric is-pink"><span>Avertissements actifs</span><strong>${escapeHtml(item.warnings.activeCount)}</strong><small>${Number(item.warnings.activeCount) ? `Expiration après ${escapeHtml(item.warnings.expirationDays)} jours` : 'Aucun avertissement actif'}</small></article>
+        </div>
+        <div class="member-detail-columns">
+          <div class="member-detail-column">
+            <article class="member-card"><header class="member-section-heading"><div><span>Activité</span><h3>Mes derniers services</h3></div><strong>${escapeHtml(sessions.length)}</strong></header>${sessions.length ? `<div class="member-list">${sessions.map(session => `<article><strong>${escapeHtml(session.durationLabel)}</strong><small>${escapeHtml(formatDate(session.date))}</small></article>`).join('')}</div>` : emptyMemberState('Aucune session enregistrée.')}</article>
+            <article class="member-card"><header class="member-section-heading"><div><span>Modération</span><h3>Mon registre disciplinaire</h3></div><strong>${escapeHtml(item.warnings.items.length)}</strong></header>${warningList(item.warnings, item.appeals, item.guild.id)}</article>
+            <article class="member-card"><header class="member-section-heading"><div><span>Discord</span><h3>Résumés reçus</h3></div><strong>${escapeHtml(digests.length)}</strong></header>${digestHistory(digests)}</article>
+          </div>
+          <div class="member-detail-column">
+            <article class="member-card"><header class="member-section-heading"><div><span>Support</span><h3>Mes tickets</h3></div><strong>${escapeHtml(dossiers.length)}</strong></header>${dossierList(dossiers)}</article>
+            <article class="member-card"><header class="member-section-heading"><div><span>Suivi</span><h3>Mes notifications</h3></div><strong>${escapeHtml(notifications.length)}</strong></header>${notificationList(notifications)}</article>
+            <article class="member-card member-preferences-card"><header class="member-section-heading"><div><span>Préférences</span><h3>Mes alertes</h3></div></header><form data-preferences data-guild-id="${escapeHtml(item.guild.id)}" class="member-preferences">
+              <div class="member-preference-grid">${preferences.map(([key, label, detail]) => `<label class="member-preference-toggle"><input type="checkbox" name="${key}" ${item.preferences[key] ? 'checked' : ''}><span class="member-switch" aria-hidden="true"></span><span class="member-preference-copy"><strong>${label}</strong><small>${detail}</small></span></label>`).join('')}</div>
+              <label class="member-digest-setting"><span><strong>Résumé privé Discord</strong><small>Reçois un récapitulatif directement en message privé.</small></span><select name="digestFrequency"><option value="none" ${item.preferences.digestFrequency === 'none' ? 'selected' : ''}>Désactivé</option><option value="daily" ${item.preferences.digestFrequency === 'daily' ? 'selected' : ''}>Chaque jour</option><option value="weekly" ${item.preferences.digestFrequency === 'weekly' ? 'selected' : ''}>Chaque semaine</option></select></label>
+              <button class="button member-preferences-save" type="submit">Enregistrer mes préférences</button>
+            </form></article>
+          </div>
         </div>
       </section>
     `;
