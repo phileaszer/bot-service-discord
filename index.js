@@ -9347,6 +9347,7 @@ function mapOfficialUpdate(row) {
         bodyEn: row.body_en || null,
         source: row.source || null,
         createdByUserId: row.created_by_user_id || null,
+        patchNumber: Number(row.patch_number) || null,
         createdAt: row.created_at,
         publishedAt: row.published_at
     };
@@ -9377,9 +9378,14 @@ function createOfficialUpdateRecord({ titleFr, bodyFr, titleEn, bodyEn, source, 
 function getPublicOfficialUpdates(limit = 20) {
     const safeLimit = clampNumber(limit, 1, 50);
     return db.prepare(`
-        SELECT *
-        FROM official_updates
-        WHERE is_public = 1
+        SELECT ranked.*
+        FROM (
+            SELECT
+                official_updates.*,
+                ROW_NUMBER() OVER (ORDER BY published_at ASC, id ASC) AS patch_number
+            FROM official_updates
+            WHERE is_public = 1
+        ) ranked
         ORDER BY published_at DESC, id DESC
         LIMIT ?
     `).all(safeLimit).map(mapOfficialUpdate);

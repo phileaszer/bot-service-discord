@@ -16,7 +16,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20261009-12">
+  <link rel="stylesheet" href="styles.css?v=20261009-13">
 </head>
 <body>
   <header class="site-header">
@@ -54,6 +54,25 @@
           </div>
           <a class="button button-ghost button-small" href="installation.html">Installer Sentinel</a>
         </div>
+        <div class="updates-tools" aria-label="Rechercher dans les nouveautés">
+          <label class="updates-control updates-search-control">
+            <span data-updates-search-label>Rechercher</span>
+            <input type="search" data-updates-search placeholder="Rechercher une nouveauté" autocomplete="off">
+          </label>
+          <label class="updates-control">
+            <span data-updates-category-label>Catégorie</span>
+            <select data-updates-category>
+              <option value="all">Toutes les catégories</option>
+            </select>
+          </label>
+          <label class="updates-control">
+            <span data-updates-year-label>Année</span>
+            <select data-updates-year>
+              <option value="all">Toutes les années</option>
+            </select>
+          </label>
+          <p class="updates-results" data-updates-results aria-live="polite"></p>
+        </div>
         <div class="official-updates" data-official-updates aria-live="polite">
           <p class="muted">Chargement des nouveautés...</p>
         </div>
@@ -68,6 +87,6 @@
   <script src="theme.js?v=20261009-4"></script>
   <script src="i18n.js?v=20261007-4"></script>
   <script src="auth.js?v=20260924-4"></script>
-  <script src="updates.js?v=20261009-4"></script>
+  <script src="updates.js?v=20261009-5"></script>
 </body>
 </html>
