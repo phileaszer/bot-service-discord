@@ -90,3 +90,13 @@ test('the site control room lists every installed Sentinel server', () => {
     assert.match(frontend, /data-select-guild="\$\{escapeHtml\(guild\.id\)\}"/);
     assert.match(frontend, /\{ id: 'servers', label: 'Serveurs'/);
 });
+
+test('every site page receives the public Sentinel creator credit', () => {
+    const theme = read('site/theme.js');
+    assert.match(theme, /function ensureCreatorCredit\(\)/);
+    assert.match(theme, /Fantomenale/);
+    assert.match(theme, /Créatrice de Sentinel/);
+    assert.match(theme, /515991628448792604/);
+    assert.match(theme, /https:\/\/discord\.com\/users\/515991628448792604/);
+    assert.match(theme, /document\.body\.append\(footer\)/);
+});

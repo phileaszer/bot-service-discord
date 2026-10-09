@@ -9,6 +9,8 @@
       actionSentinel: 'Style Sentinel',
       currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
       currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.',
+      creatorRole: 'Créatrice de Sentinel',
+      creatorId: 'ID Discord',
       releaseTitle: 'Version de démonstration publique',
       releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
     },
@@ -17,12 +19,19 @@
       actionSentinel: 'Sentinel style',
       currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
       currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.',
+      creatorRole: 'Creator of Sentinel',
+      creatorId: 'Discord ID',
       releaseTitle: 'Public demonstration version',
       releaseMessage: 'Sentinel is currently available at no cost so communities can try it. Some advanced features may become paid later, but a free part will remain available. No subscription or charge is active today, and the details will be announced before any change.'
     }
   };
 
   function pageLanguage() {
+    try {
+      if (localStorage.getItem('sentinel-site-language') === 'en') return 'en';
+    } catch (error) {
+      // The HTML language remains the fallback when local storage is unavailable.
+    }
     return document.documentElement.lang === 'en' ? 'en' : 'fr';
   }
 
@@ -145,9 +154,67 @@
     updateReleaseNotice();
   }
 
+  function updateCreatorCredit() {
+    const credit = document.querySelector('[data-creator-credit]');
+    if (!credit) return;
+
+    const text = labels[pageLanguage()];
+    const role = credit.querySelector('[data-creator-role]');
+    const idLabel = credit.querySelector('[data-creator-id-label]');
+    if (role) role.textContent = text.creatorRole;
+    if (idLabel) idLabel.textContent = text.creatorId;
+  }
+
+  function ensureCreatorCredit() {
+    let footer = document.querySelector('.site-footer');
+
+    if (!footer) {
+      footer = document.createElement('footer');
+      footer.className = 'site-footer site-footer-minimal';
+      document.body.append(footer);
+    }
+
+    if (footer.querySelector('[data-creator-credit]')) {
+      updateCreatorCredit();
+      return;
+    }
+
+    let identity = footer.querySelector('.site-footer-identity');
+    if (!identity) {
+      identity = document.createElement('div');
+      identity.className = 'site-footer-identity';
+      const brand = Array.from(footer.children).find((child) => child.tagName === 'SPAN');
+      if (brand) {
+        identity.append(brand);
+      } else {
+        const brandName = document.createElement('span');
+        brandName.textContent = 'Sentinel';
+        identity.append(brandName);
+      }
+      footer.prepend(identity);
+    }
+
+    const credit = document.createElement('a');
+    credit.className = 'creator-credit';
+    credit.dataset.creatorCredit = 'true';
+    credit.dataset.i18nIgnore = 'true';
+    credit.href = 'https://discord.com/users/515991628448792604';
+    credit.target = '_blank';
+    credit.rel = 'noopener noreferrer';
+    credit.setAttribute('aria-label', 'Fantomenale, créatrice de Sentinel, ID Discord 515991628448792604');
+    credit.innerHTML = `
+      <strong>Fantomenale</strong>
+      <small data-creator-role></small>
+      <code><span data-creator-id-label></span> : 515991628448792604</code>
+    `;
+    identity.append(credit);
+    updateCreatorCredit();
+  }
+
   function initializePageChrome() {
     ensureButton();
     ensureReleaseNotice();
+    ensureCreatorCredit();
   }
 
   applyRootTheme(readTheme());
@@ -169,6 +236,7 @@
   window.addEventListener('sentinel:site-language-change', () => {
     updateButtons();
     updateReleaseNotice();
+    updateCreatorCredit();
   });
 
   window.SentinelTheme = {
