@@ -113,3 +113,19 @@ test('the simulation bench explains each safe test and its result', () => {
     assert.match(frontend, /function simulationHistory\(state\)[\s\S]*Réponse prévue/);
     assert.doesNotMatch(frontend, /Tester la garde|Tester le routage|Tester une paie/);
 });
+
+test('the dashboard patch note is public, readable and delivered only through opted-in update channels', () => {
+    const database = read('database/database.js');
+    const bot = read('index.js');
+    const updates = read('site/updates.js');
+    const status = read('site/status.js');
+
+    assert.match(database, /sentinel-dashboard-services-tests-2026-10-09/);
+    assert.match(database, /Plus de spam dans les tickets/);
+    assert.match(database, /aucun ticket n’est créé/);
+    assert.match(bot, /if \(!config\.updatesChannelId \|\| !config\.statusUpdatesEnabled\) \{\s*return null;/);
+    assert.match(bot, /const officialDistribution = await distributeLatestPublicOfficialUpdate\(\)/);
+    assert.match(updates, /function renderUpdateBody\(host, value\)/);
+    assert.match(updates, /line\.match\(\/\^#\{2,3\}\\s\+\(\.\+\)\$\//);
+    assert.doesNotMatch(status, /sentinel-dashboard-services-tests-2026-10-09/);
+});

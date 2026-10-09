@@ -21,13 +21,52 @@
     }).format(date);
   }
 
+  function renderUpdateBody(host, value) {
+    let list = null;
+
+    String(value || '').replace(/\r/g, '').split('\n').forEach((rawLine) => {
+      const line = rawLine.trim();
+
+      if (!line) {
+        list = null;
+        return;
+      }
+
+      const heading = line.match(/^#{2,3}\s+(.+)$/);
+      if (heading) {
+        const title = document.createElement('h3');
+        title.textContent = heading[1];
+        host.append(title);
+        list = null;
+        return;
+      }
+
+      const item = line.match(/^-\s+(.+)$/);
+      if (item) {
+        if (!list) {
+          list = document.createElement('ul');
+          host.append(list);
+        }
+        const entry = document.createElement('li');
+        entry.textContent = item[1];
+        list.append(entry);
+        return;
+      }
+
+      const paragraph = document.createElement('p');
+      paragraph.textContent = line;
+      host.append(paragraph);
+      list = null;
+    });
+  }
+
   function createUpdate(update, language) {
     const article = document.createElement('article');
     const meta = document.createElement('div');
     const label = document.createElement('span');
     const date = document.createElement('time');
     const title = document.createElement('h2');
-    const body = document.createElement('p');
+    const body = document.createElement('div');
 
     article.className = 'official-update-entry';
     meta.className = 'official-update-meta';
@@ -36,7 +75,7 @@
     date.textContent = formatDate(date.dateTime, language);
     title.textContent = language === 'en' && update.titleEn ? update.titleEn : update.titleFr;
     body.className = 'official-update-body';
-    body.textContent = language === 'en' && update.bodyEn ? update.bodyEn : update.bodyFr;
+    renderUpdateBody(body, language === 'en' && update.bodyEn ? update.bodyEn : update.bodyFr);
 
     meta.append(label, date);
     article.append(meta, title, body);
