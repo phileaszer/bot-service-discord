@@ -306,6 +306,8 @@
   min-width: 0;
 }
 
+.member-server-identity > div { min-width: 0; }
+
 .member-guild-heading img,
 .member-guild-heading .guild-fallback {
   width: 56px;
@@ -329,6 +331,7 @@
   margin: 0;
   color: var(--muted);
   font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 
 .member-sync-state {
@@ -478,7 +481,12 @@
   text-align: center;
 }
 
-.member-empty p { margin: 0; }
+.member-empty p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 
 .member-list article {
   display: grid;
@@ -634,6 +642,8 @@
   .member-preferences,
   .member-preference-grid { grid-template-columns: 1fr; }
   .member-guild-heading { align-items: flex-start; }
+  .member-server-identity { align-items: flex-start; }
+  .member-guild-heading p:not(.eyebrow) { display: none; }
   .member-sync-state { display: none; }
   .member-digest-setting { grid-template-columns: 1fr; }
   .member-preferences-save { justify-self: stretch; width: 100%; min-width: 0; }
