@@ -131,6 +131,9 @@ test('the dashboard patch note is public, readable and delivered only through op
     assert.match(updates, /official-update-section-list/);
     assert.match(updates, /official-update-sublist/);
     assert.doesNotMatch(updates, /inlineDetails/);
-    assert.match(read('site/styles.css'), /\.official-update-section-list,[\s\S]*\.official-update-sublist/);
+    const styles = read('site/styles.css');
+    assert.match(styles, /\.official-update-section-list,[\s\S]*\.official-update-sublist/);
+    assert.doesNotMatch(styles, /\.official-update-entry--structured\s*\{/);
+    assert.doesNotMatch(styles, /\.official-update-body--sections\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
     assert.doesNotMatch(status, /sentinel-dashboard-services-tests-2026-10-09/);
 });
