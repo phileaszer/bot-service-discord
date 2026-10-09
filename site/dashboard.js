@@ -5639,7 +5639,7 @@ const DASHBOARD_TABS = [
   {
     id: 'overview',
     label: 'Accueil',
-    eyebrow: 'Vue claire',
+    eyebrow: 'Synthèse',
     title: 'Accueil serveur',
     description: 'État, alertes et actions récentes'
   },
