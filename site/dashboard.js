@@ -6381,7 +6381,70 @@ function copyTextForSpreadsheet(text) {
   return Promise.resolve();
 }
 
-function showGoogleSheetsReadyDialog() {
+function spreadsheetClipboardHtml(kind, text) {
+  const rows = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((row, index, list) => row.length || index < list.length - 1)
+    .map((row) => row.split('\t'));
+  const columns = rows[0] || ['Données'];
+  const dataRows = rows.slice(1);
+  const columnCount = Math.max(columns.length, 1);
+  const reportTitle = {
+    service: 'Registre des services',
+    payroll: 'Registre des salaires',
+    dossiers: 'Suivi des tickets',
+    moderation: 'Registre de modération'
+  }[kind] || 'Rapport Sentinel';
+  const guildName = currentState?.guild?.name || selectedGuildPreview?.name || 'Serveur Discord';
+  const generatedAt = new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'long',
+    timeStyle: 'short'
+  }).format(new Date());
+  const titleCells = Array.from({ length: columnCount }, (_, index) => (
+    `<td style="padding:12px 10px;background:#102d3a;color:#ffffff;font-family:Arial,sans-serif;font-size:${index === 0 ? '16' : '11'}px;font-weight:700;border:1px solid #102d3a;">${index === 0 ? escapeHtml(reportTitle) : ''}</td>`
+  )).join('');
+  const subtitleCells = Array.from({ length: columnCount }, (_, index) => (
+    `<td style="padding:7px 10px;background:#dff4f3;color:#31505d;font-family:Arial,sans-serif;font-size:10px;border:1px solid #c8d9df;">${index === 0 ? `${escapeHtml(guildName)} · Généré le ${escapeHtml(generatedAt)}` : ''}</td>`
+  )).join('');
+  const headerCells = columns.map((column) => (
+    `<th style="padding:9px 10px;background:#176174;color:#ffffff;font-family:Arial,sans-serif;font-size:11px;font-weight:700;text-align:left;border:1px solid #0f4b5a;white-space:nowrap;">${escapeHtml(column)}</th>`
+  )).join('');
+  const bodyRows = dataRows.map((row, rowIndex) => {
+    const background = rowIndex % 2 ? '#edf5f6' : '#ffffff';
+    const cells = columns.map((column, columnIndex) => {
+      const rawValue = String(row[columnIndex] ?? '');
+      const preserveAsText = /(^|\s)id(\s|$)/i.test(column) || /^\d{15,20}$/.test(rawValue);
+      const value = preserveAsText && !rawValue.startsWith("'") ? `'${rawValue}` : rawValue;
+      return `<td style="padding:8px 10px;background:${background};color:#17242d;font-family:Arial,sans-serif;font-size:10px;border:1px solid #c8d9df;vertical-align:top;white-space:nowrap;mso-number-format:'\\@';">${escapeHtml(value)}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  return `<!doctype html><html><body><table style="border-collapse:collapse;border-spacing:0;">`
+    + `<tr>${titleCells}</tr><tr>${subtitleCells}</tr><tr>${headerCells}</tr>${bodyRows}`
+    + '</table></body></html>';
+}
+
+async function copyReportForSpreadsheet(kind, text) {
+  if (navigator.clipboard?.write && window.ClipboardItem && window.isSecureContext) {
+    try {
+      const item = new ClipboardItem({
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+        'text/html': new Blob([spreadsheetClipboardHtml(kind, text)], { type: 'text/html' })
+      });
+      await navigator.clipboard.write([item]);
+      return true;
+    } catch (error) {
+      // Some browsers only allow plain-text clipboard writes.
+    }
+  }
+
+  await copyTextForSpreadsheet(text);
+  return false;
+}
+
+function showGoogleSheetsReadyDialog(richFormatting = false) {
   let dialog = document.querySelector('[data-sheets-ready-dialog]');
   if (!dialog) {
     dialog = document.createElement('dialog');
@@ -6394,13 +6457,13 @@ function showGoogleSheetsReadyDialog() {
             <p class="eyebrow">Export Google Sheets</p>
             <h3>Le tableau est prêt</h3>
           </div>
-          <span class="sheets-copy-status">Copié</span>
+          <span class="sheets-copy-status" data-sheets-copy-status>Copié</span>
         </header>
-        <p class="sheets-ready-intro">Les données sont dans ton presse-papiers. Il reste trois gestes rapides.</p>
+        <p class="sheets-ready-intro" data-sheets-ready-intro>Les données sont dans ton presse-papiers. Il reste trois gestes rapides.</p>
         <ol class="sheets-ready-steps">
           <li><span>1</span><div><strong>Ouvre une feuille</strong><small>Utilise le bouton ci-dessous.</small></div></li>
           <li><span>2</span><div><strong>Sélectionne A1</strong><small>C’est la première cellule en haut à gauche.</small></div></li>
-          <li><span>3</span><div><strong>Fais Ctrl+V</strong><small>Le tableau et ses colonnes apparaîtront.</small></div></li>
+          <li><span>3</span><div><strong>Fais Ctrl+V</strong><small data-sheets-paste-result>Le tableau et ses colonnes apparaîtront.</small></div></li>
         </ol>
         <div class="sheets-ready-actions">
           <button class="button button-ghost" type="button" data-close-sheets-dialog>Fermer</button>
@@ -6414,6 +6477,21 @@ function showGoogleSheetsReadyDialog() {
     dialog.addEventListener('click', (event) => {
       if (event.target === dialog) dialog.close();
     });
+  }
+
+  const status = dialog.querySelector('[data-sheets-copy-status]');
+  const intro = dialog.querySelector('[data-sheets-ready-intro]');
+  const pasteResult = dialog.querySelector('[data-sheets-paste-result]');
+  if (status) status.textContent = richFormatting ? 'Style inclus' : 'Copié';
+  if (intro) {
+    intro.textContent = richFormatting
+      ? 'Le tableau Sentinel et sa mise en forme sont dans ton presse-papiers.'
+      : 'Les données sont dans ton presse-papiers. Il reste trois gestes rapides.';
+  }
+  if (pasteResult) {
+    pasteResult.textContent = richFormatting
+      ? 'Le tableau mis en forme apparaîtra automatiquement.'
+      : 'Le tableau et ses colonnes apparaîtront.';
   }
 
   if (!dialog.open) dialog.showModal();
@@ -6434,9 +6512,9 @@ async function prepareReportForGoogleSheets(kind, button = null) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload.error || `Erreur ${response.status}`);
     }
-    await copyTextForSpreadsheet(await response.text());
-    showGoogleSheetsReadyDialog();
-    toast('Tableau copié et prêt pour Google Sheets.');
+    const richFormatting = await copyReportForSpreadsheet(kind, await response.text());
+    showGoogleSheetsReadyDialog(richFormatting);
+    toast(richFormatting ? 'Tableau mis en forme et prêt pour Google Sheets.' : 'Tableau copié et prêt pour Google Sheets.');
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {

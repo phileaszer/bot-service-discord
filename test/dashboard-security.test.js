@@ -139,6 +139,10 @@ test('dashboard downloads real XLSX reports without navigating to an external ap
     assert.match(dashboardClient, /Le tableau est prêt/);
     assert.match(dashboardClient, /https:\/\/sheets\.new/);
     assert.match(dashboardClient, /navigator\.clipboard/);
+    assert.match(dashboardClient, /new ClipboardItem/);
+    assert.match(dashboardClient, /'text\/html': new Blob/);
+    assert.match(dashboardClient, /Registre des services/);
+    assert.match(dashboardClient, /Style inclus/);
     assert.match(dashboardClient, /showGoogleSheetsReadyDialog/);
     assert.match(dashboardClient, /<strong>Sélectionne A1<\/strong>/);
     assert.doesNotMatch(dashboardClient, /sheetsLink\.click\(\)/);
