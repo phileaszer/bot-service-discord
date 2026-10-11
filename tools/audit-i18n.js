@@ -56,6 +56,11 @@ function cleanCandidate(value) {
     .trim();
 }
 
+function looksFrench(value) {
+  return /[àâçéèêëîïôùûüÿœ]/i.test(value)
+    || /\b(?:afficher|ajouter|aucun|aucune|avec|ce|cette|ces|choisir|choisis|configurer|dans|de|des|du|en|envoyer|est|et|fermer|la|le|les|mettre|modifier|nouveau|nouvelle|ou|par|pas|pour|sans|sur|supprimer|tous|toutes|un|une|utilise|vérifier|votre|vos)\b/i.test(value);
+}
+
 function createAudit() {
   const runtime = loadI18nRuntime();
   const translations = { ...runtime.en, ...runtime.placeholderEn };
@@ -68,7 +73,8 @@ function createAudit() {
     if (/^[!/]/.test(value) || /^(?:width=device-width.*|index, follow|noindex, nofollow|applications\.commands)$/i.test(value)) return false;
     if (/^… ms$/.test(value)) return false;
     if (/^(https?:|\/api\/|data:|assets\/|#[0-9a-f]{3,8}$)/i.test(value)) return false;
-    if (/[{}]|=>|\b(?:function|return|const|let|if)\b/.test(value)) return false;
+    if (/[{}\[\]<>=$]|=>|\b(?:function|return|const|let|if)\b/.test(value)) return false;
+    if (/^(?:GET|POST|PUT|PATCH|DELETE)\s+\//.test(value)) return false;
     if (/^[a-z][a-z0-9_-]*$/i.test(value) && !value.includes(' ')) return false;
     return /[A-Za-zÀ-ÿ]/.test(value);
   }
@@ -127,6 +133,18 @@ function createAudit() {
       const value = cleanCandidate(match[2].replace(/\\(['"`])/g, '$1'));
       if (isCandidate(value) && !isTranslated(value)) {
         output.set(`${file}:call:${value}`, { file, type: 'message', value });
+      }
+    }
+
+    if (['updates.js', 'status.js', 'theme.js'].includes(file)) return;
+
+    const sourceWithoutTemplates = source
+      .replace(/`[^`]*`/gs, '')
+      .replace(/function dashboardErrorMessage[\s\S]*?\nfunction toast/, 'function toast');
+    for (const match of sourceWithoutTemplates.matchAll(/(['"])((?:\\.|(?!\1)[^\\\r\n])*)\1/g)) {
+      const value = cleanCandidate(match[2].replace(/\\(['"])/g, '$1'));
+      if (looksFrench(value) && isCandidate(value) && !isTranslated(value)) {
+        output.set(`${file}:literal:${value}`, { file, type: 'literal', value });
       }
     }
   }

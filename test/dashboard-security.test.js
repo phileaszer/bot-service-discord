@@ -166,7 +166,7 @@ test('the personal register separates readable metrics, activity and notificatio
     assert.match(styles, /\.member-preference-toggle input:checked \+ \.member-switch/);
     assert.match(styles, /\.member-detail-columns[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(page, /styles\.css\?v=20261009-10/);
-    assert.match(page, /membre\.js\?v=20261011-2/);
+    assert.match(page, /membre\.js\?v=20261012-1/);
 });
 
 test('the dashboard patch note is public, readable and delivered only through opted-in update channels', () => {

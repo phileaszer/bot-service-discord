@@ -42,7 +42,8 @@
 
   function formatDate(value) {
     if (!value) return '';
-    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+    const locale = document.documentElement.lang === 'en' ? 'en-GB' : 'fr-FR';
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
   }
 
   function appealStatusLabel(status) {
