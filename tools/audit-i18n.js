@@ -58,23 +58,27 @@ function cleanCandidate(value) {
 
 function looksFrench(value) {
   return /[àâçéèêëîïôùûüÿœ]/i.test(value)
-    || /\b(?:afficher|ajouter|aucun|aucune|avec|ce|cette|ces|choisir|choisis|configurer|dans|de|des|du|en|envoyer|est|et|fermer|la|le|les|mettre|modifier|nouveau|nouvelle|ou|par|pas|pour|sans|sur|supprimer|tous|toutes|un|une|utilise|vérifier|votre|vos)\b/i.test(value);
+    || /\b(?:afficher|ajouter|aucun|aucune|avec|bannissement|bureau|ce|cette|ces|choisir|choisis|configurer|consigner|dans|de|des|dossier|données|du|équipe|en|envoyer|essais|est|et|fermer|formulaire|garde|gérer|historique|journal|la|le|les|lexique|mettre|modifier|nouveau|nouvelle|notifications|nouveautés|ou|palier|par|parcours|pas|première|programmation|rapports|recherche|registre|résolution|salaires|salon|salons|sans|sécurité|serveurs|signalement|sommaire|sur|surveillance|supprimer|synchronisation|traitement|tous|toutes|un|une|utilise|vérifier|votre|vos)\b/i.test(value);
 }
 
 function createAudit() {
   const runtime = loadI18nRuntime();
   const translations = { ...runtime.en, ...runtime.placeholderEn };
   const normalizedTranslations = new Set(Object.keys(translations).map(normalize));
-  const ignored = new Set(['FR', 'EN', 'Sentinel', 'Western', 'Style Sentinel', 'Discord', 'PDF', 'XLSX']);
+  const ignored = new Set(['FR', 'EN', 'Sentinel', 'Western', 'Style Sentinel', 'Discord', 'PDF', 'XLSX', 'Salary journal']);
 
   function isCandidate(value) {
     if (!value || ignored.has(value)) return false;
     if (value.length < 2 || /^[/#.:\d\s%+_-]+$/.test(value)) return false;
-    if (/^[!/]/.test(value) || /^(?:width=device-width.*|index, follow|noindex, nofollow|applications\.commands)$/i.test(value)) return false;
+    if (/^[!/.]/.test(value) || /^(?:width=device-width.*|index, follow|noindex, nofollow|applications\.commands)$/i.test(value)) return false;
     if (/^… ms$/.test(value)) return false;
     if (/^(https?:|\/api\/|data:|assets\/|#[0-9a-f]{3,8}$)/i.test(value)) return false;
     if (/[{}\[\]<>=$]|=>|\b(?:function|return|const|let|if)\b/.test(value)) return false;
     if (/^(?:GET|POST|PUT|PATCH|DELETE)\s+\//.test(value)) return false;
+    const possibleClassList = value.replace(/…/g, '').trim();
+    if (value.includes('…') && /^[a-z][a-z0-9_-]*$/i.test(possibleClassList) && possibleClassList.includes('-')) return false;
+    if (/^(?:[a-z][a-z0-9_-]*)(?:\s+[a-z][a-z0-9_-]*)+$/i.test(possibleClassList)
+      && possibleClassList.split(/\s+/).every((token) => token.includes('-'))) return false;
     if (/^[a-z][a-z0-9_-]*$/i.test(value) && !value.includes(' ')) return false;
     return /[A-Za-zÀ-ÿ]/.test(value);
   }
@@ -138,15 +142,23 @@ function createAudit() {
 
     if (['updates.js', 'status.js', 'theme.js'].includes(file)) return;
 
+    function collectQuotedLiterals(snippet) {
+      for (const match of snippet.matchAll(/(['"])((?:\\.|(?!\1)[^\\\r\n])*)\1/g)) {
+        const value = cleanCandidate(match[2].replace(/\\(['"])/g, '$1'));
+        if (looksFrench(value) && isCandidate(value) && !isTranslated(value)) {
+          output.set(`${file}:literal:${value}`, { file, type: 'literal', value });
+        }
+      }
+    }
+
+    for (const match of source.matchAll(/\$\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/gs)) {
+      collectQuotedLiterals(match[1]);
+    }
+
     const sourceWithoutTemplates = source
       .replace(/`[^`]*`/gs, '')
       .replace(/function dashboardErrorMessage[\s\S]*?\nfunction toast/, 'function toast');
-    for (const match of sourceWithoutTemplates.matchAll(/(['"])((?:\\.|(?!\1)[^\\\r\n])*)\1/g)) {
-      const value = cleanCandidate(match[2].replace(/\\(['"])/g, '$1'));
-      if (looksFrench(value) && isCandidate(value) && !isTranslated(value)) {
-        output.set(`${file}:literal:${value}`, { file, type: 'literal', value });
-      }
-    }
+    collectQuotedLiterals(sourceWithoutTemplates);
   }
 
   const missing = new Map();
@@ -174,4 +186,4 @@ if (require.main === module) {
   if (result.missing.length > 0) process.exitCode = 1;
 }
 
-module.exports = { createAudit };
+module.exports = { createAudit, loadI18nRuntime };

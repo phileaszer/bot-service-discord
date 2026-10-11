@@ -2377,6 +2377,232 @@
     "Style actuel : Western RP. Cliquer pour revenir au style Sentinel.": "Current style: Western RP. Click to switch back to Sentinel style."
   });
 
+  Object.assign(en, {
+    "À effectuer": "To do",
+    "à verser": "pending",
+    "Acceptée": "Accepted",
+    "Accès général aux dossiers": "General ticket access",
+    "action configurée": "configured action",
+    "Activation volontaire requise Renseigne le serveur privé et les deux comptes dédiés avant d’activer le contrôle bloquant et les sanctions réelles.": "Manual activation required Enter the private server and both dedicated accounts before enabling blocking checks and real sanctions.",
+    "Affiche les dernières mesures enregistrées sur ce serveur.": "Show the latest actions recorded on this server.",
+    "Affiche seulement un type de sanction : avertissement, timeout, ban, purge, etc.": "Show only one sanction type: warning, timeout, ban, purge, and so on.",
+    "Ajoute un avertissement au dossier disciplinaire d’un utilisateur.": "Add a warning to a user's disciplinary record.",
+    "Allume ou met en pause toutes les règles automatiques du serveur.": "Enable or pause all automated server rules.",
+    "Annule un avertissement précis sans effacer l’historique.": "Remove a specific warning without deleting its history.",
+    "Arrête le service en cours d’un membre, calcule la durée et ajoute ce temps à son registre.": "End a member's current duty session, calculate its duration, and add it to their record.",
+    "Arrivées groupées": "Coordinated joins",
+    "Aucun incident ouvert": "No open incident",
+    "Aucune description": "No description",
+    "Aucune miniature sélectionnée": "No thumbnail selected",
+    "Aucune nouvelle miniature": "No new thumbnail",
+    "Aucune nouvelle photo": "No new image",
+    "Aucune photo sélectionnée": "No image selected",
+    "Aucune raison": "No reason",
+    "Aucune règle automatique ne se déclenche.": "No automated rule will trigger.",
+    "Bannit un utilisateur avec son ID, même s’il n’est plus présent.": "Ban a user by ID, even if they are no longer present.",
+    "Bannit un utilisateur pour une durée précise, puis Sentinel lève automatiquement le bannissement.": "Ban a user for a set duration, then Sentinel automatically removes the ban.",
+    "Bloque l’envoi de messages dans un salon.": "Prevent messages from being sent in a channel.",
+    "Ces rôles voient toutes les catégories, sauf celles que tu limites à des rôles précis plus bas.": "These roles can view every category except those restricted to specific roles below.",
+    "Chaque envoi affiche son état, le nombre d’essais et son dernier résultat.": "Each delivery shows its status, attempt count, and latest result.",
+    "Configuration incomplète Termine l’assistant avant de publier le panneau pour éviter un bouton inutilisable. Ouvrir l’assistant": "Incomplete setup Finish the assistant before publishing the panel to avoid an unusable button. Open the assistant",
+    "Configuration prête Tu peux publier le panneau ou continuer avec les autres onglets.": "Setup ready You can publish the panel or continue with the other tabs.",
+    "Configuré": "Configured",
+    "Configurés": "Configured",
+    "Consigner un avertissement": "Record a warning",
+    "Contrôle les panneaux Discord et libère automatiquement les références qui ont été supprimées.": "Check Discord panels and automatically clear deleted references.",
+    "Corrige la raison d’un dossier disciplinaire.": "Edit the reason for a disciplinary case.",
+    "Crée des réponses réutilisables, puis envoie-les en un clic depuis un dossier.": "Create reusable replies, then send them from a ticket in one click.",
+    "déjà versée": "already issued",
+    "Démarre manuellement le service d’un membre avec son ID et applique le grade de service si possible.": "Start a member's duty session manually using their ID and apply the duty role when possible.",
+    "désactivé": "disabled",
+    "Détecte les messages envoyés trop vite par la même personne.": "Detect messages sent too quickly by the same person.",
+    "Détecte les mots ajoutés dans le registre du serveur.": "Detect words added to the server register.",
+    "Donne automatiquement un grade aux nouveaux membres. Sentinel doit être placé au-dessus du grade choisi.": "Automatically assign a role to new members. Sentinel must be placed above the selected role.",
+    "Durée de silence": "Timeout duration",
+    "Durée du silence": "Timeout duration",
+    "Durée du silence automatique en secondes.": "Automatic timeout duration in seconds.",
+    "Durée en minutes utilisée pour compter les déclenchements répétés.": "Time window in minutes used to count repeat triggers.",
+    "Durée en secondes utilisée pour compter les messages rapides.": "Time window in seconds used to count rapid messages.",
+    "Durée en secondes utilisée pour détecter une vague d’arrivées.": "Time window in seconds used to detect a wave of joins.",
+    "Durée en secondes, de 60 secondes à 28 jours.": "Duration in seconds, from 60 seconds to 28 days.",
+    "En pause": "Paused",
+    "Entretien en cours": "Maintenance in progress",
+    "Envoie chaque type de dossier dans une catégorie Discord différente, par exemple recrutement dans une catégorie staff dédiée.": "Route each ticket type to a different Discord category, such as recruitment to a dedicated staff category.",
+    "Escalade récidive": "Repeat-offense escalation",
+    "Expiration des avertissements": "Warning expiration",
+    "Fenêtre d’arrivée": "Join window",
+    "Fenêtre de surveillance": "Monitoring window",
+    "Fenêtre récidive": "Repeat-offense window",
+    "Fermer le service d’un agent": "End a member's duty session",
+    "Filtre les actions qui concernent un membre, un rôle, un salon, un message ou un cas précis.": "Filter actions involving a specific member, role, channel, message, or case.",
+    "Filtre les sanctions liées à un ID Discord précis.": "Filter sanctions linked to a specific Discord ID.",
+    "Grade automatique d’arrivée": "Automatic join role",
+    "Grades exemptés": "Exempt roles",
+    "Grades ignorés": "Ignored roles",
+    "Historique des dossiers": "Case history",
+    "Hors du serveur ou introuvable": "Not in the server or not found",
+    "IDs de grades ignorés par la garde automatique, séparés par des espaces.": "Role IDs ignored by automated protection, separated by spaces.",
+    "IDs de salons ou catégories ignorés par la garde automatique, séparés par des espaces.": "Channel or category IDs ignored by automated protection, separated by spaces.",
+    "IDs des rôles qui ne subiront jamais une sanction automatique.": "Role IDs that will never receive an automated sanction.",
+    "Impose un délai entre deux messages.": "Set a delay between messages.",
+    "Le premier entretien sera lancé automatiquement au démarrage.": "The first maintenance run will start automatically on startup.",
+    "Les règles actives surveillent les salons autorisés.": "Active rules monitor allowed channels.",
+    "Lever le silence": "Remove timeout",
+    "Lever un bannissement": "Remove a ban",
+    "Limite de mentions": "Mention limit",
+    "Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard.": "List embeds that Sentinel can still edit or delete from the dashboard.",
+    "Mesure appliquée aux messages abusant des majuscules.": "Action applied to messages using excessive capitals.",
+    "Mesure appliquée quand le seuil de mentions est dépassé.": "Action applied when the mention threshold is exceeded.",
+    "Mesure appliquée quand le seuil de rafale est dépassé.": "Action applied when the burst threshold is exceeded.",
+    "Mesure appliquée quand un mot surveillé est détecté.": "Action applied when a monitored word is detected.",
+    "Mesure appliquée quand une invitation est détectée.": "Action applied when an invitation is detected.",
+    "Mesure la prise en charge et la résolution des dossiers.": "Measure ticket assignment and resolution.",
+    "Mettre la garde en service": "Enable protection",
+    "Modifie un embed Sentinel déjà envoyé avec son ID de message.": "Edit an existing Sentinel embed using its message ID.",
+    "Nombre d’arrivées à partir duquel Sentinel alerte l’équipe.": "Number of joins that triggers a staff alert.",
+    "Nombre de jours pendant lesquels un avertissement compte dans les paliers.": "Number of days a warning counts toward thresholds.",
+    "Nombre de mentions à partir duquel la règle se déclenche.": "Number of mentions that triggers the rule.",
+    "Nombre de messages tolérés dans la fenêtre de surveillance.": "Number of messages allowed during the monitoring window.",
+    "Nombre de signaux avant bannissement automatique.": "Number of signals before an automatic ban.",
+    "Nombre de signaux avant expulsion automatique.": "Number of signals before an automatic kick.",
+    "Nombre de signaux avant silence automatique.": "Number of signals before an automatic timeout.",
+    "Nombre maximum de dossiers affichés dans cette vue.": "Maximum number of tickets displayed in this view.",
+    "Nombre maximum de lignes affichées dans cette vue.": "Maximum number of rows displayed in this view.",
+    "Non planifié": "Not scheduled",
+    "Nouvelle miniature": "New thumbnail",
+    "Nouvelle photo principale": "New main image",
+    "Optionnel : ce rôle sera mentionné pour chaque nouvelle annonce officielle.": "Optional: this role will be mentioned for every new official announcement.",
+    "Ouvre rapidement un dossier précis avec son numéro.": "Quickly open a specific case using its number.",
+    "Ouvrir le service d’un agent": "Start a member's duty session",
+    "Points à corriger": "Items to fix",
+    "Premier nombre d’avertissements déclenchant une mesure.": "First warning count that triggers an action.",
+    "Prépare la remise à zéro de toutes les heures. Un autre responsable devra la valider.": "Prepare a reset of all hours. Another manager must approve it.",
+    "Présent sur le serveur": "Present on the server",
+    "Protection complète active Chaque démarrage exige désormais la validation Discord réelle configurée.": "Full protection enabled Every startup now requires the configured live Discord validation.",
+    "Publie un nouveau panneau de demandes privées.": "Publish a new private-request panel.",
+    "Rafales de messages": "Message bursts",
+    "Ralentir un salon": "Set channel slowmode",
+    "Recherche le sujet ou un membre dans les dossiers visibles.": "Search subjects or members in visible tickets.",
+    "Recherche le sujet, un membre et le contenu des archives.": "Search subjects, members, and archive contents.",
+    "Réduire": "Collapse",
+    "Refusée": "Rejected",
+    "Registre de l’équipe": "Team register",
+    "Règle détectée": "Detected rule",
+    "Remet à zéro les heures d’une seule personne avec son ID, même si elle a quitté le serveur.": "Reset one person's hours by ID, even if they left the server.",
+    "Remise à zéro générale": "Full reset",
+    "Remise à zéro individuelle": "Individual reset",
+    "Rend temporairement muet un membre présent pendant la durée indiquée.": "Temporarily timeout a present member for the specified duration.",
+    "Renforce la mesure quand la même personne récidive dans la période choisie.": "Escalate the action when the same person reoffends during the selected period.",
+    "Répare les écarts entre agents en service, grades et registre de service.": "Repair mismatches between members on duty, roles, and the duty register.",
+    "Repère les liens discord.gg et les liens d’invitation.": "Detect discord.gg links and invitation links.",
+    "Repère les messages avec trop de mentions.": "Detect messages with too many mentions.",
+    "Repère les messages presque entièrement en majuscules.": "Detect messages written almost entirely in capitals.",
+    "Réponse invitations": "Invitation action",
+    "Réponse lexique": "Vocabulary action",
+    "Réponse majuscules": "Capital-letter action",
+    "Réponse mentions": "Mention action",
+    "Réponse rafale": "Burst action",
+    "Réponses préparées": "Prepared replies",
+    "Rétablit l’envoi de messages dans un salon verrouillé.": "Restore message sending in a locked channel.",
+    "Retire le bannissement d’un utilisateur avec son ID.": "Remove a user's ban using their ID.",
+    "Retire un dossier disciplinaire invalide.": "Remove an invalid disciplinary case.",
+    "Retire un membre du serveur sans le bannir.": "Remove a member from the server without banning them.",
+    "Retire un silence actif et conserve une trace de l’action.": "Remove an active timeout and keep a record of the action.",
+    "Retirer un dossier": "Remove a case",
+    "Retrouve tout l’historique visible et affine la liste avec les filtres complets.": "Browse all visible history and refine the list with full filters.",
+    "rôle supprimé sur Discord": "role deleted on Discord",
+    "Rouvrir un salon": "Reopen a channel",
+    "Salon dans lequel Sentinel déposera le Bureau de service et ses boutons de présence.": "Channel where Sentinel will publish the duty desk and attendance buttons.",
+    "Salon de statut": "Status channel",
+    "Salons ignorés": "Ignored channels",
+    "Sans durée": "No duration",
+    "Sentinel crée et vérifie une archive privée avant toute suppression. Le mode complet recrée ensuite le salon vide.": "Sentinel creates and verifies a private archive before deletion. Full mode then recreates the empty channel.",
+    "Sentinel y maintient uniquement son panneau d’état technique.": "Sentinel only maintains its technical status panel there.",
+    "Sentinel y publie les annonces destinées à tous les serveurs abonnés.": "Sentinel publishes announcements for all subscribed servers there.",
+    "Seuil de rafale": "Burst threshold",
+    "Signale une arrivée massive de membres dans un court délai.": "Detect a large number of joins over a short period.",
+    "Sous contrôle": "Under control",
+    "Synchronisation du registre": "Register synchronization",
+    "Tout est en ordre": "Everything is ready",
+    "Un dossier Sentinel est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.": "A Sentinel ticket is a private request for support, a report, recruitment, a partnership, or another topic.",
+    "Utilise 0 pour désactiver ce palier.": "Use 0 to disable this threshold.",
+    "Validation réussie": "Validation successful",
+    "Vérifier les bureaux": "Check desks",
+    "Vue privée de régie : lecture des accès et suivi global sans commandes fondatrices.": "Private control-room view: access review and global monitoring without founder commands.",
+    "Vue privée des accès site, des staffs autorisés et de la maintenance Sentinel.": "Private view of site access, authorized staff, and Sentinel maintenance.",
+    "Aucun avertissement actif": "No active warning",
+    "Service en cours": "On duty",
+    "Session enregistrée": "Recorded session",
+    "Sessions enregistrées": "Recorded sessions",
+    "Sommaire": "Summary",
+    "Bureau": "Desk",
+    "Traitement": "Workflow",
+    "Registre": "Register",
+    "Registre disciplinaire": "Disciplinary record",
+    "Dossiers Sentinel": "Sentinel tickets",
+    "Signalement": "Report",
+    "Sélectionner un rôle Discord": "Select a Discord role",
+    "Accès actuel": "Current access",
+    "Tous les responsables Sentinel": "All Sentinel managers",
+    "Formulaire": "Form",
+    "Première réponse, min": "First response, min",
+    "Résolution, min": "Resolution, min",
+    "Délais": "Deadlines",
+    "Lexique": "Vocabulary",
+    "Garde": "Protection",
+    "Lexique interdit": "Forbidden vocabulary",
+    "Invitations externes": "External invitations",
+    "Log seulement": "Log only",
+    "Bannir": "Ban",
+    "Consigner": "Record",
+    "État technique accessible": "Technical status accessible",
+    "Salon des nouveautés accessible": "Updates channel accessible",
+    "Base": "Basics",
+    "Profil": "Profile",
+    "Nouveautés": "Updates",
+    "Données": "Data",
+    "Salaires": "Salaries",
+    "Actions": "Actions",
+    "Confidentialité": "Privacy",
+    "Protection": "Protection",
+    "Sanctions": "Sanctions",
+    "Salons": "Channels",
+    "Modifier": "Edit",
+    "Gérer": "Manage",
+    "Journal": "Log",
+    "Notifications": "Notifications",
+    "Rapports": "Reports",
+    "Essais": "Tests",
+    "Serveurs": "Servers",
+    "Sécurité": "Security",
+    "Publication": "Publishing",
+    "Surveillance": "Monitoring",
+    "Équipe": "Team",
+    "Parcours": "Setup path",
+    "Surveillance majuscules": "Capital-letter monitoring",
+    "Mentions massives": "Mass mentions",
+    "Palier silence": "Timeout threshold",
+    "Palier expulsion": "Kick threshold",
+    "Palier bannissement": "Ban threshold",
+    "Palier mise au silence": "Timeout threshold",
+    "Studio d’annonces": "Announcement studio",
+    "Photo principale": "Main image",
+    "Miniature": "Thumbnail",
+    "Importer": "Upload",
+    "Recherche membre": "Member search",
+    "Statut dossier": "Ticket status",
+    "Formulaire dossier": "Ticket form",
+    "Rapport automatique": "Automated report",
+    "Mise au silence": "Timeout",
+    "Bannissement": "Ban",
+    "Bannissement temporaire": "Temporary ban",
+    "Salon rouvert": "Channel reopened",
+    "Salon ralenti": "Channel slow mode",
+    "Synchronisation": "Synchronization",
+    "Programmation": "Scheduling",
+    "Salon": "Channel"
+  });
+
   let normalizedTranslations = null;
 
   function normalizeTranslationKey(value) {
@@ -2430,10 +2656,10 @@
     if (match) return `${match[1]} displayed entr${match[1] === '1' ? 'y' : 'ies'}`;
 
     match = /^Actuel : (.+)\. Diffusion : (.+)\.$/.exec(normalizedValue);
-    if (match) return `Current: ${match[1]}. Delivery: ${match[2]}.`;
+    if (match) return `Current: ${translateValue(match[1], language)}. Delivery: ${translateValue(match[2], language)}.`;
 
     match = /^Actuel : (.+)$/.exec(normalizedValue);
-    if (match) return `Current: ${match[1]}`;
+    if (match) return `Current: ${translateValue(match[1], language)}`;
 
     match = /^Affichage limite aux (\d+) derniers dossiers(?: visibles)? (?:pour|sur) ce serveur\.$/.exec(normalizedValue);
     if (match) return `Display limited to the latest ${match[1]} tickets for this server.`;
@@ -2494,6 +2720,48 @@
 
     match = /^(\d+)\/5 a finaliser$/.exec(normalizedValue);
     if (match) return `${match[1]}/5 to finish`;
+
+    match = /^Action Sentinel depuis bouton Discord\.$/.exec(normalizedValue);
+    if (match) return 'Sentinel action from a Discord button.';
+
+    match = /^Action Sentinel depuis commande Discord\.$/.exec(normalizedValue);
+    if (match) return 'Sentinel action from a Discord command.';
+
+    match = /^Action Sentinel depuis une commande texte Discord\.$/.exec(normalizedValue);
+    if (match) return 'Sentinel action from a Discord text command.';
+
+    match = /^Embed Sentinel envoye dans #(.+)\. ID : (.+)\. Quota Premium : acces illimite aux embeds\.$/.exec(normalizedValue);
+    if (match) return `Sentinel embed sent in #${match[1]}. ID: ${match[2]}. Unlimited embed access.`;
+
+    match = /^Paie RP archivee pour (.+)\.$/.exec(normalizedValue);
+    if (match) return `Salary register archived for ${match[1]}.`;
+
+    match = /^Embed Sentinel (.+) supprime\.$/.exec(normalizedValue);
+    if (match) return `Sentinel embed ${match[1]} deleted.`;
+
+    match = /^Embed Sentinel (.+) modifie\.$/.exec(normalizedValue);
+    if (match) return `Sentinel embed ${match[1]} edited.`;
+
+    match = /^Profil serveur mis a jour : (.+)\.$/.exec(normalizedValue);
+    if (match) return `Server profile updated: ${match[1]}.`;
+
+    match = /^Panneau de service publie dans #(.+)\.$/.exec(normalizedValue);
+    if (match) return `Duty desk published in #${match[1]}.`;
+
+    match = /^Salon statut Sentinel configure : #(.+)\.$/.exec(normalizedValue);
+    if (match) return `Sentinel status channel configured: #${match[1]}.`;
+
+    match = /^Les nouveautes officielles Sentinel pourront etre envoyees dans le salon statut\.$/.exec(normalizedValue);
+    if (match) return 'Official Sentinel updates can be sent to the status channel.';
+
+    match = /^Paie RP mise a jour : (.+)\.$/.exec(normalizedValue);
+    if (match) return `Salary settings updated: ${match[1]}.`;
+
+    match = /^Bureau d'accueil Sentinel publie dans #(.+)\.$/.exec(normalizedValue);
+    if (match) return `Sentinel welcome desk published in #${match[1]}.`;
+
+    match = /^❌ Couleur invalide\. Utilise (.+)$/.exec(normalizedValue);
+    if (match) return `❌ Invalid color. Use ${match[1]}`;
 
     return value;
   }
