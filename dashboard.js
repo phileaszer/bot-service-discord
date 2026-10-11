@@ -5328,7 +5328,7 @@ async function handleApi(req, res, ctx, url) {
         const { guild, member } = await getDashboardAccess(ctx, session, reportMatch[1]);
         await requireAdvanced(ctx, guild.id, member, session);
         const format = String(url.searchParams.get('format') || 'pdf').toLowerCase();
-        if (!['xls', 'xlsx', 'pdf'].includes(format)) {
+        if (!['xls', 'xlsx', 'pdf', 'tsv'].includes(format)) {
             throw createHttpError(400, 'Format de rapport invalide.');
         }
         const report = ctx.helpers.createGuildReport(guild, reportMatch[2], format);

@@ -97,6 +97,11 @@ test('report generators produce recognizable XLSX and PDF files', () => {
     const input = { title: 'Rapport Sentinel', columns: ['Nom', 'Valeur'], rows: [{ Nom: 'Test', Valeur: '42' }] };
     assert.equal(operations.REPORT_FORMATS.has('csv'), false);
     assert.throws(() => operations.createReportDocument({ ...input, format: 'csv' }), /Format de rapport invalide/);
+    const sheets = operations.createReportDocument({ ...input, format: 'tsv' });
+    assert.equal(sheets.contentType, 'text/tab-separated-values; charset=utf-8');
+    assert.match(sheets.buffer.toString('utf8'), /Nom\tValeur\r\nTest\t42/);
+    const protectedSheets = operations.createReportDocument({ ...input, rows: [{ Nom: '=IMPORTDATA("https://example.com")', Valeur: '42' }], format: 'tsv' });
+    assert.match(protectedSheets.buffer.toString('utf8'), /'=IMPORTDATA/);
     const xlsx = operations.createReportDocument({ ...input, format: 'xlsx' });
     const pdf = operations.createReportDocument({ ...input, format: 'pdf' });
     assert.equal(xlsx.extension, 'xlsx');

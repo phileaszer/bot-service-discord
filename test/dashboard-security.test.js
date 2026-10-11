@@ -134,6 +134,9 @@ test('dashboard downloads real XLSX reports without navigating to an external ap
     assert.match(dashboardClient, /Excel \/ Google Sheets/);
     assert.match(dashboardClient, /URL\.createObjectURL\(blob\)/);
     assert.match(dashboardClient, /link\.download = fileName/);
+    assert.match(dashboardClient, /data-report-sheets=/);
+    assert.match(dashboardClient, /https:\/\/sheets\.new/);
+    assert.match(dashboardClient, /navigator\.clipboard/);
     assert.doesNotMatch(dashboardClient, /data-report-format="csv"/);
     assert.doesNotMatch(dashboardClient, /<option value="csv">CSV<\/option>/);
 });

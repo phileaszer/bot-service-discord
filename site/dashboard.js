@@ -5141,7 +5141,8 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
                 <strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
                 <div class="report-download-actions">
                   <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
-                  <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur XLSX compatible avec Excel et Google Sheets">Excel / Google Sheets</button>
+                  <button class="button button-small button-ghost" type="button" data-report-sheets="${kind}" title="Copie les données et ouvre une nouvelle feuille Google Sheets">Google Sheets</button>
+                  <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur pour Microsoft Excel">Télécharger XLSX</button>
                 </div>
               </div>
             `).join('')}
@@ -6355,6 +6356,59 @@ async function downloadReportFile(kind, format, button = null) {
   }
 }
 
+function copyTextForSpreadsheet(text) {
+  const fallbackCopy = () => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('Copie impossible dans ce navigateur.');
+  };
+
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy());
+  }
+
+  fallbackCopy();
+  return Promise.resolve();
+}
+
+async function openReportInGoogleSheets(kind, button = null) {
+  if (!selectedGuildId || !['service', 'payroll', 'dossiers', 'moderation'].includes(kind)) return;
+  const sheetsLink = document.createElement('a');
+  sheetsLink.href = 'https://sheets.new';
+  sheetsLink.target = '_blank';
+  sheetsLink.rel = 'noopener noreferrer';
+  document.body.appendChild(sheetsLink);
+  sheetsLink.click();
+  sheetsLink.remove();
+  setLoading(button, true);
+
+  try {
+    const url = new URL(`/api/guilds/${encodeURIComponent(selectedGuildId)}/reports/${encodeURIComponent(kind)}`, window.location.origin);
+    url.searchParams.set('format', 'tsv');
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: { Accept: 'text/tab-separated-values, application/json' }
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || `Erreur ${response.status}`);
+    }
+    await copyTextForSpreadsheet(await response.text());
+    toast('Données copiées. Colle-les dans Google Sheets avec Ctrl+V.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 async function runAction(action, data, button = null) {
   if (!selectedGuildId) return;
   setLoading(button, true);
@@ -6707,6 +6761,12 @@ function attachDashboardHandlers() {
   $$('[data-report-download]').forEach((button) => {
     button.addEventListener('click', () => {
       downloadReportFile(button.dataset.reportDownload, button.dataset.reportFormat, button);
+    });
+  });
+
+  $$('[data-report-sheets]').forEach((button) => {
+    button.addEventListener('click', () => {
+      openReportInGoogleSheets(button.dataset.reportSheets, button);
     });
   });
 

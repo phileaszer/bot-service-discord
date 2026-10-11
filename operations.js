@@ -5,6 +5,7 @@ const { createProfessionalPdf } = require('./pdf-document');
 const { createXlsxDocument } = require('./xlsx-document');
 
 const REPORT_FORMATS = new Set(['xls', 'xlsx', 'pdf']);
+const GENERATED_REPORT_FORMATS = new Set([...REPORT_FORMATS, 'tsv']);
 const REPORT_KINDS = new Set(['service', 'payroll', 'dossiers', 'moderation']);
 const RECURRENCES = new Set(['none', 'weekly', 'monthly']);
 
@@ -601,6 +602,11 @@ function reportCell(value) {
     return String(value).replace(/[\r\n]+/g, ' ').trim();
 }
 
+function spreadsheetClipboardCell(value) {
+    const text = reportCell(value).replace(/\t/g, ' ');
+    return /^[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
 function createReportDocument({
     title,
     subtitle = 'Rapport administratif Sentinel',
@@ -612,8 +618,14 @@ function createReportDocument({
     rows,
     format
 }) {
-    if (!REPORT_FORMATS.has(format)) throw new Error('Format de rapport invalide.');
+    if (!GENERATED_REPORT_FORMATS.has(format)) throw new Error('Format de rapport invalide.');
     const safeRows = Array.isArray(rows) ? rows.slice(0, 10000) : [];
+    if (format === 'tsv') {
+        const text = [columns.map(spreadsheetClipboardCell), ...safeRows.map(row => columns.map(column => spreadsheetClipboardCell(row[column])))]
+            .map(row => row.join('\t'))
+            .join('\r\n');
+        return { buffer: Buffer.from(text, 'utf8'), extension: 'tsv', contentType: 'text/tab-separated-values; charset=utf-8' };
+    }
     if (format === 'xls' || format === 'xlsx') {
         return {
             buffer: createXlsxDocument({ title, subtitle, columns, rows: safeRows }),
