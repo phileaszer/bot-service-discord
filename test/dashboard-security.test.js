@@ -103,7 +103,7 @@ test('every site page receives the public Sentinel creator credit', () => {
 
 test('the simulation bench explains each safe test and its result', () => {
     const frontend = read('site/dashboard.js');
-    for (const label of ['Auto-modération', 'Dossier privé', 'Paie RP', 'Annonce Discord']) {
+    for (const label of ['Auto-modération', 'Dossier privé', 'Salaire', 'Annonce Discord']) {
         assert.match(frontend, new RegExp(label));
     }
     for (const action of ['Simuler l’auto-modération', 'Vérifier le dossier', 'Calculer l’aperçu', 'Contrôler l’annonce']) {
@@ -112,6 +112,20 @@ test('the simulation bench explains each safe test and its result', () => {
     assert.match(frontend, /Aucun effet sur Discord/);
     assert.match(frontend, /function simulationHistory\(state\)[\s\S]*Réponse prévue/);
     assert.doesNotMatch(frontend, /Tester la garde|Tester le routage|Tester une paie/);
+});
+
+test('RP salary wording stays immersive across dashboard, member space and PDF reports', () => {
+    const dashboard = read('site/dashboard.js');
+    const member = `${read('site/membre.html')}\n${read('site/membre.js')}`;
+    const bot = read('index.js');
+    const privacy = read('privacy-center.js');
+    const visibleSources = `${dashboard}\n${member}\n${privacy}`;
+    assert.doesNotMatch(visibleSources, /Paie RP|Registre de paie|Archives de paie|Suivi hebdomadaire des paiements/);
+    assert.match(dashboard, /Registre hebdomadaire des salaires/);
+    assert.match(member, /Salaire de la semaine/);
+    assert.match(bot, /title: 'État des salaires'/);
+    assert.match(bot, /'Statut du salaire': item\.paid \? 'Versé' : 'À verser'/);
+    assert.match(privacy, /weekly_payments: 'Salaires hebdomadaires'/);
 });
 
 test('the personal register separates readable metrics, activity and notification preferences', () => {
@@ -129,7 +143,7 @@ test('the personal register separates readable metrics, activity and notificatio
     assert.match(styles, /\.member-preference-toggle input:checked \+ \.member-switch/);
     assert.match(styles, /\.member-detail-columns[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(page, /styles\.css\?v=20261009-10/);
-    assert.match(page, /membre\.js\?v=20261011-1/);
+    assert.match(page, /membre\.js\?v=20261011-2/);
 });
 
 test('the dashboard patch note is public, readable and delivered only through opted-in update channels', () => {

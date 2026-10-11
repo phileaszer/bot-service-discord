@@ -92,7 +92,7 @@
     const digests = item.digestHistory || [];
     const preferences = [
       ['serviceEnabled', 'Services', 'Début, fin et rappel de service'],
-      ['payrollEnabled', 'Paie RP', 'Relevé et versement de la semaine'],
+      ['payrollEnabled', 'Salaire', 'Relevé et versement de la semaine'],
       ['dossierEnabled', 'Tickets', 'Réponse et changement de statut'],
       ['moderationEnabled', 'Modération', 'Avertissement et décision du staff']
     ];
@@ -105,7 +105,7 @@
         <div class="dashboard-metrics member-metrics">
           <article class="member-metric is-cyan"><span>Temps total</span><strong>${escapeHtml(item.service.totalTimeLabel)}</strong><small>${item.service.active ? 'Service en cours' : 'Hors service'}</small></article>
           <article class="member-metric is-mint"><span>Sessions</span><strong>${escapeHtml(item.service.sessionCount)}</strong><small>${Number(item.service.sessionCount) === 1 ? 'Session enregistrée' : 'Sessions enregistrées'}</small></article>
-          <article class="member-metric is-violet"><span>Paie de la semaine</span><strong>${line ? escapeHtml(line.amountLabel) : 'Aucune'}</strong><small>${line ? (line.paid ? 'Versement effectué' : 'Versement en attente') : 'Aucune paie enregistrée'}</small></article>
+          <article class="member-metric is-violet"><span>Salaire de la semaine</span><strong>${line ? escapeHtml(line.amountLabel) : 'Aucun'}</strong><small>${line ? (line.paid ? 'Salaire versé' : 'Salaire à verser') : 'Aucun salaire enregistré'}</small></article>
           <article class="member-metric is-pink"><span>Avertissements actifs</span><strong>${escapeHtml(item.warnings.activeCount)}</strong><small>${Number(item.warnings.activeCount) ? `Expiration après ${escapeHtml(item.warnings.expirationDays)} jours` : 'Aucun avertissement actif'}</small></article>
         </div>
         <div class="member-detail-columns">

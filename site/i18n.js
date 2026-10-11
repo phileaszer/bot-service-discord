@@ -1711,6 +1711,40 @@
     'Aucun résultat enregistré pour le moment.': 'No results recorded yet.'
   });
 
+  Object.assign(en, {
+    'Registre hebdomadaire des salaires': 'Weekly salary register',
+    'Voir les salaires estimés et leur état versé/à verser': 'View estimated salaries and their issued/pending status',
+    'Archiver les salaires de la semaine': 'Archive this week salaries',
+    'Marquer un salaire comme versé ou à verser': 'Mark a salary as issued or pending',
+    'Salaires': 'Salaries',
+    'Service & salaires': 'Duty & salaries',
+    'Service et salaires': 'Duty and salaries',
+    'Présences, barèmes et versements': 'Duty, salary rates, and issued salaries',
+    'Semaine, versements et archives': 'Week, issued salaries, and archives',
+    'Heures, sanctions, tickets et salaires': 'Hours, sanctions, tickets, and salaries',
+    'Heures, salaire, dossiers et avertissements visibles uniquement depuis ton compte Discord.': 'Hours, salary, tickets, and warnings visible only from your Discord account.',
+    'Salaire': 'Salary',
+    'Salaire de la semaine': 'This week salary',
+    'Salaire versé': 'Salary issued',
+    'Salaire à verser': 'Salary pending',
+    'Aucun salaire enregistré': 'No salary recorded',
+    'Aucun salaire trouvé pour cette semaine.': 'No salary found for this week.',
+    'Aucun salaire pour cette semaine.': 'No salary for this week.',
+    'Historique des salaires': 'Salary history',
+    'Archives des salaires': 'Salary archives',
+    'Barème des salaires': 'Salary scale',
+    'Salaires par grade et ajustements': 'Salaries by role and adjustments',
+    'Vérifie les réglages du serveur sans sanctionner, publier, créer de dossier ni enregistrer de salaire.': 'Check server settings without sanctioning, publishing, creating a ticket, or recording a salary.',
+    'Calcule le salaire de la semaine sans le marquer comme versé.': 'Calculates this week salary without marking it as issued.',
+    'Les dossiers, services, sanctions et archives des salaires restent dans le registre actif. Les anciens journaux techniques sont conservés sous forme compressée.': 'Tickets, duty records, sanctions, and salary archives remain in the active register. Older technical logs are kept in compressed form.',
+    'Entre un ID Discord pour ouvrir la fiche liée à cette personne : heures, sanctions, tickets, salaire et dernières actions.': 'Enter a Discord ID to open this person profile: hours, sanctions, tickets, salary, and latest actions.',
+    'Entre un ID Discord pour voir les heures, sanctions, tickets, salaire et actions liées à cette personne.': 'Enter a Discord ID to view hours, sanctions, tickets, salary, and related actions.',
+    'Suis les agents en service, les heures et les salaires de la semaine.': 'Track active agents, hours, and weekly salaries.',
+    'Registre administratif des salaires du serveur.': 'Administrative salary register for the server.',
+    'salaires encore à verser cette semaine.': 'salaries still pending this week.',
+    'salaire(s) encore à verser cette semaine.': 'salary line(s) still pending this week.'
+  });
+
   let normalizedTranslations = null;
 
   function normalizeTranslationKey(value) {

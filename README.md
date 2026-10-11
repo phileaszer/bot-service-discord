@@ -17,7 +17,7 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 ## Ce que fait Sentinel
 
 - Suivi des services : prise et fin de service, temps total, historique personnel, agents en service et classements.
-- Paie RP hebdomadaire : montant par heure, calcul estimé, suivi payé/non payé, archives consultables et journal des règlements depuis le dashboard.
+- Registre hebdomadaire des salaires : montant par heure, calcul estimé, suivi versé/à verser, archives consultables et journal des salaires depuis le dashboard.
 - Modération : rôle automatique à l'arrivée, avertissements, timeout, expulsion, ban par ID, purge et consultation des sanctions.
 - Dossiers Sentinel : système de tickets privés pour le support, les signalements, les recrutements, les partenariats et les autres demandes.
 - Annonces : création et modification d'embeds publiés sous l'identité de Sentinel.
@@ -31,7 +31,7 @@ Sentinel comprend :
 - panneau de service ;
 - heures personnelles ;
 - historique complet et classements avancés ;
-- paie RP hebdomadaire avec taux par rôle, ajustements, suivi payé/non payé et archives ;
+- salaires hebdomadaires avec taux par rôle, ajustements, suivi versé/à verser et archives ;
 - modération complète, sanctions temporaires, verrouillage de salons et escalade automatique ;
 - rôle automatique à l'arrivée des membres ;
 - consultation et correction complète des sanctions ;
@@ -42,7 +42,7 @@ Sentinel comprend :
 
 ## Espace personnel
 
-La page `/membre` permet à chaque personne connectée avec Discord de consulter uniquement ses propres heures, sa paie de la semaine, ses dossiers, ses avertissements visibles et ses préférences de notification. Un résumé Discord quotidien ou hebdomadaire peut être activé volontairement et désactivé à tout moment. Elle ne donne aucun accès à la configuration ou aux données des autres membres.
+La page `/membre` permet à chaque personne connectée avec Discord de consulter uniquement ses propres heures, son salaire de la semaine, ses dossiers, ses avertissements visibles et ses préférences de notification. Un résumé Discord quotidien ou hebdomadaire peut être activé volontairement et désactivé à tout moment. Elle ne donne aucun accès à la configuration ou aux données des autres membres.
 
 ## Installation rapide
 
@@ -68,7 +68,7 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/config-autorole` | `/autorole-config` | Définir le rôle automatique d'arrivée |
 | `/config-logs` | `/config-channel` | Définir le salon de logs |
 | `/config-statut` | `/status-channel` | Séparer l’état technique, les nouveautés et le rôle à prévenir |
-| `/config-paie` | `/payroll-config` | Définir le montant horaire global ou propre à un rôle |
+| `/config-paie` | `/payroll-config` | Définir le salaire horaire global ou propre à un rôle |
 | `/config-voir` | `/config-view` | Voir la configuration actuelle |
 | `/config-permissions` | `/config-permissions` | Gérer les rôles autorisés |
 | `/dashboard` | `/dashboard` | Ouvrir le dashboard web |
@@ -76,9 +76,9 @@ Le rôle Discord de Sentinel doit être placé au-dessus des rôles qu'il doit g
 | `/mes-heures` | `/my-hours` | Voir ses heures |
 | `/en-service` | `/on-duty` | Voir les agents en service |
 | `/top-service` | `/top-service` | Voir le classement global |
-| `/paie-semaine` | `/weekly-payroll` | Voir la paie RP de la semaine |
-| `/paie-historique` | `/payroll-history` | Retrouver les archives et le suivi des anciennes paies RP |
-| `/paie-archive` | `/payroll-archive` | Archiver la paie RP de la semaine |
+| `/paie-semaine` | `/weekly-payroll` | Voir les salaires de la semaine |
+| `/paie-historique` | `/payroll-history` | Retrouver les archives et le suivi des anciens salaires |
+| `/paie-archive` | `/payroll-archive` | Archiver les salaires de la semaine |
 | `/paie-ajustement` | `/payroll-adjustment` | Ajouter une prime, une retenue ou une correction RP |
 | `/reset-heures` | `/reset-hours` | Remettre les heures d'une personne à zéro |
 | `/reset-heures-all` | `/reset-hours-all` | Préparer la remise à zéro générale sécurisée |
@@ -106,7 +106,7 @@ Avant toute suppression, Sentinel crée et vérifie une archive contenant les me
 
 ## Stockage et sauvegardes
 
-Sentinel conserve sans expiration les archives de paie, les heures de service, les dossiers et les sanctions. Les sessions web expirées sont nettoyées automatiquement. Avant de quitter la base active, les anciens journaux d'auto-modération et de régie sont écrits dans des archives `jsonl.gz`, validés puis restent téléchargeables par le fondateur.
+Sentinel conserve sans expiration les archives des salaires, les heures de service, les dossiers et les sanctions. Les sessions web expirées sont nettoyées automatiquement. Avant de quitter la base active, les anciens journaux d'auto-modération et de régie sont écrits dans des archives `jsonl.gz`, validés puis restent téléchargeables par le fondateur.
 
 La base SQLite utilise WAL, des checkpoints et un entretien progressif. Les sauvegardes sont compressées en `.db.gz` et suivent trois générations par défaut : 7 quotidiennes, 8 hebdomadaires et 12 mensuelles, dans une enveloppe de 96 Mo. Chaque nouvelle copie est restaurée dans une base temporaire et soumise à `PRAGMA integrity_check`. Un redéploiement rapproché ne crée pas de copie identique supplémentaire et les anciennes sauvegardes `.db` sont converties automatiquement.
 

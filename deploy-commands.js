@@ -144,7 +144,7 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('config-paie', 'payroll-config', 'Configure le montant horaire de la paie RP.', 'Configures the hourly amount for RP payroll.')
+    command('config-paie', 'payroll-config', 'Configure le salaire horaire des agents.', 'Configures the agents hourly salary.')
         .addNumberOption(option =>
             option
                 .setName('montant')
@@ -203,9 +203,9 @@ const publicCommands = [
 
     command('config-voir', 'config-view', 'Affiche la configuration de service du serveur.', 'Shows this server service configuration.'),
 
-    command('paie-semaine', 'weekly-payroll', 'Affiche la paie RP estimee de la semaine.', 'Shows this week estimated RP payroll.'),
+    command('paie-semaine', 'weekly-payroll', 'Affiche les salaires estimes de la semaine.', 'Shows this week estimated salaries.'),
 
-    command('paie-historique', 'payroll-history', 'Consulte les anciennes archives de paie RP.', 'Reviews previous RP payroll archives.')
+    command('paie-historique', 'payroll-history', 'Consulte les anciennes archives des salaires.', 'Reviews previous salary archives.')
         .addStringOption(option =>
             option
                 .setName('semaine')
@@ -215,7 +215,7 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('paie-ajustement', 'payroll-adjustment', 'Ajoute une prime, une retenue ou une correction de paie RP.', 'Adds a bonus, deduction, or correction to RP payroll.')
+    command('paie-ajustement', 'payroll-adjustment', 'Ajoute une prime, une retenue ou une correction de salaire.', 'Adds a bonus, deduction, or salary correction.')
         .addStringOption(option =>
             option
                 .setName('type')
@@ -264,14 +264,14 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('paie-archive', 'payroll-archive', 'Archive la paie RP de la semaine en cours.', 'Archives this week RP payroll.'),
+    command('paie-archive', 'payroll-archive', 'Archive les salaires de la semaine en cours.', 'Archives this week salaries.'),
 
-    command('paie-marquer', 'payroll-mark', 'Marque une paie hebdomadaire comme payee ou non payee.', 'Marks a weekly payroll line as paid or unpaid.')
+    command('paie-marquer', 'payroll-mark', 'Marque un salaire hebdomadaire comme verse ou a verser.', 'Marks a weekly salary as issued or pending.')
         .addBooleanOption(option =>
             option
                 .setName('paye')
                 .setNameLocalizations(en('paid'))
-                .setDescription('Etat de paiement a appliquer')
+                .setDescription('Etat du salaire a appliquer')
                 .setDescriptionLocalizations(en('Payment status to apply'))
                 .setRequired(true)
         )

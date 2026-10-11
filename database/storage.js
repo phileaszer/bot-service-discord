@@ -718,7 +718,7 @@ function getVolumeStats(targetPath) {
 
 function storageCategoryForName(name) {
     if (/service_(?:times|sessions)/.test(name)) return 'Services';
-    if (/weekly_|guild_pay/.test(name)) return 'Paie RP';
+    if (/weekly_|guild_pay/.test(name)) return 'Salaires';
     if (/automod/.test(name)) return 'Auto-modération';
     if (/moderation/.test(name)) return 'Modération';
     if (/dossier/.test(name)) return 'Dossiers';

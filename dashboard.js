@@ -4335,7 +4335,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             throw createHttpError(400, 'Invalid hourly rate.');
         }
 
-        return `Paie RP mise a jour : ${settings.hourlyRate} ${settings.currency}/h.`;
+        return `Salaires mis a jour : ${settings.hourlyRate} ${settings.currency}/h.`;
     }
 
     if (action === 'set-payroll-role-rate') {
@@ -4359,7 +4359,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             throw createHttpError(400, 'Invalid hourly rate.');
         }
 
-        return `Taux de paie configure pour ${role.name} : ${roleSettings.hourlyRate}/h.`;
+        return `Salaire horaire configure pour ${role.name} : ${roleSettings.hourlyRate}/h.`;
     }
 
     if (action === 'remove-payroll-role-rate') {
@@ -4373,7 +4373,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         }
 
         ctx.helpers.removeGuildPayRoleSettings(guild.id, role.id);
-        return `Taux de paie specifique retire pour ${role.name}.`;
+        return `Salaire specifique retire pour ${role.name}.`;
     }
 
     if (action === 'add-payroll-adjustment') {
@@ -4396,7 +4396,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             throw createHttpError(400, 'Invalid payroll adjustment.');
         }
 
-        return `Ajustement de paie ajoute pour ${userId}.`;
+        return `Ajustement de salaire ajoute pour ${userId}.`;
     }
 
     if (action === 'archive-payroll') {
@@ -4408,8 +4408,8 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         });
 
         return archive.replaced
-            ? `Archive de paie mise a jour pour ${archive.weekStart} - ${archive.weekEnd}.`
-            : `Paie RP archivee pour ${archive.weekStart} - ${archive.weekEnd}.`;
+            ? `Archive des salaires mise a jour pour ${archive.weekStart} - ${archive.weekEnd}.`
+            : `Salaires archives pour ${archive.weekStart} - ${archive.weekEnd}.`;
     }
 
     if (action === 'toggle-payroll-paid') {
@@ -4454,8 +4454,8 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         ctx.helpers.setWeeklyPaymentStatus(guild.id, userId, weekStart, paid, member?.id || null);
 
         return paid
-            ? `Paie RP marquee comme payee pour ${userId}, semaine du ${weekStart}.`
-            : `Paie RP remise a payer pour ${userId}, semaine du ${weekStart}.`;
+            ? `Salaire marque comme verse pour ${userId}, semaine du ${weekStart}.`
+            : `Salaire remis en attente pour ${userId}, semaine du ${weekStart}.`;
     }
 
     if (action === 'start-service') {

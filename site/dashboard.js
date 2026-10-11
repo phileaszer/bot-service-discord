@@ -68,7 +68,7 @@ const SERVER_PRESETS = [
     summary: 'Adapté aux serveurs Red Dead ou RP plus immersifs, avec un vocabulaire plus sobre.',
     advice: [
       'Prévois des tickets pour plaintes, recrutements, demandes RP et signalements.',
-      'Utilise la paie RP si les heures servent à payer les métiers ou services.',
+      'Utilise le registre des salaires si les heures servent à rémunérer les métiers ou services.',
       'Le thème western du site peut être activé séparément selon la préférence de chacun.'
     ]
   },
@@ -514,10 +514,10 @@ function dashboardErrorMessage(input) {
     'Invalid temporary ban duration.': 'Durée de ban temporaire invalide.',
     'Invalid slowmode duration.': 'Durée de mode lent invalide.',
     'Invalid hourly rate.': 'Montant horaire invalide.',
-    'Invalid payroll adjustment.': 'Ajustement de paie invalide.',
-    'Invalid payroll week.': 'La semaine de paie indiquée est invalide.',
-    'Invalid payroll status.': 'L’état de paie indiqué est invalide.',
-    'Payroll line not found.': 'Cette ligne de paie n’existe plus.',
+    'Invalid payroll adjustment.': 'Ajustement de salaire invalide.',
+    'Invalid payroll week.': 'La semaine de salaire indiquée est invalide.',
+    'Invalid payroll status.': 'L’état du salaire indiqué est invalide.',
+    'Payroll line not found.': 'Cette ligne de salaire n’existe plus.',
     'Invalid message ID.': 'ID de message invalide.',
     'No service role is configured.': 'Aucun rôle de service n’est configuré.',
     'This user must be in the server to start duty.': 'Cette personne doit être présente sur le serveur pour prendre son service depuis le dashboard.',
@@ -557,9 +557,9 @@ function dashboardErrorMessage(input) {
     'Invalid server profile.': 'Choisis un profil proposé dans l’assistant.',
     'Invalid hourly rate.': 'Indique un montant horaire positif, par exemple 500 ou 1250.',
     'Invalid payroll adjustment.': 'Indique un ID Discord, un type, un montant positif et une raison courte.',
-    'Invalid payroll week.': 'Rouvre l’archive puis relance l’action depuis sa ligne de paiement.',
-    'Invalid payroll status.': 'Actualise le dashboard et utilise le bouton présent sur la ligne de paie.',
-    'Payroll line not found.': 'Actualise le dashboard et choisis une ligne de paie actuelle ou archivée.',
+    'Invalid payroll week.': 'Rouvre l’archive puis relance l’action depuis la ligne de salaire.',
+    'Invalid payroll status.': 'Actualise le dashboard et utilise le bouton présent sur la ligne de salaire.',
+    'Payroll line not found.': 'Actualise le dashboard et choisis une ligne de salaire actuelle ou archivée.',
     'Invalid message ID.': 'Copie l’ID numérique complet du message envoyé par Sentinel.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
@@ -1492,9 +1492,9 @@ function todayOverviewCards(state) {
       ready: true
     },
     {
-      eyebrow: 'Paie RP',
+      eyebrow: 'Salaires',
       value: payroll.totals?.unpaidCount || 0,
-      detail: 'ligne(s) encore à payer cette semaine.',
+      detail: 'salaire(s) encore à verser cette semaine.',
       ready: true
     },
     {
@@ -1530,7 +1530,7 @@ function planScopeCards(state) {
       <article class="plan-scope-card is-free">
         <span>Sentinel actif</span>
         <strong>Les outils essentiels du serveur</strong>
-        <p>Service, paie, modération, tickets, journaux, dashboard et annonces.</p>
+        <p>Service, salaires, modération, tickets, journaux, dashboard et annonces.</p>
       </article>
     </div>
   `;
@@ -1545,7 +1545,7 @@ function globalLookupPanel(state) {
         <div>
           <p class="eyebrow">Recherche par ID</p>
           <h2>Retrouver une personne dans l’historique</h2>
-          <p class="muted">Entre un ID Discord pour ouvrir la fiche liée à cette personne : heures, sanctions, tickets, paie et dernières actions.</p>
+          <p class="muted">Entre un ID Discord pour ouvrir la fiche liée à cette personne : heures, sanctions, tickets, salaire et dernières actions.</p>
         </div>
         <span class="status-badge is-site">Historique serveur</span>
       </div>
@@ -1650,7 +1650,7 @@ function dashboardPath(state) {
     {
       step: '02',
       title: 'Gérer les services',
-      detail: 'Suis les agents en service, les heures, la paie RP et les paiements de la semaine.',
+      detail: 'Suis les agents en service, les heures et les salaires de la semaine.',
       tab: 'service',
       label: 'Ouvrir'
     },
@@ -2272,14 +2272,14 @@ function payrollCopy() {
 
   return isEnglish
     ? {
-        eyebrow: 'RP payroll',
-        title: 'Weekly pay tracking',
-        description: 'Set the hourly amount and mark who has been paid.',
+        eyebrow: 'Salaries',
+        title: 'Weekly salary register',
+        description: 'Set the hourly salary and mark which salaries have been issued.',
         rateLabel: 'Hourly amount',
-        rateHelp: 'Amount used to calculate the estimated RP pay from completed sessions and current duty time.',
+        rateHelp: 'Amount used to calculate the estimated salary from completed sessions and current duty time.',
         currencyLabel: 'Currency / unit',
         currencyHelp: 'Short label displayed after the amount, for example $, €, credits, or SA$.',
-        update: 'Update pay settings',
+        update: 'Update salary settings',
         roleRates: 'Role rates',
         roleRatesHelp: 'A member uses the highest configured rate among their current Discord roles. If no role matches, Sentinel uses the global rate.',
         roleLabel: 'Discord role',
@@ -2303,25 +2303,25 @@ function payrollCopy() {
         archiveButton: 'Archive this week',
         updateArchiveButton: 'Refresh this archive',
         currentArchive: 'This week was archived on',
-        historyTitle: 'Payroll archives',
+        historyTitle: 'Salary archives',
         historyEyebrow: 'Ledger',
-        historyHelp: 'Review prior periods, find an agent, and continue payment tracking without changing frozen hours or amounts.',
+        historyHelp: 'Review prior periods, find an agent, and continue salary tracking without changing frozen hours or amounts.',
         historySearch: 'Search by period, agent, or Discord ID',
-        historyStatus: 'Payment status',
+        historyStatus: 'Salary status',
         historyAll: 'All periods',
-        historyOpen: 'Payment pending',
-        historySettled: 'Fully paid',
+        historyOpen: 'Salaries pending',
+        historySettled: 'Fully issued',
         historyCount: 'archived period(s)',
-        historyEmpty: 'No payroll period has been archived yet.',
+        historyEmpty: 'No salary period has been archived yet.',
         historyNoMatch: 'No archive matches these filters.',
         archivedOn: 'Archived on',
         archivedBy: 'Archived by',
         lastActivity: 'Last activity',
-        paymentProgress: 'Payment progress',
-        paymentJournal: 'Payment journal',
+        paymentProgress: 'Salary progress',
+        paymentJournal: 'Salary journal',
         paymentJournalEmpty: 'No status change has been recorded for this period yet.',
-        markedPaid: 'marked as paid',
-        markedUnpaid: 'returned to pending',
+        markedPaid: 'marked the salary as issued for',
+        markedUnpaid: 'returned the salary to pending for',
         clearFilters: 'Clear filters',
         filterButton: 'Filter',
         loadMoreArchives: 'Load older periods',
@@ -2330,34 +2330,34 @@ function payrollCopy() {
         agents: 'Agents',
         totalHours: 'Total hours',
         hourlyRate: 'Rate',
-        basePay: 'Base pay',
+        basePay: 'Base salary',
         adjustmentTotal: 'Adjustments',
-        estimatedPay: 'Estimated pay',
-        toPay: 'To pay',
-        alreadyPaid: 'Already paid',
+        estimatedPay: 'Estimated salary',
+        toPay: 'To issue',
+        alreadyPaid: 'Already issued',
         status: 'Status',
-        paid: 'Paid',
-        unpaid: 'To pay',
-        markPaid: 'Mark paid',
-        markUnpaid: 'Mark unpaid',
-        paidBy: 'Paid by',
+        paid: 'Issued',
+        unpaid: 'To issue',
+        markPaid: 'Mark issued',
+        markUnpaid: 'Return to pending',
+        paidBy: 'Issued by',
         empty: 'No service time recorded for the current week.',
-        note: 'This is an internal RP tracking tool. Sentinel does not process real payments.',
+        note: 'Administrative salary register for the server.',
         premiumOnly: 'Advanced option'
       }
     : {
-        eyebrow: 'Paie RP',
-        title: 'Suivi hebdomadaire des paiements',
-        description: 'Règle le montant horaire et coche qui a été payé.',
-        rateLabel: 'Montant par heure',
-        rateHelp: 'Montant utilisé pour calculer la paie RP estimée à partir des sessions terminées et du service en cours.',
+        eyebrow: 'Salaires',
+        title: 'Registre hebdomadaire des salaires',
+        description: 'Règle le salaire horaire et indique quels salaires ont été versés.',
+        rateLabel: 'Salaire par heure',
+        rateHelp: 'Montant utilisé pour calculer le salaire estimé à partir des sessions terminées et du service en cours.',
         currencyLabel: 'Devise / unité',
         currencyHelp: 'Texte court affiché après le montant, par exemple $, €, crédits ou SA$.',
-        update: 'Mettre à jour la paie',
+        update: 'Mettre à jour les salaires',
         roleRates: 'Taux par rôle',
         roleRatesHelp: 'Un membre utilise le meilleur taux configuré parmi ses rôles Discord actuels. Si aucun rôle ne correspond, Sentinel utilise le taux global.',
         roleLabel: 'Rôle Discord',
-        roleRateLabel: 'Montant par heure du rôle',
+        roleRateLabel: 'Salaire par heure du rôle',
         setRoleRate: 'Enregistrer le taux',
         removeRoleRate: 'Retirer',
         roleRatesEmpty: 'Aucun taux spécifique configuré pour le moment.',
@@ -2373,29 +2373,29 @@ function payrollCopy() {
         addAdjustment: 'Ajouter l’ajustement',
         adjustmentsEmpty: 'Aucun ajustement sur cette semaine.',
         archive: 'Archiver la semaine',
-        archiveHelp: 'Enregistre une capture de la semaine : heures, montants, état payé/non payé et ajustements.',
+        archiveHelp: 'Enregistre une capture de la semaine : heures, montants, salaires versés ou à verser et ajustements.',
         archiveButton: 'Archiver cette semaine',
         updateArchiveButton: 'Actualiser cette archive',
         currentArchive: 'Cette semaine a été archivée le',
-        historyTitle: 'Archives de paie',
+        historyTitle: 'Archives des salaires',
         historyEyebrow: 'Registre',
-        historyHelp: 'Retrouve les périodes précédentes, cherche un agent et poursuis le suivi des règlements sans modifier les heures ni les montants figés.',
+        historyHelp: 'Retrouve les périodes précédentes, cherche un agent et poursuis le suivi des salaires sans modifier les heures ni les montants figés.',
         historySearch: 'Rechercher une période, un agent ou un ID Discord',
-        historyStatus: 'État des règlements',
+        historyStatus: 'État des salaires',
         historyAll: 'Toutes les périodes',
-        historyOpen: 'Paiements en attente',
-        historySettled: 'Entièrement réglées',
+        historyOpen: 'Salaires à verser',
+        historySettled: 'Salaires versés',
         historyCount: 'période(s) archivée(s)',
-        historyEmpty: 'Aucune période de paie n’a encore été archivée.',
+        historyEmpty: 'Aucune période de salaire n’a encore été archivée.',
         historyNoMatch: 'Aucune archive ne correspond à ces filtres.',
         archivedOn: 'Archivée le',
         archivedBy: 'Archivée par',
         lastActivity: 'Dernière activité',
-        paymentProgress: 'Avancement des règlements',
-        paymentJournal: 'Journal des règlements',
+        paymentProgress: 'Avancement des salaires',
+        paymentJournal: 'Journal des salaires',
         paymentJournalEmpty: 'Aucun changement d’état n’a encore été enregistré pour cette période.',
-        markedPaid: 'a marqué la paie comme réglée',
-        markedUnpaid: 'a remis la paie en attente',
+        markedPaid: 'a marqué le salaire comme versé pour',
+        markedUnpaid: 'a remis le salaire en attente pour',
         clearFilters: 'Effacer les filtres',
         filterButton: 'Filtrer',
         loadMoreArchives: 'Charger les périodes plus anciennes',
@@ -2404,19 +2404,19 @@ function payrollCopy() {
         agents: 'Agents',
         totalHours: 'Heures totales',
         hourlyRate: 'Taux',
-        basePay: 'Base',
+        basePay: 'Salaire de base',
         adjustmentTotal: 'Ajustements',
-        estimatedPay: 'Paie estimée',
-        toPay: 'À payer',
-        alreadyPaid: 'Déjà payé',
+        estimatedPay: 'Salaire estimé',
+        toPay: 'À verser',
+        alreadyPaid: 'Déjà versé',
         status: 'État',
-        paid: 'Payé',
-        unpaid: 'À payer',
-        markPaid: 'Marquer payé',
-        markUnpaid: 'Remettre à payer',
-        paidBy: 'Payé par',
+        paid: 'Versé',
+        unpaid: 'À verser',
+        markPaid: 'Marquer versé',
+        markUnpaid: 'Remettre en attente',
+        paidBy: 'Versé par',
         empty: 'Aucune heure de service enregistrée sur la semaine en cours.',
-        note: 'Ce suivi reste interne au RP. Sentinel ne traite aucun paiement réel.',
+        note: 'Registre administratif des salaires du serveur.',
         premiumOnly: 'Option avancée'
       };
 }
@@ -2822,8 +2822,8 @@ function renderPremiumPayrollPanel(state, premiumBadge, premiumTag) {
     <section class="dashboard-panel payroll-panel premium-view-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Règles de paie RP</p>
-          <h2>Taux par grade et ajustements</h2>
+          <p class="eyebrow">Barème des salaires</p>
+          <h2>Salaires par grade et ajustements</h2>
           <p class="muted">Applique des taux propres à chaque grade et consigne les primes, retenues ou corrections.</p>
         </div>
         ${premiumBadge}
@@ -2865,7 +2865,7 @@ function renderFreeServicePanel(state) {
         <div>
           <p class="eyebrow">Registre</p>
           <h2>Registre de service</h2>
-          <p class="muted">Suivi des fiches agent, déploiements actifs, cycles hebdomadaires et paie.</p>
+          <p class="muted">Suivi des fiches agent, déploiements actifs, cycles hebdomadaires et salaires.</p>
         </div>
         <span class="status-badge">Sentinel</span>
       </div>
@@ -3856,13 +3856,13 @@ const AUDIT_ACTION_LABELS = {
   'enable-status-updates': 'Nouveautés statut',
   'disable-status-updates': 'Nouveautés statut',
   'publish-service-panel': 'Bureau de service',
-  'set-payroll-settings': 'Réglage paie RP',
-  'set-payroll-role-rate': 'Taux paie par rôle',
-  'remove-payroll-role-rate': 'Taux paie retiré',
-  'add-payroll-adjustment': 'Ajustement paie',
-  'mark-payroll-status': 'Statut paie',
-  'archive-payroll': 'Archive paie',
-  'toggle-payroll-paid': 'Paie RP',
+  'set-payroll-settings': 'Réglage des salaires',
+  'set-payroll-role-rate': 'Salaire par rôle',
+  'remove-payroll-role-rate': 'Salaire de rôle retiré',
+  'add-payroll-adjustment': 'Ajustement de salaire',
+  'mark-payroll-status': 'Statut du salaire',
+  'archive-payroll': 'Archive des salaires',
+  'toggle-payroll-paid': 'Salaire',
   'publish-dossier-panel': 'Bureau d’accueil',
   'configure-dossier-roles': 'Rôles dossiers',
   'dossier-close': 'Dossier clôturé',
@@ -4787,13 +4787,13 @@ function profileDossierList(dossiers) {
 
 function profilePayrollSummary(payroll) {
   if (!payroll) {
-    return '<p class="muted">La paie RP n’est pas disponible sur ce serveur.</p>';
+    return '<p class="muted">Le registre des salaires n’est pas disponible sur ce serveur.</p>';
   }
 
   const history = payroll.history || [];
 
   if (!payroll.line && !history.length) {
-    return '<p class="muted">Aucune ligne de paie actuelle ou archivée pour cette personne.</p>';
+    return '<p class="muted">Aucune ligne de salaire actuelle ou archivée pour cette personne.</p>';
   }
 
   return `
@@ -4808,18 +4808,18 @@ function profilePayrollSummary(payroll) {
       </div>
       <div>
         <span>Statut</span>
-        <strong>${payroll.line.paid ? 'Payé' : 'À payer'}</strong>
+        <strong>${payroll.line.paid ? 'Versé' : 'À verser'}</strong>
         ${payroll.line.paidAt ? `<small>${escapeHtml(formatSessionDate(payroll.line.paidAt))}</small>` : ''}
       </div>
     </div>` : '<p class="muted">Aucune ligne sur la semaine en cours.</p>'}
     ${history.length ? `
       <div class="profile-payroll-history">
-        <h5>Historique de paie</h5>
+        <h5>Historique des salaires</h5>
         <ul class="compact-list">
           ${history.map((item) => `
             <li>
               <span>${escapeHtml(item.weekStart)} → ${escapeHtml(item.weekEnd)}</span>
-              <strong>${escapeHtml(item.amountLabel)} · ${item.paid ? 'Payé' : 'À payer'}</strong>
+              <strong>${escapeHtml(item.amountLabel)} · ${item.paid ? 'Versé' : 'À verser'}</strong>
             </li>
           `).join('')}
         </ul>
@@ -4830,7 +4830,7 @@ function profilePayrollSummary(payroll) {
 
 function userProfilePanel(profile) {
   if (!profile) {
-    return '<p class="muted">Entre un ID Discord pour voir les heures, sanctions, tickets, paie et actions liées à cette personne.</p>';
+    return '<p class="muted">Entre un ID Discord pour voir les heures, sanctions, tickets, salaire et actions liées à cette personne.</p>';
   }
 
   const sessions = profile.service?.sessions || [];
@@ -4874,9 +4874,9 @@ function userProfilePanel(profile) {
           <strong>${escapeHtml(dossiers.length)}</strong>
         </article>
         <article>
-          <span>Paie semaine</span>
+          <span>Salaire de la semaine</span>
           <strong>${payrollLine ? escapeHtml(payrollLine.amountLabel) : 'Aucune'}</strong>
-          ${payrollLine ? `<small>${payrollLine.paid ? 'Payé' : 'À payer'}</small>` : ''}
+          ${payrollLine ? `<small>${payrollLine.paid ? 'Versé' : 'À verser'}</small>` : ''}
         </article>
       </div>
       <div class="user-profile-columns">
@@ -4897,7 +4897,7 @@ function userProfilePanel(profile) {
           ${profileDossierList(dossiers)}
         </div>
         <div>
-          <h4>Paie de la semaine</h4>
+          <h4>Salaire de la semaine</h4>
           ${profilePayrollSummary(profile.payroll)}
         </div>
         <div class="user-profile-wide">
@@ -5021,7 +5021,7 @@ function scheduledAnnouncementList(state) {
 }
 
 function reportScheduleList(state) {
-  const labels = { service: 'Services', payroll: 'Paie RP', dossiers: 'Dossiers', moderation: 'Modération' };
+  const labels = { service: 'Services', payroll: 'Salaires', dossiers: 'Dossiers', moderation: 'Modération' };
   const items = state.reportSchedules || [];
   if (!items.length) return '<p class="muted">Aucun rapport automatique configuré.</p>';
 
@@ -5049,7 +5049,7 @@ function simulationHistory(state) {
   const labels = {
     automod: 'Auto-modération',
     dossier: 'Dossier',
-    payroll: 'Paie RP',
+    payroll: 'Salaires',
     announcement: 'Annonce'
   };
   const actionLabels = {
@@ -5075,7 +5075,7 @@ function simulationHistory(state) {
     if (item.kind === 'payroll') {
       return result.found
         ? `${result.totalTimeLabel} · ${result.amountLabel} · ${result.paid ? 'déjà versée' : 'à verser'}`
-        : (result.detail || 'Aucune paie trouvée pour cette semaine.');
+        : (result.detail || 'Aucun salaire trouvé pour cette semaine.');
     }
     if (item.kind === 'announcement') {
       return `Annonce valide · ${result.totalCharacters || 0} caractère(s)`;
@@ -5137,7 +5137,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
           <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Le rapport PDF est prêt à présenter. CSV et Excel restent disponibles pour retravailler les données.</p></div></div>
           <div class="report-download-grid">
             ${['service', 'payroll', 'dossiers', 'moderation'].map(kind => `
-              <div><strong>${escapeHtml({ service: 'Services', payroll: 'Paie RP', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
+              <div><strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
                 <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">PDF</button>
                 <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="csv">CSV</button>
                 <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls">Excel</button>
@@ -5149,7 +5149,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
         <article class="inline-form operation-card" data-operation-section="reports">
           <div class="panel-mini-heading"><div><h3>Rapports automatiques ${premiumTag}</h3><p class="muted">Envoi hebdomadaire ou mensuel dans un salon Discord.</p></div></div>
           <form data-action-form="save-report-schedule" class="operation-form-grid">
-            <select name="reportKind"><option value="service">Services</option><option value="payroll">Paie RP</option><option value="dossiers">Tickets</option><option value="moderation">Modération</option></select>
+            <select name="reportKind"><option value="service">Services</option><option value="payroll">Salaires</option><option value="dossiers">Tickets</option><option value="moderation">Modération</option></select>
             <select name="frequency"><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select>
             <select name="format"><option value="pdf">PDF</option><option value="csv">CSV</option><option value="xls">Excel</option></select>
             <select name="channelId" required>${channelOptions}</select>
@@ -5177,7 +5177,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
         </article>
 
         <article class="inline-form operation-card operation-card-wide" data-operation-section="testing">
-          <div class="panel-mini-heading row-heading"><div><h3>Simulations sans action ${premiumTag}</h3><p class="muted">Vérifie les réglages du serveur sans sanctionner, publier, créer de dossier ni enregistrer de paie.</p></div><span class="status-badge is-ready">Aucun effet sur Discord</span></div>
+          <div class="panel-mini-heading row-heading"><div><h3>Simulations sans action ${premiumTag}</h3><p class="muted">Vérifie les réglages du serveur sans sanctionner, publier, créer de dossier ni enregistrer de salaire.</p></div><span class="status-badge is-ready">Aucun effet sur Discord</span></div>
           <div class="simulation-grid">
             <form class="simulation-test" data-action-form="run-simulation">
               <input type="hidden" name="kind" value="automod">
@@ -5193,7 +5193,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
             </form>
             <form class="simulation-test" data-action-form="run-simulation">
               <input type="hidden" name="kind" value="payroll">
-              <div class="simulation-test-heading"><span>03</span><div><h4>Paie RP</h4><p>Calcule la ligne de paie de la semaine sans la marquer comme versée.</p></div></div>
+              <div class="simulation-test-heading"><span>03</span><div><h4>Salaire</h4><p>Calcule le salaire de la semaine sans le marquer comme versé.</p></div></div>
               <label><span>Membre concerné</span><input name="userId" placeholder="ID Discord du membre" inputmode="numeric" required></label>
               <button class="button" type="submit">Calculer l’aperçu</button>
             </form>
@@ -5426,7 +5426,7 @@ function founderStoragePanel(overview) {
         <div>
           <p class="eyebrow">Conservation</p>
           <h3>Centre de maintenance</h3>
-          <p class="muted">Les dossiers, services, sanctions et archives de paie restent dans le registre actif. Les anciens journaux techniques sont conservés sous forme compressée.</p>
+          <p class="muted">Les dossiers, services, sanctions et archives des salaires restent dans le registre actif. Les anciens journaux techniques sont conservés sous forme compressée.</p>
         </div>
         ${statusBadge(alerts.length ? `${alerts.length} alerte(s)` : (allCompressed ? 'Sous contrôle' : 'Entretien en cours'), !alerts.length)}
       </div>
@@ -5776,10 +5776,10 @@ const DASHBOARD_TABS = [
   },
   {
     id: 'service',
-    label: 'Service & paie',
+    label: 'Service & salaires',
     eyebrow: 'Heures',
-    title: 'Service et paie',
-    description: 'Présences, salaires et paiements'
+    title: 'Service et salaires',
+    description: 'Présences, barèmes et versements'
   },
   {
     id: 'dossiers',
@@ -5844,7 +5844,7 @@ const DASHBOARD_SUBTABS = {
   ],
   service: [
     { id: 'attendance', label: 'Présences', description: 'Agents actifs et registres', selectors: ['.service-overview-panel'] },
-    { id: 'payroll', label: 'Paie RP', description: 'Semaine, règlements et archives', selectors: ['.payroll-panel'] },
+    { id: 'payroll', label: 'Salaires', description: 'Semaine, versements et archives', selectors: ['.payroll-panel'] },
     { id: 'actions', label: 'Actions', description: 'Ouverture, clôture et synchronisation', selectors: ['.service-actions-panel', '.inline-premium-panel'] }
   ],
   dossiers: [

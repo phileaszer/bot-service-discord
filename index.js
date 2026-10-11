@@ -403,18 +403,18 @@ const I18N = {
         officialUpdateSent: '✅ Mise à jour officielle publiée. Serveur Sentinel : **{referenceCount}** salon(s). Serveurs abonnés : **{subscriberCount}** salon(s).',
         officialUpdateNoTarget: '❌ Aucun salon de nouveautés disponible pour publier cette mise à jour.',
         payRateInvalid: '❌ Montant horaire invalide. Exemple : `/config-paie montant:500 devise:$`.',
-        paySettingsUpdated: '✅ Paie RP configurée : **{rate}** par heure.',
+        paySettingsUpdated: '✅ Salaires configurés : **{rate}** par heure.',
         payRoleSettingsUpdated: '✅ Taux configuré pour {role} : **{rate}** par heure.',
         payRoleSettingsRemoved: '✅ Le taux spécifique de {role} a été retiré. Sentinel utilisera le taux global si aucun autre rôle ne correspond.',
         payAdjustmentInvalid: '❌ Ajustement invalide. Indique un membre, un type, un montant positif et une raison courte.',
         payAdjustmentAdded: '✅ Ajustement ajouté pour {member} : **{amount}** ({type}).',
-        payrollArchived: '✅ Paie RP archivée pour la semaine **{weekStart} → {weekEnd}**. Total : **{amount}**.',
+        payrollArchived: '✅ Salaires archivés pour la semaine **{weekStart} → {weekEnd}**. Total : **{amount}**.',
         payrollWeekInvalid: '❌ Semaine invalide. Utilise le format `AAAA-MM-JJ`, par exemple `2026-08-17`.',
-        payrollMarkTargetRequired: '❌ Choisis un membre ou indique son ID Discord pour marquer la paie.',
-        payrollMarkNoLine: '❌ Aucune ligne de paie trouvée pour {target} sur cette semaine.',
-        payrollMarked: '✅ Paie de {target} marquée **{status}** pour la semaine **{weekStart} → {weekEnd}**. Montant : **{amount}**.',
-        payrollPaidStatus: 'payée',
-        payrollUnpaidStatus: 'non payée',
+        payrollMarkTargetRequired: '❌ Choisis un membre ou indique son ID Discord pour modifier son salaire.',
+        payrollMarkNoLine: '❌ Aucun salaire trouvé pour {target} sur cette semaine.',
+        payrollMarked: '✅ Salaire de {target} marqué **{status}** pour la semaine **{weekStart} → {weekEnd}**. Montant : **{amount}**.',
+        payrollPaidStatus: 'versé',
+        payrollUnpaidStatus: 'à verser',
         payrollEmpty: '📄 Aucune heure de service enregistrée sur la semaine en cours.',
         pingOk: '🏓 Pong ! Données internes OK. Latence Discord : **{ping}ms**',
         pingDbError: '❌ Le bot répond, mais les données internes ne répondent pas correctement.',
@@ -646,18 +646,18 @@ const I18N = {
         officialUpdateSent: '✅ Official update published. Sentinel server: **{referenceCount}** channel(s). Subscribed servers: **{subscriberCount}** channel(s).',
         officialUpdateNoTarget: '❌ No updates channel is available for this announcement.',
         payRateInvalid: '❌ Invalid hourly amount. Example: `/payroll-config hourly_rate:500 currency:$`.',
-        paySettingsUpdated: '✅ RP payroll configured: **{rate}** per hour.',
+        paySettingsUpdated: '✅ Salaries configured: **{rate}** per hour.',
         payRoleSettingsUpdated: '✅ Rate configured for {role}: **{rate}** per hour.',
         payRoleSettingsRemoved: '✅ The specific rate for {role} has been removed. Sentinel will use the global rate if no other role matches.',
         payAdjustmentInvalid: '❌ Invalid adjustment. Provide a member, type, positive amount, and short reason.',
         payAdjustmentAdded: '✅ Adjustment added for {member}: **{amount}** ({type}).',
-        payrollArchived: '✅ RP payroll archived for **{weekStart} → {weekEnd}**. Total: **{amount}**.',
+        payrollArchived: '✅ Salaries archived for **{weekStart} → {weekEnd}**. Total: **{amount}**.',
         payrollWeekInvalid: '❌ Invalid week. Use the `YYYY-MM-DD` format, for example `2026-08-17`.',
-        payrollMarkTargetRequired: '❌ Choose a member or provide their Discord ID to mark payroll.',
-        payrollMarkNoLine: '❌ No payroll line found for {target} this week.',
-        payrollMarked: '✅ Payroll for {target} marked **{status}** for **{weekStart} → {weekEnd}**. Amount: **{amount}**.',
-        payrollPaidStatus: 'paid',
-        payrollUnpaidStatus: 'unpaid',
+        payrollMarkTargetRequired: '❌ Choose a member or provide their Discord ID to update their salary.',
+        payrollMarkNoLine: '❌ No salary found for {target} this week.',
+        payrollMarked: '✅ Salary for {target} marked **{status}** for **{weekStart} → {weekEnd}**. Amount: **{amount}**.',
+        payrollPaidStatus: 'issued',
+        payrollUnpaidStatus: 'pending',
         payrollEmpty: '📄 No service time recorded for the current week.',
         pingOk: '🏓 Pong! Internal data OK. Discord latency: **{ping}ms**',
         pingDbError: '❌ The bot is responding, but internal data is not responding correctly.',
@@ -8687,8 +8687,8 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
     const isEnglish = language === 'en';
     const lines = displayedItems.map((item, index) => {
         const status = item.paid
-            ? (isEnglish ? 'Paid' : 'Payé')
-            : (isEnglish ? 'To pay' : 'À payer');
+            ? (isEnglish ? 'Issued' : 'Versé')
+            : (isEnglish ? 'To issue' : 'À verser');
 
         const ratePart = item.payrollRoleName
             ? `${item.payrollRoleName} · ${item.hourlyRateLabel}/h`
@@ -8713,7 +8713,7 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Weekly RP payroll' : 'Sentinel | Registre de paie',
+        title: isEnglish ? 'Sentinel | Weekly salary register' : 'Sentinel | Registre des salaires',
         description,
         requester,
         thumbnail: guild.iconURL(),
@@ -8736,7 +8736,7 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
                 inline: true
             },
             {
-                name: isEnglish ? 'Already paid' : 'Déjà payé',
+                name: isEnglish ? 'Already issued' : 'Déjà versé',
                 value: `**${payroll.totals.paidAmountLabel}**`,
                 inline: true
             },
@@ -8746,15 +8746,15 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
                 inline: true
             },
             {
-                name: isEnglish ? 'Still to pay' : 'Reste à payer',
+                name: isEnglish ? 'Still to issue' : 'Reste à verser',
                 value: `**${payroll.totals.unpaidAmountLabel}**`,
                 inline: true
             },
             {
                 name: isEnglish ? 'Dashboard' : 'Dashboard',
                 value: isEnglish
-                    ? `Use ${getDashboardUrl('/dashboard')} to tick paid/unpaid lines.`
-                    : `Utilise ${getDashboardUrl('/dashboard')} pour cocher les lignes payé/non payé.`,
+                    ? `Use ${getDashboardUrl('/dashboard')} to mark salaries as issued or pending.`
+                    : `Utilise ${getDashboardUrl('/dashboard')} pour marquer les salaires versés ou à verser.`,
                 inline: false
             }
         );
@@ -8795,7 +8795,7 @@ function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
 
         return createSentinelEmbed({
             color: SENTINEL_COLORS.accent,
-            title: isEnglish ? 'Sentinel | Payroll archives' : 'Sentinel | Archives de paie',
+            title: isEnglish ? 'Sentinel | Salary archives' : 'Sentinel | Archives des salaires',
             description: lines.join('\n\n'),
             requester,
             thumbnail: guild.iconURL(),
@@ -8803,16 +8803,16 @@ function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
         }).addFields({
             name: isEnglish ? 'Full ledger' : 'Registre complet',
             value: isEnglish
-                ? `Open ${getDashboardUrl('/dashboard')} to search all periods and update payment status.`
-                : `Ouvre ${getDashboardUrl('/dashboard')} pour rechercher toutes les périodes et suivre les règlements.`,
+                ? `Open ${getDashboardUrl('/dashboard')} to search all periods and update salary status.`
+                : `Ouvre ${getDashboardUrl('/dashboard')} pour rechercher toutes les périodes et suivre les salaires.`,
             inline: false
         });
     }
 
     const lines = selectedArchive.items.slice(0, 10).map(item => {
         const status = item.paid
-            ? (isEnglish ? 'Paid' : 'Payé')
-            : (isEnglish ? 'Pending' : 'À payer');
+            ? (isEnglish ? 'Issued' : 'Versé')
+            : (isEnglish ? 'Pending' : 'À verser');
 
         return `<@${item.userId}> · **${item.amountLabel}** · ${item.totalTimeLabel} · ${status}`;
     });
@@ -8826,8 +8826,8 @@ function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
 
     return createSentinelEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Archived payroll' : 'Sentinel | Paie archivée',
-        description: lines.join('\n') || (isEnglish ? 'No payroll line in this archive.' : 'Aucune ligne de paie dans cette archive.'),
+        title: isEnglish ? 'Sentinel | Archived salaries' : 'Sentinel | Salaires archivés',
+        description: lines.join('\n') || (isEnglish ? 'No salary in this archive.' : 'Aucun salaire dans cette archive.'),
         requester,
         thumbnail: guild.iconURL(),
         language
@@ -8848,12 +8848,12 @@ function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
             inline: true
         },
         {
-            name: isEnglish ? 'Already paid' : 'Déjà payé',
+            name: isEnglish ? 'Already issued' : 'Déjà versé',
             value: `**${selectedArchive.totals.paidAmountLabel}**`,
             inline: true
         },
         {
-            name: isEnglish ? 'Still to pay' : 'Reste à payer',
+            name: isEnglish ? 'Still to issue' : 'Reste à verser',
             value: `**${selectedArchive.totals.unpaidAmountLabel}**`,
             inline: true
         },
@@ -10052,7 +10052,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/en-service` - agents actuellement en service',
         '`/top-service`, `/top-semaine`, `/resume-service` - classements et resume complet',
         '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
-        '`/config-paie`, `/paie-semaine`, `/paie-historique`, `/paie-archive` - régler, consulter et archiver la paie RP hebdomadaire',
+        '`/config-paie`, `/paie-semaine`, `/paie-historique`, `/paie-archive` - régler, consulter et archiver les salaires hebdomadaires',
         '`/config-role`, `/config-autorole`, `/config-logs`, `/config-statut`, `/config-permissions`, `/config-voir` - configuration',
         '`/embed creer` - publier une annonce sous l identite de Sentinel'
     ];
@@ -10078,7 +10078,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/unban utilisateur_id` - debannir par ID et annuler un tempban actif',
         '`/lock`, `/unlock`, `/slowmode duree` - gerer rapidement un salon',
         '`/config-paie role:@role` - definir un taux horaire par role',
-        '`/paie-ajustement` - ajouter une prime, une retenue ou une correction de paie',
+        '`/paie-ajustement` - ajouter une prime, une retenue ou une correction de salaire',
         'Escalade active : timeout, expulsion ou bannissement après les seuils d’avertissements choisis, avec expiration, rôles exemptés et journal.'
     ];
     const availableCapacity = [
@@ -10687,10 +10687,10 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/dashboard` donne le lien de la console.',
                         '`/support` donne les accès officiels.',
                         '`/reset-heures membre:@membre` ou `utilisateur_id:ID` remet une personne à zéro, même si elle a quitté.',
-                        '`/config-paie` règle le montant horaire RP.',
-                        '`/paie-semaine` affiche qui est payé ou encore à payer cette semaine.',
-                        '`/paie-historique` retrouve les anciennes archives de paie.',
-                        '`/paie-marquer paye:true membre:@membre` marque une ligne comme payée ou non payée.',
+                        '`/config-paie` règle le salaire horaire.',
+                        '`/paie-semaine` affiche les salaires versés ou encore à verser cette semaine.',
+                        '`/paie-historique` retrouve les anciennes archives des salaires.',
+                        '`/paie-marquer paye:true membre:@membre` marque un salaire comme versé ou à verser.',
                         '`/config-autorole` gère le rôle donné automatiquement aux nouveaux membres.',
                         '`/embed creer` publie une annonce sous l’identité de Sentinel.',
                         'Les créations et modifications d’embeds Sentinel sont disponibles sans quota de formule.'
@@ -15303,16 +15303,16 @@ function getGuildReportDataset(guild, kind) {
     if (kind === 'payroll') {
         const payroll = getWeeklyPayroll(guild.id, { guild, language });
         return {
-            title: 'État de paie RP',
-            subtitle: 'Synthèse hebdomadaire des présences, ajustements et règlements',
-            sectionTitle: 'Détail de la paie',
+            title: 'État des salaires',
+            subtitle: 'Synthèse hebdomadaire des présences, ajustements et salaires',
+            sectionTitle: 'Détail des salaires',
             description: `Semaine de référence : ${payroll.weekStart}.`,
             metadata: [
                 { label: 'Serveur', value: guild.name },
                 { label: 'Semaine', value: payroll.weekStart },
-                { label: 'Registre', value: 'Paie RP' }
+                { label: 'Registre', value: 'Salaires' }
             ],
-            columns: ['Utilisateur', 'ID Discord', 'Temps', 'Taux', 'Ajustements', 'Montant', 'Paiement'],
+            columns: ['Utilisateur', 'ID Discord', 'Temps', 'Taux', 'Ajustements', 'Montant', 'Statut du salaire'],
             rows: payroll.items.map(item => ({
                 Utilisateur: item.displayName || item.username || item.userId,
                 'ID Discord': item.userId,
@@ -15320,7 +15320,7 @@ function getGuildReportDataset(guild, kind) {
                 Taux: item.hourlyRateLabel,
                 Ajustements: item.adjustmentAmountLabel,
                 Montant: item.amountLabel,
-                Paiement: item.paid ? 'Payé' : 'À payer'
+                'Statut du salaire': item.paid ? 'Versé' : 'À verser'
             }))
         };
     }
@@ -15429,8 +15429,8 @@ function buildDashboardNotifications(guildId, userId, snapshot = {}) {
     if (unpaidCount) notifications.push({
         key: `payroll-unpaid-${payroll.weekStart}`,
         severity: 'info',
-        title: `${unpaidCount} paiement(s) à valider`,
-        detail: `Paie de la semaine du ${payroll.weekStart}.`,
+        title: `${unpaidCount} salaire(s) à verser`,
+        detail: `Salaires de la semaine du ${payroll.weekStart}.`,
         tab: 'service'
     });
     if (automodCount) notifications.push({
@@ -15511,7 +15511,7 @@ function getMemberPortalGuild(guild, userId) {
     if (preferences.payrollEnabled && payrollLine) {
         memberNotifications.push({
             key: `payroll-${payroll.weekStart}`,
-            title: payrollLine.paid ? 'Paie enregistrée' : 'Paie en attente',
+            title: payrollLine.paid ? 'Salaire versé' : 'Salaire à verser',
             detail: `${payrollLine.amountLabel} pour la semaine du ${payroll.weekStart}.`,
             createdAt: payrollLine.paidAt || payroll.weekEnd
         });
@@ -15612,7 +15612,7 @@ function simulateGuildOperation(guild, actorUserId, kind, input = {}) {
         const line = payroll.items.find(item => item.userId === userId);
         result = line
             ? { found: true, userId, totalTimeLabel: line.totalTimeLabel, hourlyRateLabel: line.hourlyRateLabel, amountLabel: line.amountLabel, paid: line.paid }
-            : { found: false, userId, detail: 'Aucune ligne de paie pour cette semaine.' };
+            : { found: false, userId, detail: 'Aucun salaire pour cette semaine.' };
     } else {
         throw new Error('Mode d’essai inconnu.');
     }
@@ -16953,7 +16953,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 return interaction.reply({
                     content: language === 'en'
                         ? 'No payroll archive was found for this period.'
-                        : 'Aucune archive de paie n’a été trouvée pour cette période.',
+                        : 'Aucune archive des salaires n’a été trouvée pour cette période.',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -17830,7 +17830,7 @@ client.on(Events.MessageCreate, async message => {
         if (!embed) {
             return message.reply(language === 'en'
                 ? 'No payroll archive was found for this period.'
-                : 'Aucune archive de paie n’a été trouvée pour cette période.');
+                : 'Aucune archive des salaires n’a été trouvée pour cette période.');
         }
 
         return message.reply({ embeds: [embed] });
