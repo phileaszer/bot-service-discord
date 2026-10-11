@@ -58,8 +58,8 @@ function createWorksheet({ title, subtitle, columns, rows }) {
   <sheetFormatPr defaultRowHeight="18"/>
   <cols>${cols}</cols>
   <sheetData>${titleRow}${subtitleRow}${headingRow}${dataRows}</sheetData>
-  ${mergedCells}
   <autoFilter ref="A${headerRow}:${lastColumn}${Math.max(lastRow, headerRow)}"/>
+  ${mergedCells}
 </worksheet>`;
 }
 

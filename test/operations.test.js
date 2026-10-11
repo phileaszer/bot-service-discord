@@ -109,8 +109,13 @@ test('report generators produce recognizable XLSX and PDF files', () => {
     assert.equal(xlsx.buffer.subarray(0, 4).toString('hex'), '504b0304');
     const workbookFiles = unzipSync(xlsx.buffer);
     assert.ok(workbookFiles['xl/workbook.xml']);
-    assert.match(strFromU8(workbookFiles['xl/worksheets/sheet1.xml']), /Rapport Sentinel/);
-    assert.match(strFromU8(workbookFiles['xl/worksheets/sheet1.xml']), /Test/);
+    const worksheetXml = strFromU8(workbookFiles['xl/worksheets/sheet1.xml']);
+    assert.match(worksheetXml, /Rapport Sentinel/);
+    assert.match(worksheetXml, /Test/);
+    assert.ok(
+        worksheetXml.indexOf('<autoFilter ') < worksheetXml.indexOf('<mergeCells '),
+        'Excel exige autoFilter avant mergeCells dans une feuille OOXML'
+    );
     assert.equal(pdf.buffer.subarray(0, 5).toString('latin1'), '%PDF-');
     assert.match(pdf.buffer.toString('latin1'), /SENTINEL/);
     assert.match(pdf.buffer.toString('latin1'), /Rapport Sentinel/);
