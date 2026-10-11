@@ -137,6 +137,7 @@ test('dashboard downloads real XLSX reports without navigating to an external ap
     assert.match(dashboardClient, /data-report-sheets=/);
     assert.match(dashboardClient, /https:\/\/sheets\.new/);
     assert.match(dashboardClient, /navigator\.clipboard/);
+    assert.match(dashboardClient, /<summary class="button button-small button-ghost">Autres formats<\/summary>/);
     assert.doesNotMatch(dashboardClient, /data-report-format="csv"/);
     assert.doesNotMatch(dashboardClient, /<option value="csv">CSV<\/option>/);
 });

@@ -5142,7 +5142,10 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
                 <div class="report-download-actions">
                   <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
                   <button class="button button-small button-ghost" type="button" data-report-sheets="${kind}" title="Copie les données et ouvre une nouvelle feuille Google Sheets">Google Sheets</button>
-                  <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur pour Microsoft Excel">Télécharger XLSX</button>
+                  <details class="report-format-menu">
+                    <summary class="button button-small button-ghost">Autres formats</summary>
+                    <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur pour Microsoft Excel">Télécharger XLSX</button>
+                  </details>
                 </div>
               </div>
             `).join('')}
