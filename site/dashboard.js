@@ -5141,7 +5141,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
                 <strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
                 <div class="report-download-actions">
                   <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
-                  <button class="button button-small button-ghost" type="button" data-report-sheets="${kind}" title="Prépare le tableau à coller dans une nouvelle feuille Google Sheets">Préparer pour Google Sheets</button>
+                  <button class="button button-small button-ghost report-sheets-button" type="button" data-report-sheets="${kind}" title="Copier le tableau pour Google Sheets">Google Sheets</button>
                   <details class="report-format-menu">
                     <summary class="button button-small button-ghost">Autres formats</summary>
                     <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur pour Microsoft Excel">Télécharger XLSX</button>
@@ -6389,12 +6389,22 @@ function showGoogleSheetsReadyDialog() {
     dialog.dataset.sheetsReadyDialog = '';
     dialog.innerHTML = `
       <div class="sheets-ready-content">
-        <p class="eyebrow">Export prêt</p>
-        <h3>Ton tableau est copié</h3>
-        <p>Ouvre Google Sheets, sélectionne la cellule <strong>A1</strong>, puis utilise <strong>Ctrl+V</strong>. Le tableau complet apparaîtra avec ses colonnes.</p>
+        <header class="sheets-ready-heading">
+          <div>
+            <p class="eyebrow">Export Google Sheets</p>
+            <h3>Le tableau est prêt</h3>
+          </div>
+          <span class="sheets-copy-status">Copié</span>
+        </header>
+        <p class="sheets-ready-intro">Les données sont dans ton presse-papiers. Il reste trois gestes rapides.</p>
+        <ol class="sheets-ready-steps">
+          <li><span>1</span><div><strong>Ouvre une feuille</strong><small>Utilise le bouton ci-dessous.</small></div></li>
+          <li><span>2</span><div><strong>Sélectionne A1</strong><small>C’est la première cellule en haut à gauche.</small></div></li>
+          <li><span>3</span><div><strong>Fais Ctrl+V</strong><small>Le tableau et ses colonnes apparaîtront.</small></div></li>
+        </ol>
         <div class="sheets-ready-actions">
           <button class="button button-ghost" type="button" data-close-sheets-dialog>Fermer</button>
-          <a class="button" href="https://sheets.new" target="_blank" rel="noopener noreferrer" data-open-sheets>Ouvrir Google Sheets</a>
+          <a class="button" href="https://sheets.new" target="_blank" rel="noopener noreferrer" data-open-sheets autofocus>Ouvrir Google Sheets</a>
         </div>
       </div>
     `;
