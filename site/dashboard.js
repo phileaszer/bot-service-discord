@@ -5134,13 +5134,21 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
       ${notificationCenter(state)}
       <div class="operations-grid">
         <article class="inline-form operation-card" data-operation-section="reports">
-          <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Le rapport PDF est prêt à présenter. CSV et Excel restent disponibles pour retravailler les données.</p></div></div>
+          <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Le PDF est le format conseillé pour consulter, partager ou archiver un rapport.</p></div></div>
           <div class="report-download-grid">
             ${['service', 'payroll', 'dossiers', 'moderation'].map(kind => `
-              <div><strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
-                <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">PDF</button>
-                <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="csv">CSV</button>
-                <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls">Excel</button>
+              <div class="report-download-row">
+                <strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
+                <div class="report-download-actions">
+                  <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
+                  <details class="report-format-menu">
+                    <summary class="button button-small button-ghost">Autres formats</summary>
+                    <div class="report-format-options">
+                      <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="csv" title="Données brutes pour un import">CSV</button>
+                      <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls" title="Tableau modifiable dans Excel">Excel</button>
+                    </div>
+                  </details>
+                </div>
               </div>
             `).join('')}
           </div>
