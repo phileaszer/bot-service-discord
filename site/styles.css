@@ -273,6 +273,62 @@
   margin-top: 6px;
 }
 
+.sheets-ready-dialog {
+  width: min(520px, calc(100vw - 32px));
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, var(--line));
+  background: var(--surface-strong);
+  color: var(--text);
+  padding: 0;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .52);
+}
+
+.sheets-ready-dialog::backdrop {
+  background: rgba(5, 8, 12, .76);
+  backdrop-filter: blur(5px);
+}
+
+.sheets-ready-content {
+  padding: 26px;
+  border-left: 4px solid var(--accent);
+}
+
+.sheets-ready-content h3 {
+  margin: 6px 0 10px;
+  font-size: 1.4rem;
+}
+
+.sheets-ready-content > p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.sheets-ready-content strong {
+  color: var(--text);
+}
+
+.sheets-ready-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+@media (max-width: 560px) {
+  .sheets-ready-content {
+    padding: 22px 18px;
+  }
+
+  .sheets-ready-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .sheets-ready-actions .button {
+    width: 100%;
+  }
+}
+
 .scheduled-announcement-editor {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr);

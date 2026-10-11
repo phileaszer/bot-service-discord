@@ -5141,7 +5141,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
                 <strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
                 <div class="report-download-actions">
                   <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
-                  <button class="button button-small button-ghost" type="button" data-report-sheets="${kind}" title="Copie les données et ouvre une nouvelle feuille Google Sheets">Google Sheets</button>
+                  <button class="button button-small button-ghost" type="button" data-report-sheets="${kind}" title="Prépare le tableau à coller dans une nouvelle feuille Google Sheets">Préparer pour Google Sheets</button>
                   <details class="report-format-menu">
                     <summary class="button button-small button-ghost">Autres formats</summary>
                     <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur pour Microsoft Excel">Télécharger XLSX</button>
@@ -6381,15 +6381,36 @@ function copyTextForSpreadsheet(text) {
   return Promise.resolve();
 }
 
-async function openReportInGoogleSheets(kind, button = null) {
+function showGoogleSheetsReadyDialog() {
+  let dialog = document.querySelector('[data-sheets-ready-dialog]');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.className = 'sheets-ready-dialog';
+    dialog.dataset.sheetsReadyDialog = '';
+    dialog.innerHTML = `
+      <div class="sheets-ready-content">
+        <p class="eyebrow">Export prêt</p>
+        <h3>Ton tableau est copié</h3>
+        <p>Ouvre Google Sheets, sélectionne la cellule <strong>A1</strong>, puis utilise <strong>Ctrl+V</strong>. Le tableau complet apparaîtra avec ses colonnes.</p>
+        <div class="sheets-ready-actions">
+          <button class="button button-ghost" type="button" data-close-sheets-dialog>Fermer</button>
+          <a class="button" href="https://sheets.new" target="_blank" rel="noopener noreferrer" data-open-sheets>Ouvrir Google Sheets</a>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+    dialog.querySelector('[data-close-sheets-dialog]')?.addEventListener('click', () => dialog.close());
+    dialog.querySelector('[data-open-sheets]')?.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+
+  if (!dialog.open) dialog.showModal();
+}
+
+async function prepareReportForGoogleSheets(kind, button = null) {
   if (!selectedGuildId || !['service', 'payroll', 'dossiers', 'moderation'].includes(kind)) return;
-  const sheetsLink = document.createElement('a');
-  sheetsLink.href = 'https://sheets.new';
-  sheetsLink.target = '_blank';
-  sheetsLink.rel = 'noopener noreferrer';
-  document.body.appendChild(sheetsLink);
-  sheetsLink.click();
-  sheetsLink.remove();
   setLoading(button, true);
 
   try {
@@ -6404,7 +6425,8 @@ async function openReportInGoogleSheets(kind, button = null) {
       throw new Error(payload.error || `Erreur ${response.status}`);
     }
     await copyTextForSpreadsheet(await response.text());
-    toast('Données copiées. Colle-les dans Google Sheets avec Ctrl+V.');
+    showGoogleSheetsReadyDialog();
+    toast('Tableau copié et prêt pour Google Sheets.');
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
@@ -6769,7 +6791,7 @@ function attachDashboardHandlers() {
 
   $$('[data-report-sheets]').forEach((button) => {
     button.addEventListener('click', () => {
-      openReportInGoogleSheets(button.dataset.reportSheets, button);
+      prepareReportForGoogleSheets(button.dataset.reportSheets, button);
     });
   });
 
