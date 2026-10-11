@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('./database/database');
+const { createProfessionalPdf } = require('./pdf-document');
 
 const REPORT_FORMATS = new Set(['csv', 'xls', 'pdf']);
 const REPORT_KINDS = new Set(['service', 'payroll', 'dossiers', 'moderation']);
@@ -329,7 +330,7 @@ function scheduleStart(frequency) {
 function saveReportSchedule(guildId, actorUserId, input) {
     const reportKind = REPORT_KINDS.has(input.reportKind) ? input.reportKind : null;
     const frequency = ['weekly', 'monthly'].includes(input.frequency) ? input.frequency : null;
-    const format = REPORT_FORMATS.has(input.format) ? input.format : 'csv';
+    const format = REPORT_FORMATS.has(input.format) ? input.format : 'pdf';
     const channelId = String(input.channelId || '');
     if (!reportKind || !frequency || !/^\d{17,20}$/.test(channelId)) throw new Error('Rapport, fréquence ou salon invalide.');
     const now = new Date().toISOString();
@@ -612,74 +613,17 @@ function xmlEscape(value) {
         .replace(/"/g, '&quot;');
 }
 
-function pdfEscape(value) {
-    return reportCell(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-function wrapText(value, width = 92) {
-    const words = reportCell(value).split(/\s+/).filter(Boolean);
-    const lines = [];
-    let line = '';
-    for (const word of words) {
-        if (`${line} ${word}`.trim().length > width && line) {
-            lines.push(line);
-            line = word;
-        } else {
-            line = `${line} ${word}`.trim();
-        }
-    }
-    if (line) lines.push(line);
-    return lines.length ? lines : [''];
-}
-
-function createPdf(title, columns, rows) {
-    const reportLines = [];
-    for (const row of rows) {
-        reportLines.push(...wrapText(columns.map(column => reportCell(row[column])).join(' | ')));
-    }
-    const pageSize = 58;
-    const pageCount = Math.max(1, Math.ceil(reportLines.length / pageSize));
-    const fontObjectId = 3 + (pageCount * 2);
-    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', ''];
-    const pageIds = [];
-
-    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-        const pageObjectId = 3 + (pageIndex * 2);
-        const contentObjectId = pageObjectId + 1;
-        const pageLines = [
-            `${title} - page ${pageIndex + 1}/${pageCount}`,
-            `Généré le ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`,
-            '',
-            columns.join(' | '),
-            '-'.repeat(92),
-            ...reportLines.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-        ];
-        const stream = [
-            'BT', '/F1 9 Tf', '44 800 Td',
-            ...pageLines.flatMap((line, index) => [index ? '0 -12 Td' : '', `(${pdfEscape(line)}) Tj`]).filter(Boolean),
-            'ET'
-        ].join('\n');
-        pageIds.push(pageObjectId);
-        objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObjectId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`);
-        objects.push(`<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`);
-    }
-
-    objects[1] = `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`;
-    objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
-    let output = '%PDF-1.4\n';
-    const offsets = [0];
-    objects.forEach((object, index) => {
-        offsets.push(Buffer.byteLength(output, 'latin1'));
-        output += `${index + 1} 0 obj\n${object}\nendobj\n`;
-    });
-    const xref = Buffer.byteLength(output, 'latin1');
-    output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-    output += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
-    output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-    return Buffer.from(output, 'latin1');
-}
-
-function createReportDocument({ title, columns, rows, format }) {
+function createReportDocument({
+    title,
+    subtitle = 'Rapport administratif Sentinel',
+    metadata = [],
+    sectionTitle = 'Données du rapport',
+    description = '',
+    confidentiality = 'Document interne Sentinel',
+    columns,
+    rows,
+    format
+}) {
     if (!REPORT_FORMATS.has(format)) throw new Error('Format de rapport invalide.');
     const safeRows = Array.isArray(rows) ? rows.slice(0, 10000) : [];
     if (format === 'csv') {
@@ -693,7 +637,20 @@ function createReportDocument({ title, columns, rows, format }) {
         const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Sentinel"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
         return { buffer: Buffer.from(xml, 'utf8'), extension: 'xls', contentType: 'application/vnd.ms-excel' };
     }
-    return { buffer: createPdf(title, columns, safeRows), extension: 'pdf', contentType: 'application/pdf' };
+    return {
+        buffer: createProfessionalPdf({
+            title,
+            subtitle,
+            metadata: [
+                ...metadata,
+                { label: 'Enregistrements', value: safeRows.length.toLocaleString('fr-FR') }
+            ],
+            sections: [{ title: sectionTitle, description, columns, rows: safeRows }],
+            confidentiality
+        }),
+        extension: 'pdf',
+        contentType: 'application/pdf'
+    };
 }
 
 module.exports = {

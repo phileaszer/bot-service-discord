@@ -15281,7 +15281,15 @@ function getGuildReportDataset(guild, kind) {
 
     if (kind === 'service') {
         return {
-            title: `Sentinel - Services - ${guild.name}`,
+            title: 'Rapport des services',
+            subtitle: 'Registre administratif des présences et du temps de service',
+            sectionTitle: 'État des services',
+            description: 'Situation des membres enregistrés au moment de la génération du rapport.',
+            metadata: [
+                { label: 'Serveur', value: guild.name },
+                { label: 'Identifiant', value: guild.id },
+                { label: 'Registre', value: 'Services' }
+            ],
             columns: ['Utilisateur', 'ID Discord', 'Temps total', 'En service'],
             rows: getTopService(guild.id).map(item => ({
                 Utilisateur: reportMemberLabel(guild, item.userId),
@@ -15295,7 +15303,15 @@ function getGuildReportDataset(guild, kind) {
     if (kind === 'payroll') {
         const payroll = getWeeklyPayroll(guild.id, { guild, language });
         return {
-            title: `Sentinel - Paie ${payroll.weekStart} - ${guild.name}`,
+            title: 'État de paie RP',
+            subtitle: 'Synthèse hebdomadaire des présences, ajustements et règlements',
+            sectionTitle: 'Détail de la paie',
+            description: `Semaine de référence : ${payroll.weekStart}.`,
+            metadata: [
+                { label: 'Serveur', value: guild.name },
+                { label: 'Semaine', value: payroll.weekStart },
+                { label: 'Registre', value: 'Paie RP' }
+            ],
             columns: ['Utilisateur', 'ID Discord', 'Temps', 'Taux', 'Ajustements', 'Montant', 'Paiement'],
             rows: payroll.items.map(item => ({
                 Utilisateur: item.displayName || item.username || item.userId,
@@ -15314,10 +15330,18 @@ function getGuildReportDataset(guild, kind) {
             SELECT * FROM sentinel_dossiers WHERE guild_id = ? ORDER BY id DESC LIMIT 10000
         `).all(guild.id).map(mapDossier);
         return {
-            title: `Sentinel - Dossiers - ${guild.name}`,
-            columns: ['Dossier', 'Type', 'Sujet', 'Demandeur', 'Statut', 'Priorité', 'Référent', 'Ouverture', 'Clôture'],
+            title: 'Registre des tickets',
+            subtitle: 'Suivi administratif des demandes privées du serveur',
+            sectionTitle: 'Historique des tickets',
+            description: 'Tickets récents, responsables, priorités et état de traitement.',
+            metadata: [
+                { label: 'Serveur', value: guild.name },
+                { label: 'Identifiant', value: guild.id },
+                { label: 'Registre', value: 'Tickets' }
+            ],
+            columns: ['Ticket', 'Type', 'Sujet', 'Demandeur', 'Statut', 'Priorité', 'Référent', 'Ouverture', 'Clôture'],
             rows: rows.map(item => ({
-                Dossier: `#${item.id}`,
+                Ticket: `#${item.id}`,
                 Type: item.type,
                 Sujet: item.subject || '',
                 Demandeur: item.ownerUserId,
@@ -15335,7 +15359,15 @@ function getGuildReportDataset(guild, kind) {
             SELECT * FROM moderation_cases WHERE guild_id = ? ORDER BY id DESC LIMIT 10000
         `).all(guild.id);
         return {
-            title: `Sentinel - Modération - ${guild.name}`,
+            title: 'Registre de modération',
+            subtitle: 'Historique administratif des décisions de modération',
+            sectionTitle: 'Mesures enregistrées',
+            description: 'Actions de modération consignées par Sentinel sur ce serveur.',
+            metadata: [
+                { label: 'Serveur', value: guild.name },
+                { label: 'Identifiant', value: guild.id },
+                { label: 'Registre', value: 'Modération' }
+            ],
             columns: ['Cas', 'Action', 'Cible', 'Modérateur', 'Raison', 'Durée', 'Date'],
             rows: rows.map(item => ({
                 Cas: `#${item.id}`,

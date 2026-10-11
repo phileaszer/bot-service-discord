@@ -4827,7 +4827,8 @@ async function handleApi(req, res, ctx, url) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/me/privacy/export') {
-        const file = ctx.helpers.createMemberDataExport(session.user.id);
+        const format = url.searchParams.get('format') === 'json' ? 'json' : 'pdf';
+        const file = ctx.helpers.createMemberDataExport(session.user.id, format);
         writeResponse(res, 200, {
             'Content-Type': file.contentType,
             'Content-Disposition': `attachment; filename="${file.fileName}"`,
@@ -5194,7 +5195,8 @@ async function handleApi(req, res, ctx, url) {
         if (!isGuildOwner && !siteAccess.isFounder) {
             throw createHttpError(403, 'Seul le propriétaire du serveur peut exporter toutes ses données.');
         }
-        const file = ctx.helpers.createGuildDataExport(guild);
+        const format = url.searchParams.get('format') === 'json' ? 'json' : 'pdf';
+        const file = ctx.helpers.createGuildDataExport(guild, format);
         writeResponse(res, 200, {
             'Content-Type': file.contentType,
             'Content-Disposition': `attachment; filename="${file.fileName}"`,
@@ -5325,7 +5327,7 @@ async function handleApi(req, res, ctx, url) {
     if (req.method === 'GET' && reportMatch) {
         const { guild, member } = await getDashboardAccess(ctx, session, reportMatch[1]);
         await requireAdvanced(ctx, guild.id, member, session);
-        const format = String(url.searchParams.get('format') || 'csv').toLowerCase();
+        const format = String(url.searchParams.get('format') || 'pdf').toLowerCase();
         if (!['csv', 'xls', 'pdf'].includes(format)) {
             throw createHttpError(400, 'Format de rapport invalide.');
         }

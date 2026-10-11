@@ -147,9 +147,16 @@ test('a member can appeal only their own case and staff records one decision', (
 test('privacy exports remain scoped and retention settings are bounded', () => {
     db.prepare('INSERT INTO service_times (guild_id, user_id, total_time) VALUES (?, ?, ?)').run(guildId, userId, 1000);
     db.prepare('INSERT INTO service_times (guild_id, user_id, total_time) VALUES (?, ?, ?)').run('100000000000000199', userId, 2000);
-    const guildExport = JSON.parse(privacy.createGuildDataExport({ id: guildId, name: 'Validation' }).buffer.toString('utf8'));
+    const guildExport = JSON.parse(privacy.createGuildDataExport({ id: guildId, name: 'Validation' }, 'json').buffer.toString('utf8'));
     assert.equal(guildExport.tables.service_times.length, 1);
     assert.equal(guildExport.tables.service_times[0].guild_id, guildId);
+    const guildPdf = privacy.createGuildDataExport({ id: guildId, name: 'Validation' });
+    const memberPdf = privacy.createMemberDataExport(userId);
+    assert.equal(guildPdf.contentType, 'application/pdf');
+    assert.equal(memberPdf.contentType, 'application/pdf');
+    assert.match(guildPdf.fileName, /\.pdf$/);
+    assert.equal(guildPdf.buffer.subarray(0, 5).toString('latin1'), '%PDF-');
+    assert.equal(memberPdf.buffer.subarray(0, 5).toString('latin1'), '%PDF-');
     const retention = privacy.updateRetentionSettings(guildId, staffId, {
         automodDays: 1,
         auditDays: 99999,

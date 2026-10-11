@@ -100,12 +100,24 @@ test('report generators produce recognizable CSV, Excel and PDF files', () => {
     assert.match(csv.buffer.toString('utf8'), /Nom;Valeur/);
     assert.match(xls.buffer.toString('utf8'), /<Workbook/);
     assert.equal(pdf.buffer.subarray(0, 5).toString('latin1'), '%PDF-');
+    assert.match(pdf.buffer.toString('latin1'), /SENTINEL/);
+    assert.match(pdf.buffer.toString('latin1'), /Rapport Sentinel/);
     const longPdf = operations.createReportDocument({
         ...input,
         rows: Array.from({ length: 100 }, (_, index) => ({ Nom: `Ligne ${index + 1}`, Valeur: index })),
         format: 'pdf'
     });
-    assert.match(longPdf.buffer.toString('latin1'), /\/Count 2/);
+    const pageCount = Number(longPdf.buffer.toString('latin1').match(/\/Count (\d+)/)?.[1] || 0);
+    assert.ok(pageCount >= 2);
+});
+
+test('scheduled reports use the professional PDF format by default', () => {
+    const schedules = operations.saveReportSchedule(guildId, userId, {
+        reportKind: 'service',
+        frequency: 'weekly',
+        channelId: '100000000000000004'
+    });
+    assert.equal(schedules.find(item => item.reportKind === 'service')?.format, 'pdf');
 });
 
 test('member preferences cannot affect another guild record', () => {

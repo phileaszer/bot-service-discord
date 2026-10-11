@@ -10,7 +10,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('privacy, repair, appeal and incident routes enforce server-side identity checks', () => {
     const source = read('dashboard.js');
-    assert.match(source, /\/api\/me\/privacy\/export[\s\S]*createMemberDataExport\(session\.user\.id\)/);
+    assert.match(source, /\/api\/me\/privacy\/export[\s\S]*createMemberDataExport\(session\.user\.id, format\)/);
     assert.match(source, /guildPrivacyExportMatch[\s\S]*guild\.ownerId === session\.user\.id[\s\S]*siteAccess\.isFounder/);
     assert.match(source, /request-guild-data-deletion[\s\S]*guild\.ownerId !== session\?\.user\?\.id[\s\S]*!siteAccess\.isFounder/);
     assert.match(source, /\/api\/me\/appeals[\s\S]*guild\.members\.fetch\(session\.user\.id\)[\s\S]*createAppeal\(guild\.id[\s\S]*session\.user\.id/);
@@ -129,7 +129,7 @@ test('the personal register separates readable metrics, activity and notificatio
     assert.match(styles, /\.member-preference-toggle input:checked \+ \.member-switch/);
     assert.match(styles, /\.member-detail-columns[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(page, /styles\.css\?v=20261009-10/);
-    assert.match(page, /membre\.js\?v=20261009-4/);
+    assert.match(page, /membre\.js\?v=20261011-1/);
 });
 
 test('the dashboard patch note is public, readable and delivered only through opted-in update channels', () => {

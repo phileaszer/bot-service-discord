@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('./database/database');
+const { cleanText, createProfessionalPdf } = require('./pdf-document');
 
 const GUILD_EXPORT_TABLES = [
     'guild_configs',
@@ -37,6 +38,114 @@ const GUILD_EXPORT_TABLES = [
     'moderation_appeals'
 ];
 
+const EXPORT_SECTION_LABELS = {
+    guild_configs: 'Configuration du serveur',
+    service_times: 'Temps de service',
+    service_sessions: 'Sessions de service',
+    service_checkins: 'Contrôles de service',
+    guild_pay_settings: 'Réglages de paie',
+    weekly_payments: 'Paies hebdomadaires',
+    guild_pay_role_settings: 'Taux par rôle',
+    weekly_pay_adjustments: 'Ajustements de paie',
+    weekly_payroll_archives: 'Archives de paie',
+    weekly_payment_events: 'Suivi des paiements',
+    guild_command_roles: 'Accès aux commandes',
+    sentinel_dossier_roles: 'Rôles responsables des tickets',
+    moderation_cases: 'Registre de modération',
+    message_purge_archives: 'Archives des nettoyages',
+    moderation_tempbans: 'Exclusions temporaires',
+    guild_automod_settings: 'Réglages de l’auto-modération',
+    guild_automod_words: 'Mots surveillés',
+    guild_automod_events: 'Interventions automatiques',
+    custom_embeds: 'Messages personnalisés',
+    sentinel_dossiers: 'Tickets',
+    sentinel_dossier_panels: 'Panneaux de tickets',
+    sentinel_dossier_type_settings: 'Réglages des tickets',
+    sentinel_dossier_templates: 'Réponses préparées',
+    sentinel_dossier_type_roles: 'Confidentialité des tickets',
+    dashboard_audit_logs: 'Historique du dashboard',
+    official_update_deliveries: 'Diffusion des nouveautés',
+    guild_warning_escalation_settings: 'Sanctions progressives',
+    warning_escalation_events: 'Historique des sanctions progressives',
+    scheduled_announcements: 'Annonces programmées',
+    guild_report_schedules: 'Rapports programmés',
+    moderation_appeals: 'Contestations de sanctions',
+    profiles: 'Profil Discord',
+    serviceTimes: 'Temps de service',
+    serviceSessions: 'Sessions de service',
+    weeklyPayments: 'Paies hebdomadaires',
+    payAdjustments: 'Ajustements de paie',
+    moderationCases: 'Registre disciplinaire',
+    dossiers: 'Tickets',
+    appeals: 'Contestations',
+    notificationPreferences: 'Préférences de notification'
+};
+
+const EXPORT_FIELD_LABELS = {
+    id: 'N°',
+    guild_id: 'Serveur',
+    user_id: 'Utilisateur',
+    target_user_id: 'Membre concerné',
+    moderator_user_id: 'Responsable',
+    owner_user_id: 'Demandeur',
+    opener_user_id: 'Ouvert par',
+    channel_id: 'Salon',
+    role_id: 'Rôle',
+    created_at: 'Création',
+    updated_at: 'Mise à jour',
+    closed_at: 'Clôture',
+    last_activity_at: 'Dernière activité',
+    total_time: 'Temps total',
+    start_time: 'Début',
+    duration: 'Durée',
+    reason: 'Motif',
+    status: 'Statut',
+    action: 'Action',
+    subject: 'Sujet',
+    type: 'Type',
+    amount: 'Montant',
+    paid: 'Payé',
+    username: 'Pseudo',
+    global_name: 'Nom affiché',
+    last_login_at: 'Dernière connexion',
+    last_seen_at: 'Dernière présence'
+};
+
+function exportLabel(value) {
+    return EXPORT_FIELD_LABELS[value]
+        || String(value || '').replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function exportValue(value) {
+    if (value === null || value === undefined || value === '') return '-';
+    if (Buffer.isBuffer(value)) return `[fichier de ${value.length} octets]`;
+    if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+    if (typeof value === 'object') return cleanText(JSON.stringify(value));
+    const text = String(value);
+    if (text === '0' || text === '1') return text;
+    return cleanText(text);
+}
+
+function exportSection(key, rows) {
+    const sourceRows = Array.isArray(rows) ? rows : [];
+    const keys = [...new Set(sourceRows.flatMap(row => Object.keys(row || {})))];
+    const columns = keys.map(exportLabel);
+    return {
+        title: EXPORT_SECTION_LABELS[key] || exportLabel(key),
+        description: `${sourceRows.length.toLocaleString('fr-FR')} enregistrement(s)`,
+        columns,
+        rows: sourceRows.map(row => Object.fromEntries(keys.map((field, index) => [columns[index], exportValue(row[field])])))
+    };
+}
+
+function jsonExport(document, fileName) {
+    return {
+        buffer: Buffer.from(JSON.stringify(document, null, 2), 'utf8'),
+        fileName,
+        contentType: 'application/json; charset=utf-8'
+    };
+}
+
 function cleanExportRow(table, row) {
     const copy = { ...row };
     if (table === 'message_purge_archives') {
@@ -50,7 +159,7 @@ function cleanExportRow(table, row) {
     return copy;
 }
 
-function createGuildDataExport(guild) {
+function createGuildDataExport(guild, format = 'pdf') {
     const tables = {};
     for (const table of GUILD_EXPORT_TABLES) {
         tables[table] = db.prepare(`SELECT * FROM ${table} WHERE guild_id = ?`)
@@ -63,14 +172,39 @@ function createGuildDataExport(guild) {
         guild: { id: guild.id, name: guild.name },
         tables
     };
+    const date = new Date().toISOString().slice(0, 10);
+    if (format === 'json') return jsonExport(document, `sentinel-${guild.id}-${date}.json`);
+    const populatedTables = Object.entries(tables).filter(([, rows]) => rows.length);
+    const summaryRows = Object.entries(tables).map(([key, rows]) => ({
+        Catégorie: EXPORT_SECTION_LABELS[key] || exportLabel(key),
+        Enregistrements: rows.length.toLocaleString('fr-FR')
+    }));
     return {
-        buffer: Buffer.from(JSON.stringify(document, null, 2), 'utf8'),
-        fileName: `sentinel-${guild.id}-${new Date().toISOString().slice(0, 10)}.json`,
-        contentType: 'application/json; charset=utf-8'
+        buffer: createProfessionalPdf({
+            title: 'Rapport des données du serveur',
+            subtitle: 'Copie lisible des informations conservées par Sentinel',
+            metadata: [
+                { label: 'Serveur', value: guild.name || guild.id },
+                { label: 'Identifiant', value: guild.id },
+                { label: 'Catégories actives', value: populatedTables.length }
+            ],
+            sections: [
+                {
+                    title: 'Synthèse',
+                    description: 'Répartition des données par catégorie.',
+                    columns: ['Catégorie', 'Enregistrements'],
+                    rows: summaryRows
+                },
+                ...populatedTables.map(([key, rows]) => exportSection(key, rows))
+            ],
+            confidentiality: 'Copie confidentielle destinée au propriétaire du serveur'
+        }),
+        fileName: `sentinel-${guild.id}-${date}.pdf`,
+        contentType: 'application/pdf'
     };
 }
 
-function createMemberDataExport(userId) {
+function createMemberDataExport(userId, format = 'pdf') {
     const queries = {
         profiles: db.prepare('SELECT user_id, username, global_name, avatar_url, last_login_at, last_seen_at, updated_at FROM user_profiles WHERE user_id = ?').all(userId),
         serviceTimes: db.prepare('SELECT * FROM service_times WHERE user_id = ?').all(userId),
@@ -89,10 +223,31 @@ function createMemberDataExport(userId) {
         userId,
         data: queries
     };
+    const date = new Date().toISOString().slice(0, 10);
+    if (format === 'json') return jsonExport(document, `sentinel-membre-${userId}-${date}.json`);
+    const sections = Object.entries(queries)
+        .filter(([, rows]) => rows.length)
+        .map(([key, rows]) => exportSection(key, rows));
+    const recordCount = Object.values(queries).reduce((total, rows) => total + rows.length, 0);
     return {
-        buffer: Buffer.from(JSON.stringify(document, null, 2), 'utf8'),
-        fileName: `sentinel-membre-${userId}-${new Date().toISOString().slice(0, 10)}.json`,
-        contentType: 'application/json; charset=utf-8'
+        buffer: createProfessionalPdf({
+            title: 'Rapport personnel Sentinel',
+            subtitle: 'Copie lisible des informations associées à ton compte',
+            metadata: [
+                { label: 'Compte Discord', value: userId },
+                { label: 'Enregistrements', value: recordCount.toLocaleString('fr-FR') },
+                { label: 'Catégories actives', value: sections.length }
+            ],
+            sections: sections.length ? sections : [{
+                title: 'Synthèse',
+                description: 'Aucune information personnelle enregistrée.',
+                columns: [],
+                rows: []
+            }],
+            confidentiality: 'Copie confidentielle destinée au membre concerné'
+        }),
+        fileName: `sentinel-membre-${userId}-${date}.pdf`,
+        contentType: 'application/pdf'
     };
 }
 

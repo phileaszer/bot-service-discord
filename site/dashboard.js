@@ -1981,7 +1981,7 @@ function privacyCenterPanel(state) {
         <button class="button button-small" type="submit">Enregistrer les durées</button>
       </form>
       <div class="split-actions">
-        ${canExport ? `<a class="button button-small button-ghost" href="/api/guilds/${escapeHtml(state.guild.id)}/privacy/export">Exporter les données</a>` : '<span class="muted">Export complet réservé au propriétaire.</span>'}
+        ${canExport ? `<a class="button button-small" href="/api/guilds/${escapeHtml(state.guild.id)}/privacy/export?format=pdf">Télécharger le rapport PDF</a><a class="button button-small button-ghost" href="/api/guilds/${escapeHtml(state.guild.id)}/privacy/export?format=json">Format technique JSON</a>` : '<span class="muted">Export complet réservé au propriétaire.</span>'}
       </div>
       ${state.viewerAccess?.isGuildOwner ? `<form data-action-form="request-guild-data-deletion" class="operation-form-grid"><label><span>Demande de suppression</span><textarea name="reason" maxlength="1000" placeholder="Explique la demande afin qu’elle puisse être contrôlée."></textarea></label><button class="button button-small button-ghost" type="submit">Envoyer la demande</button></form>` : ''}
       ${requests.length ? `<div class="operation-list">${requests.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.requestKey)}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(formatAuditDate(item.createdAt))}</small></div></div>`).join('')}</div>` : ''}
@@ -5134,13 +5134,13 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
       ${notificationCenter(state)}
       <div class="operations-grid">
         <article class="inline-form operation-card" data-operation-section="reports">
-          <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Télécharge un registre complet dans le format voulu.</p></div></div>
+          <div class="panel-mini-heading"><div><h3>Exports immédiats ${premiumTag}</h3><p class="muted">Le rapport PDF est prêt à présenter. CSV et Excel restent disponibles pour retravailler les données.</p></div></div>
           <div class="report-download-grid">
             ${['service', 'payroll', 'dossiers', 'moderation'].map(kind => `
-              <div><strong>${escapeHtml({ service: 'Services', payroll: 'Paie RP', dossiers: 'Dossiers', moderation: 'Modération' }[kind])}</strong>
+              <div><strong>${escapeHtml({ service: 'Services', payroll: 'Paie RP', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
+                <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">PDF</button>
                 <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="csv">CSV</button>
                 <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls">Excel</button>
-                <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="pdf">PDF</button>
               </div>
             `).join('')}
           </div>
@@ -5149,9 +5149,9 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
         <article class="inline-form operation-card" data-operation-section="reports">
           <div class="panel-mini-heading"><div><h3>Rapports automatiques ${premiumTag}</h3><p class="muted">Envoi hebdomadaire ou mensuel dans un salon Discord.</p></div></div>
           <form data-action-form="save-report-schedule" class="operation-form-grid">
-            <select name="reportKind"><option value="service">Services</option><option value="payroll">Paie RP</option><option value="dossiers">Dossiers</option><option value="moderation">Modération</option></select>
+            <select name="reportKind"><option value="service">Services</option><option value="payroll">Paie RP</option><option value="dossiers">Tickets</option><option value="moderation">Modération</option></select>
             <select name="frequency"><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select>
-            <select name="format"><option value="csv">CSV</option><option value="xls">Excel</option><option value="pdf">PDF</option></select>
+            <select name="format"><option value="pdf">PDF</option><option value="csv">CSV</option><option value="xls">Excel</option></select>
             <select name="channelId" required>${channelOptions}</select>
             <button class="button" type="submit">Programmer</button>
           </form>
