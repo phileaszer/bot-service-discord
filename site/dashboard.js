@@ -5141,13 +5141,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
                 <strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
                 <div class="report-download-actions">
                   <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
-                  <details class="report-format-menu">
-                    <summary class="button button-small button-ghost">Autres formats</summary>
-                    <div class="report-format-options">
-                      <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="csv" title="Données brutes pour un import">CSV</button>
-                      <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls" title="Tableau modifiable dans Excel">Excel</button>
-                    </div>
-                  </details>
+                  <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls" title="Tableau modifiable dans Excel ou importable dans Google Sheets">Excel / Google Sheets</button>
                 </div>
               </div>
             `).join('')}
