@@ -1747,6 +1747,8 @@
 
   Object.assign(en, {
     "Changer de style": "Change theme",
+    "Version de démonstration publique": "Public demonstration version",
+    "Fantomenale, créatrice de Sentinel": "Fantomenale, creator of Sentinel",
     "Afficher le bilan complet": "View the full report",
     "Ajouter une prime, une retenue ou une correction RP": "Add a bonus, deduction, or RP adjustment",
     "Annuler un avertissement précis": "Remove a specific warning",
@@ -2273,8 +2275,8 @@
   }
 
   function translateAttributes(language) {
-    const attrs = ['placeholder', 'aria-label', 'alt', 'content', 'data-tooltip'];
-    document.querySelectorAll('[placeholder], [aria-label], [alt], meta[content], [data-tooltip]').forEach((element) => {
+    const attrs = ['placeholder', 'aria-label', 'alt', 'title', 'content', 'data-tooltip'];
+    document.querySelectorAll('[placeholder], [aria-label], [alt], [title], meta[content], [data-tooltip]').forEach((element) => {
       attrs.forEach((attr) => {
         if (!element.hasAttribute(attr)) return;
         const key = `i18nOriginal${attr.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())}`;

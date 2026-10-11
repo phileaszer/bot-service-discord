@@ -109,7 +109,7 @@ function createAudit() {
       }
     }
 
-    for (const match of withoutIgnored.matchAll(/(?:placeholder|aria-label|alt|content|data-tooltip)=(['"])(.*?)\1/gs)) {
+    for (const match of withoutIgnored.matchAll(/(?:placeholder|aria-label|alt|title|content|data-tooltip)=(['"])(.*?)\1/gs)) {
       const value = cleanCandidate(match[2]);
       if (isCandidate(value) && !isTranslated(value)) {
         output.set(`${file}:attr:${value}`, { file, type: 'attribute', value });

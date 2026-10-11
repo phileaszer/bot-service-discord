@@ -158,6 +158,7 @@
 
     const text = labels[pageLanguage()];
     const role = credit.querySelector('[data-creator-role]');
+    credit.setAttribute('aria-label', `Fantomenale, ${text.creatorRole.toLowerCase()}`);
     if (role) role.textContent = text.creatorRole;
   }
 
