@@ -15386,10 +15386,11 @@ function getGuildReportDataset(guild, kind) {
 
 function createGuildReport(guild, kind, format) {
     const dataset = getGuildReportDataset(guild, kind);
+    const document = operations.createReportDocument({ ...dataset, format });
     return {
-        ...operations.createReportDocument({ ...dataset, format }),
+        ...document,
         title: dataset.title,
-        fileName: `sentinel-${kind}-${new Date().toISOString().slice(0, 10)}.${format === 'xls' ? 'xls' : format}`
+        fileName: `sentinel-${kind}-${new Date().toISOString().slice(0, 10)}.${document.extension}`
     };
 }
 

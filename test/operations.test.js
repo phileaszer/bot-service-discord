@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { strFromU8, unzipSync } = require('fflate');
 
 const testDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'sentinel-validation-'));
 process.env.DATABASE_PATH = path.join(testDirectory, 'validation.db');
@@ -92,13 +93,19 @@ test('scheduled announcement approval requires a second responsible user', () =>
     assert.ok(approved.approvedAt);
 });
 
-test('report generators produce recognizable CSV, Excel and PDF files', () => {
+test('report generators produce recognizable XLSX and PDF files', () => {
     const input = { title: 'Rapport Sentinel', columns: ['Nom', 'Valeur'], rows: [{ Nom: 'Test', Valeur: '42' }] };
-    const csv = operations.createReportDocument({ ...input, format: 'csv' });
-    const xls = operations.createReportDocument({ ...input, format: 'xls' });
+    assert.equal(operations.REPORT_FORMATS.has('csv'), false);
+    assert.throws(() => operations.createReportDocument({ ...input, format: 'csv' }), /Format de rapport invalide/);
+    const xlsx = operations.createReportDocument({ ...input, format: 'xlsx' });
     const pdf = operations.createReportDocument({ ...input, format: 'pdf' });
-    assert.match(csv.buffer.toString('utf8'), /Nom;Valeur/);
-    assert.match(xls.buffer.toString('utf8'), /<Workbook/);
+    assert.equal(xlsx.extension, 'xlsx');
+    assert.equal(xlsx.contentType, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    assert.equal(xlsx.buffer.subarray(0, 4).toString('hex'), '504b0304');
+    const workbookFiles = unzipSync(xlsx.buffer);
+    assert.ok(workbookFiles['xl/workbook.xml']);
+    assert.match(strFromU8(workbookFiles['xl/worksheets/sheet1.xml']), /Rapport Sentinel/);
+    assert.match(strFromU8(workbookFiles['xl/worksheets/sheet1.xml']), /Test/);
     assert.equal(pdf.buffer.subarray(0, 5).toString('latin1'), '%PDF-');
     assert.match(pdf.buffer.toString('latin1'), /SENTINEL/);
     assert.match(pdf.buffer.toString('latin1'), /Rapport Sentinel/);

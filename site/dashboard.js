@@ -5141,7 +5141,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
                 <strong>${escapeHtml({ service: 'Services', payroll: 'Salaires', dossiers: 'Tickets', moderation: 'Modération' }[kind])}</strong>
                 <div class="report-download-actions">
                   <button class="button button-small" type="button" data-report-download="${kind}" data-report-format="pdf">Télécharger le PDF</button>
-                  <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xls" title="Tableau modifiable dans Excel ou importable dans Google Sheets">Excel / Google Sheets</button>
+                  <button class="button button-small button-ghost" type="button" data-report-download="${kind}" data-report-format="xlsx" title="Télécharge un vrai classeur XLSX compatible avec Excel et Google Sheets">Excel / Google Sheets</button>
                 </div>
               </div>
             `).join('')}
@@ -5153,7 +5153,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
           <form data-action-form="save-report-schedule" class="operation-form-grid">
             <select name="reportKind"><option value="service">Services</option><option value="payroll">Salaires</option><option value="dossiers">Tickets</option><option value="moderation">Modération</option></select>
             <select name="frequency"><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select>
-            <select name="format"><option value="pdf">PDF</option><option value="csv">CSV</option><option value="xls">Excel</option></select>
+            <select name="format"><option value="pdf">PDF</option><option value="xlsx">Excel / Google Sheets</option></select>
             <select name="channelId" required>${channelOptions}</select>
             <button class="button" type="submit">Programmer</button>
           </form>
@@ -6315,6 +6315,46 @@ async function downloadMaintenanceFile(kind, fileName, button = null) {
   }
 }
 
+async function downloadReportFile(kind, format, button = null) {
+  if (!selectedGuildId || !['service', 'payroll', 'dossiers', 'moderation'].includes(kind) || !['pdf', 'xlsx'].includes(format)) return;
+  setLoading(button, true);
+  const url = new URL(`/api/guilds/${encodeURIComponent(selectedGuildId)}/reports/${encodeURIComponent(kind)}`, window.location.origin);
+  url.searchParams.set('format', format);
+
+  try {
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: { Accept: format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json' : 'application/pdf, application/json' }
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || `Erreur ${response.status}`);
+    }
+
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const quotedName = disposition.match(/filename="([^"]+)"/i)?.[1];
+    const fileName = encodedName
+      ? decodeURIComponent(encodedName)
+      : (quotedName || `sentinel-${kind}-${new Date().toISOString().slice(0, 10)}.${format}`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    toast(format === 'xlsx' ? 'Classeur XLSX téléchargé.' : 'Rapport PDF téléchargé.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
 async function runAction(action, data, button = null) {
   if (!selectedGuildId) return;
   setLoading(button, true);
@@ -6666,15 +6706,7 @@ function attachDashboardHandlers() {
 
   $$('[data-report-download]').forEach((button) => {
     button.addEventListener('click', () => {
-      if (!selectedGuildId) return;
-      const kind = button.dataset.reportDownload;
-      const format = button.dataset.reportFormat;
-      const link = document.createElement('a');
-      link.href = `/api/guilds/${encodeURIComponent(selectedGuildId)}/reports/${encodeURIComponent(kind)}?format=${encodeURIComponent(format)}`;
-      link.rel = 'noopener';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      downloadReportFile(button.dataset.reportDownload, button.dataset.reportFormat, button);
     });
   });
 

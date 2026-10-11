@@ -128,6 +128,16 @@ test('RP salary wording stays immersive across dashboard, member space and PDF r
     assert.match(privacy, /weekly_payments: 'Salaires hebdomadaires'/);
 });
 
+test('dashboard downloads real XLSX reports without navigating to an external application', () => {
+    const dashboardClient = fs.readFileSync(path.join(__dirname, '..', 'site', 'dashboard.js'), 'utf8');
+    assert.match(dashboardClient, /data-report-format="xlsx"/);
+    assert.match(dashboardClient, /Excel \/ Google Sheets/);
+    assert.match(dashboardClient, /URL\.createObjectURL\(blob\)/);
+    assert.match(dashboardClient, /link\.download = fileName/);
+    assert.doesNotMatch(dashboardClient, /data-report-format="csv"/);
+    assert.doesNotMatch(dashboardClient, /<option value="csv">CSV<\/option>/);
+});
+
 test('the personal register separates readable metrics, activity and notification preferences', () => {
     const frontend = read('site/membre.js');
     const styles = read('site/styles.css');

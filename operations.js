@@ -2,8 +2,9 @@
 
 const db = require('./database/database');
 const { createProfessionalPdf } = require('./pdf-document');
+const { createXlsxDocument } = require('./xlsx-document');
 
-const REPORT_FORMATS = new Set(['csv', 'xls', 'pdf']);
+const REPORT_FORMATS = new Set(['xls', 'xlsx', 'pdf']);
 const REPORT_KINDS = new Set(['service', 'payroll', 'dossiers', 'moderation']);
 const RECURRENCES = new Set(['none', 'weekly', 'monthly']);
 
@@ -600,19 +601,6 @@ function reportCell(value) {
     return String(value).replace(/[\r\n]+/g, ' ').trim();
 }
 
-function csvEscape(value) {
-    const text = reportCell(value);
-    return /[;"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function xmlEscape(value) {
-    return reportCell(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
 function createReportDocument({
     title,
     subtitle = 'Rapport administratif Sentinel',
@@ -626,16 +614,12 @@ function createReportDocument({
 }) {
     if (!REPORT_FORMATS.has(format)) throw new Error('Format de rapport invalide.');
     const safeRows = Array.isArray(rows) ? rows.slice(0, 10000) : [];
-    if (format === 'csv') {
-        const text = [columns.map(csvEscape).join(';'), ...safeRows.map(row => columns.map(column => csvEscape(row[column])).join(';'))].join('\r\n');
-        return { buffer: Buffer.from(`\uFEFF${text}`, 'utf8'), extension: 'csv', contentType: 'text/csv; charset=utf-8' };
-    }
-    if (format === 'xls') {
-        const xmlRows = [columns.reduce((row, column) => ({ ...row, [column]: column }), {}), ...safeRows]
-            .map(row => `<Row>${columns.map(column => `<Cell><Data ss:Type="String">${xmlEscape(row[column])}</Data></Cell>`).join('')}</Row>`)
-            .join('');
-        const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Sentinel"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
-        return { buffer: Buffer.from(xml, 'utf8'), extension: 'xls', contentType: 'application/vnd.ms-excel' };
+    if (format === 'xls' || format === 'xlsx') {
+        return {
+            buffer: createXlsxDocument({ title, subtitle, columns, rows: safeRows }),
+            extension: 'xlsx',
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        };
     }
     return {
         buffer: createProfessionalPdf({

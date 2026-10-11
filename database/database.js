@@ -584,7 +584,7 @@ CREATE TABLE IF NOT EXISTS guild_report_schedules (
     channel_id TEXT NOT NULL,
     report_kind TEXT NOT NULL,
     frequency TEXT NOT NULL,
-    format TEXT NOT NULL DEFAULT 'csv',
+    format TEXT NOT NULL DEFAULT 'pdf',
     enabled INTEGER NOT NULL DEFAULT 1,
     created_by_user_id TEXT,
     next_run_at TEXT NOT NULL,
@@ -952,6 +952,8 @@ CREATE INDEX IF NOT EXISTS idx_moderation_appeals_user
 ON moderation_appeals (user_id, created_at);
 
 `);
+
+db.prepare("UPDATE guild_report_schedules SET format = 'xlsx' WHERE format IN ('csv', 'xls')").run();
 
 const guildConfigColumns = db.prepare('PRAGMA table_info(guild_configs)').all()
     .map(column => column.name);
