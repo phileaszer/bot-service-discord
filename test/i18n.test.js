@@ -27,7 +27,7 @@ test('every public site page loads the translation runtime', () => {
 });
 
 test('short dashboard labels and legacy French logs translate at runtime', () => {
-  const { translateValue } = loadI18nRuntime();
+  const { en, translateValue } = loadI18nRuntime();
 
   assert.equal(translateValue('Sécurité', 'en'), 'Security');
   assert.equal(translateValue('Programmation', 'en'), 'Scheduling');
@@ -39,5 +39,10 @@ test('short dashboard labels and legacy French logs translate at runtime', () =>
   assert.equal(
     translateValue('Paie RP archivée pour Fantomenale.', 'en'),
     'Salary register archived for Fantomenale.'
+  );
+  assert.deepEqual(
+    Object.values(en).filter((value) => /\bdossiers?\b/i.test(value)),
+    [],
+    'English site copy must use “ticket”, never the untranslated French word “dossier”.'
   );
 });

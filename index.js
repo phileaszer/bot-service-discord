@@ -713,7 +713,7 @@ const I18N = {
         confirmBan: 'Ban',
         confirmKick: 'Kick',
         confirmResetUser: 'Hours reset',
-        confirmDossierClose: 'Dossier closure',
+        confirmDossierClose: 'Ticket closure',
         serviceLogStartTitle: 'Sentinel | Service started',
         serviceLogEndTitle: 'Sentinel | Service ended',
         serviceLogLongTitle: 'Sentinel | Long service',
@@ -801,11 +801,11 @@ const I18N = {
         customEmbedNoEditFields: '❌ Provide at least one field to edit: title, message, color, image, thumbnail, or footer.',
         customEmbedQuotaUnlimited: 'Unlimited quota.',
         dossierPanelTitle: 'Sentinel | Reception desk',
-        dossierPanelDescription: '`Confidential reception`\nChoose the nature of your request. Sentinel will prepare a reserved space with authorized personnel and keep the follow-up inside one clear dossier.',
+        dossierPanelDescription: '`Confidential reception`\nChoose the nature of your request. Sentinel will prepare a reserved space with authorized personnel and keep the follow-up inside one clear ticket.',
         dossierPanelAccessName: 'Reception',
         dossierPanelAccessValue: 'Each request opens a confidential space for discussion with the assigned team.',
         dossierPanelFollowName: 'Follow-up',
-        dossierPanelFollowValue: 'Status, referent, and written record stay attached to the same dossier.',
+        dossierPanelFollowValue: 'Status, referent, and written record stay attached to the same ticket.',
         dossierPanelBeforeName: 'Before opening',
         dossierPanelBeforeValue: 'Prepare a short subject and the useful elements: facts, people involved, moment, proof, or context.',
         dossierPanelFooter: 'Sentinel - reception desk',
@@ -814,32 +814,32 @@ const I18N = {
         dossierRecruitmentLabel: 'Application',
         dossierPartnershipLabel: 'Alliance',
         dossierOtherLabel: 'Request',
-        dossierModalTitle: 'Open a dossier',
+        dossierModalTitle: 'Open a ticket',
         dossierModalSubject: 'Subject',
         dossierModalSubjectPlaceholder: 'Example: administrative assistance request',
         dossierModalDescription: 'Description',
         dossierModalDescriptionPlaceholder: 'Explain your request with useful details.',
-        dossierOpenedTitle: 'Sentinel | Dossier opened',
-        dossierAlreadyOpen: 'You already have an open dossier: {channel}',
-        dossierCooldown: '⏳ Wait another **{time}** before opening a new dossier.',
+        dossierOpenedTitle: 'Sentinel | Ticket opened',
+        dossierAlreadyOpen: 'You already have an open ticket: {channel}',
+        dossierCooldown: '⏳ Wait another **{time}** before opening a new ticket.',
         dossierPanelCooldown: '⏳ This panel was just used. Try again in **{time}**.',
-        dossierPanelLimitReached: 'This server can keep **{limit}** dossier panel. Keep this panel or delete it before publishing another one.',
-        dossierOpenLimitReached: 'This server already has **{limit}** open dossiers. Close a completed dossier before opening another one.',
-        dossierCreated: 'Dossier created: {channel}',
-        dossierNotInDossier: 'This button must be used inside a Sentinel dossier.',
-        dossierCloseDenied: 'Only the requester or an authorized member can close this dossier.',
-        dossierClosed: 'Dossier closed. The written record has been sent, then the space will be sealed.',
-        dossierClaimed: 'Dossier taken over by {member}.',
-        dossierClaimDenied: 'You need an authorized role to take over this dossier.',
-        dossierStatusDenied: 'You need an authorized role to update this dossier status.',
-        dossierStatusUpdated: 'Dossier status updated: **{status}**.',
-        dossierRoleAdded: '✅ {role} can now take over and manage Sentinel dossiers.',
-        dossierRoleRemoved: '✅ {role} can no longer take over Sentinel dossiers.',
-        dossierRoleList: 'Sentinel dossier roles:\n{roles}',
-        dossierRoleListEmpty: 'No dossier role configured. Roles allowed to manage Sentinel and members with suitable Discord permissions can manage dossiers.',
-        dossierAddDone: '✅ {member} has been added as a dossier participant.',
-        dossierRemoveDone: '✅ {member} has been removed from this dossier.',
-        dossierCommandOutside: '❌ This command must be used inside a Sentinel dossier channel.',
+        dossierPanelLimitReached: 'This server can keep **{limit}** ticket panel. Keep this panel or delete it before publishing another one.',
+        dossierOpenLimitReached: 'This server already has **{limit}** open tickets. Close a completed ticket before opening another one.',
+        dossierCreated: 'Ticket created: {channel}',
+        dossierNotInDossier: 'This button must be used inside a Sentinel ticket.',
+        dossierCloseDenied: 'Only the requester or an authorized member can close this ticket.',
+        dossierClosed: 'Ticket closed. The written record has been sent, then the space will be sealed.',
+        dossierClaimed: 'Ticket taken over by {member}.',
+        dossierClaimDenied: 'You need an authorized role to take over this ticket.',
+        dossierStatusDenied: 'You need an authorized role to update this ticket status.',
+        dossierStatusUpdated: 'Ticket status updated: **{status}**.',
+        dossierRoleAdded: '✅ {role} can now take over and manage Sentinel tickets.',
+        dossierRoleRemoved: '✅ {role} can no longer take over Sentinel tickets.',
+        dossierRoleList: 'Sentinel ticket roles:\n{roles}',
+        dossierRoleListEmpty: 'No ticket role configured. Roles allowed to manage Sentinel and members with suitable Discord permissions can manage tickets.',
+        dossierAddDone: '✅ {member} has been added as a ticket participant.',
+        dossierRemoveDone: '✅ {member} has been removed from this ticket.',
+        dossierCommandOutside: '❌ This command must be used inside a Sentinel ticket channel.',
         dossierTranscriptDone: '✅ Written record prepared.',
         dossierPanelPublished: '✅ Sentinel reception desk published in {channel}.'
     }
@@ -1137,7 +1137,7 @@ function buildSupportEmbed(guild, requester) {
         title: language === 'en' ? 'Sentinel | Support' : 'Sentinel | Support',
         description: language === 'en'
             ? [
-                'Need help with setup, permissions, service tracking, moderation, embeds, or dossiers?',
+                'Need help with setup, permissions, service tracking, moderation, embeds, or tickets?',
                 'Use the support server for questions, bug reports and follow-up.'
             ].join('\n')
             : [
@@ -2808,7 +2808,7 @@ const DOSSIER_TYPES = {
         },
         en: {
             label: 'Assistance',
-            channelPrefix: 'support-dossier',
+            channelPrefix: 'support-ticket',
             intro: [
                 'Explain your request clearly so the team can act quickly.',
                 '',
@@ -2816,7 +2816,7 @@ const DOSSIER_TYPES = {
                 '- element concerned',
                 '- attachment or proof if available',
                 '',
-                'A referent will take over the dossier as soon as possible.'
+                'A referent will take over the ticket as soon as possible.'
             ]
         }
     },
@@ -2839,7 +2839,7 @@ const DOSSIER_TYPES = {
         },
         en: {
             label: 'Report',
-            channelPrefix: 'report-dossier',
+            channelPrefix: 'report-ticket',
             intro: [
                 'Describe the report with useful details.',
                 '',
@@ -2848,7 +2848,7 @@ const DOSSIER_TYPES = {
                 '**Place / moment:**',
                 '**Proof or screenshot:**',
                 '',
-                'The authorized team will handle the dossier.'
+                'The authorized team will handle the ticket.'
             ]
         }
     },
@@ -2869,7 +2869,7 @@ const DOSSIER_TYPES = {
         },
         en: {
             label: 'Application',
-            channelPrefix: 'recruitment-dossier',
+            channelPrefix: 'recruitment-ticket',
             intro: [
                 'Present your application with useful information.',
                 '',
@@ -2897,7 +2897,7 @@ const DOSSIER_TYPES = {
         },
         en: {
             label: 'Alliance',
-            channelPrefix: 'partnership-dossier',
+            channelPrefix: 'partnership-ticket',
             intro: [
                 'Present the alliance request clearly.',
                 '',
@@ -2924,7 +2924,7 @@ const DOSSIER_TYPES = {
         },
         en: {
             label: 'Request',
-            channelPrefix: 'other-dossier',
+            channelPrefix: 'other-ticket',
             intro: [
                 'Explain your request in a few lines.',
                 '',
@@ -3754,7 +3754,7 @@ function markDossierReminder(guildId, channelId) {
 async function reopenDossierChannel(guild, channel, actor, language = 'fr', options = {}) {
     if (!isAdvancedGuild(guild.id) && !options.advanced) {
         throw new Error(language === 'en'
-            ? 'Dossier reopening is currently unavailable.'
+            ? 'Ticket reopening is currently unavailable.'
             : 'La réouverture des dossiers est indisponible pour le moment.');
     }
 
@@ -3762,7 +3762,7 @@ async function reopenDossierChannel(guild, channel, actor, language = 'fr', opti
 
     if (!dossier) {
         throw new Error(language === 'en'
-            ? 'This dossier can no longer be reopened.'
+            ? 'This ticket can no longer be reopened.'
             : 'Ce dossier ne peut plus être réouvert.');
     }
 
@@ -3774,7 +3774,7 @@ async function reopenDossierChannel(guild, channel, actor, language = 'fr', opti
         EmbedLinks: true
     }, { reason: `Réouverture du dossier Sentinel par ${actor.id}` });
     await channel.send(language === 'en'
-        ? `The dossier has been reopened by ${actor}.`
+        ? `The ticket has been reopened by ${actor}.`
         : `Le dossier a été réouvert par ${actor}.`);
 
     return dossier;
@@ -3821,6 +3821,7 @@ async function processDossierMaintenance() {
         }
 
         const dossiers = getRecentDossiers(guild.id, 100).filter(item => item.status !== 'closed');
+        const language = getGuildLanguage(guild.id);
 
         for (const dossier of dossiers) {
             const settings = getDossierTypeSetting(guild.id, dossier.type);
@@ -3852,7 +3853,9 @@ async function processDossierMaintenance() {
                 ? `<@${dossier.referentUserId}>`
                 : (roleMentions || fallbackRoleMentions);
             const reminderSent = await channel
-                .send(`${recipients ? `${recipients} ` : ''}Ce dossier demande une intervention : le délai prévu est dépassé.`)
+                .send(`${recipients ? `${recipients} ` : ''}${language === 'en'
+                    ? 'This ticket needs attention: its expected response time has passed.'
+                    : 'Ce dossier demande une intervention : le délai prévu est dépassé.'}`)
                 .then(() => true)
                 .catch(error => {
                     reportRuntimeIncident('dossier-overdue-reminder', error, {
@@ -7942,7 +7945,7 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
 
     if (!dossier) {
         throw new Error(language === 'en'
-            ? 'This channel is not a Sentinel dossier.'
+            ? 'This channel is not a Sentinel ticket.'
             : 'Ce salon n’est pas un dossier Sentinel.');
     }
     const actorUser = actor.user || actor;
@@ -7959,7 +7962,7 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
 
     if (!archive?.archived) {
         throw new Error(language === 'en'
-            ? 'The complete archive could not be confirmed. The dossier remains open.'
+            ? 'The complete archive could not be confirmed. The ticket remains open.'
             : 'L’archive complète n’a pas pu être confirmée. Le dossier reste ouvert.');
     }
 
@@ -7978,9 +7981,9 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
         await owner?.send({
             embeds: [new EmbedBuilder()
                 .setColor(SENTINEL_COLORS.neutral)
-                .setTitle(language === 'en' ? 'Sentinel | Dossier closed' : 'Sentinel | Dossier clôturé')
+                .setTitle(language === 'en' ? 'Sentinel | Ticket closed' : 'Sentinel | Dossier clôturé')
                 .setDescription(language === 'en'
-                    ? `Your dossier #${closedDossier.id || channel.id} has been closed and safely archived.`
+                    ? `Your ticket #${closedDossier.id || channel.id} has been closed and safely archived.`
                     : `Ton dossier #${closedDossier.id || channel.id} a été clôturé et archivé.`)
                 .addFields(
                     { name: language === 'en' ? 'Reason' : 'Motif', value: reason },
@@ -7993,7 +7996,7 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
     await sendSentinelStaffLog(
         channel.guild,
         language === 'en'
-            ? `Sentinel dossier #${closedDossier?.id || channel.id} closed and archived: **${channel.name}** by ${actorUser}.`
+            ? `Sentinel ticket #${closedDossier?.id || channel.id} closed and archived: **${channel.name}** by ${actorUser}.`
             : `Dossier Sentinel #${closedDossier?.id || channel.id} clôturé et archivé : **${channel.name}** par ${actorUser}.`,
         {
             color: SENTINEL_COLORS.warning,
@@ -8003,7 +8006,7 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
     );
 
     await channel.send(language === 'en'
-        ? `This dossier is sealed. Its complete archive is confirmed. This space will be withdrawn ${closedDossier.deletionScheduledAt ? `<t:${Math.floor(new Date(closedDossier.deletionScheduledAt).getTime() / 1000)}:R>` : 'later'}.`
+        ? `This ticket is sealed. Its complete archive is confirmed. This space will be withdrawn ${closedDossier.deletionScheduledAt ? `<t:${Math.floor(new Date(closedDossier.deletionScheduledAt).getTime() / 1000)}:R>` : 'later'}.`
         : `Ce dossier est scellé. Son archive complète est confirmée. Cet espace sera retiré ${closedDossier.deletionScheduledAt ? `<t:${Math.floor(new Date(closedDossier.deletionScheduledAt).getTime() / 1000)}:R>` : 'ultérieurement'}.`
     ).catch(() => {});
 
@@ -10324,11 +10327,11 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             },
             {
                 id: 'dossiers',
-                label: 'Dossiers',
-                menuDescription: 'Sentinel dossier system with a RP vocabulary.',
+                label: 'Tickets',
+                menuDescription: 'Sentinel ticket system with roleplay-friendly wording.',
                 emoji: '📁',
-                title: 'Sentinel | Dossiers',
-                description: 'In Sentinel, a dossier is a reserved request space handled by authorized personnel.',
+                title: 'Sentinel | Tickets',
+                description: 'In Sentinel, a ticket is a reserved request space handled by authorized personnel.',
                 fields: [
                     {
                         name: 'How it works',
@@ -10339,13 +10342,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         ].join('\n')
                     },
                     {
-                        name: 'Inside a dossier',
+                        name: 'Inside a ticket',
                         value: [
-                            'Teams can reply, add participants, prepare a written record, and close the dossier.',
-                            '`/ticket-roles action:add role:@role` gives a role access to dossier handling.',
-                            '`/ticket-claim` marks you as the dossier referent.',
+                            'Teams can reply, add participants, prepare a written record, and close the ticket.',
+                            '`/ticket-roles action:add role:@role` gives a role access to ticket handling.',
+                            '`/ticket-claim` marks you as the ticket referent.',
                             '`/ticket-status status:...` updates the visible status if the requester made a mistake or the situation changes.',
-                            '`/close-ticket` closes the current dossier.',
+                            '`/close-ticket` closes the current ticket.',
                             '`/ticket-add member:@member` adds a participant.',
                             '`/ticket-remove member:@member` removes a participant.',
                             '`/ticket-transcript` sends the written record to the log channel when possible.'
@@ -10354,7 +10357,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     {
                         name: 'Capacity',
                         value: [
-                            'Reception panels, open dossiers, and complete history without a plan quota.'
+                            'Reception panels, open tickets, and complete history without a plan quota.'
                         ].join('\n')
                     }
                 ]
@@ -11911,7 +11914,7 @@ function buildDossierOpenModal(dossierType, language = 'fr', questions = []) {
 function buildDossierCloseModal(channelId, language = 'fr') {
     return new ModalBuilder()
         .setCustomId(`sentinel_dossier_close:${channelId}`)
-        .setTitle(language === 'en' ? 'Close the dossier' : 'Clôturer le dossier')
+        .setTitle(language === 'en' ? 'Close the ticket' : 'Clôturer le dossier')
         .addComponents(
             new ActionRowBuilder().addComponents(
                 new TextInputBuilder()
@@ -11954,14 +11957,14 @@ function buildDossierControlComponents(language = 'fr', options = {}) {
                 .setEmoji('🧾'),
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:close')
-                .setLabel(language === 'en' ? 'Close dossier' : 'Clôturer le dossier')
+                .setLabel(language === 'en' ? 'Close ticket' : 'Clôturer le dossier')
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🔒')
         ),
         new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
                 .setCustomId('sentinel_dossier_status')
-                .setPlaceholder(language === 'en' ? 'Update dossier status' : 'Modifier le statut du dossier')
+                .setPlaceholder(language === 'en' ? 'Update ticket status' : 'Modifier le statut du dossier')
                 .addOptions(statusOptions)
         )
     ];
@@ -12870,7 +12873,7 @@ function buildDossierTranscriptFromMessages(channel, dossier, messages, language
         : null;
     const header = language === 'en'
         ? [
-            `Sentinel dossier #${dossier?.id || 'unknown'}`,
+            `Sentinel ticket #${dossier?.id || 'unknown'}`,
             `Channel: #${channel.name}`,
             `Requester: ${dossier?.ownerUserId || 'unknown'}`,
             `Type: ${dossier?.type || 'support'}`,
@@ -12898,12 +12901,19 @@ function buildDossierTranscriptFromMessages(channel, dossier, messages, language
             `Généré : ${new Date().toISOString()}`
         ];
     const lines = messages.map(message => {
-        const additions = [
-            ...(message.attachments || []).map(file => `[pièce jointe: ${file.name || file.id}]`),
-            ...((message.embeds || []).length ? [`[${message.embeds.length} contenu(s) intégré(s)]`] : [])
-        ];
-        const content = [message.content, ...additions].filter(Boolean).join(' ') || '[message sans texte]';
-        return `[${message.createdAt}] ${message.author?.tag || message.author?.id || 'inconnu'}: ${content.replace(/\s+/g, ' ')}`;
+        const additions = language === 'en'
+            ? [
+                ...(message.attachments || []).map(file => `[attachment: ${file.name || file.id}]`),
+                ...((message.embeds || []).length ? [`[${message.embeds.length} embedded item(s)]`] : [])
+            ]
+            : [
+                ...(message.attachments || []).map(file => `[pièce jointe: ${file.name || file.id}]`),
+                ...((message.embeds || []).length ? [`[${message.embeds.length} contenu(s) intégré(s)]`] : [])
+            ];
+        const content = [message.content, ...additions].filter(Boolean).join(' ')
+            || (language === 'en' ? '[message without text]' : '[message sans texte]');
+        const unknownAuthor = language === 'en' ? 'unknown' : 'inconnu';
+        return `[${message.createdAt}] ${message.author?.tag || message.author?.id || unknownAuthor}: ${content.replace(/\s+/g, ' ')}`;
     });
 
     return [...header, '', ...lines].join('\n');
@@ -13026,14 +13036,14 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     const status = getDossierStatusLabel(dossier?.status || 'open', language);
     const archiveEmbed = new EmbedBuilder()
         .setColor(SENTINEL_COLORS.neutral)
-        .setTitle(language === 'en' ? 'Sentinel | Dossier archive' : 'Sentinel | Archive de dossier')
+        .setTitle(language === 'en' ? 'Sentinel | Ticket archive' : 'Sentinel | Archive de dossier')
         .setDescription(language === 'en'
             ? `Written record prepared for ${channel}.`
             : `Compte rendu préparé pour ${channel}.`
         )
         .addFields(
             {
-                name: language === 'en' ? 'Dossier' : 'Dossier',
+                name: language === 'en' ? 'Ticket' : 'Dossier',
                 value: `#${dossier?.id || channel.id}`,
                 inline: true
             },
@@ -13406,7 +13416,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
 
     const description = [
         language === 'en'
-            ? `${interaction.user}, this reserved space is your Sentinel dossier.`
+            ? `${interaction.user}, this reserved space is your Sentinel ticket.`
             : `${interaction.user}, cet espace réservé est ton dossier Sentinel.`,
         subject
             ? (language === 'en' ? `**Subject:** ${subject}` : `**Sujet :** ${subject}`)
@@ -13436,7 +13446,12 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
             advanced: hasAdvancedAccess(interaction.member)
         })
     });
-    await sendSentinelStaffLog(interaction.guild, `📁 Dossier Sentinel #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`);
+    await sendSentinelStaffLog(
+        interaction.guild,
+        language === 'en'
+            ? `📁 Sentinel ticket #${dossier.id} opened: ${ticketChannel} by ${interaction.user} (${dossierType}).`
+            : `📁 Dossier Sentinel #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`
+    );
     setCooldown(dossierCreateCooldowns, interaction.guild.id, interaction.user.id, DOSSIER_CREATE_COOLDOWN_MS);
 
     return interaction.reply({
@@ -13536,10 +13551,15 @@ async function handleSentinelDossierClaimButton(interaction) {
 
     const dossier = setDossierReferent(interaction.guild.id, channel.id, interaction.user.id);
     await channel.send(language === 'en'
-        ? `✅ ${interaction.user} is now the dossier referent.`
+        ? `✅ ${interaction.user} is now the ticket referent.`
         : `✅ ${interaction.user} prend ce dossier en charge.`
     ).catch(() => {});
-    await sendSentinelStaffLog(interaction.guild, `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`);
+    await sendSentinelStaffLog(
+        interaction.guild,
+        language === 'en'
+            ? `✅ Sentinel ticket #${dossier?.id || channel.id} assigned to ${interaction.user}.`
+            : `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`
+    );
 
     return interaction.reply({
         content: t(language, 'dossierClaimed', { member: interaction.user }),
@@ -13574,14 +13594,14 @@ async function handleDossierStatusSelect(interaction) {
     const label = getDossierStatusLabel(dossier?.status || nextStatus, language);
 
     await channel.send(language === 'en'
-        ? `📌 ${interaction.user} updated the dossier status: **${label}**.`
+        ? `📌 ${interaction.user} updated the ticket status: **${label}**.`
         : `📌 ${interaction.user} a mis à jour le statut du dossier : **${label}**.`
     ).catch(() => {});
 
     await sendSentinelStaffLog(
         interaction.guild,
         language === 'en'
-            ? `📌 Sentinel dossier #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
+            ? `📌 Sentinel ticket #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
             : `📌 Statut du dossier Sentinel #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
     );
 
@@ -13758,10 +13778,15 @@ async function handleDossierInteraction(interaction, commandName, language) {
     if (commandName === 'dossier-prendre') {
         const dossier = setDossierReferent(interaction.guild.id, channel.id, interaction.user.id);
         await channel.send(language === 'en'
-            ? `✅ ${interaction.user} is now the dossier referent.`
+            ? `✅ ${interaction.user} is now the ticket referent.`
             : `✅ ${interaction.user} prend ce dossier en charge.`
         ).catch(() => {});
-        await sendSentinelStaffLog(interaction.guild, `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`);
+        await sendSentinelStaffLog(
+            interaction.guild,
+            language === 'en'
+                ? `✅ Sentinel ticket #${dossier?.id || channel.id} assigned to ${interaction.user}.`
+                : `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`
+        );
 
         await interaction.reply({
             content: t(language, 'dossierClaimed', { member: interaction.user }),
@@ -13778,13 +13803,13 @@ async function handleDossierInteraction(interaction, commandName, language) {
         const label = getDossierStatusLabel(dossier?.status || nextStatus, language);
 
         await channel.send(language === 'en'
-            ? `📌 ${interaction.user} updated the dossier status: **${label}**.`
+            ? `📌 ${interaction.user} updated the ticket status: **${label}**.`
             : `📌 ${interaction.user} a mis à jour le statut du dossier : **${label}**.`
         ).catch(() => {});
         await sendSentinelStaffLog(
             interaction.guild,
             language === 'en'
-                ? `📌 Sentinel dossier #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
+                ? `📌 Sentinel ticket #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
                 : `📌 Statut du dossier Sentinel #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
         );
 
@@ -13807,7 +13832,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
             await reopenDossierChannel(interaction.guild, channel, interaction.user, language, {
                 advanced: hasAdvancedAccess(interaction.member)
             });
-            await interaction.editReply(language === 'en' ? 'The dossier is open again.' : 'Le dossier est de nouveau ouvert.');
+            await interaction.editReply(language === 'en' ? 'The ticket is open again.' : 'Le dossier est de nouveau ouvert.');
         } catch (error) {
             await interaction.editReply(error.message || t(language, 'serviceError'));
         }
@@ -13838,7 +13863,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
             flags: MessageFlags.Ephemeral
         });
         await channel.send(language === 'en'
-            ? `${user} has been added as a dossier participant.`
+            ? `${user} has been added as a ticket participant.`
             : `${user} a été ajouté comme intervenant du dossier.`
         ).catch(() => {});
         return true;
@@ -13849,7 +13874,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
     if (topic?.ownerUserId === user.id) {
         await interaction.reply({
             content: language === 'en'
-                ? 'The requester cannot be removed from their own dossier.'
+                ? 'The requester cannot be removed from their own ticket.'
                 : 'Le demandeur ne peut pas être retiré de son propre dossier.',
             flags: MessageFlags.Ephemeral
         });
@@ -13865,7 +13890,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
         flags: MessageFlags.Ephemeral
     });
     await channel.send(language === 'en'
-        ? `${user} has been removed from this dossier.`
+        ? `${user} has been removed from this ticket.`
         : `${user} a été retiré du dossier.`
     ).catch(() => {});
     return true;
