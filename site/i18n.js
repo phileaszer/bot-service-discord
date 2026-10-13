@@ -2758,6 +2758,9 @@
     match = /^(\d+)\/5 a finaliser$/.exec(normalizedValue);
     if (match) return `${match[1]}/5 to finish`;
 
+    match = /^Derniere lecture : (.+)$/.exec(normalizedValue);
+    if (match) return `Last checked: ${match[1]}`;
+
     match = /^Action Sentinel depuis bouton Discord\.$/.exec(normalizedValue);
     if (match) return 'Sentinel action from a Discord button.';
 

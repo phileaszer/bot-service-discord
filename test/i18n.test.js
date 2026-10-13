@@ -40,6 +40,10 @@ test('short dashboard labels and legacy French logs translate at runtime', () =>
     translateValue('Paie RP archivée pour Fantomenale.', 'en'),
     'Salary register archived for Fantomenale.'
   );
+  assert.equal(
+    translateValue('Dernière lecture : 10/13/26, 9:30 PM', 'en'),
+    'Last checked: 10/13/26, 9:30 PM'
+  );
   assert.deepEqual(
     Object.values(en).filter((value) => /\bdossiers?\b/i.test(value)),
     [],
