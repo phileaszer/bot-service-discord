@@ -2640,6 +2640,43 @@
     "Vérifier le dossier": "Check the ticket"
   });
 
+  Object.assign(en, {
+    "Ajouter staff": "Add staff member",
+    "Archive confirmée": "Archive confirmed",
+    "Aucun registre disponible": "No register available",
+    "Aucun serveur ne correspond à cette recherche.": "No server matches this search.",
+    "Autres formats": "More formats",
+    "Code à usage unique ou code de secours": "One-time code or recovery code",
+    "Conforme": "Passed",
+    "Contrôler les médias": "Check media",
+    "Copie à restaurer": "Backup to restore",
+    "Correspondance dans l’archive": "Archive match",
+    "Désactiver": "Disable",
+    "Envoyer la réponse": "Send response",
+    "Google Sheets": "Google Sheets",
+    "ID utilisateur Discord": "Discord user ID",
+    "Intégrité SQLite": "SQLite integrity",
+    "Jusqu’au": "Until",
+    "Lancer l’entretien": "Run maintenance",
+    "Paliers d’avertissement": "Warning thresholds",
+    "Préparer l’authentificateur": "Set up authenticator",
+    "Préparer la restauration": "Prepare restore",
+    "Programmer": "Schedule",
+    "Réouvrir le dossier": "Reopen ticket",
+    "Résolution": "Resolution",
+    "Restauration fondatrice": "Founder restore",
+    "RESTAURER SENTINEL": "RESTORE SENTINEL",
+    "Rôles dossiers existants": "Existing ticket roles",
+    "Rôles staff existants": "Existing staff roles",
+    "Sentinel présent comme membre": "Sentinel present as a member",
+    "Télécharger l’archive": "Download archive",
+    "Télécharger le PDF": "Download PDF",
+    "Télécharger XLSX": "Download XLSX",
+    "Ton compte Discord n’est membre d’aucun serveur où Sentinel est installé.": "Your Discord account is not a member of any server where Sentinel is installed.",
+    "Validations en attente": "Pending approvals",
+    "À corriger": "Needs attention"
+  });
+
   let normalizedTranslations = null;
 
   function normalizeTranslationKey(value) {
@@ -2736,6 +2773,51 @@
 
     match = /^Controle #(.+)$/.exec(normalizedValue);
     if (match) return `Check #${match[1]}`;
+
+    match = /^(.+) · controle #(.+)$/.exec(normalizedValue);
+    if (match) return `${translateValue(match[1], language)} · check #${match[2]}`;
+
+    match = /^(.+) · simulation uniquement$/.exec(normalizedValue);
+    if (match) return `${match[1]} · simulation only`;
+
+    match = /^(.+) au (.+)e avertissement$/.exec(normalizedValue);
+    if (match) return `${translateValue(match[1], language)} at warning ${match[2]}`;
+
+    match = /^(.+) message\(s\) · (.+) retire\(s\)$/.exec(normalizedValue);
+    if (match) return `${match[1]} message(s) · ${match[2]} removed`;
+
+    match = /^(.+) messages, (.+) pieces jointes et (.+) contenus integres\.$/.exec(normalizedValue);
+    if (match) return `${match[1]} messages, ${match[2]} attachments, and ${match[3]} embeds.`;
+
+    match = /^Archive #(.+) · (.+) · (.+)$/.exec(normalizedValue);
+    if (match) return `Archive no. ${match[1]} · ${match[2]} · ${translateValue(match[3], language)}`;
+
+    match = /^Dernier controle : (.+)$/.exec(normalizedValue);
+    if (match) return `Latest check: ${match[1]}`;
+
+    match = /^Prochain envoi : (.+)$/.exec(normalizedValue);
+    if (match) return `Next delivery: ${match[1]}`;
+
+    match = /^(.+) entree\(s\) · (.+)$/.exec(normalizedValue);
+    if (match) return `${match[1]} entries · ${match[2]}`;
+
+    match = /^(.+) · demande par (.+) · (.+)$/.exec(normalizedValue);
+    if (match) return `${match[1]} · requested by ${match[2]} · ${match[3]}`;
+
+    match = /^(.+) · (.+) occurrence\(s\) · (.+)$/.exec(normalizedValue);
+    if (match) return `${match[1]} · ${match[2]} occurrence${match[2] === '1' ? '' : 's'} · ${match[3]}`;
+
+    match = /^Une validation reste valable cinq minutes dans cette session\. Codes de secours restants : (.+)\.$/.exec(normalizedValue);
+    if (match) return `A verification remains valid for five minutes in this session. Recovery codes remaining: ${match[1]}.`;
+
+    match = /^(.+) information\(s\)$/.exec(normalizedValue);
+    if (match) return `${match[1]} item(s)`;
+
+    match = /^Cas #(.+)$/.exec(normalizedValue);
+    if (match) return `Case #${match[1]}`;
+
+    match = /^Ticket #(.+) · (.+)$/.exec(normalizedValue);
+    if (match) return `Ticket no. ${match[1]} · ${translateValue(match[2], language)}`;
 
     match = /^Creee par (.+) · un autre responsable doit la valider$/.exec(normalizedValue);
     if (match) return `Created by ${match[1]} · another manager must approve it`;

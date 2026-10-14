@@ -459,6 +459,13 @@
 
 .validation-summary.is-ready { border-left-color: #62d29b; }
 
+.validation-run-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .validation-checks {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

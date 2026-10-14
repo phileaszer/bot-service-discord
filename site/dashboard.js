@@ -5108,7 +5108,7 @@ function validationHistory(state) {
   return `
     <div class="validation-summary ${run.status === 'passed' ? 'is-ready' : 'is-warning'}">
       <div class="panel-mini-heading">
-        <div><span>Contrôle #${escapeHtml(run.id)}</span><strong>${run.status === 'passed' ? 'Validation réussie' : 'Points à corriger'}</strong></div>
+        <div class="validation-run-title"><span>Contrôle #${escapeHtml(run.id)}</span><strong>${run.status === 'passed' ? 'Validation réussie' : 'Points à corriger'}</strong></div>
         <small>${escapeHtml(formatAuditDate(run.createdAt))}</small>
       </div>
       <div class="validation-checks">

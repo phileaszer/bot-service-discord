@@ -128,6 +128,23 @@ function createAudit() {
   }
 
   function collectFrontendJs(source, file, output) {
+    // Nested template literals are split by the generic template scanner.
+    // Scan simple HTML nodes and attributes directly without interpreting
+    // JavaScript comparison operators as markup.
+    for (const match of source.matchAll(/<([a-z][\w-]*)\b[^>]*>([^<>]*)<\/\1>/gis)) {
+      const value = cleanCandidate(match[2]);
+      if (isCandidate(value) && !isTranslated(value)) {
+        output.set(`${file}:text:${value}`, { file, type: 'text', value });
+      }
+    }
+
+    for (const match of source.matchAll(/(?:placeholder|aria-label|alt|title|content|data-tooltip)=(['"])(.*?)\1/gs)) {
+      const value = cleanCandidate(match[2]);
+      if (isCandidate(value) && !isTranslated(value)) {
+        output.set(`${file}:attr:${value}`, { file, type: 'attribute', value });
+      }
+    }
+
     for (const match of source.matchAll(/`([^`]*)`/gs)) {
       if (match[1].includes('<')) collectMarkup(match[1], file, output);
     }

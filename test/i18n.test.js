@@ -32,6 +32,16 @@ test('short dashboard labels and legacy French logs translate at runtime', () =>
   assert.equal(translateValue('Sécurité', 'en'), 'Security');
   assert.equal(translateValue('Programmation', 'en'), 'Scheduling');
   assert.equal(translateValue('Recherche membre', 'en'), 'Member search');
+  assert.equal(translateValue('Télécharger le PDF', 'en'), 'Download PDF');
+  assert.equal(translateValue('Autres formats', 'en'), 'More formats');
+  assert.equal(translateValue('Programmer', 'en'), 'Schedule');
+  assert.equal(translateValue('Intégrité SQLite', 'en'), 'SQLite integrity');
+  assert.equal(translateValue('Paliers d’avertissement', 'en'), 'Warning thresholds');
+  assert.equal(translateValue('Rôles staff existants', 'en'), 'Existing staff roles');
+  assert.equal(translateValue('Rôles dossiers existants', 'en'), 'Existing ticket roles');
+  assert.equal(translateValue('Sentinel présent comme membre', 'en'), 'Sentinel present as a member');
+  assert.equal(translateValue('Conforme', 'en'), 'Passed');
+  assert.equal(translateValue('Contrôle #1682', 'en'), 'Check #1682');
   assert.equal(
     translateValue('Panneau de service publié dans #service.', 'en'),
     'Duty desk published in #service.'
