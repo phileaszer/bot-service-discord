@@ -7254,6 +7254,27 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .site-header.has-collapsed-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .site-header.has-collapsed-nav .brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+
+  .site-header.has-collapsed-nav .header-actions {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    justify-content: center;
+  }
+
+  .site-header.has-collapsed-nav .nav-toggle {
+    order: 10;
+  }
+
   .brand {
     min-width: 0;
     order: 1;
