@@ -1,0 +1,32 @@
+name: Sentinel uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-uptime
+  cancel-in-progress: true
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check dashboard and Discord bot
+        env:
+          SENTINEL_HEALTHCHECK_URL: https://bot-service-discord-production.up.railway.app/api/status
+          SENTINEL_ALERT_WEBHOOK_URL: ${{ secrets.SENTINEL_ALERT_WEBHOOK_URL }}
+        run: node tools/check-uptime.js

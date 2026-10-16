@@ -211,6 +211,121 @@ function createObjectStorageFromEnv(env = process.env, options = {}) {
     };
 }
 
+function createBackupStorageFromEnv(env = process.env, options = {}) {
+    const enabled = envBoolean(env.DATABASE_OFFSITE_BACKUP_ENABLED, false);
+    const provider = safeProviderName(
+        env.DATABASE_OFFSITE_BACKUP_PROVIDER
+        || env.SENTINEL_OBJECT_STORAGE_PROVIDER
+        || 's3'
+    );
+    const endpoint = String(
+        env.DATABASE_OFFSITE_BACKUP_ENDPOINT
+        || env.SENTINEL_OBJECT_STORAGE_ENDPOINT
+        || ''
+    ).trim() || null;
+    const region = String(
+        env.DATABASE_OFFSITE_BACKUP_REGION
+        || env.SENTINEL_OBJECT_STORAGE_REGION
+        || 'auto'
+    ).trim() || 'auto';
+    const bucket = String(
+        env.DATABASE_OFFSITE_BACKUP_BUCKET
+        || env.SENTINEL_OBJECT_STORAGE_BUCKET
+        || ''
+    ).trim();
+    const accessKeyId = String(
+        env.DATABASE_OFFSITE_BACKUP_ACCESS_KEY_ID
+        || env.SENTINEL_OBJECT_STORAGE_ACCESS_KEY_ID
+        || ''
+    ).trim();
+    const secretAccessKey = String(
+        env.DATABASE_OFFSITE_BACKUP_SECRET_ACCESS_KEY
+        || env.SENTINEL_OBJECT_STORAGE_SECRET_ACCESS_KEY
+        || ''
+    ).trim();
+    const prefix = String(env.DATABASE_OFFSITE_BACKUP_PREFIX || 'sentinel/backups')
+        .trim()
+        .replace(/^\/+|\/+$/g, '') || 'sentinel/backups';
+    const missing = [];
+
+    if (!bucket) missing.push('bucket');
+    if (!accessKeyId) missing.push('accessKeyId');
+    if (!secretAccessKey) missing.push('secretAccessKey');
+    if (provider === 'r2' && !endpoint) missing.push('endpoint');
+
+    const configured = enabled && missing.length === 0;
+    const client = configured
+        ? options.client || new S3Client({
+            region,
+            endpoint: endpoint || undefined,
+            forcePathStyle: envBoolean(
+                env.DATABASE_OFFSITE_BACKUP_FORCE_PATH_STYLE,
+                envBoolean(env.SENTINEL_OBJECT_STORAGE_FORCE_PATH_STYLE, false)
+            ),
+            requestChecksumCalculation: 'WHEN_REQUIRED',
+            responseChecksumValidation: 'WHEN_REQUIRED',
+            maxAttempts: envInteger(env.DATABASE_OFFSITE_BACKUP_MAX_ATTEMPTS, 3, 1, 5),
+            requestHandler: new NodeHttpHandler({
+                connectionTimeout: envInteger(env.DATABASE_OFFSITE_BACKUP_CONNECTION_TIMEOUT_MS, 5000, 500, 30000),
+                requestTimeout: envInteger(env.DATABASE_OFFSITE_BACKUP_REQUEST_TIMEOUT_MS, 60000, 1000, 180000)
+            }),
+            credentials: { accessKeyId, secretAccessKey }
+        })
+        : null;
+
+    return {
+        enabled,
+        configured,
+        provider,
+        bucket: bucket || null,
+        prefix,
+        missing,
+        async putIfAbsent({ key, body, contentLength, sha256, metadata = {} }) {
+            if (!configured || !client) {
+                throw new Error(`Sauvegarde externe non configuree : ${missing.join(', ') || 'stockage desactive'}.`);
+            }
+
+            const objectKey = `${prefix}/${String(key || '').replace(/^\/+/, '')}`;
+            try {
+                await client.send(new HeadObjectCommand({ Bucket: bucket, Key: objectKey }));
+                return { created: false, key: objectKey };
+            } catch (error) {
+                if (!isMissingObjectError(error)) throw error;
+            }
+
+            await client.send(new PutObjectCommand({
+                Bucket: bucket,
+                Key: objectKey,
+                Body: body,
+                ContentType: 'application/gzip',
+                ContentLength: contentLength,
+                CacheControl: 'no-store',
+                ContentDisposition: `attachment; filename="${String(key || 'sentinel-backup.db.gz').split('/').pop().replace(/["\\]/g, '')}"`,
+                ServerSideEncryption: env.DATABASE_OFFSITE_BACKUP_SSE || undefined,
+                Metadata: {
+                    sha256: String(sha256 || '').slice(0, 64),
+                    ...Object.fromEntries(
+                        Object.entries(metadata)
+                            .filter(([, value]) => value !== undefined && value !== null)
+                            .map(([name, value]) => [name, String(value).slice(0, 1024)])
+                    )
+                }
+            }));
+            return { created: true, key: objectKey };
+        },
+        status() {
+            return {
+                enabled,
+                configured,
+                provider,
+                bucket: bucket || null,
+                prefix,
+                missing: [...missing]
+            };
+        }
+    };
+}
+
 function getImageOptimizationOptions(env = process.env) {
     return {
         quality: envInteger(env.EMBED_MEDIA_WEBP_QUALITY, 82, 45, 100),
@@ -277,6 +392,7 @@ function embedMediaObjectKey(contentHash) {
 }
 
 module.exports = {
+    createBackupStorageFromEnv,
     createObjectStorageFromEnv,
     embedMediaObjectKey,
     getImageOptimizationOptions,

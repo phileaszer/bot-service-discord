@@ -107,7 +107,10 @@ function createAudit() {
   }
 
   function collectMarkup(source, file, output) {
-    const withoutIgnored = source
+    const manuallyBilingual = ['conditions.html', 'confidentialite.html'].includes(file)
+      ? source.replace(/<main\b[\s\S]*?<\/main>/i, '')
+      : source;
+    const withoutIgnored = manuallyBilingual
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<!--([\s\S]*?)-->/g, '');

@@ -7,24 +7,38 @@ const {
 } = require('discord.js');
 const { recreateChannelForPurge } = require('./message-purge');
 
-function boolEnv(name, fallback = false) {
-    const value = String(process.env[name] || '').trim().toLowerCase();
+function boolEnvValue(value, fallback = false) {
+    value = String(value || '').trim().toLowerCase();
     if (!value) return fallback;
     return ['1', 'true', 'yes', 'on'].includes(value);
 }
 
-function stagingValidationConfig() {
-    const guildId = String(process.env.SENTINEL_STAGING_GUILD_ID || '').trim();
-    const moderationMemberId = String(process.env.SENTINEL_STAGING_MEMBER_ID || '').trim();
-    const banTargetId = String(process.env.SENTINEL_STAGING_BAN_TARGET_ID || '').trim();
-    return {
+function stagingValidationConfig(env = process.env) {
+    const guildId = String(env.SENTINEL_STAGING_GUILD_ID || '').trim();
+    const moderationMemberId = String(env.SENTINEL_STAGING_MEMBER_ID || '').trim();
+    const banTargetId = String(env.SENTINEL_STAGING_BAN_TARGET_ID || '').trim();
+    const config = {
         guildId: /^\d{17,20}$/.test(guildId) ? guildId : null,
-        required: boolEnv('SENTINEL_STAGING_VALIDATION_REQUIRED', false),
-        realActions: boolEnv('SENTINEL_STAGING_REAL_ACTIONS', false),
+        required: boolEnvValue(env.SENTINEL_STAGING_VALIDATION_REQUIRED, false),
+        realActions: boolEnvValue(env.SENTINEL_STAGING_REAL_ACTIONS, false),
         moderationMemberId: /^\d{17,20}$/.test(moderationMemberId) ? moderationMemberId : null,
         banTargetId: /^\d{17,20}$/.test(banTargetId) ? banTargetId : null,
         enabled: Boolean(/^\d{17,20}$/.test(guildId))
     };
+    const issues = [];
+
+    if (guildId && !config.guildId) issues.push('SENTINEL_STAGING_GUILD_ID doit être un identifiant Discord valide.');
+    if (moderationMemberId && !config.moderationMemberId) issues.push('SENTINEL_STAGING_MEMBER_ID doit être un identifiant Discord valide.');
+    if (banTargetId && !config.banTargetId) issues.push('SENTINEL_STAGING_BAN_TARGET_ID doit être un identifiant Discord valide.');
+    if (config.required && !config.enabled) issues.push('SENTINEL_STAGING_GUILD_ID est obligatoire pour la validation bloquante.');
+    if (config.required && !config.realActions) issues.push('SENTINEL_STAGING_REAL_ACTIONS doit être activé pour une validation bloquante complète.');
+    if (config.realActions && !config.moderationMemberId) issues.push('Un compte de test dédié au timeout est obligatoire.');
+    if (config.realActions && !config.banTargetId) issues.push('Un compte de test dédié au bannissement est obligatoire.');
+    if (config.moderationMemberId && config.moderationMemberId === config.banTargetId) {
+        issues.push('Les comptes de test du timeout et du bannissement doivent être différents.');
+    }
+
+    return { ...config, issues, ready: config.enabled && issues.length === 0 };
 }
 
 async function deleteSafely(resource, reason) {
@@ -34,8 +48,10 @@ async function deleteSafely(resource, reason) {
 
 async function runDiscordStagingValidation(client, options = {}) {
     const config = stagingValidationConfig();
+    if (config.issues.length && (config.required || config.enabled || config.realActions)) {
+        throw new Error(`Configuration de préproduction incomplète : ${config.issues.join(' ')}`);
+    }
     if (!config.enabled) {
-        if (config.required) throw new Error('SENTINEL_STAGING_GUILD_ID est obligatoire pour la validation bloquante.');
         return { skipped: true, reason: 'staging_guild_not_configured', checks: [] };
     }
 

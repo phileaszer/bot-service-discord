@@ -8583,3 +8583,95 @@ code {
 .member-body .member-digest-setting {
   display: grid !important;
 }
+/* Keyboard access and trust pages */
+.skip-link {
+  position: fixed;
+  z-index: 10000;
+  top: 10px;
+  left: 10px;
+  padding: 10px 14px;
+  color: #071116;
+  background: #54e8df;
+  border: 2px solid currentColor;
+  font-weight: 800;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid #50e6ff;
+  outline-offset: 3px;
+}
+
+.trust-document {
+  width: min(1080px, calc(100% - 32px));
+  margin: 0 auto 72px;
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.trust-document-nav {
+  position: sticky;
+  top: 92px;
+  padding: 18px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .14));
+  background: var(--panel, #171b24);
+}
+
+.trust-document-nav strong,
+.trust-document-nav a {
+  display: block;
+}
+
+.trust-document-nav a {
+  padding: 7px 0;
+  color: var(--muted, #aeb8cb);
+}
+
+.trust-document-body {
+  min-width: 0;
+  padding: 30px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .14));
+  background: var(--panel, #171b24);
+}
+
+.trust-document-body section + section {
+  margin-top: 34px;
+  padding-top: 30px;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, .12));
+}
+
+.trust-document-body h2 {
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+}
+
+.trust-document-body li,
+.trust-document-body p {
+  overflow-wrap: anywhere;
+}
+
+html[lang="fr"] .language-en,
+html[lang="en"] .language-fr {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .trust-document {
+    grid-template-columns: 1fr;
+    width: min(100% - 20px, 1080px);
+    gap: 14px;
+  }
+
+  .trust-document-nav {
+    position: static;
+  }
+
+  .trust-document-body {
+    padding: 20px 16px;
+  }
+}

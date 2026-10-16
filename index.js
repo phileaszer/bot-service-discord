@@ -42,11 +42,13 @@ const {
     verifyDatabaseBackup
 } = require('./database/storage');
 const {
+    createBackupStorageFromEnv,
     createObjectStorageFromEnv,
     embedMediaObjectKey,
     getImageOptimizationOptions,
     optimizeEmbedImage
 } = require('./database/object-storage');
+const { uploadVerifiedBackup } = require('./database/offsite-backup');
 const { syncSentinelServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
 const operations = require('./operations');
@@ -57,6 +59,7 @@ const repairCenter = require('./repair-center');
 const runtimeGuard = require('./runtime-guard');
 const serviceCheckins = require('./service-checkins');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
+const { createPerformanceMonitor } = require('./performance-monitor');
 const {
     canRecreateChannelForPurge,
     freezeChannelForPurge,
@@ -253,6 +256,7 @@ const EMBED_MEDIA_QUOTA_BYTES = Math.max(
 ) * 1024 * 1024;
 const EMBED_MEDIA_IMAGE_OPTIONS = getImageOptimizationOptions();
 const embedMediaObjectStorage = createObjectStorageFromEnv();
+const databaseOffsiteBackupStorage = createBackupStorageFromEnv();
 const preparedCustomEmbedUploads = new WeakMap();
 const DATABASE_BACKUP_COMPRESS = String(process.env.DATABASE_BACKUP_COMPRESS || 'true').toLowerCase() !== 'false';
 const DATABASE_BACKUP_COMPRESSION_LEVEL = Math.min(Math.max(
@@ -287,25 +291,7 @@ let lastDatabaseBackup = null;
 let lastDatabaseMaintenance = null;
 let lastDatabaseBackupFailure = null;
 let mediaScanPromise = null;
-const runtimePerformance = {
-    startedAt: new Date().toISOString(),
-    dashboard: {
-        requestCount: 0,
-        errorCount: 0,
-        slowRequestCount: 0,
-        maxDurationMs: 0,
-        recentDurations: [],
-        recentSlowRequests: []
-    },
-    discord: {
-        interactionCount: 0,
-        errorCount: 0,
-        slowInteractionCount: 0,
-        maxDurationMs: 0,
-        recentDurations: [],
-        recentSlowInteractions: []
-    }
-};
+const performanceMonitor = createPerformanceMonitor({ getGatewayPing: () => client.ws.ping });
 const automodSpamBuckets = new Map();
 const automodRaidBuckets = new Map();
 let lastSlashCommandCheck = {
@@ -1441,87 +1427,6 @@ function checkDatabase() {
     db.prepare('SELECT 1').get();
 }
 
-function recordDashboardRequestMetric({ durationMs, status, method, route }) {
-    const bucket = runtimePerformance.dashboard;
-    const duration = Math.max(Number(durationMs) || 0, 0);
-    bucket.requestCount += 1;
-    bucket.errorCount += Number(status) >= 500 ? 1 : 0;
-    bucket.maxDurationMs = Math.max(bucket.maxDurationMs, duration);
-    bucket.recentDurations.push(duration);
-    bucket.recentDurations = bucket.recentDurations.slice(-500);
-
-    if (duration >= 1000) {
-        bucket.slowRequestCount += 1;
-        bucket.recentSlowRequests.unshift({
-            method: String(method || 'GET').slice(0, 12),
-            route: String(route || '/').replace(/\d{17,20}/g, ':id').slice(0, 160),
-            status: Number(status) || 0,
-            durationMs: Math.round(duration),
-            occurredAt: new Date().toISOString()
-        });
-        bucket.recentSlowRequests.length = Math.min(bucket.recentSlowRequests.length, 25);
-    }
-}
-
-function recordDiscordInteractionMetric(interaction, durationMs, failed = false) {
-    const bucket = runtimePerformance.discord;
-    const duration = Math.max(Number(durationMs) || 0, 0);
-    bucket.interactionCount += 1;
-    bucket.errorCount += failed ? 1 : 0;
-    bucket.maxDurationMs = Math.max(bucket.maxDurationMs, duration);
-    bucket.recentDurations.push(duration);
-    bucket.recentDurations = bucket.recentDurations.slice(-500);
-
-    if (duration >= 1500) {
-        bucket.slowInteractionCount += 1;
-        bucket.recentSlowInteractions.unshift({
-            type: interaction?.isChatInputCommand?.() ? 'command' : (interaction?.isButton?.() ? 'button' : 'interaction'),
-            name: String(interaction?.commandName || interaction?.customId || 'unknown').slice(0, 120),
-            durationMs: Math.round(duration),
-            failed: Boolean(failed),
-            occurredAt: new Date().toISOString()
-        });
-        bucket.recentSlowInteractions.length = Math.min(bucket.recentSlowInteractions.length, 25);
-    }
-}
-
-function percentile(values, ratio) {
-    if (!values.length) {
-        return 0;
-    }
-
-    const sorted = [...values].sort((a, b) => a - b);
-    return Math.round(sorted[Math.min(Math.ceil(sorted.length * ratio) - 1, sorted.length - 1)] * 10) / 10;
-}
-
-function getRuntimePerformanceStatus() {
-    const dashboard = runtimePerformance.dashboard;
-    const discord = runtimePerformance.discord;
-
-    return {
-        startedAt: runtimePerformance.startedAt,
-        dashboard: {
-            requestCount: dashboard.requestCount,
-            errorCount: dashboard.errorCount,
-            slowRequestCount: dashboard.slowRequestCount,
-            p50Ms: percentile(dashboard.recentDurations, 0.5),
-            p95Ms: percentile(dashboard.recentDurations, 0.95),
-            maxDurationMs: Math.round(dashboard.maxDurationMs * 10) / 10,
-            recentSlowRequests: dashboard.recentSlowRequests.map(item => ({ ...item }))
-        },
-        discord: {
-            interactionCount: discord.interactionCount,
-            errorCount: discord.errorCount,
-            slowInteractionCount: discord.slowInteractionCount,
-            p50Ms: percentile(discord.recentDurations, 0.5),
-            p95Ms: percentile(discord.recentDurations, 0.95),
-            maxDurationMs: Math.round(discord.maxDurationMs * 10) / 10,
-            gatewayPingMs: Math.max(Number(client.ws.ping) || 0, 0),
-            recentSlowInteractions: discord.recentSlowInteractions.map(item => ({ ...item }))
-        }
-    };
-}
-
 async function createDatabaseBackup(reason = 'auto') {
     const backup = await createCompressedDatabaseBackup(db, {
         backupDirectory: DATABASE_BACKUP_DIR,
@@ -1641,6 +1546,7 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
         );
         let backupPath = null;
         let verification = null;
+        let offsiteBackup = { skipped: true, reason: 'no_new_verified_backup' };
 
         try {
             backupPath = createBackup
@@ -1653,6 +1559,15 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
 
                 if (verification.status !== 'ok') {
                     throw new Error(verification.errorMessage || 'La verification de la sauvegarde a echoue.');
+                }
+
+                if (createBackup) {
+                    offsiteBackup = await uploadVerifiedBackup(
+                        databaseOffsiteBackupStorage,
+                        backupPath,
+                        verification,
+                        reason
+                    );
                 }
             }
 
@@ -1692,6 +1607,7 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             compressedBackups: compression.compressedCount,
             reclaimedBackupBytes: compression.reclaimedBytes,
             backupVerification: verification,
+            offsiteBackup,
             retention,
             media
         };
@@ -1791,10 +1707,11 @@ function getDatabaseBackupStatus() {
             lastBackupFailure: lastDatabaseBackupFailure,
             backupEnabled: DATABASE_BACKUP_ENABLED,
             backupIntervalHours: Math.round(DATABASE_BACKUP_INTERVAL_MS / 60 / 60 / 1000),
-            runtimePerformance: getRuntimePerformanceStatus()
+            runtimePerformance: performanceMonitor.status()
         });
 
         status.media.objectStorage = embedMediaObjectStorage.status();
+        status.offsiteBackup = databaseOffsiteBackupStorage.status();
         status.media.quotaBytes = EMBED_MEDIA_QUOTA_BYTES;
         status.media.webp = { ...EMBED_MEDIA_IMAGE_OPTIONS };
         return status;
@@ -15983,7 +15900,7 @@ client.once(Events.ClientReady, async () => {
             reconcileDossierPanels,
             runSentinelGuildValidation,
             simulateGuildOperation,
-            recordDashboardRequestMetric,
+            recordDashboardRequestMetric: performanceMonitor.recordDashboardRequest,
             reportIncident: reportRuntimeIncident,
             removeAutomodWord,
             removeDossierRole,
@@ -17528,7 +17445,7 @@ client.on(Events.InteractionCreate, async interaction => {
             status: auditStatus,
             summary: auditSummary
         });
-        recordDiscordInteractionMetric(
+        performanceMonitor.recordDiscordInteraction(
             interaction,
             Number(process.hrtime.bigint() - interactionStartedAt) / 1e6,
             auditStatus === 'failed'

@@ -10,6 +10,7 @@
       currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
       currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.',
       creatorRole: 'Créatrice de Sentinel',
+      skipContent: 'Aller au contenu principal',
       releaseTitle: 'Version de démonstration publique',
       releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
     },
@@ -19,6 +20,7 @@
       currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
       currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.',
       creatorRole: 'Creator of Sentinel',
+      skipContent: 'Skip to main content',
       releaseTitle: 'Public demonstration version',
       releaseMessage: 'Sentinel is currently available at no cost so communities can try it. Some advanced features may become paid later, but a free part will remain available. No subscription or charge is active today, and the details will be announced before any change.'
     }
@@ -205,6 +207,16 @@
   }
 
   function initializePageChrome() {
+    const main = document.querySelector('main');
+    if (main && !document.querySelector('.skip-link')) {
+      main.id ||= 'main-content';
+      const skipLink = document.createElement('a');
+      skipLink.className = 'skip-link';
+      skipLink.href = `#${main.id}`;
+      skipLink.dataset.i18nIgnore = 'true';
+      skipLink.textContent = labels[pageLanguage()].skipContent;
+      document.body.prepend(skipLink);
+    }
     ensureButton();
     ensureReleaseNotice();
     ensureCreatorCredit();
@@ -230,6 +242,8 @@
     updateButtons();
     updateReleaseNotice();
     updateCreatorCredit();
+    const skipLink = document.querySelector('.skip-link');
+    if (skipLink) skipLink.textContent = labels[pageLanguage()].skipContent;
   });
 
   window.SentinelTheme = {

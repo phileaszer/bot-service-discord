@@ -11,8 +11,8 @@ Sentinel est un bot Discord bilingue pensé pour les communautés, les serveurs 
 - Dashboard : https://bot-service-discord-production.up.railway.app/dashboard
 - Inviter Sentinel : https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands
 - Serveur support : https://discord.gg/jzPqcUdVns
-- Conditions d'utilisation : https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md
-- Politique de confidentialité : https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md
+- Conditions d'utilisation : https://phileaszer.github.io/bot-service-discord/conditions.html
+- Politique de confidentialité : https://phileaszer.github.io/bot-service-discord/confidentialite.html
 
 ## Ce que fait Sentinel
 
@@ -114,6 +114,8 @@ La Console fondateur contient le Centre de maintenance : capacité du volume, r�
 
 Le stockage des images accepte tout service compatible S3, notamment Cloudflare R2. Active `SENTINEL_OBJECT_STORAGE_ENABLED`, renseigne le bucket, les identifiants, l'endpoint et une URL publique HTTPS dans les variables d'environnement. Le jeton doit être limité à la lecture, l'écriture et la suppression des objets du bucket média, idéalement sous le préfixe `sentinel/embeds/`, sans droit d'administration du compte. Les clés sont uniquement lues côté serveur. Si le service distant est absent, lent ou temporairement indisponible, Sentinel conserve le chemin Discord/local existant pour que l'envoi reste possible. Le quota média par serveur est réglable avec `EMBED_MEDIA_QUOTA_MB`.
 
+Une copie privée des sauvegardes SQLite vérifiées peut être envoyée vers un second stockage S3/R2 avec `DATABASE_OFFSITE_BACKUP_ENABLED=true` et les variables `DATABASE_OFFSITE_BACKUP_*`. Utilise un bucket privé distinct, un jeton limité au préfixe `sentinel/backups/` et, si le fournisseur le permet, `DATABASE_OFFSITE_BACKUP_SSE=AES256`. Une sauvegarde dont le contrôle d'intégrité échoue n'est jamais envoyée.
+
 Un bucket privé peut utiliser `DASHBOARD_URL/media` comme base publique. Sentinel valide alors l'empreinte demandée dans SQLite et diffuse uniquement l'objet WebP correspondant, avec cache immuable, sans révéler les identifiants S3 ni permettre de parcourir le bucket.
 
 - `npm run backup:db` crée une sauvegarde manuelle compressée et vérifie la politique de rétention.
@@ -136,6 +138,8 @@ Les changements de grade staff sont réservés au compte fondateur, exigent une 
 
 Le contrôle Discord de préproduction peut être rendu bloquant avant la mise en service avec `SENTINEL_STAGING_GUILD_ID` et `SENTINEL_STAGING_VALIDATION_REQUIRED=true`. Il crée et supprime de vrais salons et rôles privés. `SENTINEL_STAGING_REAL_ACTIONS=true` ajoute un timeout réel sur `SENTINEL_STAGING_MEMBER_ID` puis un bannissement immédiatement levé sur le compte absent `SENTINEL_STAGING_BAN_TARGET_ID`; ces deux IDs doivent donc être des comptes de test dédiés.
 
+Le workflow `Sentinel uptime` contrôle `/api/status` toutes les quinze minutes. Ajoute le secret GitHub `SENTINEL_ALERT_WEBHOOK_URL` pour recevoir aussi une alerte Discord lorsque le site ou le bot ne répond plus.
+
 ## Licence
 
 Sentinel est un projet propriétaire. Le dépôt est consultable publiquement pour présenter le bot et suivre son évolution, mais le code ne peut pas être copié, redistribué ou réutilisé sans autorisation préalable.
@@ -151,8 +155,8 @@ Useful links:
 - Dashboard: https://bot-service-discord-production.up.railway.app/dashboard
 - Invite Sentinel: https://discord.com/oauth2/authorize?client_id=1511426423376842922&permissions=1099780189206&integration_type=0&scope=bot+applications.commands
 - Support server: https://discord.gg/jzPqcUdVns
-- Terms of Service: https://github.com/phileaszer/bot-service-discord/blob/master/TERMS_OF_SERVICE.md
-- Privacy Policy: https://github.com/phileaszer/bot-service-discord/blob/master/PRIVACY_POLICY.md
+- Terms of Service: https://phileaszer.github.io/bot-service-discord/conditions.html
+- Privacy Policy: https://phileaszer.github.io/bot-service-discord/confidentialite.html
 
 Main features:
 
