@@ -207,6 +207,12 @@
   }
 
   function initializePageChrome() {
+    if (!document.querySelector('link[rel="manifest"]')) {
+      const manifest = document.createElement('link');
+      manifest.rel = 'manifest';
+      manifest.href = 'manifest.webmanifest';
+      document.head.append(manifest);
+    }
     const main = document.querySelector('main');
     if (main && !document.querySelector('.skip-link')) {
       main.id ||= 'main-content';
@@ -220,6 +226,32 @@
     ensureButton();
     ensureReleaseNotice();
     ensureCreatorCredit();
+  }
+
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    if (document.querySelector('[data-install-sentinel]')) return;
+    const actions = document.querySelector('.header-actions');
+    if (!actions) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button button-small button-ghost install-sentinel-button';
+    button.dataset.installSentinel = 'true';
+    button.textContent = pageLanguage() === 'en' ? 'Install' : 'Installer';
+    button.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      await deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      button.remove();
+    });
+    actions.prepend(button);
+  });
+
+  if ('serviceWorker' in navigator && (window.isSecureContext || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => null));
   }
 
   applyRootTheme(readTheme());

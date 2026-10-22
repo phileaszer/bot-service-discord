@@ -694,6 +694,18 @@ async function actionFormData(form, action) {
     }
   }
 
+  if (action === 'community-create-shift') {
+    for (const key of ['startsAt', 'endsAt']) {
+      const value = new Date(data[key]);
+      if (!Number.isNaN(value.getTime())) data[key] = value.toISOString();
+    }
+  }
+
+  if (action === 'community-review-application' && data.interviewAt) {
+    const interviewAt = new Date(data.interviewAt);
+    if (!Number.isNaN(interviewAt.getTime())) data.interviewAt = interviewAt.toISOString();
+  }
+
   if (action === 'custom-embed-create' || action === 'custom-embed-edit') {
     const imageUpload = await customEmbedUploadFromInput(form.elements.imageFile, 'Image principale');
     const thumbnailUpload = await customEmbedUploadFromInput(form.elements.thumbnailFile, 'Miniature');
@@ -1750,6 +1762,7 @@ function serverPresetSelector(state) {
 
 function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOptions, updatesChannelOptions) {
   const status = dashboardConfigStatus(state);
+  const onboarding = state.community?.onboarding || { completed: status.completedSteps, total: 5, ready: status.ready, steps: [] };
   const languageLabel = state.config.language === 'en' ? 'English' : 'Français';
   const serviceRoleLabel = status.serviceRole ? `@${status.serviceRole.name}` : 'Aucun rôle choisi';
   const logChannelLabel = status.logChannel ? `#${status.logChannel.name}` : 'Aucun salon choisi';
@@ -1766,7 +1779,12 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
           <h2>Configurer Sentinel en 5 étapes</h2>
           <p class="muted">Suis ces étapes dans l’ordre. Chaque validation met directement à jour ce serveur Discord.</p>
         </div>
-        <span class="setup-progress">${status.completedSteps}/5</span>
+        <span class="setup-progress">${escapeHtml(onboarding.completed)}/${escapeHtml(onboarding.total)}</span>
+      </div>
+      <div class="onboarding-verification">
+        <div class="onboarding-progress-track" aria-label="Progression de l’installation"><span style="width:${Math.round((onboarding.completed / Math.max(onboarding.total, 1)) * 100)}%"></span></div>
+        <div class="onboarding-checks">${onboarding.steps.map(step => `<article class="${step.complete ? 'is-ready' : 'is-missing'}"><span aria-hidden="true">${step.complete ? '✓' : '!'}</span><div><strong>${escapeHtml(step.label)}</strong><small>${escapeHtml(step.detail)}</small></div></article>`).join('')}</div>
+        <form data-action-form="run-validation"><button class="button button-small button-ghost" type="submit">Vérifier aussi les permissions Discord</button></form>
       </div>
       <div class="setup-steps">
         ${setupStep({
@@ -5758,6 +5776,128 @@ function labelHelp(label, help, addon = '') {
   return `<label><span>${escapeHtml(label)}</span>${addon} ${helpTip(help)}</label>`;
 }
 
+function communityStatusLabel(value) {
+  return ({
+    submitted: 'Reçue', reviewing: 'En lecture', interview: 'Entretien', accepted: 'Acceptée', rejected: 'Refusée', withdrawn: 'Retirée',
+    scheduled: 'Planifié', cancelled: 'Annulé', published: 'Publiée'
+  })[value] || value;
+}
+
+function emptyPanel(message) {
+  return `<p class="community-empty">${escapeHtml(message)}</p>`;
+}
+
+function renderCommunityPanel(state, roleOptions, channelOptions) {
+  const community = state.community || {};
+  const recruitment = community.recruitment || { forms: [], applications: [] };
+  const planning = community.planning || { shifts: [], absences: [] };
+  const suggestions = community.suggestions || [];
+  const analytics = community.analytics || {};
+  const themes = community.panelThemes || {};
+  const applicationRows = recruitment.applications.map((item) => `
+    <article class="community-record">
+      <header><div><span>Candidature #${escapeHtml(item.id)}</span><strong>${escapeHtml(item.formTitle || 'Recrutement')}</strong></div>${statusBadge(communityStatusLabel(item.status), item.status === 'accepted')}</header>
+      <p>Membre <code>${escapeHtml(item.userId)}</code> · ${escapeHtml(formatAuditDate(item.submittedAt))}</p>
+      <details><summary>Lire les réponses</summary><div class="community-answer-list">${item.answers.map(answer => `<p><strong>${escapeHtml(answer.question)}</strong><span>${escapeHtml(answer.answer || 'Sans réponse')}</span></p>`).join('')}</div></details>
+      <form data-action-form="community-review-application" class="operation-form-grid">
+        <input type="hidden" name="applicationId" value="${escapeHtml(item.id)}">
+        <select name="status" required><option value="reviewing">Passer en lecture</option><option value="interview">Prévoir un entretien</option><option value="accepted">Accepter</option><option value="rejected">Refuser</option></select>
+        <input type="datetime-local" name="interviewAt" aria-label="Date de l’entretien">
+        <textarea name="staffNote" maxlength="2000" placeholder="Réponse visible par la personne"></textarea>
+        <button class="button button-small" type="submit">Mettre à jour</button>
+      </form>
+    </article>`).join('');
+  const shiftRows = planning.shifts.map((shift) => `
+    <article class="community-record">
+      <header><div><span>Créneau #${escapeHtml(shift.id)}</span><strong>${escapeHtml(shift.title)}</strong></div>${statusBadge(`${shift.counts.available}/${shift.capacity || '∞'} présents`, true)}</header>
+      <p>${escapeHtml(formatAuditDate(shift.startsAt))} → ${escapeHtml(formatAuditDate(shift.endsAt))}</p>
+      <div class="community-response-strip"><span>${escapeHtml(shift.counts.available)} disponibles</span><span>${escapeHtml(shift.counts.maybe)} incertains</span><span>${escapeHtml(shift.counts.unavailable)} indisponibles</span></div>
+      <form data-action-form="community-cancel-shift"><input type="hidden" name="shiftId" value="${escapeHtml(shift.id)}"><button class="button button-small button-ghost" type="submit">Annuler ce créneau</button></form>
+    </article>`).join('');
+  const suggestionRows = suggestions.map((item) => `
+    <article class="community-record">
+      <header><div><span>Suggestion #${escapeHtml(item.id)}</span><strong>${escapeHtml(item.title)}</strong></div>${statusBadge(`${item.score} point(s)`, item.score > 0)}</header>
+      <p>${escapeHtml(item.body)}</p>
+      <small>${escapeHtml(communityStatusLabel(item.status))} · ${escapeHtml(item.voteCount)} vote(s) · membre <code>${escapeHtml(item.userId)}</code></small>
+      ${item.status !== 'published' ? `<form data-action-form="community-review-suggestion" class="operation-form-grid">
+        <input type="hidden" name="suggestionId" value="${escapeHtml(item.id)}">
+        <select name="status"><option value="reviewing">Mettre en étude</option><option value="accepted">Accepter</option><option value="rejected">Refuser</option></select>
+        <label><span>Salon si acceptée</span><select name="publishChannelId"><option value="">Ne pas publier maintenant</option>${channelOptions}</select></label>
+        <textarea name="staffResponse" maxlength="2000" placeholder="Réponse officielle">${escapeHtml(item.staffResponse || '')}</textarea>
+        <button class="button button-small" type="submit">Enregistrer la décision</button>
+      </form>` : ''}
+      ${item.status === 'accepted' ? `<form data-action-form="community-publish-suggestion" class="inline-action-row"><input type="hidden" name="suggestionId" value="${escapeHtml(item.id)}"><select name="channelId" required>${channelOptions}</select><button class="button button-small" type="submit">Publier sur Discord</button></form>` : ''}
+    </article>`).join('');
+  const helpItems = [
+    ['Installation', 'Configurer Sentinel', 'Choisis le profil, le rôle de service, le salon des registres, les responsables et le salon des nouveautés.'],
+    ['Service', 'Publier le panneau', 'Ouvre Configuration ou Service, choisis le salon puis publie le panneau de prise de service.'],
+    ['Tickets', 'Recevoir les demandes', 'Configure les responsables par type, puis publie le bureau d’accueil dans un salon public.'],
+    ['Modération', 'Protéger le serveur', 'Vérifie d’abord le diagnostic des permissions, puis active seulement les règles utiles.'],
+    ['Recrutement', 'Ouvrir une campagne', 'Crée un formulaire ici. Les membres répondront depuis leur espace personnel.'],
+    ['Planning', 'Préparer une équipe', 'Crée un créneau avec une capacité et un rappel. Les réponses sont visibles en direct.'],
+    ['Suggestions', 'Consulter les idées', 'Les membres proposent et votent depuis leur espace. Le staff décide avant toute publication.'],
+    ['Panneaux', 'Adapter l’identité', 'Personnalise les textes, la couleur et l’image, puis republie le panneau concerné.']
+  ];
+  const panelForm = (type, label, theme = {}) => {
+    const buttonFields = type === 'service'
+      ? [['Start', 'Prendre service'], ['End', 'Fin service'], ['Hours', 'Mes heures'], ['Active', 'En service']]
+      : [['Support', 'Support'], ['Report', 'Signalement'], ['Recruitment', 'Recrutement'], ['Partnership', 'Partenariat'], ['Other', 'Autre']];
+    const buttonValues = theme.buttonLabels || {};
+    const previewButtons = type === 'service'
+      ? [buttonValues.start || 'Prendre service', buttonValues.end || 'Fin service', buttonValues.hours || 'Mes heures', buttonValues.active || 'En service']
+      : [buttonValues.support || 'Support', buttonValues.report || 'Signalement', buttonValues.recruitment || 'Recrutement', buttonValues.partnership || 'Partenariat', buttonValues.other || 'Autre'];
+    return `
+    <form data-action-form="community-save-panel-theme" class="community-panel-editor">
+      <input type="hidden" name="panelType" value="${escapeHtml(type)}">
+      <div class="panel-heading"><div><p class="eyebrow">${escapeHtml(label)}</p><h3>Identité du panneau</h3></div><span class="panel-color-preview" style="--panel-preview-color:${escapeHtml(theme.color || '#24D7D0')}"></span></div>
+      <label><span>Titre</span><input name="title" maxlength="120" value="${escapeHtml(theme.title || '')}" placeholder="Garder le titre Sentinel"></label>
+      <label><span>Texte d’accueil</span><textarea name="description" maxlength="2000" placeholder="Garder le texte Sentinel">${escapeHtml(theme.description || '')}</textarea></label>
+      <div class="form-row"><label><span>Couleur</span><input name="color" type="color" value="${escapeHtml(theme.color || '#24D7D0')}"></label><label><span>Pied de panneau</span><input name="footer" maxlength="200" value="${escapeHtml(theme.footer || '')}" placeholder="Texte facultatif"></label></div>
+      <label><span>Illustration HTTPS</span><input name="imageUrl" type="url" maxlength="1000" value="${escapeHtml(theme.imageUrl || '')}" placeholder="https://..."></label>
+      <fieldset class="community-button-labels"><legend>Texte des boutons</legend>${buttonFields.map(([key, fallback]) => `<label><span>${escapeHtml(fallback)}</span><input name="button${key}Label" maxlength="80" value="${escapeHtml(buttonValues[key[0].toLowerCase() + key.slice(1)] || '')}" placeholder="${escapeHtml(fallback)}"></label>`).join('')}</fieldset>
+      <div class="discord-panel-preview" data-panel-preview>
+        <div class="discord-panel-preview-accent"></div>
+        <div><strong data-panel-preview-title>${escapeHtml(theme.title || label)}</strong><p data-panel-preview-description>${escapeHtml(theme.description || 'Le texte du panneau apparaîtra ici.')}</p>${theme.imageUrl ? `<img data-panel-preview-image src="${escapeHtml(theme.imageUrl)}" alt="">` : '<img data-panel-preview-image alt="" hidden>'}<div class="discord-panel-preview-buttons">${previewButtons.map(value => `<span>${escapeHtml(value)}</span>`).join('')}</div></div>
+      </div>
+      <button class="button" type="submit">Enregistrer le style</button>
+    </form>`;
+  };
+
+  return `<section class="dashboard-panel community-suite-panel">
+    <div class="panel-heading row-heading"><div><p class="eyebrow">Vie du serveur</p><h2>Équipe et communauté</h2><p class="muted">Recrutements, disponibilités, idées et suivi depuis un même bureau.</p></div><span class="status-badge is-ready">Actif</span></div>
+    <section class="community-section community-recruitment">
+      <div class="community-section-heading"><div><span>Recrutements</span><h3>Campagnes et candidatures</h3></div><strong>${escapeHtml(recruitment.applications.filter(item => ['submitted', 'reviewing', 'interview'].includes(item.status)).length)} à traiter</strong></div>
+      <div class="community-two-column"><form data-action-form="community-create-recruitment-form" class="community-create-form">
+        <label><span>Nom du recrutement</span><input name="title" maxlength="100" required placeholder="Ex. Recrutement modération"></label>
+        <label><span>Présentation</span><textarea name="description" maxlength="1000" placeholder="Explique le rôle recherché"></textarea></label>
+        <label><span>Questions, une par ligne</span><textarea name="questions" required placeholder="Pourquoi souhaites-tu nous rejoindre ?&#10;Quelles sont tes disponibilités ?"></textarea></label>
+        <div class="form-row"><label><span>Rôle après acceptation</span><select name="targetRoleId">${roleOptions}</select></label><label><span>Salon de suivi</span><select name="reviewChannelId">${channelOptions}</select></label></div>
+        <button class="button" type="submit">Ouvrir le recrutement</button>
+      </form><div class="community-record-list">${recruitment.forms.length ? recruitment.forms.map(form => `<article class="community-compact-record"><div><strong>${escapeHtml(form.title)}</strong><small>${escapeHtml(form.questions.length)} question(s) · ${form.open ? 'Ouvert' : 'Fermé'}</small></div><form data-action-form="community-toggle-recruitment-form"><input type="hidden" name="formId" value="${escapeHtml(form.id)}"><input type="hidden" name="open" value="${form.open ? 'false' : 'true'}"><button class="button button-small button-ghost" type="submit">${form.open ? 'Fermer' : 'Rouvrir'}</button></form></article>`).join('') : emptyPanel('Aucun recrutement créé.')}</div></div>
+      <div class="community-record-list community-applications-list">${applicationRows || emptyPanel('Aucune candidature reçue.')}</div>
+    </section>
+    <section class="community-section community-planning">
+      <div class="community-section-heading"><div><span>Planning</span><h3>Créneaux et disponibilités</h3></div><strong>${escapeHtml(planning.shifts.length)} à venir</strong></div>
+      <form data-action-form="community-create-shift" class="community-create-form community-shift-form">
+        <label><span>Nom du créneau</span><input name="title" maxlength="100" required placeholder="Ex. Service du vendredi soir"></label>
+        <label><span>Début</span><input type="datetime-local" name="startsAt" required></label><label><span>Fin</span><input type="datetime-local" name="endsAt" required></label>
+        <label><span>Places</span><input type="number" name="capacity" min="0" max="500" value="0"><small>0 signifie sans limite.</small></label>
+        <label><span>Rappel</span><select name="reminderMinutes"><option value="30">30 minutes avant</option><option value="60" selected>1 heure avant</option><option value="1440">1 jour avant</option></select></label>
+        <label><span>Rôle à prévenir</span><select name="roleId">${roleOptions}</select></label><label><span>Salon du rappel</span><select name="channelId">${channelOptions}</select></label>
+        <label class="community-wide-field"><span>Consignes</span><textarea name="description" maxlength="1000"></textarea></label><button class="button" type="submit">Créer le créneau</button>
+      </form>
+      <div class="community-record-list">${shiftRows || emptyPanel('Aucun créneau à venir.')}</div>
+      ${planning.absences.length ? `<div class="community-absence-strip"><strong>Absences déclarées</strong>${planning.absences.map(item => `<span><code>${escapeHtml(item.userId)}</code> · ${escapeHtml(formatAuditDate(item.startsAt))} → ${escapeHtml(formatAuditDate(item.endsAt))}</span>`).join('')}</div>` : ''}
+    </section>
+    <section class="community-section community-suggestions"><div class="community-section-heading"><div><span>Boîte à idées</span><h3>Propositions de la communauté</h3></div><strong>${escapeHtml(suggestions.length)} idée(s)</strong></div><div class="community-record-list">${suggestionRows || emptyPanel('Aucune suggestion pour le moment.')}</div></section>
+    <section class="community-section community-panels"><div class="community-section-heading"><div><span>Identité Discord</span><h3>Personnalisation des panneaux</h3></div></div><div class="community-two-column">${panelForm('service', 'Panneau de service', themes.service)}${panelForm('tickets', 'Panneau des tickets', themes.tickets)}</div></section>
+    <section class="community-section community-analytics"><div class="community-section-heading"><div><span>Lecture d’activité</span><h3>Statistiques responsables</h3></div><small>30 derniers jours</small></div><div class="community-analytics-grid">
+      <article><span>Services</span><strong>${escapeHtml(analytics.services30d || 0)}</strong><small>${escapeHtml(analytics.serviceUsers30d || 0)} membre(s)</small></article><article><span>Tickets ouverts</span><strong>${escapeHtml(analytics.ticketsOpen || 0)}</strong><small>${escapeHtml(analytics.tickets30d || 0)} créés en 30 jours</small></article><article><span>Modération</span><strong>${escapeHtml(analytics.moderation30d || 0)}</strong><small>${escapeHtml(analytics.automod24h || 0)} détection(s) aujourd’hui</small></article><article><span>Première réponse</span><strong>${analytics.averageFirstResponseMinutes == null ? '—' : `${escapeHtml(analytics.averageFirstResponseMinutes)} min`}</strong><small>Moyenne des tickets répondus</small></article>
+    </div><div class="community-two-column"><article class="community-insight"><h4>Heures les plus actives</h4>${analytics.busiestHours?.length ? analytics.busiestHours.map(item => `<p><span>${String(item.hour).padStart(2, '0')} h</span><strong>${escapeHtml(item.count)} session(s)</strong></p>`).join('') : emptyPanel('Pas encore assez de services.')}</article><article class="community-insight"><h4>Charge des responsables</h4>${analytics.staffLoad?.length ? analytics.staffLoad.map(item => `<p><span>${item.userId === 'unassigned' ? 'Sans référent' : `<code>${escapeHtml(item.userId)}</code>`}</span><strong>${escapeHtml(item.count)} ticket(s)</strong></p>`).join('') : emptyPanel('Aucun ticket en attente.')}</article></div></section>
+    <section class="community-section community-help"><div class="community-section-heading"><div><span>Centre d’aide</span><h3>Trouver rapidement un réglage</h3></div></div><label class="community-help-search"><span>Que veux-tu faire ?</span><input type="search" data-community-help-search placeholder="Ex. recrutement, panneau, sanction..."></label><div class="community-help-grid">${helpItems.map(([category, title, detail]) => `<article data-community-help-item data-search="${escapeHtml(`${category} ${title} ${detail}`.toLocaleLowerCase('fr'))}"><span>${escapeHtml(category)}</span><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail)}</p></article>`).join('')}</div><p class="member-empty" data-community-help-empty hidden>Aucun résultat. Essaie un mot plus simple.</p></section>
+  </section>`;
+}
+
 const DASHBOARD_TABS = [
   {
     id: 'overview',
@@ -5823,6 +5963,13 @@ const DASHBOARD_TABS = [
     description: 'Alertes, exports, essais et contrôles'
   },
   {
+    id: 'community',
+    label: 'Équipe & communauté',
+    eyebrow: 'Organisation',
+    title: 'Équipe et communauté',
+    description: 'Recrutements, planning, idées et statistiques'
+  },
+  {
     id: 'founder',
     label: 'Accès au site',
     eyebrow: 'Régie',
@@ -5879,6 +6026,14 @@ const DASHBOARD_SUBTABS = {
     { id: 'reports', label: 'Rapports', description: 'Exports et envois automatiques', selectors: ['[data-operation-section="reports"]'] },
     { id: 'announcements', label: 'Programmation', description: 'Brouillons et annonces planifiées', selectors: ['[data-operation-section="announcements"]'] },
     { id: 'testing', label: 'Essais', description: 'Simulations et validation Sentinel', selectors: ['[data-operation-section="testing"]'] }
+  ],
+  community: [
+    { id: 'recruitment', label: 'Recrutements', description: 'Formulaires et décisions', selectors: ['.community-recruitment'] },
+    { id: 'planning', label: 'Planning', description: 'Créneaux, réponses et absences', selectors: ['.community-planning'] },
+    { id: 'suggestions', label: 'Suggestions', description: 'Idées, votes et publication', selectors: ['.community-suggestions'] },
+    { id: 'panels', label: 'Panneaux', description: 'Identité des messages Discord', selectors: ['.community-panels'] },
+    { id: 'analytics', label: 'Statistiques', description: 'Activité et charge des équipes', selectors: ['.community-analytics'] },
+    { id: 'help', label: 'Aide', description: 'Recherche adaptée au serveur', selectors: ['.community-help'] }
   ],
   founder: [
     { id: 'servers', label: 'Serveurs', description: 'Parc équipé de Sentinel', selectors: ['[aria-label="Serveurs Sentinel"]'] },
@@ -6105,6 +6260,8 @@ function renderDashboard() {
       ${tabPanel('audit', () => renderAuditPanel(state))}
 
       ${tabPanel('operations', () => renderOperationsPanel(state, getChannelOptions(), premiumBadge, premiumTag))}
+
+      ${tabPanel('community', () => renderCommunityPanel(state, getRoleOptions(), getChannelOptions()))}
 
       ${canShowFounderTab(state) ? tabPanel('founder', () => renderFounderPremiumPanel()) : ''}
 
@@ -6806,6 +6963,45 @@ function attachDashboardHandlers() {
       activeDashboardSubtabs[parent] = button.dataset.dashboardSubtab;
       applyDashboardSubtabs($('[data-dashboard-main]'));
     });
+  });
+
+  $('[data-community-help-search]')?.addEventListener('input', (event) => {
+    const query = String(event.currentTarget.value || '').trim().toLocaleLowerCase('fr');
+    let visible = 0;
+    $$('[data-community-help-item]').forEach((item) => {
+      item.hidden = Boolean(query) && !String(item.dataset.search || '').includes(query);
+      if (!item.hidden) visible += 1;
+    });
+    const empty = $('[data-community-help-empty]');
+    if (empty) empty.hidden = visible > 0;
+  });
+
+  $$('.community-panel-editor').forEach((form) => {
+    const updatePanelPreview = () => {
+      const preview = form.querySelector('[data-panel-preview]');
+      const color = form.elements.color?.value || '#24D7D0';
+      form.querySelector('.panel-color-preview')?.style.setProperty('--panel-preview-color', color);
+      preview?.style.setProperty('--panel-preview-color', color);
+      const title = preview?.querySelector('[data-panel-preview-title]');
+      const description = preview?.querySelector('[data-panel-preview-description]');
+      if (title) title.textContent = form.elements.title?.value.trim() || (form.elements.panelType.value === 'service' ? 'Panneau de service' : 'Panneau des tickets');
+      if (description) description.textContent = form.elements.description?.value.trim() || 'Le texte du panneau apparaîtra ici.';
+      const image = preview?.querySelector('[data-panel-preview-image]');
+      if (image) {
+        const source = form.elements.imageUrl?.value.trim();
+        image.hidden = !source;
+        if (source) image.src = source;
+      }
+      const fieldNames = form.elements.panelType.value === 'service'
+        ? ['buttonStartLabel', 'buttonEndLabel', 'buttonHoursLabel', 'buttonActiveLabel']
+        : ['buttonSupportLabel', 'buttonReportLabel', 'buttonRecruitmentLabel', 'buttonPartnershipLabel', 'buttonOtherLabel'];
+      preview?.querySelectorAll('.discord-panel-preview-buttons span').forEach((button, index) => {
+        const field = form.elements[fieldNames[index]];
+        button.textContent = field?.value.trim() || field?.placeholder || 'Bouton';
+      });
+    };
+    form.addEventListener('input', updatePanelPreview);
+    updatePanelPreview();
   });
 
   $$('[data-refresh-creator-premium]').forEach((button) => {

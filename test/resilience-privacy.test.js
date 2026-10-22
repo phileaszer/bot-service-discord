@@ -147,9 +147,14 @@ test('a member can appeal only their own case and staff records one decision', (
 test('privacy exports remain scoped and retention settings are bounded', () => {
     db.prepare('INSERT INTO service_times (guild_id, user_id, total_time) VALUES (?, ?, ?)').run(guildId, userId, 1000);
     db.prepare('INSERT INTO service_times (guild_id, user_id, total_time) VALUES (?, ?, ?)').run('100000000000000199', userId, 2000);
+    db.prepare(`INSERT INTO community_suggestions (guild_id, user_id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(guildId, userId, 'Amélioration du bureau', 'Une proposition suffisamment détaillée pour le test.', new Date().toISOString(), new Date().toISOString());
     const guildExport = JSON.parse(privacy.createGuildDataExport({ id: guildId, name: 'Validation' }, 'json').buffer.toString('utf8'));
     assert.equal(guildExport.tables.service_times.length, 1);
     assert.equal(guildExport.tables.service_times[0].guild_id, guildId);
+    assert.equal(guildExport.tables.community_suggestions.length, 1);
+    const memberExport = JSON.parse(privacy.createMemberDataExport(userId, 'json').buffer.toString('utf8'));
+    assert.equal(memberExport.data.suggestions.length, 1);
     const guildPdf = privacy.createGuildDataExport({ id: guildId, name: 'Validation' });
     const memberPdf = privacy.createMemberDataExport(userId);
     assert.equal(guildPdf.contentType, 'application/pdf');

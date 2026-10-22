@@ -1,0 +1,32 @@
+{
+  "name": "Sentinel",
+  "short_name": "Sentinel",
+  "description": "Services, tickets, modération et vie d'équipe depuis un tableau de bord Discord sécurisé.",
+  "lang": "fr",
+  "start_url": "./dashboard.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1118",
+  "theme_color": "#0d1b24",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "assets/sentinel-mark.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Gérer un serveur",
+      "short_name": "Dashboard",
+      "url": "dashboard.html"
+    },
+    {
+      "name": "Mon espace",
+      "short_name": "Mon espace",
+      "url": "membre.html"
+    }
+  ]
+}

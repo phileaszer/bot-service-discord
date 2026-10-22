@@ -78,10 +78,81 @@
     return `<div class="member-list">${items.map(item => `<article><span>${escapeHtml(item.title)}</span><strong>${escapeHtml(item.detail)}</strong>${item.createdAt ? `<small>${escapeHtml(formatDate(item.createdAt))}</small>` : ''}</article>`).join('')}</div>`;
   }
 
+  function memberCommunityPanel(item) {
+    const community = item.community || {};
+    const recruitment = community.recruitment || { forms: [], applications: [] };
+    const planning = community.planning || { shifts: [], absences: [] };
+    const suggestions = community.suggestions || [];
+    const appliedFormIds = new Set(recruitment.applications.map(application => Number(application.formId)));
+    const statusLabels = {
+      submitted: 'Candidature reçue', reviewing: 'En cours de lecture', interview: 'Entretien prévu', accepted: 'Acceptée', rejected: 'Refusée', withdrawn: 'Retirée',
+      available: 'Disponible', unavailable: 'Indisponible', maybe: 'Peut-être', reviewingSuggestion: 'En étude', published: 'Publiée'
+    };
+    const recruitmentForms = recruitment.forms.filter(form => !appliedFormIds.has(Number(form.id))).map(form => `
+      <details class="member-community-item">
+        <summary><span><strong>${escapeHtml(form.title)}</strong><small>${escapeHtml(form.description || 'Recrutement ouvert')}</small></span><em>${escapeHtml(form.questions.length)} question(s)</em></summary>
+        <form data-community-action="apply" data-guild-id="${escapeHtml(item.guild.id)}" data-form-id="${escapeHtml(form.id)}" class="member-community-form">
+          ${form.questions.map((question, index) => `<label><span>${escapeHtml(question.label)}</span><textarea data-recruitment-answer="${index}" maxlength="1200" ${question.required ? 'required' : ''}></textarea></label>`).join('')}
+          <button class="button button-small" type="submit">Envoyer ma candidature</button>
+        </form>
+      </details>`).join('');
+    const applications = recruitment.applications.map(application => `<article class="member-community-item"><span>${escapeHtml(application.formTitle || 'Recrutement')}</span><strong>${escapeHtml(statusLabels[application.status] || application.status)}</strong>${application.interviewAt ? `<small>Entretien : ${escapeHtml(formatDate(application.interviewAt))}</small>` : ''}${application.staffNote ? `<p>${escapeHtml(application.staffNote)}</p>` : ''}${!['accepted', 'rejected', 'withdrawn'].includes(application.status) ? `<button class="button button-small button-ghost" type="button" data-community-click="withdraw-application" data-guild-id="${escapeHtml(item.guild.id)}" data-application-id="${escapeHtml(application.id)}">Retirer ma candidature</button>` : ''}</article>`).join('');
+    const shifts = planning.shifts.map(shift => `<article class="member-community-item"><span>${escapeHtml(formatDate(shift.startsAt))}</span><strong>${escapeHtml(shift.title)}</strong><small>${escapeHtml(shift.description || 'Aucune consigne particulière')} · ${escapeHtml(shift.counts.available)} présent(s)${shift.capacity ? ` sur ${escapeHtml(shift.capacity)}` : ''}</small><div class="member-community-actions">${[['available', 'Disponible'], ['maybe', 'Peut-être'], ['unavailable', 'Indisponible']].map(([value, label]) => `<button class="button button-small ${shift.ownResponse?.status === value ? '' : 'button-ghost'}" type="button" data-community-click="shift-response" data-guild-id="${escapeHtml(item.guild.id)}" data-shift-id="${escapeHtml(shift.id)}" data-status="${value}">${label}</button>`).join('')}</div></article>`).join('');
+    const absences = planning.absences.map(absence => `<article class="member-community-item"><span>Absence déclarée</span><strong>${escapeHtml(formatDate(absence.startsAt))} → ${escapeHtml(formatDate(absence.endsAt))}</strong><small>${escapeHtml(absence.reason || 'Aucun motif indiqué')}</small>${absence.status === 'declared' ? `<button class="button button-small button-ghost" type="button" data-community-click="cancel-absence" data-guild-id="${escapeHtml(item.guild.id)}" data-absence-id="${escapeHtml(absence.id)}">Annuler</button>` : ''}</article>`).join('');
+    const suggestionItems = suggestions.map(suggestion => `<article class="member-community-item"><span>${escapeHtml(suggestion.status === 'reviewing' ? 'En étude' : (statusLabels[suggestion.status] || suggestion.status))}</span><strong>${escapeHtml(suggestion.title)}</strong><p>${escapeHtml(suggestion.body)}</p>${suggestion.staffResponse ? `<small>Réponse : ${escapeHtml(suggestion.staffResponse)}</small>` : ''}<div class="member-community-actions"><button class="button button-small ${suggestion.viewerVote === 1 ? '' : 'button-ghost'}" type="button" data-community-click="vote-suggestion" data-guild-id="${escapeHtml(item.guild.id)}" data-suggestion-id="${escapeHtml(suggestion.id)}" data-value="1">Utile · ${escapeHtml(suggestion.score)}</button><button class="button button-small button-ghost" type="button" data-community-click="vote-suggestion" data-guild-id="${escapeHtml(item.guild.id)}" data-suggestion-id="${escapeHtml(suggestion.id)}" data-value="-1">Pas prioritaire</button></div></article>`).join('');
+
+    return `<section class="member-community-suite">
+      <div class="member-community-heading"><div><span>Vie du serveur</span><h3>Mon équipe et ma communauté</h3></div><small>Actions liées à ${escapeHtml(item.guild.name)}</small></div>
+      <div class="member-community-grid">
+        <article class="member-card"><header class="member-section-heading"><div><span>Recrutements</span><h3>Mes candidatures</h3></div><strong>${escapeHtml(recruitment.applications.length)}</strong></header><div class="member-community-list">${applications || emptyMemberState('Aucune candidature envoyée.')}${recruitmentForms || (!recruitment.forms.length ? emptyMemberState('Aucun recrutement ouvert.') : '')}</div></article>
+        <article class="member-card"><header class="member-section-heading"><div><span>Planning</span><h3>Mes prochains créneaux</h3></div><strong>${escapeHtml(planning.shifts.length)}</strong></header><div class="member-community-list">${shifts || emptyMemberState('Aucun créneau à venir.')}</div><form data-community-action="declare-absence" data-guild-id="${escapeHtml(item.guild.id)}" class="member-community-form member-absence-form"><h4>Déclarer une absence</h4><label><span>Début</span><input type="datetime-local" name="startsAt" required></label><label><span>Fin</span><input type="datetime-local" name="endsAt" required></label><label><span>Motif facultatif</span><input name="reason" maxlength="500"></label><button class="button button-small" type="submit">Enregistrer</button></form><div class="member-community-list">${absences}</div></article>
+        <article class="member-card member-suggestions-card"><header class="member-section-heading"><div><span>Boîte à idées</span><h3>Suggestions de la communauté</h3></div><strong>${escapeHtml(suggestions.length)}</strong></header><form data-community-action="create-suggestion" data-guild-id="${escapeHtml(item.guild.id)}" class="member-community-form"><label><span>Titre</span><input name="title" minlength="5" maxlength="120" required></label><label><span>Proposition</span><textarea name="body" minlength="20" maxlength="3000" required></textarea></label><button class="button button-small" type="submit">Proposer cette idée</button></form><div class="member-community-list">${suggestionItems || emptyMemberState('Aucune suggestion publiée.')}</div></article>
+      </div>
+    </section>`;
+  }
+
   function digestHistory(items) {
     if (!items?.length) return emptyMemberState('Aucun résumé Discord envoyé pour le moment.');
     const labels = { delivered: 'Envoyé', empty: 'Aucune nouveauté', failed: 'Échec' };
     return `<div class="member-list">${items.map(item => `<article><span>${escapeHtml(labels[item.status] || item.status)}</span><strong>${escapeHtml(item.itemCount || 0)} information(s)</strong><small>${escapeHtml(formatDate(item.deliveredAt || item.attemptedAt))}${item.errorMessage ? ` · ${escapeHtml(item.errorMessage)}` : ''}</small></article>`).join('')}</div>`;
+  }
+
+  async function showNewBrowserNotifications() {
+    if (!('Notification' in window) || Notification.permission !== 'granted' || !portal?.guilds?.length) return;
+    const registration = await navigator.serviceWorker?.ready?.catch(() => null);
+    for (const item of portal.guilds) {
+      for (const notification of (item.notifications || []).slice(0, 5)) {
+        const key = `sentinel-browser-notification:${item.guild.id}:${notification.key}:${notification.createdAt || ''}`;
+        if (localStorage.getItem(key)) continue;
+        const options = {
+          body: `${item.guild.name} · ${notification.detail}`,
+          icon: 'assets/sentinel-mark.png',
+          badge: 'assets/sentinel-mark.png',
+          tag: key,
+          data: { url: 'membre.html' }
+        };
+        if (registration) await registration.showNotification(notification.title, options);
+        else new Notification(notification.title, options);
+        localStorage.setItem(key, new Date().toISOString());
+      }
+    }
+  }
+
+  function attachNotificationControl() {
+    const button = document.querySelector('[data-enable-browser-notifications]');
+    if (!button || !('Notification' in window)) {
+      button?.remove();
+      return;
+    }
+    if (Notification.permission === 'granted') button.textContent = 'Notifications actives';
+    if (Notification.permission === 'denied') button.textContent = 'Notifications bloquées';
+    button.disabled = Notification.permission === 'denied';
+    button.addEventListener('click', async () => {
+      const permission = await Notification.requestPermission();
+      button.textContent = permission === 'granted' ? 'Notifications actives' : 'Notifications bloquées';
+      button.disabled = permission === 'denied';
+      if (permission === 'granted') await showNewBrowserNotifications();
+    });
   }
 
   function renderGuild(item) {
@@ -125,6 +196,7 @@
             </form></article>
           </div>
         </div>
+        ${memberCommunityPanel(item)}
       </section>
     `;
   }
@@ -167,6 +239,53 @@
         finally { button.disabled = false; }
       });
     });
+    document.querySelectorAll('[data-community-action]').forEach(form => {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        const action = form.dataset.communityAction;
+        const body = { action, guildId: form.dataset.guildId };
+        if (action === 'apply') {
+          body.formId = form.dataset.formId;
+          body.answers = Array.from(form.querySelectorAll('[data-recruitment-answer]')).map(input => ({ answer: input.value }));
+        } else {
+          new FormData(form).forEach((value, key) => { body[key] = value; });
+          for (const key of ['startsAt', 'endsAt']) {
+            if (body[key]) body[key] = new Date(body[key]).toISOString();
+          }
+        }
+        try {
+          const payload = await api('/api/me/community', { method: 'POST', body: JSON.stringify(body) });
+          portal = payload.portal;
+          render();
+          toast('Ton espace a été mis à jour.');
+        } catch (error) { toast(error.message, 'error'); }
+        finally { button.disabled = false; }
+      });
+    });
+    document.querySelectorAll('[data-community-click]').forEach(button => {
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        const body = {
+          action: button.dataset.communityClick,
+          guildId: button.dataset.guildId,
+          applicationId: button.dataset.applicationId,
+          shiftId: button.dataset.shiftId,
+          absenceId: button.dataset.absenceId,
+          suggestionId: button.dataset.suggestionId,
+          status: button.dataset.status,
+          value: button.dataset.value
+        };
+        try {
+          const payload = await api('/api/me/community', { method: 'POST', body: JSON.stringify(body) });
+          portal = payload.portal;
+          render();
+          toast('Choix enregistré.');
+        } catch (error) { toast(error.message, 'error'); }
+        finally { button.disabled = false; }
+      });
+    });
     document.querySelector('[data-member-delete]')?.addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -186,9 +305,11 @@
     try {
       const session = await api('/api/session');
       csrfToken = session.csrfToken;
-      userCard.innerHTML = `<strong>${escapeHtml(session.user.globalName || session.user.username)}</strong><small>Compte Discord vérifié</small>`;
+      userCard.innerHTML = `<strong>${escapeHtml(session.user.globalName || session.user.username)}</strong><small>Compte Discord vérifié</small><button class="button button-small button-ghost" type="button" data-enable-browser-notifications>Activer les notifications</button>`;
       portal = (await api('/api/me/portal')).portal;
       render();
+      attachNotificationControl();
+      showNewBrowserNotifications();
     } catch (error) {
       content.innerHTML = `<div class="empty-state"><img src="assets/sentinel-mark.png" alt=""><h2>Connexion nécessaire</h2><p>Connecte ton compte Discord pour ouvrir ton registre personnel.</p><a class="button" href="/auth/login" data-discord-login>Connexion Discord</a></div>`;
       window.SentinelAuth?.decorateLoginLinks?.();

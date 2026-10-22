@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('./database/database');
+require('./community-suite');
 const { cleanText, createProfessionalPdf } = require('./pdf-document');
 
 const GUILD_EXPORT_TABLES = [
@@ -35,7 +36,15 @@ const GUILD_EXPORT_TABLES = [
     'warning_escalation_events',
     'scheduled_announcements',
     'guild_report_schedules',
-    'moderation_appeals'
+    'moderation_appeals',
+    'recruitment_forms',
+    'recruitment_applications',
+    'team_shifts',
+    'team_shift_responses',
+    'team_absences',
+    'community_suggestions',
+    'community_suggestion_votes',
+    'guild_panel_themes'
 ];
 
 const EXPORT_SECTION_LABELS = {
@@ -70,6 +79,14 @@ const EXPORT_SECTION_LABELS = {
     scheduled_announcements: 'Annonces programmées',
     guild_report_schedules: 'Rapports programmés',
     moderation_appeals: 'Contestations de sanctions',
+    recruitment_forms: 'Formulaires de recrutement',
+    recruitment_applications: 'Candidatures',
+    team_shifts: 'Planning des équipes',
+    team_shift_responses: 'Disponibilités du planning',
+    team_absences: 'Absences déclarées',
+    community_suggestions: 'Idées communautaires',
+    community_suggestion_votes: 'Votes communautaires',
+    guild_panel_themes: 'Personnalisation des panneaux',
     profiles: 'Profil Discord',
     serviceTimes: 'Temps de service',
     serviceSessions: 'Sessions de service',
@@ -78,7 +95,12 @@ const EXPORT_SECTION_LABELS = {
     moderationCases: 'Registre disciplinaire',
     dossiers: 'Tickets',
     appeals: 'Contestations',
-    notificationPreferences: 'Préférences de notification'
+    notificationPreferences: 'Préférences de notification',
+    recruitmentApplications: 'Candidatures',
+    shiftResponses: 'Disponibilités du planning',
+    absences: 'Absences déclarées',
+    suggestions: 'Idées communautaires',
+    suggestionVotes: 'Votes communautaires'
 };
 
 const EXPORT_FIELD_LABELS = {
@@ -215,7 +237,12 @@ function createMemberDataExport(userId, format = 'pdf') {
         dossiers: db.prepare('SELECT * FROM sentinel_dossiers WHERE owner_user_id = ? OR opener_user_id = ?').all(userId, userId)
             .map(row => cleanExportRow('sentinel_dossiers', row)),
         appeals: db.prepare('SELECT * FROM moderation_appeals WHERE user_id = ?').all(userId),
-        notificationPreferences: db.prepare('SELECT * FROM user_notification_preferences WHERE user_id = ?').all(userId)
+        notificationPreferences: db.prepare('SELECT * FROM user_notification_preferences WHERE user_id = ?').all(userId),
+        recruitmentApplications: db.prepare('SELECT * FROM recruitment_applications WHERE user_id = ?').all(userId),
+        shiftResponses: db.prepare('SELECT * FROM team_shift_responses WHERE user_id = ?').all(userId),
+        absences: db.prepare('SELECT * FROM team_absences WHERE user_id = ?').all(userId),
+        suggestions: db.prepare('SELECT * FROM community_suggestions WHERE user_id = ?').all(userId),
+        suggestionVotes: db.prepare('SELECT * FROM community_suggestion_votes WHERE user_id = ?').all(userId)
     };
     const document = {
         format: 'sentinel-member-export-v1',

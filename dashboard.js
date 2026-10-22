@@ -4,10 +4,11 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 const zlib = require('zlib');
-const { ChannelType, PermissionsBitField } = require('discord.js');
+const { ChannelType, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const db = require('./database/database');
 const { SITE_ACCESS_ROLES, siteCapabilities } = require('./access-policy');
 const governance = require('./governance');
+const communitySuite = require('./community-suite');
 
 const sessions = new Map();
 const oauthStates = new Map();
@@ -123,6 +124,7 @@ const MIME_TYPES = {
     '.css': 'text/css; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8',
     '.json': 'application/json; charset=utf-8',
+    '.webmanifest': 'application/manifest+json; charset=utf-8',
     '.png': 'image/png',
     '.webp': 'image/webp',
     '.jpg': 'image/jpeg',
@@ -2855,6 +2857,39 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
         ctx.helpers.hasModerationAccess?.(viewerMember, PermissionsBitField.Flags.ManageMessages)
         || canManageGuild
     ));
+    const onboardingSteps = [
+        {
+            id: 'profile',
+            label: 'Profil du serveur',
+            detail: 'Langue et style de fonctionnement choisis.',
+            complete: Boolean(config.language && config.serverPreset)
+        },
+        {
+            id: 'service-role',
+            label: 'Rôle de service',
+            detail: 'Rôle ajouté et retiré pendant les prises de service.',
+            complete: Boolean(config.serviceRoleId && guild.roles.cache.has(config.serviceRoleId))
+        },
+        {
+            id: 'logs',
+            label: 'Salon des registres',
+            detail: 'Salon utilisé pour conserver les actions importantes.',
+            complete: Boolean(config.logChannelId && guild.channels.cache.has(config.logChannelId))
+        },
+        {
+            id: 'staff',
+            label: 'Accès des responsables',
+            detail: 'Au moins un rôle Discord peut gérer Sentinel.',
+            complete: commandRoleIds.some(roleId => guild.roles.cache.has(roleId))
+        },
+        {
+            id: 'updates',
+            label: 'Nouveautés Sentinel',
+            detail: 'Un salon reçoit les annonces officielles du bot.',
+            complete: Boolean(config.updatesChannelId && guild.channels.cache.has(config.updatesChannelId) && config.statusUpdatesEnabled)
+        }
+    ];
+    const onboardingCompleted = onboardingSteps.filter(step => step.complete).length;
 
     return {
         guild: {
@@ -3023,6 +3058,32 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
         validationRuns: advanced && ctx.helpers.getValidationRuns
             ? ctx.helpers.getValidationRuns(guild.id, 10)
             : [],
+        community: {
+            onboarding: {
+                completed: onboardingCompleted,
+                total: onboardingSteps.length,
+                ready: onboardingCompleted === onboardingSteps.length,
+                steps: onboardingSteps
+            },
+            recruitment: {
+                forms: communitySuite.listRecruitmentForms(guild.id),
+                applications: communitySuite.listRecruitmentApplications(guild.id, { limit: 150 })
+            },
+            planning: {
+                shifts: communitySuite.listTeamShifts(guild.id, { includePast: false, limit: 100 }),
+                absences: communitySuite.listAbsences(guild.id, { limit: 150 })
+            },
+            suggestions: communitySuite.listSuggestions(guild.id, {
+                viewerUserId,
+                includeRejected: true,
+                limit: 150
+            }),
+            panelThemes: {
+                service: communitySuite.getPanelTheme(guild.id, 'service'),
+                tickets: communitySuite.getPanelTheme(guild.id, 'tickets')
+            },
+            analytics: communitySuite.getCommunityAnalytics(guild.id)
+        },
         recentActions: getDashboardAuditLogs({
             guildId: guild.id,
             limit: 5
@@ -4109,9 +4170,122 @@ async function executeGlobalCriticalAction(ctx, request) {
     }
 }
 
+async function publishCommunitySuggestion(ctx, guild, member, suggestion, channelId, language) {
+    if (!suggestion) throw createHttpError(404, 'Suggestion introuvable.');
+    if (suggestion.status === 'published') throw createHttpError(409, 'Cette suggestion est déjà publiée.');
+    const channel = getTextChannel(guild, channelId, language);
+    requireBotChannelPermissions(guild, channel, [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.EmbedLinks
+    ], language);
+    const sent = await channel.send({
+        embeds: [new EmbedBuilder()
+            .setColor(0x35D7E5)
+            .setTitle(`Suggestion retenue | ${suggestion.title}`)
+            .setDescription(suggestion.body)
+            .addFields(
+                { name: 'Soutien de la communauté', value: `${suggestion.score} point(s) · ${suggestion.voteCount} vote(s)`, inline: true },
+                { name: 'Réponse officielle', value: suggestion.staffResponse || 'Cette proposition a été retenue par l’équipe Sentinel.', inline: false }
+            )
+            .setFooter({ text: `Suggestion #${suggestion.id}` })
+            .setTimestamp()]
+    });
+    return communitySuite.markSuggestionPublished(guild.id, suggestion.id, member.id, channel.id, sent.id);
+}
+
 async function runDashboardAction(ctx, guild, member, body, session = null) {
     const action = body.action;
     const language = ctx.helpers.getGuildLanguage(guild.id);
+
+    if (action === 'community-create-recruitment-form') {
+        requireCommandAccess(ctx, member);
+        if (body.targetRoleId && !guild.roles.cache.has(body.targetRoleId)) {
+            throw createHttpError(400, 'Le rôle remis après acceptation est introuvable.');
+        }
+        if (body.reviewChannelId && !guild.channels.cache.has(body.reviewChannelId)) {
+            throw createHttpError(400, 'Le salon de suivi est introuvable.');
+        }
+        const form = communitySuite.createRecruitmentForm(guild.id, member.id, body);
+        return `Formulaire de recrutement #${form.id} ouvert : ${form.title}.`;
+    }
+
+    if (action === 'community-toggle-recruitment-form') {
+        requireCommandAccess(ctx, member);
+        const open = ['true', '1', 'yes', 'on'].includes(String(body.open || '').toLowerCase());
+        const form = communitySuite.setRecruitmentFormOpen(guild.id, Number(body.formId), open);
+        return `Recrutement « ${form.title} » ${form.open ? 'ouvert' : 'fermé'}.`;
+    }
+
+    if (action === 'community-review-application') {
+        requireCommandAccess(ctx, member);
+        const application = communitySuite.getRecruitmentApplication(guild.id, Number(body.applicationId));
+        if (!application) throw createHttpError(404, 'Candidature introuvable.');
+        if (['accepted', 'rejected', 'withdrawn'].includes(application.status)) {
+            throw createHttpError(409, 'Cette candidature est déjà clôturée et ne peut plus être modifiée.');
+        }
+        const form = communitySuite.getRecruitmentForm(guild.id, application.formId);
+        if (body.status === 'accepted' && form?.targetRoleId) {
+            const target = await guild.members.fetch(application.userId).catch(() => null);
+            const role = guild.roles.cache.get(form.targetRoleId);
+            if (!target || !role) throw createHttpError(400, 'Le membre ou le rôle prévu pour cette candidature est introuvable.');
+            try {
+                await target.roles.add(role, `Candidature Sentinel #${application.id} acceptée par ${member.id}`);
+            } catch (error) {
+                throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageRoles, language, target);
+            }
+        }
+        const reviewed = communitySuite.reviewRecruitmentApplication(guild.id, application.id, member.id, body);
+        const targetUser = await ctx.client.users.fetch(reviewed.userId).catch(() => null);
+        if (targetUser) {
+            await targetUser.send({
+                embeds: [new EmbedBuilder()
+                    .setColor(reviewed.status === 'accepted' ? 0x3DDC97 : (reviewed.status === 'rejected' ? 0xFF5F6D : 0x35D7E5))
+                    .setTitle(`Sentinel | ${reviewed.formTitle || 'Recrutement'}`)
+                    .setDescription(reviewed.staffNote || `Ta candidature passe à l’étape : ${reviewed.status}.`)
+                    .addFields({ name: 'État', value: reviewed.status, inline: true })
+                    .setTimestamp()]
+            }).catch(() => null);
+        }
+        return `Candidature #${reviewed.id} mise à jour : ${reviewed.status}.`;
+    }
+
+    if (action === 'community-create-shift') {
+        requireCommandAccess(ctx, member);
+        if (body.roleId && !guild.roles.cache.has(body.roleId)) throw createHttpError(400, 'Rôle du planning introuvable.');
+        if (body.channelId && !guild.channels.cache.has(body.channelId)) throw createHttpError(400, 'Salon du planning introuvable.');
+        const shift = communitySuite.createTeamShift(guild.id, member.id, body);
+        return `Créneau #${shift.id} créé pour le ${new Date(shift.startsAt).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}.`;
+    }
+
+    if (action === 'community-cancel-shift') {
+        requireCommandAccess(ctx, member);
+        const shift = communitySuite.cancelTeamShift(guild.id, Number(body.shiftId));
+        return `Créneau #${shift.id} annulé.`;
+    }
+
+    if (action === 'community-review-suggestion') {
+        requireCommandAccess(ctx, member);
+        const suggestion = communitySuite.reviewSuggestion(guild.id, Number(body.suggestionId), member.id, body);
+        if (suggestion.status === 'accepted' && body.publishChannelId) {
+            await publishCommunitySuggestion(ctx, guild, member, suggestion, body.publishChannelId, language);
+            return `Suggestion #${suggestion.id} acceptée et publiée automatiquement.`;
+        }
+        return `Suggestion #${suggestion.id} mise à jour : ${suggestion.status}.`;
+    }
+
+    if (action === 'community-publish-suggestion') {
+        requireCommandAccess(ctx, member);
+        const suggestion = communitySuite.getSuggestion(guild.id, Number(body.suggestionId), member.id);
+        const published = await publishCommunitySuggestion(ctx, guild, member, suggestion, body.channelId, language);
+        return `Suggestion #${published.id} publiée sur Discord.`;
+    }
+
+    if (action === 'community-save-panel-theme') {
+        requireCommandAccess(ctx, member);
+        const theme = communitySuite.savePanelTheme(guild.id, String(body.panelType || ''), member.id, body);
+        return `Style du panneau ${theme.panelType === 'service' ? 'de service' : 'des tickets'} enregistré. Republie le panneau pour l’appliquer.`;
+    }
 
     if (action === 'set-language') {
         requireCommandAccess(ctx, member);
@@ -4868,6 +5042,47 @@ async function handleApi(req, res, ctx, url) {
             throw createHttpError(400, error.message || 'La contestation n’a pas pu être enregistrée.');
         }
         json(res, 200, { ok: true, appeal });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/me/community') {
+        const body = await parseBody(req);
+        const guildId = String(body.guildId || '');
+        const guild = ctx.client.guilds.cache.get(guildId);
+        const member = guild
+            ? guild.members.cache.get(session.user.id) || await guild.members.fetch(session.user.id).catch(() => null)
+            : null;
+        if (!guild || !member) {
+            throw createHttpError(403, 'Tu dois être membre de ce serveur pour utiliser cet espace.');
+        }
+        const action = String(body.action || '');
+        let result;
+        try {
+            if (action === 'apply') {
+                result = communitySuite.submitRecruitmentApplication(guild.id, Number(body.formId), member.id, body.answers);
+            } else if (action === 'withdraw-application') {
+                result = communitySuite.withdrawRecruitmentApplication(guild.id, Number(body.applicationId), member.id);
+            } else if (action === 'shift-response') {
+                result = communitySuite.setShiftResponse(guild.id, Number(body.shiftId), member.id, String(body.status || ''), body.note);
+            } else if (action === 'declare-absence') {
+                result = communitySuite.declareAbsence(guild.id, member.id, body);
+            } else if (action === 'cancel-absence') {
+                result = communitySuite.cancelAbsence(guild.id, Number(body.absenceId), member.id);
+            } else if (action === 'create-suggestion') {
+                result = communitySuite.createSuggestion(guild.id, member.id, body);
+            } else if (action === 'vote-suggestion') {
+                result = communitySuite.voteSuggestion(guild.id, Number(body.suggestionId), member.id, Number(body.value));
+            } else {
+                throw new Error('Action communautaire inconnue.');
+            }
+        } catch (error) {
+            throw createHttpError(400, error.message || 'Cette action n’a pas pu être enregistrée.');
+        }
+        json(res, 200, {
+            ok: true,
+            result,
+            portal: await ctx.helpers.getMemberPortal(session.user.id)
+        });
         return;
     }
 

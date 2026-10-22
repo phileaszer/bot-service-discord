@@ -58,6 +58,7 @@ const privacyCenter = require('./privacy-center');
 const repairCenter = require('./repair-center');
 const runtimeGuard = require('./runtime-guard');
 const serviceCheckins = require('./service-checkins');
+const communitySuite = require('./community-suite');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
 const { createPerformanceMonitor } = require('./performance-monitor');
 const {
@@ -214,7 +215,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-10-04-standard-v1';
+const SENTINEL_BUILD = 'community-suite-2026-10-22-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -9199,7 +9200,7 @@ async function updateSentinelStatusPanel(guild) {
         const botMessage = botMessages?.find(isSentinelStatusPanelMessage);
 
         if (mixedServicePanel) {
-            await mixedServicePanel.edit(buildServicePanelPayload(language)).catch(() => {});
+            await mixedServicePanel.edit(buildServicePanelPayload(language, guild.id)).catch(() => {});
         }
 
         if (botMessage) {
@@ -10798,39 +10799,47 @@ async function handleHelpMenuInteraction(interaction) {
     });
 }
 
-function buildServicePanelComponents(language = 'fr') {
+function buildServicePanelComponents(language = 'fr', guildId = null) {
+    const labels = guildId ? communitySuite.getPanelTheme(guildId, 'service')?.buttonLabels || {} : {};
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('start_service')
-                .setLabel(t(language, 'startServiceLabel'))
+                .setLabel(labels.start || t(language, 'startServiceLabel'))
                 .setStyle(ButtonStyle.Success)
                 .setEmoji('🟢'),
             new ButtonBuilder()
                 .setCustomId('end_service')
-                .setLabel(t(language, 'endServiceLabel'))
+                .setLabel(labels.end || t(language, 'endServiceLabel'))
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🔴'),
             new ButtonBuilder()
                 .setCustomId('show_my_hours')
-                .setLabel(t(language, 'showMyHoursLabel'))
+                .setLabel(labels.hours || t(language, 'showMyHoursLabel'))
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('📊'),
             new ButtonBuilder()
                 .setCustomId('show_active_services')
-                .setLabel(t(language, 'activeLabel'))
+                .setLabel(labels.active || t(language, 'activeLabel'))
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('👥')
         )
     ];
 }
 
-function buildServicePanelEmbed(language = 'fr') {
+function panelColor(theme, fallback) {
+    return /^#[0-9a-f]{6}$/i.test(String(theme?.color || ''))
+        ? Number.parseInt(String(theme.color).slice(1), 16)
+        : fallback;
+}
+
+function buildServicePanelEmbed(language = 'fr', guildId = null) {
     const brandIcon = client.user?.displayAvatarURL();
+    const theme = guildId ? communitySuite.getPanelTheme(guildId, 'service') : null;
     const embed = new EmbedBuilder()
-        .setColor(SENTINEL_COLORS.service)
-        .setTitle(t(language, 'servicePanelTitle'))
-        .setDescription(t(language, 'servicePanelDescription'))
+        .setColor(panelColor(theme, SENTINEL_COLORS.service))
+        .setTitle(theme?.title || t(language, 'servicePanelTitle'))
+        .setDescription(theme?.description || t(language, 'servicePanelDescription'))
         .addFields(
             {
                 name: t(language, 'servicePanelStartName'),
@@ -10848,7 +10857,7 @@ function buildServicePanelEmbed(language = 'fr') {
                 inline: false
             }
         )
-        .setFooter({ text: t(language, 'servicePanelFooter') })
+        .setFooter({ text: theme?.footer || t(language, 'servicePanelFooter') })
         .setTimestamp();
 
     if (brandIcon) {
@@ -10858,6 +10867,8 @@ function buildServicePanelEmbed(language = 'fr') {
         });
         embed.setThumbnail(brandIcon);
     }
+
+    if (theme?.imageUrl) embed.setImage(theme.imageUrl);
 
     return embed;
 }
@@ -11584,10 +11595,11 @@ async function syncDossierTypePermissions(guild, dossierType, extraRoleIds = [])
 }
 
 function buildDossierPanelEmbed(guild, requester, language = 'fr') {
-    return createSentinelEmbed({
-        color: SENTINEL_COLORS.primary,
-        title: t(language, 'dossierPanelTitle'),
-        description: t(language, 'dossierPanelDescription'),
+    const theme = communitySuite.getPanelTheme(guild.id, 'tickets');
+    const embed = createSentinelEmbed({
+        color: panelColor(theme, SENTINEL_COLORS.primary),
+        title: theme?.title || t(language, 'dossierPanelTitle'),
+        description: theme?.description || t(language, 'dossierPanelDescription'),
         requester,
         thumbnail: guild.iconURL(),
         language
@@ -11609,37 +11621,41 @@ function buildDossierPanelEmbed(guild, requester, language = 'fr') {
                 inline: false
             }
         )
-        .setFooter({ text: t(language, 'dossierPanelFooter') });
+        .setFooter({ text: theme?.footer || t(language, 'dossierPanelFooter') });
+
+    if (theme?.imageUrl) embed.setImage(theme.imageUrl);
+    return embed;
 }
 
-function buildDossierPanelComponents(language = 'fr') {
+function buildDossierPanelComponents(language = 'fr', guildId = null) {
+    const labels = guildId ? communitySuite.getPanelTheme(guildId, 'tickets')?.buttonLabels || {} : {};
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:support')
-                .setLabel(t(language, 'dossierSupportLabel'))
+                .setLabel(labels.support || t(language, 'dossierSupportLabel'))
                 .setStyle(ButtonStyle.Primary)
                 .setEmoji('📁'),
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:report')
-                .setLabel(t(language, 'dossierReportLabel'))
+                .setLabel(labels.report || t(language, 'dossierReportLabel'))
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🚨'),
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:recruitment')
-                .setLabel(t(language, 'dossierRecruitmentLabel'))
+                .setLabel(labels.recruitment || t(language, 'dossierRecruitmentLabel'))
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('🧭')
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:partnership')
-                .setLabel(t(language, 'dossierPartnershipLabel'))
+                .setLabel(labels.partnership || t(language, 'dossierPartnershipLabel'))
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('🤝'),
             new ButtonBuilder()
                 .setCustomId('sentinel_dossier:other')
-                .setLabel(t(language, 'dossierOtherLabel'))
+                .setLabel(labels.other || t(language, 'dossierOtherLabel'))
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('🧾')
         )
@@ -11649,7 +11665,7 @@ function buildDossierPanelComponents(language = 'fr') {
 function buildDossierPanelPayload(guild, requester, language = 'fr') {
     return {
         embeds: [buildDossierPanelEmbed(guild, requester, language)],
-        components: buildDossierPanelComponents(language)
+        components: buildDossierPanelComponents(language, guild.id)
     };
 }
 
@@ -11698,16 +11714,16 @@ async function publishOrUpdateDossierPanel(channel, requester, language = 'fr', 
     return message;
 }
 
-function buildServicePanelPayload(language = 'fr') {
+function buildServicePanelPayload(language = 'fr', guildId = null) {
     return {
         content: '',
-        embeds: [buildServicePanelEmbed(language)],
-        components: buildServicePanelComponents(language)
+        embeds: [buildServicePanelEmbed(language, guildId)],
+        components: buildServicePanelComponents(language, guildId)
     };
 }
 
 async function publishOrUpdateServicePanel(channel, language = 'fr') {
-    const payload = buildServicePanelPayload(language);
+    const payload = buildServicePanelPayload(language, channel.guild.id);
     const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
     const existingPanel = messages?.find(message => isServicePanelMessage(message));
 
@@ -15441,6 +15457,19 @@ function getMemberPortalGuild(guild, userId) {
     const preferences = operations.getUserNotificationPreferences(guild.id, userId);
     const activeWarningCount = operations.getActiveWarningCount(guild.id, userId, warningSettings.windowDays);
     const memberAppeals = appeals.getMemberAppeals(userId, guild.id, 50);
+    const recruitmentForms = communitySuite.listRecruitmentForms(guild.id, { includeClosed: false });
+    const recruitmentApplications = communitySuite.listRecruitmentApplications(guild.id, { userId, limit: 50 });
+    const planningShifts = communitySuite.listTeamShifts(guild.id, { includePast: false, limit: 50 })
+        .map(shift => ({
+            ...shift,
+            ownResponse: shift.responses.find(response => response.userId === userId) || null
+        }));
+    const memberAbsences = communitySuite.listAbsences(guild.id, { userId, limit: 50 });
+    const suggestions = communitySuite.listSuggestions(guild.id, {
+        viewerUserId: userId,
+        includeRejected: false,
+        limit: 75
+    });
     const memberNotifications = [];
 
     if (preferences.serviceEnabled && service?.startTime) {
@@ -15503,6 +15532,17 @@ function getMemberPortalGuild(guild, userId) {
         },
         appeals: memberAppeals,
         dossiers,
+        community: {
+            recruitment: {
+                forms: recruitmentForms,
+                applications: recruitmentApplications
+            },
+            planning: {
+                shifts: planningShifts,
+                absences: memberAbsences
+            },
+            suggestions
+        },
         notifications: memberNotifications,
         preferences,
         digestHistory: operations.getMemberDigestHistory(guild.id, userId, 10)
@@ -15632,6 +15672,50 @@ async function processMemberNotificationDigests() {
     }
 }
 
+async function processTeamShiftReminders() {
+    for (const shift of communitySuite.getDueShiftReminders(50)) {
+        const guild = client.guilds.cache.get(shift.guildId);
+        if (!guild) {
+            communitySuite.markShiftReminderSent(shift.guildId, shift.id);
+            continue;
+        }
+        const fullShift = communitySuite.getTeamShift(shift.guildId, shift.id);
+        const attendees = fullShift?.responses?.filter(response => response.status === 'available') || [];
+        const dateLabel = new Date(shift.startsAt).toLocaleString('fr-FR', {
+            dateStyle: 'full',
+            timeStyle: 'short',
+            timeZone: 'Europe/Paris'
+        });
+        for (const response of attendees) {
+            const user = await client.users.fetch(response.userId).catch(() => null);
+            if (!user) continue;
+            await user.send({
+                embeds: [new EmbedBuilder()
+                    .setColor(SENTINEL_COLORS.accent)
+                    .setTitle(`Sentinel | Rappel de service`)
+                    .setDescription(`Le créneau **${shift.title}** commence ${dateLabel}.`)
+                    .addFields({ name: 'Serveur', value: guild.name, inline: true })
+                    .setFooter({ text: 'Ta disponibilité est enregistrée dans ton espace Sentinel.' })
+                    .setTimestamp()],
+                allowedMentions: { parse: [] }
+            }).catch(() => null);
+        }
+        const channel = shift.channelId ? guild.channels.cache.get(shift.channelId) : null;
+        if (channel?.isTextBased?.()) {
+            await channel.send({
+                content: shift.roleId ? `<@&${shift.roleId}>` : '',
+                embeds: [new EmbedBuilder()
+                    .setColor(SENTINEL_COLORS.accent)
+                    .setTitle(`Rappel | ${shift.title}`)
+                    .setDescription(`${dateLabel}\n${attendees.length} membre(s) ont confirmé leur présence.`)
+                    .setTimestamp()],
+                allowedMentions: shift.roleId ? { roles: [shift.roleId] } : { parse: [] }
+            }).catch(error => reportRuntimeIncident('planning-reminder-channel', error, { guildId: guild.id, shiftId: shift.id }));
+        }
+        communitySuite.markShiftReminderSent(shift.guildId, shift.id);
+    }
+}
+
 async function processScheduledOperations() {
     if (operationsCycleRunning) return;
     operationsCycleRunning = true;
@@ -15690,6 +15774,7 @@ async function processScheduledOperations() {
         }
 
         await processMemberNotificationDigests();
+        await processTeamShiftReminders();
     } finally {
         operationsCycleRunning = false;
     }

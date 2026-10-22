@@ -119,3 +119,29 @@ test('critical dashboard routes keep founder and CSRF checks server-side', () =>
     assert.match(source, /\/api\/creator\/maintenance[\s\S]{0,180}requireFounderAccess/);
     assert.match(source, /\/api\/creator\/official-update[\s\S]{0,180}requireFounderAccess/);
 });
+
+test('community workspace and installable mobile experience are wired end to end', () => {
+    const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const backend = read('dashboard.js');
+    const bot = read('index.js');
+    const dashboard = read('site/dashboard.js');
+    const member = read('site/membre.js');
+    const theme = read('site/theme.js');
+    const manifest = JSON.parse(read('site/manifest.webmanifest'));
+    const serviceWorker = read('site/sw.js');
+    assert.match(backend, /require\('\.\/community-suite'\)/);
+    assert.match(backend, /\/api\/me\/community/);
+    assert.match(backend, /community-create-recruitment-form[\s\S]{0,120}requireCommandAccess\(ctx, member\)/);
+    assert.match(bot, /processTeamShiftReminders/);
+    assert.match(bot, /getPanelTheme\(guild\.id, 'tickets'\)/);
+    for (const label of ['Recrutements', 'Planning', 'Suggestions', 'Panneaux', 'Statistiques', 'Aide']) {
+        assert.match(dashboard, new RegExp(label));
+    }
+    assert.match(member, /data-community-action="apply"/);
+    assert.match(member, /data-community-click="shift-response"/);
+    assert.match(member, /data-community-action="create-suggestion"/);
+    assert.match(theme, /beforeinstallprompt/);
+    assert.match(theme, /serviceWorker\.register/);
+    assert.equal(manifest.display, 'standalone');
+    assert.match(serviceWorker, /notificationclick/);
+});
