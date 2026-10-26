@@ -34,13 +34,13 @@ test('public status exposes incident identifiers without private incident messag
 test('obsolete reset copy is removed and the new modules are syntax-checked', () => {
     assert.doesNotMatch(read('site/securite.html'), /remise à zéro générale est indisponible/i);
     const packageSource = read('package.json');
-    for (const file of ['runtime-guard.js', 'appeals.js', 'privacy-center.js', 'repair-center.js']) {
+    for (const file of ['runtime-guard.js', 'appeals.js', 'privacy-center.js', 'repair-center.js', 'creator-overview.js']) {
         assert.match(packageSource, new RegExp(`node --check ${file.replace('.', '\\.')}`));
     }
 });
 
 test('founder console exposes staging readiness without Discord identifiers', () => {
-    const backend = read('dashboard.js');
+    const backend = `${read('dashboard.js')}\n${read('creator-overview.js')}`;
     const frontend = read('site/dashboard.js');
     assert.match(backend, /stagingValidation: ctx\.helpers\.getStagingValidationStatus/);
     assert.match(frontend, /function founderStagingPanel\(overview\)/);

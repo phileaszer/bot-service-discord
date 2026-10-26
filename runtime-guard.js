@@ -59,7 +59,9 @@ function mapIncident(row) {
         occurrenceCount: Number(row.occurrence_count || 0),
         firstSeenAt: row.first_seen_at,
         lastSeenAt: row.last_seen_at,
-        resolvedAt: row.resolved_at || null
+        resolvedAt: row.resolved_at || null,
+        resolvedByUserId: row.resolved_by_user_id || null,
+        resolutionNote: row.resolution_note || null
     };
 }
 
@@ -153,13 +155,24 @@ function listIncidents({ status = 'open', limit = 50 } = {}) {
     return rows.map(mapIncident);
 }
 
-function resolveIncident(incidentId) {
+function getIncident(incidentId) {
+    return mapIncident(db.prepare('SELECT * FROM runtime_incidents WHERE incident_id = ?').get(String(incidentId || '')));
+}
+
+function resolveIncident(incidentId, options = {}) {
     const timestamp = nowIso();
     return db.prepare(`
         UPDATE runtime_incidents
-        SET status = 'resolved', resolved_at = ?, last_seen_at = ?
+        SET status = 'resolved', resolved_at = ?, last_seen_at = ?,
+            resolved_by_user_id = ?, resolution_note = ?
         WHERE incident_id = ? AND status = 'open'
-    `).run(timestamp, timestamp, String(incidentId || '')).changes > 0;
+    `).run(
+        timestamp,
+        timestamp,
+        cleanText(options.actorUserId, 30) || null,
+        cleanText(options.note, 1000) || null,
+        String(incidentId || '')
+    ).changes > 0;
 }
 
 const acquireLeaseTransaction = db.transaction((jobKey, ttlMs) => {
@@ -276,6 +289,7 @@ module.exports = {
     claimJobExecution,
     completeJobExecution,
     finishJobLease,
+    getIncident,
     getJobHealth,
     listIncidents,
     reportIncident,

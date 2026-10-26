@@ -140,6 +140,18 @@ Le contrôle Discord de préproduction peut être rendu bloquant avant la mise e
 
 Le workflow `Sentinel uptime` contrôle `/api/status` toutes les quinze minutes. Ajoute le secret GitHub `SENTINEL_ALERT_WEBHOOK_URL` pour recevoir aussi une alerte Discord lorsque le site ou le bot ne répond plus.
 
+## Exploitation et maintenance
+
+Le démarrage de production utilise uniquement `npm run startup:check` avant de lancer Sentinel. Ce contrôle rapide vérifie les fichiers indispensables, la configuration et l'intégrité immédiate de SQLite. La suite complète reste disponible avec `npm run validate` et doit être exécutée avant chaque déploiement.
+
+- `npm run audit:performance` contrôle le poids compressé des ressources web, la taille des principaux fichiers et un budget d'écriture SQLite.
+- `npm run audit:database-portability` recense les dépendances propres à SQLite avant une future migration PostgreSQL.
+- `npm run audit:staging` vérifie que le serveur privé de préproduction et ses comptes de test sont correctement configurés.
+- La Régie fondatrice permet de suspendre séparément les automatisations sensibles sans arrêter le bot entier. Chaque changement exige une session récente, un code à usage unique et laisse une trace d'audit.
+- Les incidents possèdent un identifiant stable, leur contexte technique, leur fréquence et une résolution signée avec une note fondatrice.
+
+La procédure complète de validation Discord se trouve dans `docs/staging-discord.md`. Le plan de migration de la base se trouve dans `docs/postgresql-migration.md`. SQLite reste le moteur actif tant que Sentinel utilise une seule instance d'écriture ; aucun basculement automatique vers PostgreSQL n'est effectué.
+
 ## Licence
 
 Sentinel est un projet propriétaire. Le dépôt est consultable publiquement pour présenter le bot et suivre son évolution, mais le code ne peut pas être copié, redistribué ou réutilisé sans autorisation préalable.

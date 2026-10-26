@@ -709,7 +709,17 @@ CREATE TABLE IF NOT EXISTS runtime_incidents (
     occurrence_count INTEGER NOT NULL DEFAULT 1,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
-    resolved_at TEXT
+    resolved_at TEXT,
+    resolved_by_user_id TEXT,
+    resolution_note TEXT
+);
+
+CREATE TABLE IF NOT EXISTS system_feature_flags (
+    feature_key TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    reason TEXT,
+    updated_by_user_id TEXT,
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS guild_repair_reports (
@@ -938,6 +948,9 @@ ON scheduled_job_executions (job_type, status, claimed_at);
 
 CREATE INDEX IF NOT EXISTS idx_runtime_incidents_status_seen
 ON runtime_incidents (status, last_seen_at);
+
+CREATE INDEX IF NOT EXISTS idx_system_feature_flags_enabled
+ON system_feature_flags (enabled, updated_at);
 
 CREATE INDEX IF NOT EXISTS idx_privacy_requests_status_created
 ON data_privacy_requests (status, created_at);
@@ -1276,6 +1289,17 @@ db.prepare(`
 
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
     .map(column => column.name);
+
+const runtimeIncidentColumns = db.prepare('PRAGMA table_info(runtime_incidents)').all()
+    .map(column => column.name);
+
+if (!runtimeIncidentColumns.includes('resolved_by_user_id')) {
+    db.prepare('ALTER TABLE runtime_incidents ADD COLUMN resolved_by_user_id TEXT').run();
+}
+
+if (!runtimeIncidentColumns.includes('resolution_note')) {
+    db.prepare('ALTER TABLE runtime_incidents ADD COLUMN resolution_note TEXT').run();
+}
 
 const scheduledAnnouncementColumns = db.prepare('PRAGMA table_info(scheduled_announcements)').all()
     .map(column => column.name);

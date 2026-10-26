@@ -13,6 +13,8 @@ function siteCapabilities(role) {
         isFounder: normalized === SITE_ACCESS_ROLES.FOUNDER,
         isStaff: normalized === SITE_ACCESS_ROLES.STAFF,
         canViewSitePanel: normalized === SITE_ACCESS_ROLES.FOUNDER || normalized === SITE_ACCESS_ROLES.STAFF,
+        canManageSystem: normalized === SITE_ACCESS_ROLES.FOUNDER,
+        // Legacy alias kept for older dashboard sessions during the transition.
         canManagePremium: normalized === SITE_ACCESS_ROLES.FOUNDER,
         canManageSiteStaff: normalized === SITE_ACCESS_ROLES.FOUNDER,
         staffAssignment: normalized === SITE_ACCESS_ROLES.STAFF,

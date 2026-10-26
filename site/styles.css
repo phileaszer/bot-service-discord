@@ -4344,6 +4344,73 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+.feature-flag-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.feature-flag-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) minmax(130px, 0.45fr) minmax(220px, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  background: rgba(18, 23, 31, 0.42);
+}
+
+.feature-flag-row.is-disabled {
+  border-color: rgba(255, 103, 125, 0.55);
+}
+
+.feature-flag-row > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.feature-flag-row small,
+.incident-row small {
+  display: block;
+}
+
+.incident-row {
+  align-items: start;
+}
+
+.incident-resolution {
+  display: grid;
+  gap: 0.5rem;
+  min-width: min(100%, 260px);
+}
+
+.incident-context {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.incident-context span {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.35fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.incident-context code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .feature-flag-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .feature-flag-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .founder-guild-filter {
   display: grid;
   max-width: 520px;

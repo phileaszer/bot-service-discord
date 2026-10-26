@@ -14,6 +14,8 @@ function createPerformanceMonitor(options = {}) {
     const getGatewayPing = typeof options.getGatewayPing === 'function'
         ? options.getGatewayPing
         : () => 0;
+    const dashboardSlowMs = Math.max(Number(options.dashboardSlowMs || process.env.DASHBOARD_SLOW_REQUEST_MS) || 1000, 100);
+    const discordSlowMs = Math.max(Number(options.discordSlowMs || process.env.DISCORD_SLOW_INTERACTION_MS) || 1500, 100);
     const state = {
         startedAt: new Date().toISOString(),
         dashboard: {
@@ -43,7 +45,7 @@ function createPerformanceMonitor(options = {}) {
         bucket.recentDurations.push(duration);
         bucket.recentDurations = bucket.recentDurations.slice(-500);
 
-        if (duration >= 1000) {
+        if (duration >= dashboardSlowMs) {
             bucket.slowRequestCount += 1;
             bucket.recentSlowRequests.unshift({
                 method: String(method || 'GET').slice(0, 12),
@@ -65,7 +67,7 @@ function createPerformanceMonitor(options = {}) {
         bucket.recentDurations.push(duration);
         bucket.recentDurations = bucket.recentDurations.slice(-500);
 
-        if (duration >= 1500) {
+        if (duration >= discordSlowMs) {
             bucket.slowInteractionCount += 1;
             bucket.recentSlowInteractions.unshift({
                 type: interaction?.isChatInputCommand?.() ? 'command' : (interaction?.isButton?.() ? 'button' : 'interaction'),
@@ -91,6 +93,8 @@ function createPerformanceMonitor(options = {}) {
                 p50Ms: percentile(dashboard.recentDurations, 0.5),
                 p95Ms: percentile(dashboard.recentDurations, 0.95),
                 maxDurationMs: Math.round(dashboard.maxDurationMs * 10) / 10,
+                budgetMs: dashboardSlowMs,
+                withinBudget: percentile(dashboard.recentDurations, 0.95) < dashboardSlowMs,
                 recentSlowRequests: dashboard.recentSlowRequests.map(item => ({ ...item }))
             },
             discord: {
@@ -101,6 +105,8 @@ function createPerformanceMonitor(options = {}) {
                 p95Ms: percentile(discord.recentDurations, 0.95),
                 maxDurationMs: Math.round(discord.maxDurationMs * 10) / 10,
                 gatewayPingMs: Math.max(Number(getGatewayPing()) || 0, 0),
+                budgetMs: discordSlowMs,
+                withinBudget: percentile(discord.recentDurations, 0.95) < discordSlowMs,
                 recentSlowInteractions: discord.recentSlowInteractions.map(item => ({ ...item }))
             }
         };

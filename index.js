@@ -59,6 +59,9 @@ const repairCenter = require('./repair-center');
 const runtimeGuard = require('./runtime-guard');
 const serviceCheckins = require('./service-checkins');
 const communitySuite = require('./community-suite');
+const featureFlags = require('./feature-flags');
+const { createOperationsRunner } = require('./operations-runner');
+const { databasePortabilityReport } = require('./database/portability');
 const { runDiscordStagingValidation, stagingValidationConfig } = require('./staging-validation');
 const { createPerformanceMonitor } = require('./performance-monitor');
 const {
@@ -89,12 +92,12 @@ const FREE_DOSSIER_PANEL_LIMIT = 1;
 const FREE_OPEN_DOSSIER_LIMIT = 5;
 const FREE_DOSSIER_HISTORY_LIMIT = 10;
 const FREE_AUTOMOD_WORD_LIMIT = 25;
-const PREMIUM_AUTOMOD_WORD_LIMIT = 200;
+const ADVANCED_AUTOMOD_WORD_LIMIT = 200;
 const AUTOMOD_FREE_ACTIONS = new Set(['log', 'delete', 'warn', 'timeout']);
-const AUTOMOD_PREMIUM_ACTIONS = new Set([...AUTOMOD_FREE_ACTIONS, 'kick', 'ban']);
+const AUTOMOD_ADVANCED_ACTIONS = new Set([...AUTOMOD_FREE_ACTIONS, 'kick', 'ban']);
 const AUTOMOD_DEFAULT_TIMEOUT_SECONDS = 10 * 60;
 const AUTOMOD_FREE_MAX_TIMEOUT_SECONDS = 60 * 60;
-const AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS = 28 * 24 * 60 * 60;
+const AUTOMOD_ADVANCED_MAX_TIMEOUT_SECONDS = 28 * 24 * 60 * 60;
 const AUTOMOD_MODERATOR_USER_ID = 'sentinel-automod';
 const AUTOMOD_SPAM_BUCKET_MAX = 5000;
 const AUTOMOD_RAID_BUCKET_MAX = 1000;
@@ -215,7 +218,7 @@ const SENTINEL_COLORS = {
     advanced: 0xb76cff,
     service: 0xb21f4b
 };
-const SENTINEL_BUILD = 'community-suite-2026-10-22-v1';
+const SENTINEL_BUILD = 'system-hardening-2026-10-26-v1';
 const CUSTOM_EMBED_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/png', 'png'],
@@ -293,6 +296,7 @@ let lastDatabaseMaintenance = null;
 let lastDatabaseBackupFailure = null;
 let mediaScanPromise = null;
 const performanceMonitor = createPerformanceMonitor({ getGatewayPing: () => client.ws.ping });
+let scheduledOperationsRunner = null;
 const automodSpamBuckets = new Map();
 const automodRaidBuckets = new Map();
 let lastSlashCommandCheck = {
@@ -2182,7 +2186,7 @@ function normalizeDiscordIdList(value, limit = 50) {
 
 function normalizeAutomodAction(value, premium = false, fallback = 'delete') {
     const normalized = String(value || '').trim().toLowerCase();
-    const allowedActions = premium ? AUTOMOD_PREMIUM_ACTIONS : AUTOMOD_FREE_ACTIONS;
+    const allowedActions = premium ? AUTOMOD_ADVANCED_ACTIONS : AUTOMOD_FREE_ACTIONS;
 
     if (allowedActions.has(normalized)) {
         return normalized;
@@ -2294,7 +2298,7 @@ function withAutomodPremiumFlag(settings) {
         ...settings,
         premiumActive: hasActivePremiumUnlockForAutomod(settings.guildId, settings),
         freeWordLimit: FREE_AUTOMOD_WORD_LIMIT,
-        premiumWordLimit: PREMIUM_AUTOMOD_WORD_LIMIT
+        premiumWordLimit: ADVANCED_AUTOMOD_WORD_LIMIT
     };
 }
 
@@ -2323,7 +2327,7 @@ function updateAutomodSettings(guildId, patch = {}, options = {}) {
             patch.spamTimeoutSeconds,
             current.spamTimeoutSeconds,
             30,
-            premium ? AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS : AUTOMOD_FREE_MAX_TIMEOUT_SECONDS
+            premium ? AUTOMOD_ADVANCED_MAX_TIMEOUT_SECONDS : AUTOMOD_FREE_MAX_TIMEOUT_SECONDS
         );
     }
 
@@ -5935,7 +5939,7 @@ function automodSeverity(action) {
 
 function automodTimeoutDurationMs(settings, premiumActive = false) {
     const maxSeconds = premiumActive
-        ? AUTOMOD_PREMIUM_MAX_TIMEOUT_SECONDS
+        ? AUTOMOD_ADVANCED_MAX_TIMEOUT_SECONDS
         : AUTOMOD_FREE_MAX_TIMEOUT_SECONDS;
     const seconds = Math.min(Math.max(Number(settings.spamTimeoutSeconds) || AUTOMOD_DEFAULT_TIMEOUT_SECONDS, 30), maxSeconds);
 
@@ -12781,6 +12785,11 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
 }
 
 async function archiveAndPurgeChannelMessages(channel, options = {}) {
+    if (!featureFlags.isFeatureEnabled('message-purge')) {
+        const error = new Error(featureFlags.disabledMessage('message-purge', options.language || 'fr'));
+        error.featureDisabled = true;
+        throw error;
+    }
     const operationKey = `${channel.guild.id}:${channel.id}`;
 
     if (activeMessagePurges.has(operationKey)) {
@@ -15618,166 +15627,9 @@ function runSentinelGuildValidation(guild, trigger = 'manual') {
     return operations.addValidationRun(guild.id, trigger, checks);
 }
 
-let operationsCycleRunning = false;
-
-async function processMemberNotificationDigests() {
-    for (const item of operations.getDueMemberDigests(50)) {
-        const executionKey = `${item.guildId}:${item.userId}`;
-        const scheduledFor = item.nextDigestAt || item.periodKey || 'digest';
-        if (!runtimeGuard.claimJobExecution('member-digest', executionKey, scheduledFor)) continue;
-        const guild = client.guilds.cache.get(item.guildId);
-        if (!guild) {
-            operations.completeMemberDigest(item, { error: 'Serveur Discord introuvable.' });
-            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { error: 'Serveur Discord introuvable.' });
-            continue;
-        }
-        const member = guild.members.cache.get(item.userId)
-            || await guild.members.fetch(item.userId).catch(() => null);
-        if (!member) {
-            operations.completeMemberDigest(item, { error: 'Le membre ne fait plus partie du serveur.' });
-            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { error: 'Le membre ne fait plus partie du serveur.' });
-            continue;
-        }
-        try {
-            const portal = getMemberPortalGuild(guild, item.userId);
-            const notifications = portal.notifications.slice(0, 10);
-            if (!notifications.length) {
-                operations.completeMemberDigest(item, { skipped: true, itemCount: 0 });
-                runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { skipped: true, itemCount: 0 });
-                continue;
-            }
-            const recipient = member.user || await client.users.fetch(item.userId);
-            const message = await recipient.send({
-                embeds: [new EmbedBuilder()
-                    .setColor(SENTINEL_COLORS.accent)
-                    .setTitle(`Sentinel | Registre personnel de ${guild.name}`)
-                    .setDescription(item.digestFrequency === 'weekly'
-                        ? 'Voici ton relevé hebdomadaire demandé depuis ton espace personnel.'
-                        : 'Voici ton relevé quotidien demandé depuis ton espace personnel.')
-                    .addFields(notifications.map(notification => ({
-                        name: String(notification.title || 'Information').slice(0, 256),
-                        value: String(notification.detail || 'Consulte ton espace Sentinel.').slice(0, 1024)
-                    })))
-                    .setFooter({ text: 'Tu peux modifier ou arrêter ces messages depuis ton espace personnel.' })
-                    .setTimestamp()],
-                allowedMentions: { parse: [] }
-            });
-            operations.completeMemberDigest(item, { messageId: message.id, itemCount: notifications.length });
-            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { messageId: message.id, itemCount: notifications.length });
-        } catch (error) {
-            operations.completeMemberDigest(item, { error: error.message || error });
-            runtimeGuard.completeJobExecution('member-digest', executionKey, scheduledFor, { error });
-            reportRuntimeIncident('member-digest', error, { guildId: item.guildId, userId: item.userId });
-        }
-    }
-}
-
-async function processTeamShiftReminders() {
-    for (const shift of communitySuite.getDueShiftReminders(50)) {
-        const guild = client.guilds.cache.get(shift.guildId);
-        if (!guild) {
-            communitySuite.markShiftReminderSent(shift.guildId, shift.id);
-            continue;
-        }
-        const fullShift = communitySuite.getTeamShift(shift.guildId, shift.id);
-        const attendees = fullShift?.responses?.filter(response => response.status === 'available') || [];
-        const dateLabel = new Date(shift.startsAt).toLocaleString('fr-FR', {
-            dateStyle: 'full',
-            timeStyle: 'short',
-            timeZone: 'Europe/Paris'
-        });
-        for (const response of attendees) {
-            const user = await client.users.fetch(response.userId).catch(() => null);
-            if (!user) continue;
-            await user.send({
-                embeds: [new EmbedBuilder()
-                    .setColor(SENTINEL_COLORS.accent)
-                    .setTitle(`Sentinel | Rappel de service`)
-                    .setDescription(`Le créneau **${shift.title}** commence ${dateLabel}.`)
-                    .addFields({ name: 'Serveur', value: guild.name, inline: true })
-                    .setFooter({ text: 'Ta disponibilité est enregistrée dans ton espace Sentinel.' })
-                    .setTimestamp()],
-                allowedMentions: { parse: [] }
-            }).catch(() => null);
-        }
-        const channel = shift.channelId ? guild.channels.cache.get(shift.channelId) : null;
-        if (channel?.isTextBased?.()) {
-            await channel.send({
-                content: shift.roleId ? `<@&${shift.roleId}>` : '',
-                embeds: [new EmbedBuilder()
-                    .setColor(SENTINEL_COLORS.accent)
-                    .setTitle(`Rappel | ${shift.title}`)
-                    .setDescription(`${dateLabel}\n${attendees.length} membre(s) ont confirmé leur présence.`)
-                    .setTimestamp()],
-                allowedMentions: shift.roleId ? { roles: [shift.roleId] } : { parse: [] }
-            }).catch(error => reportRuntimeIncident('planning-reminder-channel', error, { guildId: guild.id, shiftId: shift.id }));
-        }
-        communitySuite.markShiftReminderSent(shift.guildId, shift.id);
-    }
-}
-
 async function processScheduledOperations() {
-    if (operationsCycleRunning) return;
-    operationsCycleRunning = true;
-    try {
-        for (const item of operations.getDueScheduledAnnouncements()) {
-            const executionKey = String(item.id);
-            const scheduledFor = item.nextRunAt || 'once';
-            if (!runtimeGuard.claimJobExecution('scheduled-announcement', executionKey, scheduledFor)) continue;
-            const guild = client.guilds.cache.get(item.guildId);
-            const channel = guild?.channels?.cache?.get(item.channelId);
-            if (!guild || !channel?.isTextBased?.()) {
-                operations.completeScheduledAnnouncement(item, { error: 'Serveur ou salon Discord introuvable.' });
-                runtimeGuard.completeJobExecution('scheduled-announcement', executionKey, scheduledFor, { error: 'Serveur ou salon Discord introuvable.' });
-                continue;
-            }
-            try {
-                const message = await channel.send({
-                    embeds: [buildCustomAnnouncementEmbed(item, getGuildLanguage(guild.id))],
-                    allowedMentions: { parse: [] }
-                });
-                addCustomEmbedRecord(guild.id, channel.id, message.id, item.createdByUserId, item);
-                operations.completeScheduledAnnouncement(item, { messageId: message.id });
-                runtimeGuard.completeJobExecution('scheduled-announcement', executionKey, scheduledFor, { messageId: message.id });
-            } catch (error) {
-                operations.completeScheduledAnnouncement(item, { error: error.message || error });
-                runtimeGuard.completeJobExecution('scheduled-announcement', executionKey, scheduledFor, { error });
-                reportRuntimeIncident('scheduled-announcement', error, { guildId: item.guildId, announcementId: item.id });
-            }
-        }
-
-        for (const item of operations.getDueReportSchedules()) {
-            const executionKey = String(item.id);
-            const scheduledFor = item.nextRunAt || 'once';
-            if (!runtimeGuard.claimJobExecution('scheduled-report', executionKey, scheduledFor)) continue;
-            const guild = client.guilds.cache.get(item.guildId);
-            const channel = guild?.channels?.cache?.get(item.channelId);
-            if (!guild || !channel?.isTextBased?.()) {
-                operations.completeReportSchedule(item, { error: 'Serveur ou salon Discord introuvable.' });
-                runtimeGuard.completeJobExecution('scheduled-report', executionKey, scheduledFor, { error: 'Serveur ou salon Discord introuvable.' });
-                continue;
-            }
-            try {
-                const report = createGuildReport(guild, item.reportKind, item.format);
-                const message = await channel.send({
-                    content: `Rapport Sentinel automatique : **${report.title}**`,
-                    files: [new AttachmentBuilder(report.buffer, { name: report.fileName })],
-                    allowedMentions: { parse: [] }
-                });
-                operations.completeReportSchedule(item, { messageId: message.id });
-                runtimeGuard.completeJobExecution('scheduled-report', executionKey, scheduledFor, { messageId: message.id });
-            } catch (error) {
-                operations.completeReportSchedule(item, { error: error.message || error });
-                runtimeGuard.completeJobExecution('scheduled-report', executionKey, scheduledFor, { error });
-                reportRuntimeIncident('scheduled-report', error, { guildId: item.guildId, scheduleId: item.id });
-            }
-        }
-
-        await processMemberNotificationDigests();
-        await processTeamShiftReminders();
-    } finally {
-        operationsCycleRunning = false;
-    }
+    if (!scheduledOperationsRunner) throw new Error('Le moteur des tâches planifiées Sentinel n’est pas initialisé.');
+    return scheduledOperationsRunner.run();
 }
 
 async function runStartupStagingValidation() {
@@ -15813,6 +15665,13 @@ async function runPersistentBackgroundJob(jobKey, ttlMs, handler) {
     }, handler);
 }
 
+async function runFeatureBackgroundJob(featureKey, jobKey, ttlMs, handler) {
+    if (!featureFlags.isFeatureEnabled(featureKey)) {
+        return { skipped: true, reason: 'feature-disabled', featureKey };
+    }
+    return runPersistentBackgroundJob(jobKey, ttlMs, handler);
+}
+
 async function scanAllGuildConfigurations() {
     let scanned = 0;
     for (const guild of client.guilds.cache.values()) {
@@ -15834,6 +15693,21 @@ client.once(Events.ClientReady, async () => {
         process.exitCode = 1;
         return;
     }
+
+    scheduledOperationsRunner = createOperationsRunner({
+        client,
+        operations,
+        communitySuite,
+        runtimeGuard,
+        featureFlags,
+        colors: SENTINEL_COLORS,
+        getMemberPortalGuild,
+        buildCustomAnnouncementEmbed,
+        addCustomEmbedRecord,
+        getGuildLanguage,
+        createGuildReport,
+        reportIncident: reportRuntimeIncident
+    });
 
     startDatabaseBackupSchedule();
     startDashboardServer({
@@ -15902,6 +15776,10 @@ client.once(Events.ClientReady, async () => {
             getGuildAppeals: appeals.getGuildAppeals,
             getGuildOfficialUpdateHistory,
             getGuildRepairReport: repairCenter.getGuildRepairReport,
+            getFeatureFlags: featureFlags.listFeatureFlags,
+            updateFeatureFlag: featureFlags.updateFeatureFlag,
+            getDatabasePortability: databasePortabilityReport,
+            getIncident: runtimeGuard.getIncident,
             getJobHealth: runtimeGuard.getJobHealth,
             getMemberAppeals: appeals.getMemberAppeals,
             getMemberPortal,
@@ -15939,10 +15817,12 @@ client.once(Events.ClientReady, async () => {
                 const config = stagingValidationConfig();
                 return {
                     configured: config.enabled,
+                    ready: config.ready,
                     required: config.required,
                     realActions: config.realActions,
                     moderationMemberConfigured: Boolean(config.moderationMemberId),
-                    banTargetConfigured: Boolean(config.banTargetId)
+                    banTargetConfigured: Boolean(config.banTargetId),
+                    issues: config.issues
                 };
             },
             getTemporaryBan,
@@ -16062,17 +15942,19 @@ client.once(Events.ClientReady, async () => {
             ].join(' | '));
         }
 
-        await runPersistentBackgroundJob('status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels);
+        await runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels);
         for (const guild of client.guilds.cache.values()) {
             await repairGuildOfficialUpdateReferences(guild, true).catch(error => {
                 console.error(`Réparation des salons d'annonces ${guild.id} :`, error);
             });
         }
-        const officialDistribution = await distributeLatestPublicOfficialUpdate();
-        console.log(`Bulletin public Sentinel vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
+        if (featureFlags.isFeatureEnabled('official-updates')) {
+            const officialDistribution = await distributeLatestPublicOfficialUpdate();
+            console.log(`Bulletin public Sentinel vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
+        }
         await runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans);
         await runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations);
-        await runPersistentBackgroundJob('repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations);
+        await runFeatureBackgroundJob('repair-scan', 'repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations);
         for (const guild of client.guilds.cache.values()) {
             runSentinelGuildValidation(guild, 'startup');
         }
@@ -16081,16 +15963,16 @@ client.once(Events.ClientReady, async () => {
     }
 
     setInterval(() => runPersistentBackgroundJob('slash-command-status', 30 * 60 * 1000, refreshSlashCommandStatus).catch(() => {}), 6 * 60 * 60 * 1000);
-    setInterval(() => runPersistentBackgroundJob('status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels).catch(() => {}), 5 * 60 * 1000);
+    setInterval(() => runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels).catch(() => {}), 5 * 60 * 1000);
     setInterval(() => runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans).catch(() => {}), 60 * 1000);
     setInterval(() => runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations).catch(() => {}), OPERATIONS_INTERVAL_MS);
-    setInterval(() => runPersistentBackgroundJob('official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 5 * 60 * 1000);
-    setInterval(() => runPersistentBackgroundJob('long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), LONG_SERVICE_ALERT_INTERVAL_MS);
-    setInterval(() => runPersistentBackgroundJob('dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), DOSSIER_MAINTENANCE_INTERVAL_MS);
-    setInterval(() => runPersistentBackgroundJob('repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations).catch(() => {}), 24 * 60 * 60 * 1000);
-    setTimeout(() => runPersistentBackgroundJob('long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), 60 * 1000);
-    setTimeout(() => runPersistentBackgroundJob('dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), 30 * 1000);
-    setTimeout(() => runPersistentBackgroundJob('official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 60 * 1000);
+    setInterval(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 5 * 60 * 1000);
+    setInterval(() => runFeatureBackgroundJob('long-service-alerts', 'long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), LONG_SERVICE_ALERT_INTERVAL_MS);
+    setInterval(() => runFeatureBackgroundJob('ticket-maintenance', 'dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), DOSSIER_MAINTENANCE_INTERVAL_MS);
+    setInterval(() => runFeatureBackgroundJob('repair-scan', 'repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations).catch(() => {}), 24 * 60 * 60 * 1000);
+    setTimeout(() => runFeatureBackgroundJob('long-service-alerts', 'long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), 60 * 1000);
+    setTimeout(() => runFeatureBackgroundJob('ticket-maintenance', 'dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), 30 * 1000);
+    setTimeout(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 60 * 1000);
 });
 
 client.on(Events.Error, error => {
@@ -16276,9 +16158,11 @@ client.on(Events.GuildRoleDelete, async role => {
 
 client.on(Events.GuildMemberAdd, async member => {
     await assignConfiguredAutoRole(member);
-    await handleAutomodRaid(member).catch(error => {
-        console.error('Erreur anti-raid auto-mod :', error);
-    });
+    if (featureFlags.isFeatureEnabled('automod')) {
+        await handleAutomodRaid(member).catch(error => {
+            console.error('Erreur anti-raid auto-mod :', error);
+        });
+    }
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -16298,6 +16182,13 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('sentinel_service_checkin:')) {
+        if (!featureFlags.isFeatureEnabled('long-service-alerts')) {
+            await interaction.reply({
+                content: featureFlags.disabledMessage('long-service-alerts', getGuildLanguage(interaction.guildId)),
+                flags: MessageFlags.Ephemeral
+            }).catch(() => {});
+            return;
+        }
         await handleLongServiceCheckinButton(interaction);
         return;
     }
@@ -17585,7 +17476,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     try {
-    if (await handleAutomodMessage(message)) {
+    if (featureFlags.isFeatureEnabled('automod') && await handleAutomodMessage(message)) {
         return;
     }
 

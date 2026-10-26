@@ -9,6 +9,8 @@ const db = require('./database/database');
 const { SITE_ACCESS_ROLES, siteCapabilities } = require('./access-policy');
 const governance = require('./governance');
 const communitySuite = require('./community-suite');
+const { updateFeatureFlagFromRequest } = require('./creator-system-controls');
+const { buildCreatorOverview: buildCreatorOverviewPayload } = require('./creator-overview');
 
 const sessions = new Map();
 const oauthStates = new Map();
@@ -891,6 +893,7 @@ async function getSiteAccess(ctx, userId) {
             isFounder: false,
             isStaff: false,
             canViewSitePanel: false,
+            canManageSystem: false,
             canManagePremium: false,
             canManageSiteStaff: false,
             staffAssignment: true,
@@ -2230,109 +2233,14 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
     return `Accès staff site retiré pour ${userId}.`;
 }
 
-async function buildCreatorPremiumOverview(ctx, session = null) {
-    const siteAccess = await getSiteAccess(ctx, session?.user?.id);
-    const summary = {
-        guildCount: ctx.client.guilds.cache.size
-    };
-
-    const storage = ctx.helpers.getDatabaseBackupStatus
-        ? ctx.helpers.getDatabaseBackupStatus()
-        : null;
-    const protectedStorage = storage && !siteAccess.isFounder && !storage.error
-        ? {
-            ...storage,
-            latestFile: null,
-            lastBackupFailure: storage.lastBackupFailure ? { occurredAt: storage.lastBackupFailure.occurredAt } : null,
-            media: storage.media ? {
-                ...storage.media,
-                objectStorage: storage.media.objectStorage ? {
-                    enabled: storage.media.objectStorage.enabled,
-                    configured: storage.media.objectStorage.configured,
-                    provider: storage.media.objectStorage.provider
-                } : null
-            } : null,
-            backups: (storage.backups || []).map(({ fileName, ...backup }) => ({
-                ...backup,
-                verification: backup.verification ? {
-                    status: backup.verification.status,
-                    checkedAt: backup.verification.checkedAt,
-                    integrityResult: backup.verification.integrityResult,
-                    durationMs: backup.verification.durationMs
-                } : null
-            })),
-            coldArchives: (storage.coldArchives || []).map(({ fileName, ...archive }) => archive),
-            lastMaintenance: storage.lastMaintenance ? {
-                startedAt: storage.lastMaintenance.startedAt,
-                completedAt: storage.lastMaintenance.completedAt,
-                durationMs: storage.lastMaintenance.durationMs,
-                reason: storage.lastMaintenance.reason,
-                cleanup: storage.lastMaintenance.cleanup,
-                archived: storage.lastMaintenance.archived ? {
-                    automodEvents: storage.lastMaintenance.archived.automodEvents,
-                    dashboardAuditLogs: storage.lastMaintenance.archived.dashboardAuditLogs,
-                    bytes: storage.lastMaintenance.archived.bytes
-                } : null,
-                backupVerification: storage.lastMaintenance.backupVerification ? {
-                    status: storage.lastMaintenance.backupVerification.status,
-                    checkedAt: storage.lastMaintenance.backupVerification.checkedAt,
-                    durationMs: storage.lastMaintenance.backupVerification.durationMs
-                } : null,
-                media: storage.lastMaintenance.media ? {
-                    checked: storage.lastMaintenance.media.checked,
-                    orphaned: storage.lastMaintenance.media.orphaned,
-                    synchronized: storage.lastMaintenance.media.synchronized,
-                    purged: storage.lastMaintenance.media.purged
-                } : null
-            } : null,
-            alerts: (storage.alerts || []).map(alert => ({
-                key: alert.key,
-                level: alert.level,
-                message: alert.message,
-                firstSeenAt: alert.firstSeenAt,
-                lastSeenAt: alert.lastSeenAt
-            })),
-            performance: {
-                database: storage.performance?.database ? {
-                    ...storage.performance.database,
-                    recentSlowQueries: []
-                } : null,
-                runtime: storage.performance?.runtime ? {
-                    ...storage.performance.runtime,
-                    dashboard: {
-                        ...storage.performance.runtime.dashboard,
-                        recentSlowRequests: []
-                    },
-                    discord: {
-                        ...storage.performance.runtime.discord,
-                        recentSlowInteractions: []
-                    }
-                } : null
-            }
-        }
-        : storage;
-
-    return {
-        generatedAt: new Date().toISOString(),
-        canView: true,
-        access: siteAccess,
-        summary,
-        storage: protectedStorage,
-        founderMfa: siteAccess.isFounder
-            ? governance.getFounderMfaStatus(session?.user?.id)
-            : null,
-        criticalActions: governance.listCriticalActions({ scope: 'global', limit: 50 }),
-        runtimeHealth: {
-            incidents: ctx.helpers.listIncidents?.({ status: 'open', limit: 100 }) || [],
-            jobs: ctx.helpers.getJobHealth?.(50) || []
-        },
-        stagingValidation: ctx.helpers.getStagingValidationStatus?.() || null,
-        privacyRequests: siteAccess.isFounder
-            ? (ctx.helpers.listPrivacyRequests?.({ status: 'pending', limit: 100 }) || [])
-            : [],
-        staff: await getSiteStaffUsers(ctx),
-        guilds: []
-    };
+async function buildCreatorOverview(ctx, session = null) {
+    return buildCreatorOverviewPayload({
+        ctx,
+        session,
+        governance,
+        getSiteAccess,
+        getSiteStaffUsers
+    });
 }
 
 function getDossierStatusLabel(status, language = 'fr') {
@@ -2902,7 +2810,9 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
             ? governance.listCriticalActions({ scope: 'guild', guildId: guild.id, limit: 20 })
             : [],
         creator: {
+            canViewCreatorOverview: siteAccess.canViewSitePanel,
             canViewPremiumOverview: siteAccess.canViewSitePanel,
+            canManageSystem: siteAccess.canManageSystem,
             canManagePremium: siteAccess.canManagePremium,
             canManageSiteStaff: siteAccess.canManageSiteStaff,
             role: siteAccess.role
@@ -4944,7 +4854,9 @@ async function handleApi(req, res, ctx, url) {
             settings: getUserSiteSettings(session.user.id),
             siteAccess,
             creator: {
+                canViewCreatorOverview: siteAccess.canViewSitePanel,
                 canViewPremiumOverview: siteAccess.canViewSitePanel,
+                canManageSystem: siteAccess.canManageSystem,
                 canManagePremium: siteAccess.canManagePremium,
                 canManageSiteStaff: siteAccess.canManageSiteStaff,
                 role: siteAccess.role
@@ -5149,7 +5061,7 @@ async function handleApi(req, res, ctx, url) {
 
         json(res, 200, {
             ok: true,
-            overview: await buildCreatorPremiumOverview(ctx, session)
+            overview: await buildCreatorOverview(ctx, session)
         });
         return;
     }
@@ -5159,7 +5071,11 @@ async function handleApi(req, res, ctx, url) {
         checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
         const body = await parseBody(req);
         const incidentId = String(body.incidentId || '').trim();
-        if (!ctx.helpers.resolveIncident(incidentId)) {
+        const resolutionNote = String(body.resolutionNote || '').trim().slice(0, 1000);
+        if (!ctx.helpers.resolveIncident(incidentId, {
+            actorUserId: session.user.id,
+            note: resolutionNote
+        })) {
             throw createHttpError(404, 'Incident introuvable ou déjà résolu.');
         }
         addSiteAccessAuditLog({
@@ -5172,7 +5088,32 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             message: `Incident ${incidentId} classé comme résolu.`,
-            overview: await buildCreatorPremiumOverview(ctx, session)
+            overview: await buildCreatorOverview(ctx, session)
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/creator/feature-flags') {
+        await requireFounderAccess(session, { recentLogin: true });
+        checkRateLimit(rateLimitKey(req, 'creator', session.user.id), RATE_LIMITS.creator);
+        const body = await parseBody(req);
+        requireFounderMfa(session, body.mfaCode);
+        const change = updateFeatureFlagFromRequest({
+            helpers: ctx.helpers,
+            actorUserId: session.user.id,
+            body
+        });
+        addSiteAccessAuditLog({
+            session,
+            body: { action: 'update-feature-flag', ...change },
+            status: 'success',
+            summary: change.message,
+            kind: 'feature_flag'
+        });
+        json(res, 200, {
+            ok: true,
+            message: change.message,
+            overview: await buildCreatorOverview(ctx, session)
         });
         return;
     }
@@ -5244,7 +5185,7 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             message,
-            overview: await buildCreatorPremiumOverview(ctx, session)
+            overview: await buildCreatorOverview(ctx, session)
         });
         return;
     }
@@ -5283,7 +5224,7 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             message: `Annonce #${request.id} préparée. Une autre personne autorisée doit la valider.`,
-            overview: await buildCreatorPremiumOverview(ctx, session)
+            overview: await buildCreatorOverview(ctx, session)
         });
         return;
     }
@@ -5354,7 +5295,7 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             message,
-            overview: await buildCreatorPremiumOverview(ctx, session)
+            overview: await buildCreatorOverview(ctx, session)
         });
         return;
     }
@@ -5384,7 +5325,7 @@ async function handleApi(req, res, ctx, url) {
         json(res, 200, {
             ok: true,
             message,
-            overview: await buildCreatorPremiumOverview(ctx, session)
+            overview: await buildCreatorOverview(ctx, session)
         });
         return;
     }

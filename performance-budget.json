@@ -1,0 +1,12 @@
+{
+  "assets": {
+    "site/dashboard.js": { "maxBytes": 420000, "maxGzipBytes": 95000 },
+    "site/styles.css": { "maxBytes": 360000, "maxGzipBytes": 65000 },
+    "site/i18n.js": { "maxBytes": 280000, "maxGzipBytes": 78000 },
+    "site/membre.js": { "maxBytes": 95000, "maxGzipBytes": 25000 }
+  },
+  "source": {
+    "index.js": { "maxLines": 18100 },
+    "dashboard.js": { "maxLines": 6100 }
+  }
+}

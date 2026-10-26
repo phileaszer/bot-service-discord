@@ -71,7 +71,7 @@ function createAudit() {
     if (!value || ignored.has(value)) return false;
     if (value.length < 2 || /^[/#.:\d\s%+_-]+$/.test(value)) return false;
     if (/^[!/.]/.test(value) || /^(?:width=device-width.*|index, follow|noindex, nofollow|applications\.commands)$/i.test(value)) return false;
-    if (/^… ms$/.test(value)) return false;
+    if (/^…(?: \/ …)? ms$/.test(value)) return false;
     if (/^(https?:|\/api\/|data:|assets\/|#[0-9a-f]{3,8}$)/i.test(value)) return false;
     if (/[{}\[\]<>=$]|=>|\b(?:function|return|const|let|if)\b/.test(value)) return false;
     if (/^(?:GET|POST|PUT|PATCH|DELETE)\s+\//.test(value)) return false;

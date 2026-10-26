@@ -711,6 +711,35 @@
     'Aucun abonnement ne sera activé automatiquement. Chaque serveur sera prévenu clairement et pourra décider de continuer ou non.': 'No subscription will be activated automatically. Every server will be notified clearly and can decide whether to continue.',
   });
 
+  Object.assign(en, {
+    'Aucune bascule automatique': 'No automatic migration',
+    'Aucune syntaxe spécifique à SQLite détectée.': 'No SQLite-specific syntax detected.',
+    'Contexte technique': 'Technical context',
+    'Contrôle immédiat': 'Immediate control',
+    'Dernière modification : …': 'Last change: …',
+    'Incidents récemment résolus': 'Recently resolved incidents',
+    'Interrupteur Sentinel mis à jour.': 'Sentinel switch updated.',
+    'Interrupteurs d’urgence': 'Emergency switches',
+    'Interrupteurs d’urgence Sentinel': 'Sentinel emergency switches',
+    'La migration ne sera possible qu’après import de préproduction, comparaison des données et plan de retour arrière.': 'Migration will only be possible after a staging import, data comparison, and rollback plan.',
+    'Montée en charge': 'Scaling',
+    'Note de résolution facultative': 'Optional resolution note',
+    'Premier signalement … · dernier …': 'First report … · latest …',
+    'Préparation PostgreSQL': 'PostgreSQL readiness',
+    'Protection complète': 'Full protection',
+    'Budget du site': 'Website budget',
+    'Budget Discord': 'Discord budget',
+    'Dépassé': 'Exceeded',
+    'Respecté': 'Within budget',
+    'Résolu sans note': 'Resolved without a note',
+    'Sentinel reste sur SQLite avec une seule instance. Ce relevé suit les adaptations nécessaires avant une future bascule.': 'Sentinel remains on SQLite while using a single instance. This report tracks the work required before a future migration.',
+    'Suspends uniquement la fonction en difficulté. Le reste de Sentinel continue normalement.': 'Pause only the affected feature. The rest of Sentinel keeps running normally.',
+    'Tout est actif': 'Everything is active',
+    'Visible par les responsables': 'Visible to managers',
+    '… · … · … occurrence(s)': '… · … · … occurrence(s)',
+    '… occurrence(s) · …': '… occurrence(s) · …'
+  });
+
   const placeholderEn = {
     'Choisir': 'Choose',
     'Choisir un role': 'Choose a role',

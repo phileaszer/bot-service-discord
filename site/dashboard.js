@@ -27,8 +27,8 @@ let creatorOverview = null;
 let creatorOverviewLoading = false;
 let founderMfaCode = '';
 let founderMfaSetup = null;
-let canViewPremiumOverview = false;
-let currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
+let canViewCreatorOverview = false;
+let currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManageSystem: false, canManageSiteStaff: false };
 let dashboardHydrating = false;
 let selectedGuildPreview = null;
 let csrfToken = null;
@@ -5480,9 +5480,11 @@ function founderStoragePanel(overview) {
             <div><span>Requêtes SQLite</span><strong>${escapeHtml(databasePerformance.queryCount || 0)}</strong></div>
             <div><span>Requêtes lentes</span><strong>${escapeHtml(databasePerformance.slowQueryCount || 0)}</strong></div>
             <div><span>Erreurs SQLite</span><strong>${escapeHtml(databasePerformance.errorCount || 0)}</strong></div>
-            <div><span>Site, réponse p95</span><strong>${escapeHtml(runtime.dashboard?.p95Ms || 0)} ms</strong></div>
+            <div><span>Site, réponse p95</span><strong>${escapeHtml(runtime.dashboard?.p95Ms || 0)} / ${escapeHtml(runtime.dashboard?.budgetMs || 1000)} ms</strong></div>
+            <div><span>Budget du site</span><strong>${runtime.dashboard?.withinBudget === false ? 'Dépassé' : 'Respecté'}</strong></div>
             <div><span>Erreurs du site</span><strong>${escapeHtml(runtime.dashboard?.errorCount || 0)}</strong></div>
-            <div><span>Discord, réponse p95</span><strong>${escapeHtml(runtime.discord?.p95Ms || 0)} ms</strong></div>
+            <div><span>Discord, réponse p95</span><strong>${escapeHtml(runtime.discord?.p95Ms || 0)} / ${escapeHtml(runtime.discord?.budgetMs || 1500)} ms</strong></div>
+            <div><span>Budget Discord</span><strong>${runtime.discord?.withinBudget === false ? 'Dépassé' : 'Respecté'}</strong></div>
             <div><span>Signal Discord</span><strong>${escapeHtml(runtime.discord?.gatewayPingMs || 0)} ms</strong></div>
           </div>
         </section>
@@ -5567,14 +5569,42 @@ function founderSecurityPanel(overview) {
 function founderRuntimePanel(overview) {
   const health = overview?.runtimeHealth || {};
   const incidents = health.incidents || [];
+  const resolvedIncidents = health.resolvedIncidents || [];
   const jobs = health.jobs || [];
+  const incidentContext = (item) => Object.entries(item.context || {})
+    .map(([key, value]) => `<span><strong>${escapeHtml(key)}</strong><code>${escapeHtml(typeof value === 'object' ? JSON.stringify(value) : value)}</code></span>`)
+    .join('');
   return `
     <section class="founder-storage-panel" aria-label="Surveillance Sentinel">
       <div class="panel-heading row-heading"><div><p class="eyebrow">Surveillance</p><h3>Incidents et tâches automatiques</h3><p class="muted">Chaque erreur technique reçoit un identifiant stable. Les tâches persistantes indiquent leur dernier passage et évitent les doublons entre instances.</p></div>${statusBadge(incidents.length ? `${incidents.length} incident(s)` : 'Aucun incident ouvert', !incidents.length)}</div>
       <div class="maintenance-grid">
-        <section class="maintenance-section"><h4>Incidents ouverts</h4><div class="operation-list">${incidents.length ? incidents.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.incidentId)} · ${escapeHtml(item.source)}</strong><small>${escapeHtml(item.message)} · ${escapeHtml(item.occurrenceCount)} occurrence(s) · ${escapeHtml(formatAuditDate(item.lastSeenAt))}</small></div>${overview?.access?.isFounder ? `<button class="button button-small button-ghost" type="button" data-resolve-incident="${escapeHtml(item.incidentId)}">Classer résolu</button>` : ''}</div>`).join('') : '<p class="muted">Aucun incident technique ouvert.</p>'}</div></section>
+        <section class="maintenance-section"><h4>Incidents ouverts</h4><div class="operation-list">${incidents.length ? incidents.map(item => `<div class="operation-row incident-row"><div><strong>${escapeHtml(item.incidentId)} · ${escapeHtml(item.source)}</strong><small>${escapeHtml(item.severity)} · ${escapeHtml(item.message)} · ${escapeHtml(item.occurrenceCount)} occurrence(s)</small><small>Premier signalement ${escapeHtml(formatAuditDate(item.firstSeenAt))} · dernier ${escapeHtml(formatAuditDate(item.lastSeenAt))}</small>${Object.keys(item.context || {}).length ? `<details><summary>Contexte technique</summary><div class="incident-context">${incidentContext(item)}</div></details>` : ''}</div>${overview?.access?.isFounder ? `<div class="incident-resolution"><input data-incident-resolution-note maxlength="1000" placeholder="Note de résolution facultative"><button class="button button-small button-ghost" type="button" data-resolve-incident="${escapeHtml(item.incidentId)}">Classer résolu</button></div>` : ''}</div>`).join('') : '<p class="muted">Aucun incident technique ouvert.</p>'}</div>${resolvedIncidents.length ? `<details class="maintenance-history"><summary>Incidents récemment résolus</summary><div class="operation-list">${resolvedIncidents.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.incidentId)} · ${escapeHtml(item.source)}</strong><small>${escapeHtml(item.resolutionNote || 'Résolu sans note')} · ${escapeHtml(formatAuditDate(item.resolvedAt))}</small></div></div>`).join('')}</div></details>` : ''}</section>
         <section class="maintenance-section"><h4>Tâches persistantes</h4><div class="operation-list">${jobs.length ? jobs.slice(0, 30).map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.jobKey)}</strong><small>${escapeHtml(item.lastStatus || 'inconnue')} · ${item.lastFinishedAt ? escapeHtml(formatAuditDate(item.lastFinishedAt)) : 'premier passage en cours'}${item.lastError ? ` · ${escapeHtml(item.lastError)}` : ''}</small></div></div>`).join('') : '<p class="muted">Aucune tâche enregistrée.</p>'}</div></section>
       </div>
+    </section>`;
+}
+
+function founderFeatureFlagsPanel(overview) {
+  if (!overview?.access?.isFounder) return '';
+  const flags = overview.featureFlags || [];
+  return `
+    <section class="founder-storage-panel" aria-label="Interrupteurs d’urgence Sentinel">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Contrôle immédiat</p><h3>Interrupteurs d’urgence</h3><p class="muted">Suspends uniquement la fonction en difficulté. Le reste de Sentinel continue normalement.</p></div>${statusBadge(flags.some(item => !item.enabled) ? `${flags.filter(item => !item.enabled).length} suspendue(s)` : 'Tout est actif', flags.every(item => item.enabled))}</div>
+      <div class="feature-flag-grid">
+        ${flags.map(item => `<form class="feature-flag-row ${item.enabled ? 'is-enabled' : 'is-disabled'}" data-feature-flag-form><input type="hidden" name="featureKey" value="${escapeHtml(item.key)}"><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description)}</small>${item.updatedAt ? `<small>Dernière modification : ${escapeHtml(formatAuditDate(item.updatedAt))}</small>` : ''}</div><label><span>État</span><select name="enabled"><option value="true" ${item.enabled ? 'selected' : ''}>Active</option><option value="false" ${!item.enabled ? 'selected' : ''}>Suspendue</option></select></label><label><span>Motif</span><input name="reason" maxlength="500" value="${escapeHtml(item.reason || '')}" placeholder="Visible par les responsables"></label><button class="button button-small ${item.enabled ? 'button-ghost' : ''}" type="submit">Enregistrer</button></form>`).join('')}
+      </div>
+    </section>`;
+}
+
+function founderDatabasePortabilityPanel(overview) {
+  if (!overview?.access?.isFounder || !overview.databasePortability) return '';
+  const report = overview.databasePortability;
+  const topFindings = (report.findings || []).slice(0, 8);
+  return `
+    <section class="founder-storage-panel" aria-label="Préparation PostgreSQL">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Montée en charge</p><h3>Préparation PostgreSQL</h3><p class="muted">Sentinel reste sur SQLite avec une seule instance. Ce relevé suit les adaptations nécessaires avant une future bascule.</p></div>${statusBadge(report.readyForAutomaticSwitch ? 'Prête' : `${report.findingCount} adaptation(s)`, report.readyForAutomaticSwitch)}</div>
+      <div class="maintenance-file-list">${topFindings.map(item => `<div class="maintenance-file-row"><span><strong>${escapeHtml(item.file)} · ${escapeHtml(item.key)}</strong><small>${escapeHtml(item.count)} occurrence(s) · ${escapeHtml(item.detail)}</small></span></div>`).join('') || '<p class="muted">Aucune syntaxe spécifique à SQLite détectée.</p>'}</div>
+      <p class="founder-console-note"><strong>Aucune bascule automatique</strong><span>La migration ne sera possible qu’après import de préproduction, comparaison des données et plan de retour arrière.</span></p>
     </section>`;
 }
 
@@ -5582,12 +5612,12 @@ function founderStagingPanel(overview) {
   if (!overview?.access?.isFounder) return '';
   const staging = overview.stagingValidation || {};
   const identitiesReady = Boolean(staging.moderationMemberConfigured && staging.banTargetConfigured);
-  const ready = Boolean(staging.configured && identitiesReady);
+  const ready = Boolean(staging.ready && staging.required && staging.realActions);
   return `
     <section class="founder-storage-panel" aria-label="Préproduction Discord">
       <div class="panel-heading row-heading">
         <div><p class="eyebrow">Validation avant déploiement</p><h3>Préproduction Discord</h3><p class="muted">Les essais doivent être exécutés sur un serveur privé avec deux comptes dédiés. Aucun identifiant sensible n’est affiché ici.</p></div>
-        ${statusBadge(ready ? 'Prête' : 'Configuration incomplète', ready)}
+        ${statusBadge(ready ? 'Protection complète' : 'Configuration incomplète', ready)}
       </div>
       <div class="dashboard-metrics dashboard-kpis founder-premium-kpis">
         <article class="dashboard-kpi"><span>Serveur privé</span><strong>${staging.configured ? 'Configuré' : 'Manquant'}</strong><small>environnement isolé</small></article>
@@ -5598,6 +5628,7 @@ function founderStagingPanel(overview) {
       ${ready && staging.required && staging.realActions
         ? '<p class="founder-console-note"><strong>Protection complète active</strong><span>Chaque démarrage exige désormais la validation Discord réelle configurée.</span></p>'
         : '<p class="founder-console-note"><strong>Activation volontaire requise</strong><span>Renseigne le serveur privé et les deux comptes dédiés avant d’activer le contrôle bloquant et les sanctions réelles.</span></p>'}
+      ${(staging.issues || []).length ? `<div class="maintenance-alerts">${staging.issues.map(issue => `<p>${escapeHtml(issue)}</p>`).join('')}</div>` : ''}
     </section>`;
 }
 
@@ -5720,7 +5751,7 @@ function founderGuildInventoryPanel() {
   `;
 }
 
-function renderFounderPremiumPanel() {
+function renderFounderPanel() {
   if (!canShowFounderTab()) {
     return '';
   }
@@ -5740,7 +5771,7 @@ function renderFounderPremiumPanel() {
             : 'Vue privée de régie : lecture des accès et suivi global sans commandes fondatrices.'}</p>
         </div>
         <span class="status-badge is-site">${escapeHtml(siteAccessLabel(access))}</span>
-        <button class="button button-small button-ghost" type="button" data-refresh-creator-premium ${creatorOverviewLoading ? 'disabled' : ''}>
+        <button class="button button-small button-ghost" type="button" data-refresh-creator-overview ${creatorOverviewLoading ? 'disabled' : ''}>
           ${creatorOverviewLoading ? 'Lecture...' : 'Relire'}
         </button>
       </div>
@@ -5755,8 +5786,10 @@ function renderFounderPremiumPanel() {
       ${founderSecurityPanel(overview)}
       ${criticalActionsPanel(overview)}
       ${founderOfficialUpdatePanel(overview)}
+      ${founderFeatureFlagsPanel(overview)}
       ${founderRuntimePanel(overview)}
       ${founderStagingPanel(overview)}
+      ${founderDatabasePortabilityPanel(overview)}
       ${founderPrivacyPanel(overview)}
       ${founderStoragePanel(overview)}
       ${creatorStaffManagePanel(overview)}
@@ -6105,8 +6138,9 @@ function applyDashboardSubtabs(root = document) {
 
 function canShowFounderTab(state = currentState) {
   return Boolean(
-    canViewPremiumOverview
+    canViewCreatorOverview
     || currentSiteAccess?.canViewSitePanel
+    || state?.creator?.canViewCreatorOverview
     || state?.creator?.canViewPremiumOverview
     || state?.siteAccess?.canViewSitePanel
     || creatorOverview?.canView
@@ -6115,10 +6149,12 @@ function canShowFounderTab(state = currentState) {
 
 function canManageFounderPanel() {
   return Boolean(
-    currentSiteAccess?.canManagePremium
+    currentSiteAccess?.canManageSystem
     || currentSiteAccess?.canManageSiteStaff
+    || creatorOverview?.access?.canManageSystem
     || creatorOverview?.access?.canManagePremium
     || creatorOverview?.access?.canManageSiteStaff
+    || currentState?.siteAccess?.canManageSystem
     || currentState?.siteAccess?.canManagePremium
     || currentState?.siteAccess?.canManageSiteStaff
   );
@@ -6263,7 +6299,7 @@ function renderDashboard() {
 
       ${tabPanel('community', () => renderCommunityPanel(state, getRoleOptions(), getChannelOptions()))}
 
-      ${canShowFounderTab(state) ? tabPanel('founder', () => renderFounderPremiumPanel()) : ''}
+      ${canShowFounderTab(state) ? tabPanel('founder', () => renderFounderPanel()) : ''}
 
       ${tabPanel('moderation', () => renderModerationPanel(
         state,
@@ -6285,14 +6321,14 @@ async function refreshGuildState() {
   const payload = await api(`/api/guilds/${selectedGuildId}/state`);
   currentState = payload.state;
   currentSiteAccess = currentState.siteAccess || currentSiteAccess;
-  canViewPremiumOverview = Boolean(canViewPremiumOverview || currentState.creator?.canViewPremiumOverview);
+  canViewCreatorOverview = Boolean(canViewCreatorOverview || currentState.creator?.canViewCreatorOverview || currentState.creator?.canViewPremiumOverview);
   dashboardHydrating = false;
   rememberCurrentGuildPreview();
   renderDashboard();
 }
 
-async function loadCreatorPremiumOverview(button = null, { silent = false } = {}) {
-  if (!canViewPremiumOverview) return;
+async function loadCreatorOverview(button = null, { silent = false } = {}) {
+  if (!canViewCreatorOverview) return;
 
   setLoading(button, true);
   creatorOverviewLoading = true;
@@ -6302,16 +6338,16 @@ async function loadCreatorPremiumOverview(button = null, { silent = false } = {}
     const payload = await api('/api/creator/overview');
     creatorOverview = payload.overview || null;
     currentSiteAccess = creatorOverview?.access || currentSiteAccess;
-    canViewPremiumOverview = Boolean(creatorOverview?.canView);
+    canViewCreatorOverview = Boolean(creatorOverview?.canView);
 
     if (!silent) {
       toast('Régie actualisée.');
     }
   } catch (error) {
     if (error.status === 403) {
-      canViewPremiumOverview = false;
+      canViewCreatorOverview = false;
       creatorOverview = null;
-      currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
+      currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManageSystem: false, canManageSiteStaff: false };
     }
 
     if (!silent) {
@@ -6338,7 +6374,7 @@ async function manageCreatorSiteStaffAccess(data, button = null) {
     creatorOverview = payload.overview || creatorOverview;
     founderMfaCode = '';
     currentSiteAccess = creatorOverview?.access || currentSiteAccess;
-    canViewPremiumOverview = Boolean(creatorOverview?.canView);
+    canViewCreatorOverview = Boolean(creatorOverview?.canView);
     renderDashboard();
     toast(payload.message || 'Accès staff site mis à jour.');
   } catch (error) {
@@ -6403,16 +6439,35 @@ async function manageCriticalAction(data, button = null) {
   }
 }
 
-async function resolveRuntimeIncident(incidentId, button = null) {
+async function resolveRuntimeIncident(incidentId, resolutionNote = '', button = null) {
   setLoading(button, true);
   try {
     const payload = await api('/api/creator/incidents', {
       method: 'POST',
-      body: JSON.stringify({ incidentId })
+      body: JSON.stringify({ incidentId, resolutionNote })
     });
     creatorOverview = payload.overview || creatorOverview;
     renderDashboard();
     toast(payload.message || 'Incident classé comme résolu.');
+  } catch (error) {
+    toast(dashboardErrorMessage(error), 'error');
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+async function updateFeatureFlag(data, button = null) {
+  setLoading(button, true);
+  try {
+    data.mfaCode = founderMfaCode;
+    const payload = await api('/api/creator/feature-flags', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    founderMfaCode = '';
+    creatorOverview = payload.overview || creatorOverview;
+    renderDashboard();
+    toast(payload.message || 'Interrupteur Sentinel mis à jour.');
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
@@ -6930,7 +6985,19 @@ function attachDashboardHandlers() {
   });
 
   $$('[data-resolve-incident]').forEach((button) => {
-    button.addEventListener('click', () => resolveRuntimeIncident(button.dataset.resolveIncident, button));
+    button.addEventListener('click', () => {
+      const note = button.closest('.incident-row')?.querySelector('[data-incident-resolution-note]')?.value || '';
+      resolveRuntimeIncident(button.dataset.resolveIncident, note, button);
+    });
+  });
+
+  $$('[data-feature-flag-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      data.enabled = data.enabled === 'true';
+      updateFeatureFlag(data, form.querySelector('button[type="submit"]'));
+    });
   });
 
   $$('[data-guild-critical-action]').forEach((button) => {
@@ -6950,8 +7017,8 @@ function attachDashboardHandlers() {
       activeDashboardTab = nextTab;
       renderDashboard();
 
-      if (nextTab === 'founder' && canViewPremiumOverview && !creatorOverview && !creatorOverviewLoading) {
-        loadCreatorPremiumOverview(null, { silent: true });
+      if (nextTab === 'founder' && canViewCreatorOverview && !creatorOverview && !creatorOverviewLoading) {
+        loadCreatorOverview(null, { silent: true });
       }
     });
   });
@@ -7004,9 +7071,9 @@ function attachDashboardHandlers() {
     updatePanelPreview();
   });
 
-  $$('[data-refresh-creator-premium]').forEach((button) => {
+  $$('[data-refresh-creator-overview]').forEach((button) => {
     button.addEventListener('click', () => {
-      loadCreatorPremiumOverview(button);
+      loadCreatorOverview(button);
     });
   });
 
@@ -7358,7 +7425,7 @@ async function bootstrap() {
     csrfToken = session.csrfToken || csrfToken;
     currentSettings = session.settings || null;
     currentSiteAccess = session.siteAccess || currentSiteAccess;
-    canViewPremiumOverview = Boolean(session.creator?.canViewPremiumOverview);
+    canViewCreatorOverview = Boolean(session.creator?.canViewCreatorOverview || session.creator?.canViewPremiumOverview);
     guilds = guildPayload.guilds || [];
     selectedGuildPreview = guilds.find((guild) => guild.id === selectedGuildId) || selectedGuildPreview;
     renderUser();
@@ -7392,8 +7459,8 @@ async function bootstrap() {
     selectedGuildPreview = null;
     creatorOverview = null;
     creatorOverviewLoading = false;
-    canViewPremiumOverview = false;
-    currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
+    canViewCreatorOverview = false;
+    currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManageSystem: false, canManageSiteStaff: false };
     dashboardHydrating = false;
     renderUser();
     renderGuilds();
@@ -7502,8 +7569,8 @@ $('[data-logout]')?.addEventListener('click', async () => {
   selectedGuildPreview = null;
   creatorOverview = null;
   creatorOverviewLoading = false;
-  canViewPremiumOverview = false;
-  currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManagePremium: false, canManageSiteStaff: false };
+  canViewCreatorOverview = false;
+  currentSiteAccess = { role: 'user', isFounder: false, isStaff: false, canViewSitePanel: false, canManageSystem: false, canManageSiteStaff: false };
   csrfToken = null;
   dashboardHydrating = false;
   dossierFilters = {};

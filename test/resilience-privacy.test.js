@@ -126,8 +126,14 @@ test('runtime incidents receive a stable public identifier and can be resolved',
     assert.equal(second.incidentId, first.incidentId);
     assert.equal(second.occurrenceCount, 2);
     assert.equal(first.context.token, '[redacted]');
-    assert.equal(runtime.resolveIncident(first.incidentId), true);
+    assert.equal(runtime.resolveIncident(first.incidentId, {
+        actorUserId: staffId,
+        note: 'Correction confirmée après contrôle.'
+    }), true);
     assert.equal(runtime.listIncidents({ status: 'open' }).length, 0);
+    const resolved = runtime.getIncident(first.incidentId);
+    assert.equal(resolved.resolvedByUserId, staffId);
+    assert.match(resolved.resolutionNote, /Correction confirmée/);
 });
 
 test('a member can appeal only their own case and staff records one decision', () => {

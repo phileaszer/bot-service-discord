@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { siteCapabilities, SITE_ACCESS_ROLES } = require('../access-policy');
 const { backupObjectKey, uploadVerifiedBackup } = require('../database/offsite-backup');
 const { createPerformanceMonitor } = require('../performance-monitor');
+const { protectStorageOverview } = require('../creator-overview');
 const { stagingValidationConfig } = require('../staging-validation');
 const { auditBotI18n } = require('../tools/audit-bot-i18n');
 const { validateStatusPayload } = require('../tools/check-uptime');
@@ -26,10 +27,35 @@ test('site access matrix isolates founder, staff and member privileges', () => {
     const member = siteCapabilities(SITE_ACCESS_ROLES.USER);
     assert.equal(founder.canManageSiteStaff, true);
     assert.equal(founder.canManagePremium, true);
+    assert.equal(founder.canManageSystem, true);
     assert.equal(staff.canViewSitePanel, true);
     assert.equal(staff.canManageSiteStaff, false);
     assert.equal(staff.canManagePremium, false);
+    assert.equal(staff.canManageSystem, false);
     assert.equal(member.canViewSitePanel, false);
+});
+
+test('creator overview hides private storage paths from staff', () => {
+    const storage = {
+        latestFile: 'private/latest.db.gz',
+        backups: [{ fileName: 'daily.db.gz', sizeBytes: 42 }],
+        coldArchives: [{ fileName: 'audit.jsonl.gz', rowCount: 8 }],
+        performance: {
+            database: { recentSlowQueries: [{ sql: 'SELECT secret' }] },
+            runtime: {
+                dashboard: { recentSlowRequests: [{ route: '/private' }] },
+                discord: { recentSlowInteractions: [{ command: 'secret' }] }
+            }
+        }
+    };
+    const protectedStorage = protectStorageOverview(storage, false);
+    assert.equal(protectedStorage.latestFile, null);
+    assert.equal(Object.hasOwn(protectedStorage.backups[0], 'fileName'), false);
+    assert.equal(Object.hasOwn(protectedStorage.coldArchives[0], 'fileName'), false);
+    assert.deepEqual(protectedStorage.performance.database.recentSlowQueries, []);
+    assert.deepEqual(protectedStorage.performance.runtime.dashboard.recentSlowRequests, []);
+    assert.deepEqual(protectedStorage.performance.runtime.discord.recentSlowInteractions, []);
+    assert.equal(protectStorageOverview(storage, true), storage);
 });
 
 test('staging configuration requires two distinct dedicated accounts for real actions', () => {
@@ -64,6 +90,8 @@ test('performance monitor redacts Discord ids in slow dashboard routes', () => {
     assert.equal(status.dashboard.errorCount, 1);
     assert.equal(status.dashboard.recentSlowRequests[0].route, '/api/guilds/:id/private');
     assert.equal(status.discord.gatewayPingMs, 42);
+    assert.equal(status.dashboard.budgetMs, 1000);
+    assert.equal(status.dashboard.withinBudget, false);
 });
 
 test('only verified backups are copied to private object storage', async () => {
@@ -116,6 +144,7 @@ test('critical dashboard routes keep founder and CSRF checks server-side', () =>
     assert.match(source, /if \(!SAFE_METHODS\.has\(req\.method\)\) \{\s*requireTrustedMutationOrigin\(req\)/);
     assert.match(source, /\/api\/creator\/site-staff[\s\S]{0,160}requireFounderAccess/);
     assert.match(source, /\/api\/creator\/incidents[\s\S]*requireFounderAccess/);
+    assert.match(source, /\/api\/creator\/feature-flags[\s\S]{0,320}requireFounderAccess[\s\S]{0,320}requireFounderMfa/);
     assert.match(source, /\/api\/creator\/maintenance[\s\S]{0,180}requireFounderAccess/);
     assert.match(source, /\/api\/creator\/official-update[\s\S]{0,180}requireFounderAccess/);
 });
@@ -124,6 +153,7 @@ test('community workspace and installable mobile experience are wired end to end
     const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     const backend = read('dashboard.js');
     const bot = read('index.js');
+    const runner = read('operations-runner.js');
     const dashboard = read('site/dashboard.js');
     const member = read('site/membre.js');
     const theme = read('site/theme.js');
@@ -132,7 +162,8 @@ test('community workspace and installable mobile experience are wired end to end
     assert.match(backend, /require\('\.\/community-suite'\)/);
     assert.match(backend, /\/api\/me\/community/);
     assert.match(backend, /community-create-recruitment-form[\s\S]{0,120}requireCommandAccess\(ctx, member\)/);
-    assert.match(bot, /processTeamShiftReminders/);
+    assert.match(bot, /createOperationsRunner/);
+    assert.match(runner, /processTeamShiftReminders/);
     assert.match(bot, /getPanelTheme\(guild\.id, 'tickets'\)/);
     for (const label of ['Recrutements', 'Planning', 'Suggestions', 'Panneaux', 'Statistiques', 'Aide']) {
         assert.match(dashboard, new RegExp(label));
@@ -144,4 +175,29 @@ test('community workspace and installable mobile experience are wired end to end
     assert.match(theme, /serviceWorker\.register/);
     assert.equal(manifest.display, 'standalone');
     assert.match(serviceWorker, /notificationclick/);
+});
+
+test('production startup stays fast while full validation remains in CI', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    const workflow = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'validate.yml'), 'utf8');
+    assert.match(pkg.scripts.start, /startup:check/);
+    assert.doesNotMatch(pkg.scripts.start, /validate/);
+    assert.match(pkg.scripts.validate, /audit:performance/);
+    assert.match(workflow, /npm run validate/);
+});
+
+test('emergency switches guard sensitive and scheduled features', () => {
+    const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const bot = read('index.js');
+    const runner = read('operations-runner.js');
+    const dashboard = read('dashboard.js');
+    const controls = read('creator-system-controls.js');
+    for (const feature of ['automod', 'message-purge', 'long-service-alerts', 'ticket-maintenance', 'official-updates', 'status-panels', 'repair-scan']) {
+        assert.match(bot, new RegExp(feature));
+    }
+    for (const feature of ['scheduled-announcements', 'scheduled-reports', 'member-digests', 'planning-reminders']) {
+        assert.match(runner, new RegExp(feature));
+    }
+    assert.match(dashboard, /\/api\/creator\/feature-flags/);
+    assert.match(controls, /updateFeatureFlag/);
 });
