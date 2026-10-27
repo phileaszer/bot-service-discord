@@ -73,6 +73,14 @@ test('dashboard sections use persistent internal summaries instead of one long p
     assert.match(styles, /:root\[data-theme="western"\] \.dashboard-subnav/);
 });
 
+test('the public stability patch note uses short user-facing sentences', () => {
+    const database = read('database/database.js');
+    assert.match(database, /sentinel-stability-security-2026-10-27/);
+    assert.match(database, /Sentinel redémarre plus vite\./);
+    assert.match(database, /Les accès sensibles sont mieux protégés\./);
+    assert.doesNotMatch(database, /sentinel-stability-security-2026-10-27[\s\S]{0,2400}PostgreSQL/);
+});
+
 test('an overdue dossier receives only one successful reminder', () => {
     const source = read('index.js');
     assert.match(source, /const reminderAlreadySent = Boolean\(dossier\.lastReminderAt\)/);

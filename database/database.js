@@ -1287,6 +1287,75 @@ db.prepare(`
     '2026-10-09T15:28:06.000Z'
 );
 
+db.prepare(`
+    INSERT OR IGNORE INTO official_updates (
+        public_key,
+        title_fr,
+        body_fr,
+        title_en,
+        body_en,
+        source,
+        created_by_user_id,
+        is_public,
+        created_at,
+        published_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
+`).run(
+    'sentinel-stability-security-2026-10-27',
+    'Sentinel | Plus rapide et plus stable',
+    [
+        '## Stabilité',
+        'Sentinel redémarre plus vite.',
+        'Le bot revient rapidement après une maintenance.',
+        'Les tâches automatiques reprennent correctement.',
+        '',
+        '## Performances',
+        'Le dashboard charge plus rapidement.',
+        'Les ralentissements sont mieux détectés.',
+        '',
+        '## Incidents',
+        'Les erreurs importantes reçoivent un numéro.',
+        'Ce numéro facilite l’aide du support.',
+        'Les alertes répétées sont mieux regroupées.',
+        '',
+        '## Sécurité',
+        'Les accès sensibles sont mieux protégés.',
+        'Les actions importantes sont mieux vérifiées.',
+        '',
+        '## Traductions',
+        'Les textes français et anglais ont été corrigés.',
+        'L’affichage est plus cohérent dans les deux langues.'
+    ].join('\n'),
+    'Sentinel | Faster and more stable',
+    [
+        '## Stability',
+        'Sentinel now restarts faster.',
+        'The bot returns quickly after maintenance.',
+        'Automated tasks resume correctly.',
+        '',
+        '## Performance',
+        'The dashboard now loads faster.',
+        'Slowdowns are detected more reliably.',
+        '',
+        '## Incidents',
+        'Important errors now receive an incident number.',
+        'This number makes support requests easier.',
+        'Repeated alerts are grouped more effectively.',
+        '',
+        '## Security',
+        'Sensitive access is better protected.',
+        'Important actions receive stronger checks.',
+        '',
+        '## Translations',
+        'French and English texts have been corrected.',
+        'The interface is more consistent in both languages.'
+    ].join('\n'),
+    'mise à jour officielle',
+    '2026-10-27T00:00:00.000Z',
+    '2026-10-27T00:00:00.000Z'
+);
+
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
     .map(column => column.name);
 
