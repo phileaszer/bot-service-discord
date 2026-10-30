@@ -15691,6 +15691,13 @@ client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
 
+    if (runtimeGuard.resolveIncident('INC-20261030-E038FEF1', {
+        actorUserId: 'sentinel-release',
+        note: 'Correction déployée : accusé de réception avant expiration Discord et suivi détaillé des interactions.'
+    })) {
+        console.log('Incident INC-20261030-E038FEF1 classe comme resolu apres deploiement de la correction.');
+    }
+
     try {
         await runStartupStagingValidation();
     } catch (error) {
