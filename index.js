@@ -57,6 +57,12 @@ const appeals = require('./appeals');
 const privacyCenter = require('./privacy-center');
 const repairCenter = require('./repair-center');
 const runtimeGuard = require('./runtime-guard');
+const {
+    getDiscordErrorContext,
+    getInteractionIncidentContext,
+    installInteractionDeadlineGuard,
+    isUnknownInteractionError
+} = require('./interaction-safety');
 const serviceCheckins = require('./service-checkins');
 const communitySuite = require('./community-suite');
 const featureFlags = require('./feature-flags');
@@ -15976,7 +15982,7 @@ client.once(Events.ClientReady, async () => {
 });
 
 client.on(Events.Error, error => {
-    reportRuntimeIncident('discord-client', error);
+    reportRuntimeIncident('discord-client', error, getDiscordErrorContext(error));
 });
 
 process.on('unhandledRejection', error => {
@@ -16203,6 +16209,17 @@ client.on(Events.InteractionCreate, async interaction => {
 
         return;
     }
+
+    const interactionDeadlineGuard = installInteractionDeadlineGuard(interaction, {
+        onError: error => reportRuntimeIncident(
+            'discord-interaction-deadline',
+            error,
+            getInteractionIncidentContext(interaction, interactionStartedAt, {
+                ...getDiscordErrorContext(error),
+                phase: 'acknowledgement'
+            })
+        )
+    });
 
     let auditStatus = 'success';
     let auditSummary = null;
@@ -17415,8 +17432,28 @@ client.on(Events.InteractionCreate, async interaction => {
     } catch (error) {
         auditStatus = 'failed';
         auditSummary = error.message || 'Erreur Discord Sentinel.';
-        throw error;
+        reportRuntimeIncident(
+            'discord-interaction',
+            error,
+            getInteractionIncidentContext(interaction, interactionStartedAt, getDiscordErrorContext(error))
+        );
+
+        if (!isUnknownInteractionError(error) && interaction.isRepliable()) {
+            const language = getGuildLanguage(interaction.guildId);
+            const content = language === 'en'
+                ? 'Sentinel could not complete this action. Please try again.'
+                : 'Sentinel n’a pas pu terminer cette action. Réessaie dans un instant.';
+
+            if (interaction.deferred) {
+                await interaction.editReply({ content, components: [] }).catch(() => {});
+            } else if (interaction.replied) {
+                await interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+            } else {
+                await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+            }
+        }
     } finally {
+        interactionDeadlineGuard.dispose();
         recordDiscordInteractionAudit(interaction, {
             status: auditStatus,
             summary: auditSummary
