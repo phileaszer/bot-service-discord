@@ -21,7 +21,8 @@ const {
     EmbedBuilder,
     AttachmentBuilder,
     MessageFlags,
-    Events
+    Events,
+    RESTEvents
 } = require('discord.js');
 
 const db = require('./database/database');
@@ -57,6 +58,7 @@ const appeals = require('./appeals');
 const privacyCenter = require('./privacy-center');
 const repairCenter = require('./repair-center');
 const runtimeGuard = require('./runtime-guard');
+const { createRuntimeSupervisor } = require('./runtime-supervisor');
 const {
     getDiscordErrorContext,
     getInteractionIncidentContext,
@@ -314,6 +316,8 @@ let lastSlashCommandCheck = {
 };
 let databaseBackupTimer = null;
 let databaseStorageCyclePromise = null;
+let dashboardHttpServer = null;
+let runtimeSupervisor = null;
 
 const SUPPORTED_LANGUAGES = new Set(['fr', 'en']);
 const MODERATION_ACTION_LABELS = {
@@ -1519,6 +1523,20 @@ function reportRuntimeIncident(source, error, context = {}, severity = 'error') 
     return incident;
 }
 
+runtimeSupervisor = createRuntimeSupervisor({
+    client,
+    database: db,
+    reportIncident: reportRuntimeIncident,
+    resolveIncident: runtimeGuard.resolveIncident,
+    checkDatabase,
+    getStoragePromise: () => databaseStorageCyclePromise,
+    onClearRuntimeTimers: () => {
+        if (databaseBackupTimer) clearInterval(databaseBackupTimer);
+        databaseBackupTimer = null;
+    }
+});
+runtimeSupervisor.installProcessHandlers();
+
 function shouldCreateStartupBackup() {
     const latest = listDatabaseBackups(DATABASE_BACKUP_DIR)[0] || null;
 
@@ -1666,6 +1684,9 @@ async function reportDatabaseStorageCycleFailure(error) {
         occurredAt: new Date().toISOString(),
         message: String(error?.message || error).slice(0, 500)
     };
+    reportRuntimeIncident('database-storage-cycle', error, {
+        occurredAt: lastDatabaseBackupFailure.occurredAt
+    });
 
     try {
         const status = getDatabaseBackupStatus();
@@ -15687,16 +15708,9 @@ async function scanAllGuildConfigurations() {
     return { scanned };
 }
 
-client.once(Events.ClientReady, async () => {
+runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
-
-    if (runtimeGuard.resolveIncident('INC-20261030-E038FEF1', {
-        actorUserId: 'sentinel-release',
-        note: 'Correction déployée : accusé de réception avant expiration Discord et suivi détaillé des interactions.'
-    })) {
-        console.log('Incident INC-20261030-E038FEF1 classe comme resolu apres deploiement de la correction.');
-    }
 
     try {
         await runStartupStagingValidation();
@@ -15723,7 +15737,7 @@ client.once(Events.ClientReady, async () => {
     });
 
     startDatabaseBackupSchedule();
-    startDashboardServer({
+    dashboardHttpServer = startDashboardServer({
         client,
         build: SENTINEL_BUILD,
         invitePermissions: BOT_INVITE_PERMISSIONS,
@@ -15927,6 +15941,8 @@ client.once(Events.ClientReady, async () => {
             verifyManagedDatabaseBackup
         }
     });
+    runtimeSupervisor.attachDashboardServer(dashboardHttpServer);
+    runtimeSupervisor.startHealthWatch();
 
     try {
         await refreshSlashCommandStatus();
@@ -15959,6 +15975,7 @@ client.once(Events.ClientReady, async () => {
         for (const guild of client.guilds.cache.values()) {
             await repairGuildOfficialUpdateReferences(guild, true).catch(error => {
                 console.error(`Réparation des salons d'annonces ${guild.id} :`, error);
+                reportRuntimeIncident('official-update-repair', error, { guildId: guild.id });
             });
         }
         if (featureFlags.isFeatureEnabled('official-updates')) {
@@ -15973,35 +15990,46 @@ client.once(Events.ClientReady, async () => {
         }
     } catch (error) {
         console.error('Erreur synchronisation serveur Sentinel :', error);
+        reportRuntimeIncident('startup-sync', error, { phase: 'discord-synchronization' });
     }
 
-    setInterval(() => runPersistentBackgroundJob('slash-command-status', 30 * 60 * 1000, refreshSlashCommandStatus).catch(() => {}), 6 * 60 * 60 * 1000);
-    setInterval(() => runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels).catch(() => {}), 5 * 60 * 1000);
-    setInterval(() => runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans).catch(() => {}), 60 * 1000);
-    setInterval(() => runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations).catch(() => {}), OPERATIONS_INTERVAL_MS);
-    setInterval(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 5 * 60 * 1000);
-    setInterval(() => runFeatureBackgroundJob('long-service-alerts', 'long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), LONG_SERVICE_ALERT_INTERVAL_MS);
-    setInterval(() => runFeatureBackgroundJob('ticket-maintenance', 'dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), DOSSIER_MAINTENANCE_INTERVAL_MS);
-    setInterval(() => runFeatureBackgroundJob('repair-scan', 'repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations).catch(() => {}), 24 * 60 * 60 * 1000);
-    setTimeout(() => runFeatureBackgroundJob('long-service-alerts', 'long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), 60 * 1000);
-    setTimeout(() => runFeatureBackgroundJob('ticket-maintenance', 'dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), 30 * 1000);
-    setTimeout(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 60 * 1000);
+    runtimeSupervisor.scheduleInterval(() => runPersistentBackgroundJob('slash-command-status', 30 * 60 * 1000, refreshSlashCommandStatus).catch(() => {}), 6 * 60 * 60 * 1000);
+    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels).catch(() => {}), 5 * 60 * 1000);
+    runtimeSupervisor.scheduleInterval(() => runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans).catch(() => {}), 60 * 1000);
+    runtimeSupervisor.scheduleInterval(() => runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations).catch(() => {}), OPERATIONS_INTERVAL_MS);
+    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 5 * 60 * 1000);
+    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('long-service-alerts', 'long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), LONG_SERVICE_ALERT_INTERVAL_MS);
+    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('ticket-maintenance', 'dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), DOSSIER_MAINTENANCE_INTERVAL_MS);
+    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('repair-scan', 'repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations).catch(() => {}), 24 * 60 * 60 * 1000);
+    runtimeSupervisor.scheduleTimeout(() => runFeatureBackgroundJob('long-service-alerts', 'long-service-alerts', LONG_SERVICE_ALERT_INTERVAL_MS - 1000, checkLongServiceAlerts).catch(() => {}), 60 * 1000);
+    runtimeSupervisor.scheduleTimeout(() => runFeatureBackgroundJob('ticket-maintenance', 'dossier-maintenance', DOSSIER_MAINTENANCE_INTERVAL_MS - 1000, processDossierMaintenance).catch(() => {}), 30 * 1000);
+    runtimeSupervisor.scheduleTimeout(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 60 * 1000);
 });
 
 client.on(Events.Error, error => {
     reportRuntimeIncident('discord-client', error, getDiscordErrorContext(error));
 });
 
-process.on('unhandledRejection', error => {
-    reportRuntimeIncident('unhandled-rejection', error);
+client.rest.on(RESTEvents.RateLimited, information => {
+    const retryAfterMs = Number(information?.timeToReset || information?.retryAfter || 0);
+    if (!information?.global && retryAfterMs < 30_000) return;
+    reportRuntimeIncident('discord:rate-limit', new Error('Discord limite fortement les requêtes Sentinel.'), {
+        global: Boolean(information?.global),
+        retryAfterMs: Math.round(retryAfterMs),
+        route: String(information?.route || '').replace(/\d{17,20}/g, ':id').slice(0, 160)
+    }, 'warning');
 });
 
-process.on('uncaughtException', error => {
-    reportRuntimeIncident('uncaught-exception', error, {}, 'critical');
-    setTimeout(() => process.exit(1), 1000).unref();
+runtimeSupervisor.on(Events.ShardError, 'discord:shard', (error, shardId) => ({ shardId }), async error => {
+    throw error;
 });
 
-client.on(Events.GuildCreate, async guild => {
+client.on(Events.Invalidated, () => {
+    reportRuntimeIncident('discord:invalidated', new Error('La session Discord Sentinel a été invalidée.'), {}, 'critical');
+    runtimeSupervisor.shutdown('discord-invalidated', 1);
+});
+
+runtimeSupervisor.on(Events.GuildCreate, 'discord:guild-create', guild => ({ guildId: guild.id }), async guild => {
     getGuildConfig(guild.id);
 
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
@@ -16108,7 +16136,7 @@ async function repairGuildOfficialUpdateReferences(guild, notify = false) {
     return true;
 }
 
-client.on(Events.ChannelDelete, async channel => {
+runtimeSupervisor.on(Events.ChannelDelete, 'discord:channel-delete', channel => ({ guildId: channel.guildId }), async channel => {
     const guild = channel.guild;
 
     if (!guild) {
@@ -16153,7 +16181,7 @@ client.on(Events.ChannelDelete, async channel => {
     await notifyGuildConfigurationRepair(guild, description);
 });
 
-client.on(Events.GuildRoleDelete, async role => {
+runtimeSupervisor.on(Events.GuildRoleDelete, 'discord:role-delete', role => ({ guildId: role.guild.id }), async role => {
     const config = getGuildConfig(role.guild.id);
 
     if (config.updatesPingRoleId !== role.id) {
@@ -16169,7 +16197,7 @@ client.on(Events.GuildRoleDelete, async role => {
     );
 });
 
-client.on(Events.GuildMemberAdd, async member => {
+runtimeSupervisor.on(Events.GuildMemberAdd, 'discord:member-add', member => ({ guildId: member.guild.id }), async member => {
     await assignConfiguredAutoRole(member);
     if (featureFlags.isFeatureEnabled('automod')) {
         await handleAutomodRaid(member).catch(error => {
@@ -16178,7 +16206,7 @@ client.on(Events.GuildMemberAdd, async member => {
     }
 });
 
-client.on(Events.InteractionCreate, async interaction => {
+runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', interaction => getInteractionIncidentContext(interaction), async interaction => {
     const interactionStartedAt = process.hrtime.bigint();
     saveDiscordUserProfile(interaction.user);
 
@@ -17473,7 +17501,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-client.on(Events.MessageDelete, async message => {
+runtimeSupervisor.on(Events.MessageDelete, 'discord:message-delete', message => ({ guildId: message.guild?.id || null }), async message => {
     if (message.guild?.id && message.id && message.author?.id === client.user?.id) {
         deleteCustomEmbedRecord(message.guild.id, message.id);
     }
@@ -17496,7 +17524,7 @@ client.on(Events.MessageDelete, async message => {
     );
 });
 
-client.on(Events.MessageCreate, async message => {
+runtimeSupervisor.on(Events.MessageCreate, 'discord:message-create', message => ({ guildId: message.guild?.id || null }), async message => {
     if (message.author.bot) return;
     saveDiscordUserProfile(message.author);
     if (!message.guild) return;
