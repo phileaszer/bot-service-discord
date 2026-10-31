@@ -1,6 +1,6 @@
 function updateFeatureFlagFromRequest({ helpers, actorUserId, body = {} }) {
     if (typeof helpers?.updateFeatureFlag !== 'function') {
-        throw new Error('Le service des interrupteurs Sentinel est indisponible.');
+        throw new Error('Le service des interrupteurs Noctigarde est indisponible.');
     }
 
     const featureKey = String(body.featureKey || '').trim();

@@ -53,13 +53,13 @@ function createOperationsRunner(dependencies) {
                 const message = await recipient.send({
                     embeds: [new EmbedBuilder()
                         .setColor(colors.accent)
-                        .setTitle(`Sentinel | Registre personnel de ${guild.name}`)
+                        .setTitle(`Noctigarde | Registre personnel de ${guild.name}`)
                         .setDescription(item.digestFrequency === 'weekly'
                             ? 'Voici ton relevé hebdomadaire demandé depuis ton espace personnel.'
                             : 'Voici ton relevé quotidien demandé depuis ton espace personnel.')
                         .addFields(notifications.map(notification => ({
                             name: String(notification.title || 'Information').slice(0, 256),
-                            value: String(notification.detail || 'Consulte ton espace Sentinel.').slice(0, 1024)
+                            value: String(notification.detail || 'Consulte ton espace Noctigarde.').slice(0, 1024)
                         })))
                         .setFooter({ text: 'Tu peux modifier ou arrêter ces messages depuis ton espace personnel.' })
                         .setTimestamp()],
@@ -99,10 +99,10 @@ function createOperationsRunner(dependencies) {
                 await user.send({
                     embeds: [new EmbedBuilder()
                         .setColor(colors.accent)
-                        .setTitle('Sentinel | Rappel de service')
+                        .setTitle('Noctigarde | Rappel de service')
                         .setDescription(`Le créneau **${shift.title}** commence ${dateLabel}.`)
                         .addFields({ name: 'Serveur', value: guild.name, inline: true })
-                        .setFooter({ text: 'Ta disponibilité est enregistrée dans ton espace Sentinel.' })
+                        .setFooter({ text: 'Ta disponibilité est enregistrée dans ton espace Noctigarde.' })
                         .setTimestamp()],
                     allowedMentions: { parse: [] }
                 }).catch(() => null);
@@ -172,7 +172,7 @@ function createOperationsRunner(dependencies) {
             try {
                 const report = createGuildReport(guild, item.reportKind, item.format);
                 const message = await channel.send({
-                    content: `Rapport Sentinel automatique : **${report.title}**`,
+                    content: `Rapport Noctigarde automatique : **${report.title}**`,
                     files: [new AttachmentBuilder(report.buffer, { name: report.fileName })],
                     allowedMentions: { parse: [] }
                 });

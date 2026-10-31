@@ -230,7 +230,7 @@ test('the low-level purge helper cannot bypass the verified archive workflow', a
     );
 });
 
-test('Sentinel verifies an archive before deleting dashboard or Discord messages', () => {
+test('Noctigarde verifies an archive before deleting dashboard or Discord messages', () => {
     const root = path.resolve(__dirname, '..');
     const botSource = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
     const dashboardSource = fs.readFileSync(path.join(root, 'dashboard.js'), 'utf8');
@@ -250,7 +250,7 @@ test('Sentinel verifies an archive before deleting dashboard or Discord messages
 
     assert.ok(archiveCall >= 0 && recreateCall > archiveCall);
     assert.match(workflow, /if \(snapshot\.mode === 'all'\)[\s\S]*recreateChannelForPurge/);
-    assert.match(workflow, /migrateSentinelChannelReferences\(channel\.guild\.id, channel\.id, replacement\.id\)/);
+    assert.match(workflow, /migrateNoctigardeChannelReferences\(channel\.guild\.id, channel\.id, replacement\.id\)/);
     assert.match(workflow, /'channel_recreated'/);
     assert.match(workflow, /error\.archiveFailed = true/);
     assert.match(workflow, /activeMessagePurges\.has\(operationKey\)/);

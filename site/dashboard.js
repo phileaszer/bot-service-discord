@@ -43,11 +43,11 @@ const SERVER_PRESETS = [
     id: 'standard',
     eyebrow: 'Base',
     title: 'Standard',
-    summary: 'Une configuration simple pour démarrer Sentinel sans spécialiser le serveur.',
+    summary: 'Une configuration simple pour démarrer Noctigarde sans spécialiser le serveur.',
     advice: [
       'Choisis un rôle de service uniquement si ton serveur suit des heures.',
       'Garde un salon de logs lisible pour retrouver les actions importantes.',
-      'Ajoute seulement les rôles staff qui doivent vraiment gérer Sentinel.'
+      'Ajoute seulement les rôles staff qui doivent vraiment gérer Noctigarde.'
     ]
   },
   {
@@ -79,7 +79,7 @@ const SERVER_PRESETS = [
     summary: 'Pour un serveur qui veut surtout encadrer les sanctions, les logs et les demandes membres.',
     advice: [
       'Configure les rôles autorisés avant de donner l’accès au dashboard.',
-      'Vérifie que Sentinel peut bannir, timeout, expulser et purger.',
+      'Vérifie que Noctigarde peut bannir, timeout, expulser et purger.',
       'Utilise les tickets pour centraliser les demandes et les signalements.'
     ]
   },
@@ -256,7 +256,7 @@ function storeLastGuildId(guildId) {
     // Some browsers block local storage; the backend setting remains the source of truth.
   }
 
-  window.SentinelAuth?.saveSettings?.({ lastGuildId: guildId });
+  window.NoctigardeAuth?.saveSettings?.({ lastGuildId: guildId });
 }
 
 function forgetLastGuildId(guildId = null) {
@@ -277,7 +277,7 @@ function forgetLastGuildId(guildId = null) {
       ...(currentSettings || {}),
       lastGuildId: null
     };
-    window.SentinelAuth?.saveSettings?.({ lastGuildId: null });
+    window.NoctigardeAuth?.saveSettings?.({ lastGuildId: null });
   }
 }
 
@@ -307,11 +307,11 @@ function renderDashboardLoadingState(preview = selectedGuildPreview) {
 
   return `
     <div class="empty-state dashboard-loading-state">
-      <img src="assets/sentinel-mark.png" alt="">
+      <img src="assets/noctigarde-mark.png" alt="">
       <span class="status-badge is-site">Dernier serveur</span>
       <h2>${escapeHtml(serverName)}</h2>
       <div class="dashboard-loading-server">${serverIcon}<strong>Réouverture du dashboard</strong></div>
-      <p>Sentinel remet ton dernier serveur en place et vérifie tes accès Discord.</p>
+      <p>Noctigarde remet ton dernier serveur en place et vérifie tes accès Discord.</p>
       <div class="dashboard-loading-bar" aria-hidden="true"><span></span></div>
       <button class="button button-small button-ghost" type="button" data-open-guild-drawer aria-controls="guild-drawer" aria-expanded="false">Changer de serveur</button>
     </div>
@@ -337,7 +337,7 @@ async function api(path, options = {}) {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'X-Sentinel-CSRF': csrfToken } : {}),
+        ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'X-Noctigarde-CSRF': csrfToken } : {}),
         ...(optionHeaders || {})
       },
       ...fetchOptions,
@@ -345,7 +345,7 @@ async function api(path, options = {}) {
     });
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('Sentinel met trop de temps à répondre. Réessaie dans quelques instants.');
+      throw new Error('Noctigarde met trop de temps à répondre. Réessaie dans quelques instants.');
     }
 
     throw error;
@@ -388,12 +388,12 @@ function dashboardErrorMessage(input) {
 
     const translated = {
       'Login required.': 'Log in with Discord to use the dashboard.',
-      'Sentinel is not installed on this server.': 'Invite Sentinel to this server before using the dashboard.',
+      'Noctigarde is not installed on this server.': 'Invite Noctigarde to this server before using the dashboard.',
       'You do not have access to this server dashboard.': 'You do not have access to this server dashboard.',
-      'You do not have permission to manage Sentinel on this server.': 'You do not have an allowed role to manage Sentinel on this server.',
-      'You do not have permission to manage Sentinel dossiers on this server.': 'You do not have a responsible role to manage Sentinel tickets on this server.',
+      'You do not have permission to manage Noctigarde on this server.': 'You do not have an allowed role to manage Noctigarde on this server.',
+      'You do not have permission to manage Noctigarde dossiers on this server.': 'You do not have a responsible role to manage Noctigarde tickets on this server.',
       'You do not have permission for this moderation action.': 'Your Discord role cannot perform this moderation action.',
-      'Sentinel does not have the required Discord permission.': 'Sentinel does not have the required Discord permission.',
+      'Noctigarde does not have the required Discord permission.': 'Noctigarde does not have the required Discord permission.',
       'Founder access is required.': 'Only the founder can use this command.',
       'Site staff access is required.': 'This panel is reserved for the founder and site staff.',
       'Invalid site staff action.': 'Invalid site staff action.',
@@ -403,11 +403,11 @@ function dashboardErrorMessage(input) {
       'Discord user not found.': 'This Discord account could not be found.',
       'Bot accounts cannot receive site staff access.': 'A bot account cannot receive site staff access.',
       'Site staff must be a member of this Discord server to perform actions.': 'Join this Discord server before performing an action.',
-      'A Sentinel Discord staff role is required for site staff access.': 'A staff role on the Sentinel Discord server is also required.',
-      'The Sentinel Discord server is unavailable.': 'The Sentinel Discord server is unavailable.',
-      'No Sentinel Discord staff role is configured.': 'No staff role is configured on the Sentinel Discord server.',
-      'The user must join the Sentinel Discord server before receiving site staff access.': 'This person must join the Sentinel Discord server first.',
-      'The user must have a Sentinel Discord staff role before receiving site staff access.': 'Give this person a staff role on the Sentinel Discord server first.',
+      'A Noctigarde Discord staff role is required for site staff access.': 'A staff role on the Noctigarde Discord server is also required.',
+      'The Noctigarde Discord server is unavailable.': 'The Noctigarde Discord server is unavailable.',
+      'No Noctigarde Discord staff role is configured.': 'No staff role is configured on the Noctigarde Discord server.',
+      'The user must join the Noctigarde Discord server before receiving site staff access.': 'This person must join the Noctigarde Discord server first.',
+      'The user must have a Noctigarde Discord staff role before receiving site staff access.': 'Give this person a staff role on the Noctigarde Discord server first.',
       'Invalid Discord user ID.': 'The Discord ID is not valid.',
       'Text channel not found.': 'Text channel not found.',
       'Role not found.': 'Discord role not found.',
@@ -428,25 +428,25 @@ function dashboardErrorMessage(input) {
       'Case not found.': 'No case was found with this ID.',
       'Missing dossier type.': 'Ticket type is missing.',
       'Category not found.': 'Discord category not found.',
-      'Sentinel cannot send this embed in the selected channel.': 'Sentinel cannot send this embed in the selected channel.',
-      'Sentinel cannot use the selected channel.': 'Sentinel cannot use the selected channel.',
+      'Noctigarde cannot send this embed in the selected channel.': 'Noctigarde cannot send this embed in the selected channel.',
+      'Noctigarde cannot use the selected channel.': 'Noctigarde cannot use the selected channel.',
       'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Invalid local image.',
       'Local image too large. Keep the total under 8 MB per embed.': 'Local image too large.',
       'Payload too large.': 'Uploaded image is too large.',
       'Discord refused the action.': 'Discord refused the action.',
       'Discord ban not found.': 'No Discord ban was found for this ID.',
       'No embed field provided.': 'Choose at least one embed field to update.',
-      'Sentinel embed not found.': 'No Sentinel embed was found with this ID in the selected channel.',
+      'Noctigarde embed not found.': 'No Noctigarde embed was found with this ID in the selected channel.',
       'Unknown moderation action.': 'Unknown moderation action.',
       'Automod word is invalid.': 'Enter a forbidden word with at least 2 characters.',
-      'This channel is not a Sentinel dossier.': 'This channel is not a Sentinel ticket.'
+      'This channel is not a Noctigarde dossier.': 'This channel is not a Noctigarde ticket.'
     };
 
     const resolutionByMessage = {
-      'You do not have permission for this moderation action.': 'Check that your Discord role has the right permission, or add your role to Sentinel allowed roles.',
-      'Sentinel does not have the required Discord permission.': firstFix || 'Open the permissions diagnostic and fix the permission shown there.',
+      'You do not have permission for this moderation action.': 'Check that your Discord role has the right permission, or add your role to Noctigarde allowed roles.',
+      'Noctigarde does not have the required Discord permission.': firstFix || 'Open the permissions diagnostic and fix the permission shown there.',
       'Invalid Discord user ID.': 'Copy the full numeric Discord ID, not the username.',
-      'Text channel not found.': 'Choose a text channel that Sentinel can access.',
+      'Text channel not found.': 'Choose a text channel that Noctigarde can access.',
       'Role not found.': 'Choose a Discord role that still exists on the server.',
       'No service role is configured.': 'Open the assistant and choose the role given to members on duty.',
       'This user must be in the server to start duty.': 'Check the Discord ID and make sure this person is still in the server.',
@@ -458,26 +458,26 @@ function dashboardErrorMessage(input) {
       'Invalid payroll week.': 'Open the archive again and retry from its own payment line.',
       'Invalid payroll status.': 'Refresh the dashboard and use the button on the payroll line.',
       'Payroll line not found.': 'Refresh the dashboard and choose an existing current or archived payroll line.',
-      'Invalid message ID.': 'Copy the full numeric ID of the message sent by Sentinel.',
+      'Invalid message ID.': 'Copy the full numeric ID of the message sent by Noctigarde.',
       'Case not found.': 'Check the case ID in the latest cases table.',
       'Category not found.': 'Choose a Discord category that still exists.',
-      'Sentinel cannot send this embed in the selected channel.': firstFix || 'Allow Sentinel to view the channel and send messages there.',
-      'Sentinel cannot use the selected channel.': 'Fix the permissions of the selected channel, then try again.',
+      'Noctigarde cannot send this embed in the selected channel.': firstFix || 'Allow Noctigarde to view the channel and send messages there.',
+      'Noctigarde cannot use the selected channel.': 'Fix the permissions of the selected channel, then try again.',
       'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Choose a valid PNG, JPG, WebP, or GIF image.',
       'Local image too large. Keep the total under 8 MB per embed.': 'Use a lighter image, up to 8 MB total per embed.',
       'Payload too large.': 'Use a lighter image, up to 8 MB total per embed.',
       'Discord refused the action.': 'Open the permissions diagnostic, fix the red item, then try again.',
       'Discord ban not found.': 'Check the full Discord ID and make sure this user is still banned.',
       'No embed field provided.': 'Change at least the title, description, color, image, thumbnail, or footer.',
-      'Sentinel embed not found.': 'Choose the channel where the embed is posted, then paste the message ID. If the Discord message was deleted, its slot will be freed.',
-      'This channel is not a Sentinel dossier.': 'Choose an open Sentinel ticket channel.',
+      'Noctigarde embed not found.': 'Choose the channel where the embed is posted, then paste the message ID. If the Discord message was deleted, its slot will be freed.',
+      'This channel is not a Noctigarde dossier.': 'Choose an open Noctigarde ticket channel.',
       'Founder access is required.': 'Only the founder can change this access.',
       'Site staff access is required.': 'Ask the founder to add your Discord account as site staff.',
       'Invalid site staff action.': 'Choose add or remove.',
       'Founder access cannot be managed as staff.': 'The founder account already has full access.',
       'Recent Discord login is required.': 'Reconnect with Discord, then retry the protected action.',
       'Discord session verification failed.': 'Reconnect with Discord to verify your identity.',
-      'A Sentinel Discord staff role is required for site staff access.': 'Ask the founder to assign you a staff role on the Sentinel Discord server.'
+      'A Noctigarde Discord staff role is required for site staff access.': 'Ask the founder to assign you a staff role on the Noctigarde Discord server.'
     };
     const base = translated[message] || message || 'Action failed.';
     const resolution = payloadFix || resolutionByMessage[message];
@@ -487,12 +487,12 @@ function dashboardErrorMessage(input) {
 
   const translated = {
     'Login required.': 'Connecte-toi avec Discord pour utiliser le dashboard.',
-    'Sentinel is not installed on this server.': 'Sentinel doit être invité comme bot sur ce serveur avant d’utiliser le dashboard.',
+    'Noctigarde is not installed on this server.': 'Noctigarde doit être invité comme bot sur ce serveur avant d’utiliser le dashboard.',
     'You do not have access to this server dashboard.': 'Tu n’as pas accès au dashboard de ce serveur.',
-    'You do not have permission to manage Sentinel on this server.': 'Tu n’as pas de rôle autorisé pour gérer Sentinel sur ce serveur.',
-    'You do not have permission to manage Sentinel dossiers on this server.': 'Tu n’as pas de rôle responsable pour gérer les tickets Sentinel sur ce serveur.',
+    'You do not have permission to manage Noctigarde on this server.': 'Tu n’as pas de rôle autorisé pour gérer Noctigarde sur ce serveur.',
+    'You do not have permission to manage Noctigarde dossiers on this server.': 'Tu n’as pas de rôle responsable pour gérer les tickets Noctigarde sur ce serveur.',
     'You do not have permission for this moderation action.': 'Tu n’as pas la permission Discord nécessaire pour cette sanction.',
-    'Sentinel does not have the required Discord permission.': 'Sentinel n’a pas la permission Discord nécessaire pour faire cette action.',
+    'Noctigarde does not have the required Discord permission.': 'Noctigarde n’a pas la permission Discord nécessaire pour faire cette action.',
     'Founder access is required.': 'Seul le fondateur peut faire cette action.',
     'Site staff access is required.': 'Ce panneau est réservé au fondateur et au staff site.',
     'Invalid site staff action.': 'Action staff site invalide.',
@@ -502,11 +502,11 @@ function dashboardErrorMessage(input) {
     'Discord user not found.': 'Ce compte Discord est introuvable.',
     'Bot accounts cannot receive site staff access.': 'Un compte bot ne peut pas recevoir le grade staff du site.',
     'Site staff must be a member of this Discord server to perform actions.': 'Tu dois être membre de ce serveur Discord pour y effectuer une action.',
-    'A Sentinel Discord staff role is required for site staff access.': 'Un rôle staff sur le Discord Sentinel est aussi obligatoire.',
-    'The Sentinel Discord server is unavailable.': 'Le serveur Discord Sentinel est temporairement indisponible.',
-    'No Sentinel Discord staff role is configured.': 'Aucun rôle staff n’est configuré sur le Discord Sentinel.',
-    'The user must join the Sentinel Discord server before receiving site staff access.': 'Cette personne doit d’abord rejoindre le Discord Sentinel.',
-    'The user must have a Sentinel Discord staff role before receiving site staff access.': 'Donne d’abord un rôle staff à cette personne sur le Discord Sentinel.',
+    'A Noctigarde Discord staff role is required for site staff access.': 'Un rôle staff sur le Discord Noctigarde est aussi obligatoire.',
+    'The Noctigarde Discord server is unavailable.': 'Le serveur Discord Noctigarde est temporairement indisponible.',
+    'No Noctigarde Discord staff role is configured.': 'Aucun rôle staff n’est configuré sur le Discord Noctigarde.',
+    'The user must join the Noctigarde Discord server before receiving site staff access.': 'Cette personne doit d’abord rejoindre le Discord Noctigarde.',
+    'The user must have a Noctigarde Discord staff role before receiving site staff access.': 'Donne d’abord un rôle staff à cette personne sur le Discord Noctigarde.',
     'Invalid Discord user ID.': 'L’ID Discord indiqué n’est pas valide.',
     'Text channel not found.': 'Salon textuel introuvable.',
     'Role not found.': 'Rôle Discord introuvable.',
@@ -527,28 +527,28 @@ function dashboardErrorMessage(input) {
     'Case not found.': 'Aucun cas trouvé avec cet ID.',
     'Missing dossier type.': 'Type de dossier manquant.',
     'Category not found.': 'Catégorie Discord introuvable.',
-    'Sentinel cannot send this embed in the selected channel.': 'Sentinel ne peut pas envoyer cet embed dans le salon choisi.',
-    'Sentinel cannot use the selected channel.': 'Sentinel ne peut pas utiliser le salon choisi.',
+    'Noctigarde cannot send this embed in the selected channel.': 'Noctigarde ne peut pas envoyer cet embed dans le salon choisi.',
+    'Noctigarde cannot use the selected channel.': 'Noctigarde ne peut pas utiliser le salon choisi.',
     'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Image locale invalide.',
     'Local image too large. Keep the total under 8 MB per embed.': 'Image locale trop lourde.',
     'Payload too large.': 'Image envoyée trop lourde.',
     'Discord refused the action.': 'Discord a refusé l’action.',
     'Discord ban not found.': 'Aucun bannissement Discord n’a été trouvé pour cet ID.',
     'No embed field provided.': 'Indique au moins un champ à modifier.',
-    'Sentinel embed not found.': 'Aucun embed Sentinel n’a été trouvé avec cet ID dans le salon choisi.',
+    'Noctigarde embed not found.': 'Aucun embed Noctigarde n’a été trouvé avec cet ID dans le salon choisi.',
     'Unknown moderation action.': 'Action de modération inconnue.',
     'Automod word is invalid.': 'Indique un mot interdit d’au moins 2 caractères.',
-    'This channel is not a Sentinel dossier.': 'Ce salon n’est pas un dossier Sentinel.'
+    'This channel is not a Noctigarde dossier.': 'Ce salon n’est pas un dossier Noctigarde.'
   };
 
   const base = translated[message] || message || 'Action impossible pour le moment.';
   const diagnostics = currentState?.diagnostics;
   const firstFix = diagnostics?.fixes?.[0] || null;
   const resolutionByMessage = {
-    'You do not have permission for this moderation action.': 'Vérifie que ton rôle Discord a la permission nécessaire, ou ajoute ton rôle dans les rôles autorisés Sentinel.',
-    'Sentinel does not have the required Discord permission.': firstFix || 'Ouvre le diagnostic permissions du dashboard et corrige la permission indiquée.',
+    'You do not have permission for this moderation action.': 'Vérifie que ton rôle Discord a la permission nécessaire, ou ajoute ton rôle dans les rôles autorisés Noctigarde.',
+    'Noctigarde does not have the required Discord permission.': firstFix || 'Ouvre le diagnostic permissions du dashboard et corrige la permission indiquée.',
     'Invalid Discord user ID.': 'Copie l’ID Discord numérique complet de la personne, pas son pseudo.',
-    'Text channel not found.': 'Choisis un salon textuel accessible par Sentinel.',
+    'Text channel not found.': 'Choisis un salon textuel accessible par Noctigarde.',
     'Role not found.': 'Choisis un rôle Discord toujours présent sur le serveur.',
     'No service role is configured.': 'Va dans l’assistant et choisis le rôle donné aux membres en service.',
     'This user must be in the server to start duty.': 'Vérifie l’ID Discord et assure-toi que la personne est encore sur ce serveur.',
@@ -560,26 +560,26 @@ function dashboardErrorMessage(input) {
     'Invalid payroll week.': 'Rouvre l’archive puis relance l’action depuis la ligne de salaire.',
     'Invalid payroll status.': 'Actualise le dashboard et utilise le bouton présent sur la ligne de salaire.',
     'Payroll line not found.': 'Actualise le dashboard et choisis une ligne de salaire actuelle ou archivée.',
-    'Invalid message ID.': 'Copie l’ID numérique complet du message envoyé par Sentinel.',
+    'Invalid message ID.': 'Copie l’ID numérique complet du message envoyé par Noctigarde.',
     'Case not found.': 'Vérifie l’ID du cas dans le tableau des derniers dossiers.',
     'Category not found.': 'Choisis une catégorie Discord encore présente sur le serveur.',
-    'Sentinel cannot send this embed in the selected channel.': firstFix || 'Autorise Sentinel à voir le salon et à y envoyer des messages.',
-    'Sentinel cannot use the selected channel.': 'Corrige les permissions du salon choisi, puis réessaie.',
+    'Noctigarde cannot send this embed in the selected channel.': firstFix || 'Autorise Noctigarde à voir le salon et à y envoyer des messages.',
+    'Noctigarde cannot use the selected channel.': 'Corrige les permissions du salon choisi, puis réessaie.',
     'Invalid local image. Use a PNG, JPG, WebP, or GIF image.': 'Choisis une image PNG, JPG, WebP ou GIF valide.',
     'Local image too large. Keep the total under 8 MB per embed.': 'Utilise une image plus légère, 8 Mo maximum au total par embed.',
     'Payload too large.': 'Utilise une image plus légère, 8 Mo maximum au total par embed.',
     'Discord refused the action.': 'Ouvre le diagnostic permissions, corrige le point rouge, puis réessaie.',
     'Discord ban not found.': 'Vérifie l’ID Discord complet et assure-toi que cette personne est encore bannie.',
     'No embed field provided.': 'Modifie au moins le titre, la description, la couleur, l’image, la miniature ou le footer.',
-    'Sentinel embed not found.': 'Choisis le salon où se trouve l’embed, puis colle l’ID du message. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
-    'This channel is not a Sentinel dossier.': 'Choisis un salon de ticket Sentinel ouvert.',
+    'Noctigarde embed not found.': 'Choisis le salon où se trouve l’embed, puis colle l’ID du message. Si le message a été supprimé sur Discord, son emplacement sera libéré.',
+    'This channel is not a Noctigarde dossier.': 'Choisis un salon de ticket Noctigarde ouvert.',
     'Founder access is required.': 'Connecte-toi avec le compte Discord fondateur pour modifier cet accès.',
     'Site staff access is required.': 'Demande au fondateur d’ajouter ton compte Discord au staff site.',
     'Invalid site staff action.': 'Choisis ajouter ou retirer.',
     'Founder access cannot be managed as staff.': 'Le compte fondateur n’a pas besoin d’être ajouté comme staff.',
     'Recent Discord login is required.': 'Reconnecte-toi avec Discord puis relance l’action protégée.',
     'Discord session verification failed.': 'Reconnecte-toi avec Discord pour confirmer ton identité.',
-    'A Sentinel Discord staff role is required for site staff access.': 'Demande au fondateur de t’attribuer un rôle staff sur le Discord Sentinel.'
+    'A Noctigarde Discord staff role is required for site staff access.': 'Demande au fondateur de t’attribuer un rôle staff sur le Discord Noctigarde.'
   };
   const resolution = payloadFix || resolutionByMessage[message];
 
@@ -1035,7 +1035,7 @@ function dashboardConfigStatus(state) {
   const alerts = [];
 
   if (!state.config.language) {
-    alerts.push('Choisis la langue du serveur pour que Sentinel réponde correctement.');
+    alerts.push('Choisis la langue du serveur pour que Noctigarde réponde correctement.');
   }
 
   if (!state.config.serviceRoleId) {
@@ -1051,7 +1051,7 @@ function dashboardConfigStatus(state) {
   }
 
   if (!state.config.updatesChannelId) {
-    alerts.push('Choisis le salon qui recevra les nouveautés officielles de Sentinel.');
+    alerts.push('Choisis le salon qui recevra les nouveautés officielles de Noctigarde.');
   } else if (!updatesChannel) {
     alerts.push('Le salon des nouveautés configuré n’existe plus ou n’est plus textuel.');
   }
@@ -1061,7 +1061,7 @@ function dashboardConfigStatus(state) {
   }
 
   if (allowedRoles.length === 0) {
-    alerts.push('Ajoute au moins un rôle autorisé pour déléguer la gestion de Sentinel au staff.');
+    alerts.push('Ajoute au moins un rôle autorisé pour déléguer la gestion de Noctigarde au staff.');
   }
 
   return {
@@ -1190,45 +1190,45 @@ function dossierPermissionAlert(state) {
 
   return `
     <div class="dashboard-alert is-warning dossier-permission-alert">
-      <strong>Dossiers Sentinel à vérifier</strong>
-      <p>Sentinel n’a pas encore tous les droits nécessaires pour ouvrir les salons privés ou envoyer les comptes rendus.</p>
+      <strong>Dossiers Noctigarde à vérifier</strong>
+      <p>Noctigarde n’a pas encore tous les droits nécessaires pour ouvrir les salons privés ou envoyer les comptes rendus.</p>
       <ul>
         ${missingDossierChecks.map((check) => `<li>${escapeHtml(check.fix || check.label)}</li>`).join('')}
       </ul>
-      <p>Si Sentinel a été invité avant l’ajout des dossiers, réinvite-le avec le lien officiel ou ajoute ces permissions au rôle Sentinel.</p>
-      <a class="button button-small" href="${escapeHtml(getPublicInviteUrl())}" target="_blank" rel="noopener">Réinviter Sentinel</a>
+      <p>Si Noctigarde a été invité avant l’ajout des dossiers, réinvite-le avec le lien officiel ou ajoute ces permissions au rôle Noctigarde.</p>
+      <a class="button button-small" href="${escapeHtml(getPublicInviteUrl())}" target="_blank" rel="noopener">Réinviter Noctigarde</a>
     </div>
   `;
 }
 
 const DIAGNOSTIC_LABELS = {
-  ban: 'Sentinel peut bannir',
-  timeout: 'Sentinel peut timeout',
-  kick: 'Sentinel peut expulser',
-  purge: 'Sentinel peut purger',
-  manageChannels: 'Sentinel peut créer des salons',
-  attachFiles: 'Sentinel peut joindre des fichiers',
-  manageRoles: 'Sentinel peut gérer les rôles',
+  ban: 'Noctigarde peut bannir',
+  timeout: 'Noctigarde peut timeout',
+  kick: 'Noctigarde peut expulser',
+  purge: 'Noctigarde peut purger',
+  manageChannels: 'Noctigarde peut créer des salons',
+  attachFiles: 'Noctigarde peut joindre des fichiers',
+  manageRoles: 'Noctigarde peut gérer les rôles',
   autoRole: 'Rôle automatique d’arrivée',
   serviceRole: 'Rôle de service configuré',
-  roleOrder: 'Rôle Sentinel trop bas',
+  roleOrder: 'Rôle Noctigarde trop bas',
   autoRoleOrder: 'Auto-rôle trop haut',
   logs: 'Salon de logs accessible'
 };
 
 const DIAGNOSTIC_FIXES = {
-  ban: 'Ajoute la permission “Bannir des membres” au rôle Sentinel.',
-  timeout: 'Ajoute la permission “Modérer les membres” au rôle Sentinel.',
-  kick: 'Ajoute la permission “Expulser des membres” au rôle Sentinel.',
-  purge: 'Ajoute la permission “Gérer les messages” au rôle Sentinel.',
-  manageChannels: 'Ajoute la permission “Gérer les salons” au rôle Sentinel.',
-  attachFiles: 'Ajoute la permission “Joindre des fichiers” au rôle Sentinel pour les comptes rendus.',
-  manageRoles: 'Ajoute la permission “Gérer les rôles” au rôle Sentinel.',
+  ban: 'Ajoute la permission “Bannir des membres” au rôle Noctigarde.',
+  timeout: 'Ajoute la permission “Modérer les membres” au rôle Noctigarde.',
+  kick: 'Ajoute la permission “Expulser des membres” au rôle Noctigarde.',
+  purge: 'Ajoute la permission “Gérer les messages” au rôle Noctigarde.',
+  manageChannels: 'Ajoute la permission “Gérer les salons” au rôle Noctigarde.',
+  attachFiles: 'Ajoute la permission “Joindre des fichiers” au rôle Noctigarde pour les comptes rendus.',
+  manageRoles: 'Ajoute la permission “Gérer les rôles” au rôle Noctigarde.',
   autoRole: 'Choisis un rôle automatique valide, ou désactive cette option.',
   serviceRole: 'Choisis le rôle de service dans l’assistant de configuration.',
-  roleOrder: 'Place le rôle Sentinel au-dessus du rôle de service dans les paramètres Discord.',
-  autoRoleOrder: 'Place le rôle Sentinel au-dessus du rôle automatique d’arrivée dans les paramètres Discord.',
-  logs: 'Autorise Sentinel à voir et écrire dans le salon de logs.'
+  roleOrder: 'Place le rôle Noctigarde au-dessus du rôle de service dans les paramètres Discord.',
+  autoRoleOrder: 'Place le rôle Noctigarde au-dessus du rôle automatique d’arrivée dans les paramètres Discord.',
+  logs: 'Autorise Noctigarde à voir et écrire dans le salon de logs.'
 };
 
 const DIAGNOSTIC_TAB_TARGETS = {
@@ -1342,7 +1342,7 @@ function dashboardResolutionItems(state) {
     addResolutionItem(items, {
       area: 'Configuration',
       title: 'Configurer le salon de logs',
-      detail: 'Choisis le salon où Sentinel publie les services, sanctions et actions importantes.',
+      detail: 'Choisis le salon où Noctigarde publie les services, sanctions et actions importantes.',
       tab: 'setup'
     });
   } else if (!status.logChannel) {
@@ -1360,7 +1360,7 @@ function dashboardResolutionItems(state) {
     addResolutionItem(items, {
       area: 'Actualités',
       title: 'Choisir le salon des nouveautés',
-      detail: 'Cette étape permet à ton serveur de recevoir les annonces officielles de Sentinel.',
+      detail: 'Cette étape permet à ton serveur de recevoir les annonces officielles de Noctigarde.',
       tab: 'setup'
     });
   } else if (!status.updatesChannel) {
@@ -1374,7 +1374,7 @@ function dashboardResolutionItems(state) {
   } else if (!state.config.statusUpdatesEnabled) {
     addResolutionItem(items, {
       area: 'Actualités',
-      title: 'Réactiver les nouveautés Sentinel',
+      title: 'Réactiver les nouveautés Noctigarde',
       detail: 'Valide à nouveau le salon dans l’assistant pour recevoir les annonces officielles.',
       tab: 'setup'
     });
@@ -1384,7 +1384,7 @@ function dashboardResolutionItems(state) {
     addResolutionItem(items, {
       area: 'Configuration',
       title: 'Ajouter les rôles autorisés',
-      detail: 'Ajoute les rôles staff qui peuvent gérer Sentinel sans passer par toi.',
+      detail: 'Ajoute les rôles staff qui peuvent gérer Noctigarde sans passer par toi.',
       tab: 'setup'
     });
   }
@@ -1410,7 +1410,7 @@ function resolutionAssistant(state) {
         <div class="resolution-heading">
           <div>
             <strong>Tout est prêt</strong>
-            <p>Sentinel peut gérer ce serveur. Garde le diagnostic sous la main si Discord refuse une action.</p>
+            <p>Noctigarde peut gérer ce serveur. Garde le diagnostic sous la main si Discord refuse une action.</p>
           </div>
           ${statusBadge('Prêt', true)}
         </div>
@@ -1427,7 +1427,7 @@ function resolutionAssistant(state) {
       <div class="resolution-heading">
         <div>
           <strong>À faire maintenant</strong>
-          <p>Voici les points qui peuvent bloquer Sentinel. Chaque bouton t’emmène à l’endroit où les régler.</p>
+          <p>Voici les points qui peuvent bloquer Noctigarde. Chaque bouton t’emmène à l’endroit où les régler.</p>
         </div>
         ${statusBadge('À vérifier', false)}
       </div>
@@ -1540,7 +1540,7 @@ function planScopeCards(state) {
   return `
     <div class="plan-scope-grid">
       <article class="plan-scope-card is-free">
-        <span>Sentinel actif</span>
+        <span>Noctigarde actif</span>
         <strong>Les outils essentiels du serveur</strong>
         <p>Service, salaires, modération, tickets, journaux, dashboard et annonces.</p>
       </article>
@@ -1776,7 +1776,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Assistant</p>
-          <h2>Configurer Sentinel en 5 étapes</h2>
+          <h2>Configurer Noctigarde en 5 étapes</h2>
           <p class="muted">Suis ces étapes dans l’ordre. Chaque validation met directement à jour ce serveur Discord.</p>
         </div>
         <span class="setup-progress">${escapeHtml(onboarding.completed)}/${escapeHtml(onboarding.total)}</span>
@@ -1790,7 +1790,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         ${setupStep({
           index: '01',
           title: 'Choisir la langue',
-          description: 'Définit la langue utilisée par Sentinel sur ce serveur.',
+          description: 'Définit la langue utilisée par Noctigarde sur ce serveur.',
           done: Boolean(state.config.language),
           current: `Actuel : ${languageLabel}`,
           content: `
@@ -1819,7 +1819,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         ${setupStep({
           index: '03',
           title: 'Choisir le salon de logs',
-          description: 'Sentinel y publiera les prises de service, fins de service et actions importantes.',
+          description: 'Noctigarde y publiera les prises de service, fins de service et actions importantes.',
           done: Boolean(status.logChannel),
           current: `Actuel : ${logChannelLabel}`,
           content: `
@@ -1832,7 +1832,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         ${setupStep({
           index: '04',
           title: 'Ajouter les rôles autorisés',
-          description: 'Ces rôles pourront gérer Sentinel depuis Discord et depuis le dashboard.',
+          description: 'Ces rôles pourront gérer Noctigarde depuis Discord et depuis le dashboard.',
           done: status.allowedRoles.length > 0,
           current: `Actuel : ${commandRolesLabel}`,
           content: `
@@ -1845,7 +1845,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
         ${setupStep({
           index: '05',
           title: 'Choisir le salon des nouveautés',
-          description: 'Étape obligatoire : Sentinel y publie les annonces importantes du bot.',
+          description: 'Étape obligatoire : Noctigarde y publie les annonces importantes du bot.',
           done: Boolean(status.updatesChannel && state.config.statusUpdatesEnabled),
           current: `Actuel : ${updatesChannelLabel}`,
           content: `
@@ -1860,7 +1860,7 @@ function renderSetupAssistant(state, roleOptions, commandRoleOptions, channelOpt
       <div class="setup-footer">
         ${status.ready
           ? '<p>Configuration complète. Tu peux publier le panneau de service ou gérer le serveur depuis les autres onglets.</p>'
-          : '<p>Quand les 5 étapes sont prêtes, Sentinel peut être utilisé proprement par le staff et les membres.</p>'}
+          : '<p>Quand les 5 étapes sont prêtes, Noctigarde peut être utilisé proprement par le staff et les membres.</p>'}
         <button class="button button-ghost" type="button" data-dashboard-tab="configuration">Voir les réglages avancés</button>
       </div>
     </section>
@@ -2032,17 +2032,17 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions, upd
           <h3>Bureau de service</h3>
           <p>Publie ou republie le bureau où les agents ouvrent leur poste, le clôturent et consultent le déploiement.</p>
           <form data-action-form="publish-service-panel">
-            ${labelHelp('Salon de publication', 'Salon dans lequel Sentinel déposera le Bureau de service et ses boutons de présence.')}
+            ${labelHelp('Salon de publication', 'Salon dans lequel Noctigarde déposera le Bureau de service et ses boutons de présence.')}
             <select name="channelId">${channelOptions}</select>
             <button class="button" type="submit">Publier le bureau</button>
           </form>
         </article>
         <article class="config-hub-card">
           <h3>État technique</h3>
-          <p>Optionnel : Sentinel maintient dans ce salon un panneau séparé sur son fonctionnement.</p>
+          <p>Optionnel : Noctigarde maintient dans ce salon un panneau séparé sur son fonctionnement.</p>
           <p class="muted">Actuel : ${escapeHtml(statusChannelLabel)}.</p>
           <form data-action-form="set-status-channel">
-            ${labelHelp('Salon de statut', 'Sentinel y maintient uniquement son panneau d’état technique.')}
+            ${labelHelp('Salon de statut', 'Noctigarde y maintient uniquement son panneau d’état technique.')}
             <select name="channelId">${statusChannelOptions}</select>
             <button class="button" type="submit">Publier l’état technique</button>
           </form>
@@ -2052,10 +2052,10 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions, upd
         </article>
         <article class="config-hub-card config-updates-card">
           <h3>Annonces officielles</h3>
-          <p>Ce salon reçoit uniquement les nouveautés publiques de Sentinel. Il reste indépendant du panneau technique.</p>
+          <p>Ce salon reçoit uniquement les nouveautés publiques de Noctigarde. Il reste indépendant du panneau technique.</p>
           <p class="muted">Actuel : ${escapeHtml(updatesChannelLabel)}. Diffusion : ${escapeHtml(statusUpdatesLabel)}.</p>
           <form data-action-form="set-updates-channel">
-            ${labelHelp('Salon des nouveautés', 'Sentinel y publie les annonces destinées à tous les serveurs abonnés.')}
+            ${labelHelp('Salon des nouveautés', 'Noctigarde y publie les annonces destinées à tous les serveurs abonnés.')}
             <select name="channelId">${updatesChannelOptions}</select>
             <button class="button" type="submit">Choisir ce salon</button>
           </form>
@@ -2085,7 +2085,7 @@ function renderConfigurationHub(state, channelOptions, statusChannelOptions, upd
         ${officialUpdateHistory(state)}
       </div>
       <div class="command-roles staff-permissions-panel">
-        <h3>Permissions staff ${helpTip('Liste des rôles qui peuvent gérer Sentinel. Pour ajouter un rôle, utilise l’étape 4 de l’assistant.')}</h3>
+        <h3>Permissions staff ${helpTip('Liste des rôles qui peuvent gérer Noctigarde. Pour ajouter un rôle, utilise l’étape 4 de l’assistant.')}</h3>
         <div class="role-chip-row">${commandRoleList(state)}</div>
         <button class="button button-small" type="button" data-dashboard-tab="setup">Gérer dans l’assistant</button>
       </div>
@@ -2299,7 +2299,7 @@ function payrollCopy() {
         currencyHelp: 'Short label displayed after the amount, for example $, €, credits, or SA$.',
         update: 'Update salary settings',
         roleRates: 'Role rates',
-        roleRatesHelp: 'A member uses the highest configured rate among their current Discord roles. If no role matches, Sentinel uses the global rate.',
+        roleRatesHelp: 'A member uses the highest configured rate among their current Discord roles. If no role matches, Noctigarde uses the global rate.',
         roleLabel: 'Discord role',
         roleRateLabel: 'Role hourly amount',
         setRoleRate: 'Save role rate',
@@ -2373,7 +2373,7 @@ function payrollCopy() {
         currencyHelp: 'Texte court affiché après le montant, par exemple $, €, crédits ou SA$.',
         update: 'Mettre à jour les salaires',
         roleRates: 'Taux par rôle',
-        roleRatesHelp: 'Un membre utilise le meilleur taux configuré parmi ses rôles Discord actuels. Si aucun rôle ne correspond, Sentinel utilise le taux global.',
+        roleRatesHelp: 'Un membre utilise le meilleur taux configuré parmi ses rôles Discord actuels. Si aucun rôle ne correspond, Noctigarde utilise le taux global.',
         roleLabel: 'Rôle Discord',
         roleRateLabel: 'Salaire par heure du rôle',
         setRoleRate: 'Enregistrer le taux',
@@ -2651,7 +2651,7 @@ function payrollArchiveJournal(archive, copy) {
   return `
     <ol class="payroll-event-list">
       ${events.map((event) => {
-        const actor = event.changedByDisplayName || event.changedByUserId || 'Sentinel';
+        const actor = event.changedByDisplayName || event.changedByUserId || 'Noctigarde';
         const agent = event.userDisplayName || event.userId;
         return `
           <li>
@@ -2885,7 +2885,7 @@ function renderFreeServicePanel(state) {
           <h2>Registre de service</h2>
           <p class="muted">Suivi des fiches agent, déploiements actifs, cycles hebdomadaires et salaires.</p>
         </div>
-        <span class="status-badge">Sentinel</span>
+        <span class="status-badge">Noctigarde</span>
       </div>
       ${metricCards(state)}
       <div class="service-insights">
@@ -3008,7 +3008,7 @@ function customEmbedList(state) {
   const items = state.customEmbeds?.items || [];
 
   if (items.length === 0) {
-    return '<p class="muted">Aucun embed Sentinel créé depuis ce dashboard ou Discord.</p>';
+    return '<p class="muted">Aucun embed Noctigarde créé depuis ce dashboard ou Discord.</p>';
   }
 
   return `
@@ -3028,9 +3028,9 @@ function customEmbedList(state) {
 
 function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge) {
   const modeLabel = 'Studio d’annonces';
-  const title = 'Embeds Sentinel';
-  const createHelp = 'Publie une annonce sous l’identité de Sentinel, avec image ou miniature importée depuis ton appareil.';
-  const deleteHelp = 'Supprime un embed géré par Sentinel avec son ID de message.';
+  const title = 'Embeds Noctigarde';
+  const createHelp = 'Publie une annonce sous l’identité de Noctigarde, avec image ou miniature importée depuis ton appareil.';
+  const deleteHelp = 'Supprime un embed géré par Noctigarde avec son ID de message.';
 
   return `
     <section class="dashboard-panel module-panel announcements-panel" id="embeds">
@@ -3044,7 +3044,7 @@ function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge)
       </div>
       <div class="form-grid module-form-grid">
         <form data-action-form="custom-embed-create">
-          ${labelHelp('Créer un embed Sentinel', createHelp)}
+          ${labelHelp('Créer un embed Noctigarde', createHelp)}
           <select name="channelId">${channelOptions}</select>
           <input name="title" placeholder="Titre" maxlength="256" required>
           <textarea name="description" placeholder="Message de l'annonce" maxlength="4000" required></textarea>
@@ -3054,12 +3054,12 @@ function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge)
           ${fileUploadControl('imageFile', 'Photo principale', 'Aucune photo sélectionnée', 'Importer')}
           <input name="thumbnailUrl" placeholder="Miniature URL optionnelle">
           ${fileUploadControl('thumbnailFile', 'Miniature', 'Aucune miniature sélectionnée', 'Importer')}
-          <p class="form-hint">PNG, JPG, WebP ou GIF, 8 Mo maximum au total. Sentinel optimise automatiquement les images en WebP.</p>
+          <p class="form-hint">PNG, JPG, WebP ou GIF, 8 Mo maximum au total. Noctigarde optimise automatiquement les images en WebP.</p>
           <input name="footer" placeholder="Footer optionnel">
           <button class="button" type="submit">Publier l’embed</button>
         </form>
         <form data-action-form="custom-embed-edit">
-          ${labelHelp('Modifier un embed existant', 'Modifie un embed Sentinel déjà envoyé avec son ID de message.')}
+          ${labelHelp('Modifier un embed existant', 'Modifie un embed Noctigarde déjà envoyé avec son ID de message.')}
           <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <input name="title" placeholder="Nouveau titre">
@@ -3074,13 +3074,13 @@ function renderEmbedsPanel(state, channelOptions, pingRoleOptions, premiumBadge)
           <button class="button" type="submit">Modifier</button>
         </form>
         <form data-action-form="custom-embed-delete">
-          ${labelHelp('Supprimer un embed Sentinel', deleteHelp)}
+          ${labelHelp('Supprimer un embed Noctigarde', deleteHelp)}
           <select name="channelId">${channelOptions}</select>
           <input name="messageId" placeholder="ID du message embed" required>
           <button class="button button-ghost" type="submit">Supprimer</button>
         </form>
         <article class="inline-form">
-          ${labelHelp('Embeds gérés', 'Liste les embeds que Sentinel peut encore modifier ou supprimer depuis le dashboard.')}
+          ${labelHelp('Embeds gérés', 'Liste les embeds que Noctigarde peut encore modifier ou supprimer depuis le dashboard.')}
           ${customEmbedList(state)}
         </article>
       </div>
@@ -3180,7 +3180,7 @@ function dossierTypeRolesSettings(state) {
             <span class="dossier-access-rule-number">1</span>
             <div>
               <strong>Aucun rôle choisi dans une catégorie</strong>
-              <p>Tous les responsables Sentinel peuvent voir et traiter ses dossiers.</p>
+              <p>Tous les responsables Noctigarde peuvent voir et traiter ses dossiers.</p>
             </div>
           </div>
           <div class="dossier-access-rule is-restricted">
@@ -3211,8 +3211,8 @@ function dossierTypeRolesSettings(state) {
                 <span class="dossier-access-badge ${restricted ? 'is-restricted' : 'is-general'}">${restricted ? 'Seulement ces rôles' : 'Tous les responsables'}</span>
               </header>
               <p class="dossier-access-summary">${restricted
-                ? 'Cette catégorie est limitée. Les autres responsables Sentinel n’y ont pas accès.'
-                : 'Aucun rôle spécifique : tous les responsables Sentinel ont accès à cette catégorie.'}</p>
+                ? 'Cette catégorie est limitée. Les autres responsables Noctigarde n’y ont pas accès.'
+                : 'Aucun rôle spécifique : tous les responsables Noctigarde ont accès à cette catégorie.'}</p>
               <div class="role-chip-row dossier-access-role-list">
                 ${restricted ? assigned.map((role) => `
                   <form data-action-form="remove-dossier-type-role" class="role-chip">
@@ -3221,7 +3221,7 @@ function dossierTypeRolesSettings(state) {
                     <span>@${escapeHtml(role.name)}</span>
                     <button type="submit" aria-label="Retirer le rôle ${escapeHtml(role.name)} de la catégorie ${escapeHtml(label)}">Retirer</button>
                   </form>
-                `).join('') : '<div class="dossier-general-access-note"><strong>Accès actuel</strong><span>Tous les responsables Sentinel</span></div>'}
+                `).join('') : '<div class="dossier-general-access-note"><strong>Accès actuel</strong><span>Tous les responsables Noctigarde</span></div>'}
               </div>
               <form data-action-form="add-dossier-type-role" class="dossier-type-access-form">
                 <input type="hidden" name="dossierType" value="${escapeHtml(type)}">
@@ -3231,7 +3231,7 @@ function dossierTypeRolesSettings(state) {
                 </label>
                 <button class="button button-small" type="submit"${availableRoles.length ? '' : ' disabled'}>${restricted ? 'Autoriser ce rôle aussi' : 'Limiter à ce rôle'}</button>
               </form>
-              ${restricted ? '<small class="dossier-access-footnote">En retirant le dernier rôle, tous les responsables Sentinel retrouveront automatiquement l’accès.</small>' : ''}
+              ${restricted ? '<small class="dossier-access-footnote">En retirant le dernier rôle, tous les responsables Noctigarde retrouveront automatiquement l’accès.</small>' : ''}
             </section>
           `;
         }).join('')}
@@ -3375,7 +3375,7 @@ function dossierRoleList(state) {
   const roles = dossierRoles(state);
 
   if (roles.length === 0) {
-    return '<p class="muted">Aucun rôle supplémentaire n’est ajouté ici. Les responsables déjà autorisés dans Sentinel et les administrateurs Discord conservent l’accès général.</p>';
+    return '<p class="muted">Aucun rôle supplémentaire n’est ajouté ici. Les responsables déjà autorisés dans Noctigarde et les administrateurs Discord conservent l’accès général.</p>';
   }
 
   return `
@@ -3727,7 +3727,7 @@ function dossierList(state) {
   const items = (state.dossiers?.items || []).filter(dossierMatchesFilters);
 
   if (items.length === 0) {
-    return '<p class="muted">Aucun dossier Sentinel trouvé avec ces filtres.</p>';
+    return '<p class="muted">Aucun dossier Noctigarde trouvé avec ces filtres.</p>';
   }
 
   if (dossierViewMode === 'board') {
@@ -3802,7 +3802,7 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
     <section class="dashboard-panel module-panel dossiers-panel" id="dossiers">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Dossiers Sentinel</p>
+          <p class="eyebrow">Dossiers Noctigarde</p>
           <h2>Bureau d’accueil et suivi complet</h2>
           <p class="muted">Un membre ouvre une demande privée, puis l’équipe autorisée la suit, la route et l’archive depuis son salon réservé.</p>
         </div>
@@ -3827,7 +3827,7 @@ function renderDossiersPanel(state, channelOptions, dossierRoleOptions, premiumB
           <button class="button button-ghost" type="submit">Réparer le registre des panneaux</button>
         </form>
         <article class="inline-form dossier-explain-card">
-          ${labelHelp('À quoi ça sert ?', 'Un dossier Sentinel est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.')}
+          ${labelHelp('À quoi ça sert ?', 'Un dossier Noctigarde est une demande privée pour le support, un signalement, un recrutement, un partenariat ou un autre sujet.')}
           <p>Les responsables peuvent répondre, ajouter des intervenants, prendre le dossier en charge, corriger son statut, générer un compte rendu et le clôturer.</p>
         </article>
         <article class="inline-form dossier-explain-card">
@@ -3915,7 +3915,7 @@ const AUDIT_ACTION_LABELS = {
   'save-report-schedule': 'Rapport automatique',
   'remove-report-schedule': 'Rapport automatique retiré',
   'run-simulation': 'Essai sans effet',
-  'run-validation': 'Validation Sentinel',
+  'run-validation': 'Validation Noctigarde',
   'toggle-service': 'Bouton service',
   'start-service': 'Prise de service',
   'end-service': 'Fin de service',
@@ -4078,8 +4078,8 @@ function permissionDiagnosticsPanel(state) {
       <div class="panel-mini-heading">
         <div>
           <p class="eyebrow">Diagnostic permissions</p>
-          <h3>Ce que Sentinel peut faire</h3>
-          <p class="muted">Si une action est refusée, corrige d’abord la ligne indiquée ici : permission manquante, salon inaccessible ou rôle Sentinel placé trop bas.</p>
+          <h3>Ce que Noctigarde peut faire</h3>
+          <p class="muted">Si une action est refusée, corrige d’abord la ligne indiquée ici : permission manquante, salon inaccessible ou rôle Noctigarde placé trop bas.</p>
         </div>
         ${statusBadge(headline, diagnostics.fixes.length === 0)}
       </div>
@@ -4381,7 +4381,7 @@ function automodSecurityOverview(state, settings, words) {
       </article>
       <article class="automod-security-card">
         <span>Accès</span>
-        <strong>Sentinel</strong>
+        <strong>Noctigarde</strong>
         <small>Garde essentielle disponible.</small>
       </article>
     </div>
@@ -4516,7 +4516,7 @@ function automodPremiumPanel(state, premiumTag) {
             <input name="premiumProgressiveBanThreshold" type="number" min="4" max="50" value="${escapeHtml(settings.premiumProgressiveBanThreshold)}">
           </div>
           <div>
-            ${labelHelp('Arrivées groupées', 'Nombre d’arrivées à partir duquel Sentinel alerte l’équipe.', ` ${premiumTag}`)}
+            ${labelHelp('Arrivées groupées', 'Nombre d’arrivées à partir duquel Noctigarde alerte l’équipe.', ` ${premiumTag}`)}
             <input name="premiumRaidJoinCount" type="number" min="3" max="30" value="${escapeHtml(settings.premiumRaidJoinCount)}">
           </div>
           <div>
@@ -4577,16 +4577,16 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
     <section class="dashboard-panel module-panel moderation-panel" id="moderation">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Sécurité Sentinel</p>
+          <p class="eyebrow">Sécurité Noctigarde</p>
           <h2>Centre de sécurité</h2>
           <p class="muted">Sanctions essentielles, garde automatique et registre récent du serveur.</p>
         </div>
-        <span class="status-badge">Sentinel</span>
+        <span class="status-badge">Noctigarde</span>
       </div>
       ${permissionDiagnosticsPanel(state)}
       <div class="form-grid module-form-grid">
         <article class="inline-form moderation-note">
-          ${labelHelp('Grade automatique d’arrivée', 'Donne automatiquement un grade aux nouveaux membres. Sentinel doit être placé au-dessus du grade choisi.')}
+          ${labelHelp('Grade automatique d’arrivée', 'Donne automatiquement un grade aux nouveaux membres. Noctigarde doit être placé au-dessus du grade choisi.')}
           <p class="muted">Actuel : ${state.config.autoRoleId ? escapeHtml(resolveRole(state, state.config.autoRoleId)?.name || 'rôle supprimé sur Discord') : 'désactivé'}</p>
           <form data-action-form="set-auto-role">
             <select name="roleId">${autoRoleOptions}</select>
@@ -4630,7 +4630,7 @@ function renderFreeModerationPanel(state, channelOptions, autoRoleOptions) {
           <button class="button" type="submit">Bannir</button>
         </form>
         <form data-action-form="purge" data-purge-form>
-          ${labelHelp('Archiver et nettoyer un salon', 'Sentinel crée et vérifie une archive privée avant toute suppression. Le mode complet recrée ensuite le salon vide.')}
+          ${labelHelp('Archiver et nettoyer un salon', 'Noctigarde crée et vérifie une archive privée avant toute suppression. Le mode complet recrée ensuite le salon vide.')}
           <select name="channelId">${channelOptions}</select>
           <select name="mode">
             <option value="count">Supprimer un nombre précis</option>
@@ -4685,7 +4685,7 @@ function warningEscalationPanel(state, premiumTag) {
       </div>
       <form data-action-form="set-warning-escalation" class="automod-settings-form">
         <input type="hidden" name="enabled" value="false">
-        <label class="automod-toggle"><input type="checkbox" name="enabled" value="true" ${settings.enabled ? 'checked' : ''}><span><strong>Activer les sanctions par paliers</strong><small>Sentinel vérifie le total après chaque nouvel avertissement.</small></span></label>
+        <label class="automod-toggle"><input type="checkbox" name="enabled" value="true" ${settings.enabled ? 'checked' : ''}><span><strong>Activer les sanctions par paliers</strong><small>Noctigarde vérifie le total après chaque nouvel avertissement.</small></span></label>
         <div class="automod-control-grid">
           <div>${labelHelp('Expiration des avertissements', 'Nombre de jours pendant lesquels un avertissement compte dans les paliers.')}<input name="windowDays" type="number" min="1" max="3650" value="${escapeHtml(settings.windowDays || 30)}"></div>
           <div>${labelHelp('Palier mise au silence', 'Premier nombre d’avertissements déclenchant une mesure.')}<input name="timeoutThreshold" type="number" min="1" max="50" value="${escapeHtml(settings.timeoutThreshold || 3)}"></div>
@@ -4720,7 +4720,7 @@ function renderPremiumModerationPanel(state, channelOptions, premiumBadge, premi
       ${permissionDiagnosticsPanel(state)}
       <div class="form-grid module-form-grid">
         <form data-action-form="tempban">
-          ${labelHelp('Bannissement temporaire', 'Bannit un utilisateur pour une durée précise, puis Sentinel lève automatiquement le bannissement.', ` ${premiumTag}`)}
+          ${labelHelp('Bannissement temporaire', 'Bannit un utilisateur pour une durée précise, puis Noctigarde lève automatiquement le bannissement.', ` ${premiumTag}`)}
           <input name="userId" placeholder="ID utilisateur" required>
           <input name="duration" placeholder="1h, 7d, 30d" required>
           <input name="reason" placeholder="Raison">
@@ -4988,11 +4988,11 @@ function renderFreeAuditPanel(state) {
     <section class="dashboard-panel" id="audit">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Historique Sentinel</p>
+          <p class="eyebrow">Historique Noctigarde</p>
           <h2>Dernières actions</h2>
           <p class="muted">Les dix dernières actions enregistrées sur le serveur.</p>
         </div>
-        <span class="status-badge">Sentinel</span>
+        <span class="status-badge">Noctigarde</span>
       </div>
       <div class="audit-scope-note">
         <span>Journal récent du serveur sélectionné</span>
@@ -5146,7 +5146,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
   return `
     <section class="dashboard-panel module-panel operations-panel">
       <div class="panel-heading row-heading">
-        <div><p class="eyebrow">Pilotage Sentinel</p><h2>Notifications, rapports et banc d’essai</h2><p class="muted">Retrouve les urgences, prépare les rapports et vérifie les automatisations depuis une seule vue.</p></div>
+        <div><p class="eyebrow">Pilotage Noctigarde</p><h2>Notifications, rapports et banc d’essai</h2><p class="muted">Retrouve les urgences, prépare les rapports et vérifie les automatisations depuis une seule vue.</p></div>
         ${premiumBadge}
       </div>
       ${notificationCenter(state)}
@@ -5236,7 +5236,7 @@ function renderOperationsPanel(state, channelOptions, premiumBadge, premiumTag) 
         </article>
 
         <article class="inline-form operation-card operation-card-wide" data-operation-section="testing">
-          <div class="panel-mini-heading"><div><h3>Validation Sentinel ${premiumTag}</h3><p class="muted">Contrôle l’intégrité, les permissions, les rôles supprimés et l’isolation des accès.</p></div><button class="button" type="button" data-operation-action="run-validation">Lancer le contrôle</button></div>
+          <div class="panel-mini-heading"><div><h3>Validation Noctigarde ${premiumTag}</h3><p class="muted">Contrôle l’intégrité, les permissions, les rôles supprimés et l’isolation des accès.</p></div><button class="button" type="button" data-operation-action="run-validation">Lancer le contrôle</button></div>
           ${validationHistory(state)}
         </article>
       </div>
@@ -5333,7 +5333,7 @@ function siteStaffList(overview) {
           <span>
             <strong>${escapeHtml(item.globalName || item.tag || item.username || item.id)}</strong>
             <small><code>${escapeHtml(item.id)}</code>${item.createdAt ? ` - depuis ${escapeHtml(formatAuditDate(item.createdAt))}` : ''}</small>
-            <small>${item.discordRoleVerified ? 'Rôle Discord vérifié' : (item.inReferenceGuild ? 'Rôle staff Discord manquant' : 'Hors du Discord Sentinel')}</small>
+            <small>${item.discordRoleVerified ? 'Rôle Discord vérifié' : (item.inReferenceGuild ? 'Rôle staff Discord manquant' : 'Hors du Discord Noctigarde')}</small>
           </span>
           ${canManageFounderPanel() ? `
             <button
@@ -5424,7 +5424,7 @@ function founderStoragePanel(overview) {
   if (!storage) return '';
 
   if (storage.error) {
-    return `<section class="founder-storage-panel" aria-label="Stockage Sentinel"><div class="founder-console-note"><strong>Stockage Sentinel</strong><span>Le relevé est momentanément indisponible.</span></div></section>`;
+    return `<section class="founder-storage-panel" aria-label="Stockage Noctigarde"><div class="founder-console-note"><strong>Stockage Noctigarde</strong><span>Le relevé est momentanément indisponible.</span></div></section>`;
   }
 
   const canManage = canManageFounderPanel();
@@ -5445,7 +5445,7 @@ function founderStoragePanel(overview) {
   const usagePercent = Math.max(Math.min(Number(volume.usagePercent) || 0, 100), 0);
 
   return `
-    <section class="founder-storage-panel" aria-label="Centre de maintenance Sentinel">
+    <section class="founder-storage-panel" aria-label="Centre de maintenance Noctigarde">
       <div class="panel-heading row-heading">
         <div>
           <p class="eyebrow">Conservation</p>
@@ -5526,7 +5526,7 @@ function founderStoragePanel(overview) {
           <summary>Restauration fondatrice</summary>
           <form data-maintenance-restore-form>
             <label><span>Copie à restaurer</span><select name="fileName" required>${storage.backups.map(item => `<option value="${escapeHtml(item.fileName)}">${escapeHtml(formatAuditDate(item.createdAt))} · ${escapeHtml(backupGenerationLabel(item.generations))}</option>`).join('')}</select></label>
-            <label><span>Confirmation</span><input name="confirmation" autocomplete="off" placeholder="RESTAURER SENTINEL" required></label>
+            <label><span>Confirmation</span><input name="confirmation" autocomplete="off" placeholder="RESTAURER NOCTIGARDE" required></label>
             <button class="button button-small" type="submit">Préparer la restauration</button>
           </form>
         </details>
@@ -5575,7 +5575,7 @@ function founderRuntimePanel(overview) {
     .map(([key, value]) => `<span><strong>${escapeHtml(key)}</strong><code>${escapeHtml(typeof value === 'object' ? JSON.stringify(value) : value)}</code></span>`)
     .join('');
   return `
-    <section class="founder-storage-panel" aria-label="Surveillance Sentinel">
+    <section class="founder-storage-panel" aria-label="Surveillance Noctigarde">
       <div class="panel-heading row-heading"><div><p class="eyebrow">Surveillance</p><h3>Incidents et tâches automatiques</h3><p class="muted">Chaque erreur technique reçoit un identifiant stable. Les tâches persistantes indiquent leur dernier passage et évitent les doublons entre instances.</p></div>${statusBadge(incidents.length ? `${incidents.length} incident(s)` : 'Aucun incident ouvert', !incidents.length)}</div>
       <div class="maintenance-grid">
         <section class="maintenance-section"><h4>Incidents ouverts</h4><div class="operation-list">${incidents.length ? incidents.map(item => `<div class="operation-row incident-row"><div><strong>${escapeHtml(item.incidentId)} · ${escapeHtml(item.source)}</strong><small>${escapeHtml(item.severity)} · ${escapeHtml(item.message)} · ${escapeHtml(item.occurrenceCount)} occurrence(s)</small><small>Premier signalement ${escapeHtml(formatAuditDate(item.firstSeenAt))} · dernier ${escapeHtml(formatAuditDate(item.lastSeenAt))}</small>${Object.keys(item.context || {}).length ? `<details><summary>Contexte technique</summary><div class="incident-context">${incidentContext(item)}</div></details>` : ''}</div>${overview?.access?.isFounder ? `<div class="incident-resolution"><input data-incident-resolution-note maxlength="1000" placeholder="Note de résolution facultative"><button class="button button-small button-ghost" type="button" data-resolve-incident="${escapeHtml(item.incidentId)}">Classer résolu</button></div>` : ''}</div>`).join('') : '<p class="muted">Aucun incident technique ouvert.</p>'}</div>${resolvedIncidents.length ? `<details class="maintenance-history"><summary>Incidents récemment résolus</summary><div class="operation-list">${resolvedIncidents.map(item => `<div class="operation-row"><div><strong>${escapeHtml(item.incidentId)} · ${escapeHtml(item.source)}</strong><small>${escapeHtml(item.resolutionNote || 'Résolu sans note')} · ${escapeHtml(formatAuditDate(item.resolvedAt))}</small></div></div>`).join('')}</div></details>` : ''}</section>
@@ -5588,8 +5588,8 @@ function founderFeatureFlagsPanel(overview) {
   if (!overview?.access?.isFounder) return '';
   const flags = overview.featureFlags || [];
   return `
-    <section class="founder-storage-panel" aria-label="Interrupteurs d’urgence Sentinel">
-      <div class="panel-heading row-heading"><div><p class="eyebrow">Contrôle immédiat</p><h3>Interrupteurs d’urgence</h3><p class="muted">Suspends uniquement la fonction en difficulté. Le reste de Sentinel continue normalement.</p></div>${statusBadge(flags.some(item => !item.enabled) ? `${flags.filter(item => !item.enabled).length} suspendue(s)` : 'Tout est actif', flags.every(item => item.enabled))}</div>
+    <section class="founder-storage-panel" aria-label="Interrupteurs d’urgence Noctigarde">
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Contrôle immédiat</p><h3>Interrupteurs d’urgence</h3><p class="muted">Suspends uniquement la fonction en difficulté. Le reste de Noctigarde continue normalement.</p></div>${statusBadge(flags.some(item => !item.enabled) ? `${flags.filter(item => !item.enabled).length} suspendue(s)` : 'Tout est actif', flags.every(item => item.enabled))}</div>
       <div class="feature-flag-grid">
         ${flags.map(item => `<form class="feature-flag-row ${item.enabled ? 'is-enabled' : 'is-disabled'}" data-feature-flag-form><input type="hidden" name="featureKey" value="${escapeHtml(item.key)}"><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description)}</small>${item.updatedAt ? `<small>Dernière modification : ${escapeHtml(formatAuditDate(item.updatedAt))}</small>` : ''}</div><label><span>État</span><select name="enabled"><option value="true" ${item.enabled ? 'selected' : ''}>Active</option><option value="false" ${!item.enabled ? 'selected' : ''}>Suspendue</option></select></label><label><span>Motif</span><input name="reason" maxlength="500" value="${escapeHtml(item.reason || '')}" placeholder="Visible par les responsables"></label><button class="button button-small ${item.enabled ? 'button-ghost' : ''}" type="submit">Enregistrer</button></form>`).join('')}
       </div>
@@ -5602,7 +5602,7 @@ function founderDatabasePortabilityPanel(overview) {
   const topFindings = (report.findings || []).slice(0, 8);
   return `
     <section class="founder-storage-panel" aria-label="Préparation PostgreSQL">
-      <div class="panel-heading row-heading"><div><p class="eyebrow">Montée en charge</p><h3>Préparation PostgreSQL</h3><p class="muted">Sentinel reste sur SQLite avec une seule instance. Ce relevé suit les adaptations nécessaires avant une future bascule.</p></div>${statusBadge(report.readyForAutomaticSwitch ? 'Prête' : `${report.findingCount} adaptation(s)`, report.readyForAutomaticSwitch)}</div>
+      <div class="panel-heading row-heading"><div><p class="eyebrow">Montée en charge</p><h3>Préparation PostgreSQL</h3><p class="muted">Noctigarde reste sur SQLite avec une seule instance. Ce relevé suit les adaptations nécessaires avant une future bascule.</p></div>${statusBadge(report.readyForAutomaticSwitch ? 'Prête' : `${report.findingCount} adaptation(s)`, report.readyForAutomaticSwitch)}</div>
       <div class="maintenance-file-list">${topFindings.map(item => `<div class="maintenance-file-row"><span><strong>${escapeHtml(item.file)} · ${escapeHtml(item.key)}</strong><small>${escapeHtml(item.count)} occurrence(s) · ${escapeHtml(item.detail)}</small></span></div>`).join('') || '<p class="muted">Aucune syntaxe spécifique à SQLite détectée.</p>'}</div>
       <p class="founder-console-note"><strong>Aucune bascule automatique</strong><span>La migration ne sera possible qu’après import de préproduction, comparaison des données et plan de retour arrière.</span></p>
     </section>`;
@@ -5664,7 +5664,7 @@ function criticalActionsPanel(overview) {
 function founderOfficialUpdatePanel(overview) {
   if (!overview?.access?.isFounder) return '';
   return `
-    <section class="founder-storage-panel" aria-label="Annonce globale Sentinel">
+    <section class="founder-storage-panel" aria-label="Annonce globale Noctigarde">
       <div class="panel-heading"><p class="eyebrow">Publication protégée</p><h3>Annonce globale</h3><p class="muted">La publication reste en attente jusqu’à la validation d’une autre personne autorisée.</p></div>
       <form data-founder-official-update class="operation-form-grid">
         <input name="titleFr" maxlength="256" placeholder="Titre français" required>
@@ -5680,15 +5680,15 @@ function founderOfficialUpdatePanel(overview) {
 
 function creatorStaffManagePanel(overview) {
   return `
-    <section class="founder-storage-panel" aria-label="Accès staff Sentinel">
+    <section class="founder-storage-panel" aria-label="Accès staff Noctigarde">
       <div class="founder-console-note">
         <strong>Accès de régie</strong>
-        <span>L’accès exige les deux validations : ajout par le fondateur dans la Régie et rôle staff sur le Discord Sentinel. Seul le fondateur peut modifier ces accès.</span>
+        <span>L’accès exige les deux validations : ajout par le fondateur dans la Régie et rôle staff sur le Discord Noctigarde. Seul le fondateur peut modifier ces accès.</span>
       </div>
       ${canManageFounderPanel() ? `
         <form class="creator-premium-form creator-staff-form" data-creator-staff-form>
           <input type="hidden" name="action" value="add">
-          ${labelHelp('Ajouter un staff site', 'La personne doit déjà être sur le Discord Sentinel et y posséder un rôle staff configuré. Utilise son ID Discord numérique complet.')}
+          ${labelHelp('Ajouter un staff site', 'La personne doit déjà être sur le Discord Noctigarde et y posséder un rôle staff configuré. Utilise son ID Discord numérique complet.')}
           <div class="creator-premium-row">
             <input name="userId" placeholder="ID utilisateur Discord" required>
             <button class="button button-small" type="submit">Ajouter staff</button>
@@ -5706,12 +5706,12 @@ function founderGuildInventoryPanel() {
     .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
 
   return `
-    <section class="founder-storage-panel founder-guilds-panel" aria-label="Serveurs Sentinel">
+    <section class="founder-storage-panel founder-guilds-panel" aria-label="Serveurs Noctigarde">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Parc Sentinel</p>
+          <p class="eyebrow">Parc Noctigarde</p>
           <h3>Serveurs équipés</h3>
-          <p class="muted">Tous les serveurs sur lesquels Sentinel est actuellement installé.</p>
+          <p class="muted">Tous les serveurs sur lesquels Noctigarde est actuellement installé.</p>
         </div>
         <span class="status-badge is-ready">${escapeHtml(installedGuilds.length)} serveur(s)</span>
       </div>
@@ -5738,7 +5738,7 @@ function founderGuildInventoryPanel() {
                         <span><strong>${escapeHtml(guild.name)}</strong><small><code>${escapeHtml(guild.id)}</code></small></span>
                       </span>
                     </td>
-                    <td>${statusBadge('Sentinel actif', true)}</td>
+                    <td>${statusBadge('Noctigarde actif', true)}</td>
                     <td><button class="button button-small button-ghost" type="button" data-select-guild="${escapeHtml(guild.id)}" ${selected ? 'disabled' : ''}>${selected ? 'Serveur ouvert' : 'Ouvrir'}</button></td>
                   </tr>`;
               }).join('')}
@@ -5746,7 +5746,7 @@ function founderGuildInventoryPanel() {
           </table>
           <p class="muted founder-guild-empty" data-founder-guild-empty hidden>Aucun serveur ne correspond à cette recherche.</p>
         </div>
-      ` : '<p class="muted">Aucun serveur Sentinel trouvé pour le moment.</p>'}
+      ` : '<p class="muted">Aucun serveur Noctigarde trouvé pour le moment.</p>'}
     </section>
   `;
 }
@@ -5764,10 +5764,10 @@ function renderFounderPanel() {
     <section class="dashboard-panel module-panel founder-premium-panel">
       <div class="panel-heading row-heading">
         <div>
-          <p class="eyebrow">Régie Sentinel</p>
+          <p class="eyebrow">Régie Noctigarde</p>
           <h2>${access?.canManageSiteStaff ? 'Console fondateur' : 'Console staff'}</h2>
           <p class="muted">${access?.canManageSiteStaff
-            ? 'Vue privée des accès site, des staffs autorisés et de la maintenance Sentinel.'
+            ? 'Vue privée des accès site, des staffs autorisés et de la maintenance Noctigarde.'
             : 'Vue privée de régie : lecture des accès et suivi global sans commandes fondatrices.'}</p>
         </div>
         <span class="status-badge is-site">${escapeHtml(siteAccessLabel(access))}</span>
@@ -5779,7 +5779,7 @@ function renderFounderPanel() {
         <article class="dashboard-kpi">
           <span>Postes suivis</span>
           <strong>${escapeHtml(summary.guildCount)}</strong>
-          <small>où Sentinel est installé</small>
+          <small>où Noctigarde est installé</small>
         </article>
       </div>
       ${founderGuildInventoryPanel()}
@@ -5793,7 +5793,7 @@ function renderFounderPanel() {
       ${founderPrivacyPanel(overview)}
       ${founderStoragePanel(overview)}
       ${creatorStaffManagePanel(overview)}
-      ${creatorOverviewLoading && !overview ? '<p class="muted">Lecture de la régie Sentinel...</p>' : ''}
+      ${creatorOverviewLoading && !overview ? '<p class="muted">Lecture de la régie Noctigarde...</p>' : ''}
       ${overview?.generatedAt ? `<p class="muted">Dernière lecture : ${escapeHtml(formatAuditDate(overview.generatedAt))}</p>` : ''}
     </section>
   `;
@@ -5862,7 +5862,7 @@ function renderCommunityPanel(state, roleOptions, channelOptions) {
       ${item.status === 'accepted' ? `<form data-action-form="community-publish-suggestion" class="inline-action-row"><input type="hidden" name="suggestionId" value="${escapeHtml(item.id)}"><select name="channelId" required>${channelOptions}</select><button class="button button-small" type="submit">Publier sur Discord</button></form>` : ''}
     </article>`).join('');
   const helpItems = [
-    ['Installation', 'Configurer Sentinel', 'Choisis le profil, le rôle de service, le salon des registres, les responsables et le salon des nouveautés.'],
+    ['Installation', 'Configurer Noctigarde', 'Choisis le profil, le rôle de service, le salon des registres, les responsables et le salon des nouveautés.'],
     ['Service', 'Publier le panneau', 'Ouvre Configuration ou Service, choisis le salon puis publie le panneau de prise de service.'],
     ['Tickets', 'Recevoir les demandes', 'Configure les responsables par type, puis publie le bureau d’accueil dans un salon public.'],
     ['Modération', 'Protéger le serveur', 'Vérifie d’abord le diagnostic des permissions, puis active seulement les règles utiles.'],
@@ -5883,8 +5883,8 @@ function renderCommunityPanel(state, roleOptions, channelOptions) {
     <form data-action-form="community-save-panel-theme" class="community-panel-editor">
       <input type="hidden" name="panelType" value="${escapeHtml(type)}">
       <div class="panel-heading"><div><p class="eyebrow">${escapeHtml(label)}</p><h3>Identité du panneau</h3></div><span class="panel-color-preview" style="--panel-preview-color:${escapeHtml(theme.color || '#24D7D0')}"></span></div>
-      <label><span>Titre</span><input name="title" maxlength="120" value="${escapeHtml(theme.title || '')}" placeholder="Garder le titre Sentinel"></label>
-      <label><span>Texte d’accueil</span><textarea name="description" maxlength="2000" placeholder="Garder le texte Sentinel">${escapeHtml(theme.description || '')}</textarea></label>
+      <label><span>Titre</span><input name="title" maxlength="120" value="${escapeHtml(theme.title || '')}" placeholder="Garder le titre Noctigarde"></label>
+      <label><span>Texte d’accueil</span><textarea name="description" maxlength="2000" placeholder="Garder le texte Noctigarde">${escapeHtml(theme.description || '')}</textarea></label>
       <div class="form-row"><label><span>Couleur</span><input name="color" type="color" value="${escapeHtml(theme.color || '#24D7D0')}"></label><label><span>Pied de panneau</span><input name="footer" maxlength="200" value="${escapeHtml(theme.footer || '')}" placeholder="Texte facultatif"></label></div>
       <label><span>Illustration HTTPS</span><input name="imageUrl" type="url" maxlength="1000" value="${escapeHtml(theme.imageUrl || '')}" placeholder="https://..."></label>
       <fieldset class="community-button-labels"><legend>Texte des boutons</legend>${buttonFields.map(([key, fallback]) => `<label><span>${escapeHtml(fallback)}</span><input name="button${key}Label" maxlength="80" value="${escapeHtml(buttonValues[key[0].toLowerCase() + key.slice(1)] || '')}" placeholder="${escapeHtml(fallback)}"></label>`).join('')}</fieldset>
@@ -5979,7 +5979,7 @@ const DASHBOARD_TABS = [
     label: 'Annonces',
     eyebrow: 'Messages',
     title: 'Annonces',
-    description: 'Messages propres sous Sentinel'
+    description: 'Messages propres sous Noctigarde'
   },
   {
     id: 'audit',
@@ -6046,7 +6046,7 @@ const DASHBOARD_SUBTABS = {
     { id: 'critical', label: 'Actions critiques', description: 'Remise à zéro et validations', selectors: ['[data-action-form="reset-guild"]', '#moderation-tools > .maintenance-file-list'] }
   ],
   embeds: [
-    { id: 'create', label: 'Créer', description: 'Nouvelle annonce Sentinel', selectors: ['[data-action-form="custom-embed-create"]'] },
+    { id: 'create', label: 'Créer', description: 'Nouvelle annonce Noctigarde', selectors: ['[data-action-form="custom-embed-create"]'] },
     { id: 'edit', label: 'Modifier', description: 'Texte, couleur et médias', selectors: ['[data-action-form="custom-embed-edit"]'] },
     { id: 'manage', label: 'Gérer', description: 'Liste et suppression', selectors: ['[data-action-form="custom-embed-delete"]', '.announcements-panel .inline-form'] }
   ],
@@ -6058,7 +6058,7 @@ const DASHBOARD_SUBTABS = {
     { id: 'alerts', label: 'Notifications', description: 'Points qui demandent une action', selectors: ['.operations-panel > .notification-center'] },
     { id: 'reports', label: 'Rapports', description: 'Exports et envois automatiques', selectors: ['[data-operation-section="reports"]'] },
     { id: 'announcements', label: 'Programmation', description: 'Brouillons et annonces planifiées', selectors: ['[data-operation-section="announcements"]'] },
-    { id: 'testing', label: 'Essais', description: 'Simulations et validation Sentinel', selectors: ['[data-operation-section="testing"]'] }
+    { id: 'testing', label: 'Essais', description: 'Simulations et validation Noctigarde', selectors: ['[data-operation-section="testing"]'] }
   ],
   community: [
     { id: 'recruitment', label: 'Recrutements', description: 'Formulaires et décisions', selectors: ['.community-recruitment'] },
@@ -6069,12 +6069,12 @@ const DASHBOARD_SUBTABS = {
     { id: 'help', label: 'Aide', description: 'Recherche adaptée au serveur', selectors: ['.community-help'] }
   ],
   founder: [
-    { id: 'servers', label: 'Serveurs', description: 'Parc équipé de Sentinel', selectors: ['[aria-label="Serveurs Sentinel"]'] },
+    { id: 'servers', label: 'Serveurs', description: 'Parc équipé de Noctigarde', selectors: ['[aria-label="Serveurs Noctigarde"]'] },
     { id: 'security', label: 'Sécurité', description: 'Double protection et validations', selectors: ['[aria-label="Double sécurité fondatrice"]', '[aria-label="Validations critiques"]'] },
-    { id: 'publishing', label: 'Publication', description: 'Annonce globale protégée', selectors: ['[aria-label="Annonce globale Sentinel"]'] },
-    { id: 'health', label: 'Surveillance', description: 'Incidents, tâches et préproduction', selectors: ['[aria-label="Surveillance Sentinel"]', '[aria-label="Préproduction Discord"]'] },
-    { id: 'storage', label: 'Données', description: 'Confidentialité, stockage et sauvegardes', selectors: ['[aria-label="Demandes de confidentialité"]', '[aria-label="Centre de maintenance Sentinel"]', '[aria-label="Stockage Sentinel"]'] },
-    { id: 'staff', label: 'Équipe', description: 'Accès de la régie', selectors: ['[aria-label="Accès staff Sentinel"]'] }
+    { id: 'publishing', label: 'Publication', description: 'Annonce globale protégée', selectors: ['[aria-label="Annonce globale Noctigarde"]'] },
+    { id: 'health', label: 'Surveillance', description: 'Incidents, tâches et préproduction', selectors: ['[aria-label="Surveillance Noctigarde"]', '[aria-label="Préproduction Discord"]'] },
+    { id: 'storage', label: 'Données', description: 'Confidentialité, stockage et sauvegardes', selectors: ['[aria-label="Demandes de confidentialité"]', '[aria-label="Centre de maintenance Noctigarde"]', '[aria-label="Stockage Noctigarde"]'] },
+    { id: 'staff', label: 'Équipe', description: 'Accès de la régie', selectors: ['[aria-label="Accès staff Noctigarde"]'] }
   ]
 };
 
@@ -6182,7 +6182,7 @@ function renderDashboardTabs(state) {
       <div class="western-dashboard-masthead">
         <div class="western-dashboard-masthead-copy">
           <span>Bureau territorial</span>
-          <strong>Registre Sentinel</strong>
+          <strong>Registre Noctigarde</strong>
           <small>Surveillance, service et intendance</small>
         </div>
         <img src="assets/western-cowboy-hat.webp" alt="" width="240" height="160">
@@ -6239,7 +6239,7 @@ function renderDashboard() {
       ? renderDashboardLoadingState()
       : `
         <div class="empty-state">
-          <img src="assets/sentinel-mark.png" alt="">
+          <img src="assets/noctigarde-mark.png" alt="">
           <h2>Sélectionne un serveur</h2>
           <p>Choisis un serveur pour voir les réglages et les actions disponibles.</p>
         </div>
@@ -6264,7 +6264,7 @@ function renderDashboard() {
   const getStatusChannelOptions = () => (optionMarkup.statusChannels ??= optionList(state.channels, state.config.statusChannelId, 'Choisir un salon statut'));
   const getUpdatesChannelOptions = () => (optionMarkup.updatesChannels ??= optionList(state.channels, state.config.updatesChannelId, 'Choisir le salon des nouveautés'));
   const getUpdatesRoleOptions = () => (optionMarkup.updatesRoles ??= optionList(state.roles, state.config.updatesPingRoleId, 'Choisir un rôle à prévenir'));
-  const premiumBadge = '<span class="status-badge">Sentinel</span>';
+  const premiumBadge = '<span class="status-badge">Noctigarde</span>';
   const premiumTag = '';
 
   main.innerHTML = `
@@ -6467,7 +6467,7 @@ async function updateFeatureFlag(data, button = null) {
     founderMfaCode = '';
     creatorOverview = payload.overview || creatorOverview;
     renderDashboard();
-    toast(payload.message || 'Interrupteur Sentinel mis à jour.');
+    toast(payload.message || 'Interrupteur Noctigarde mis à jour.');
   } catch (error) {
     toast(dashboardErrorMessage(error), 'error');
   } finally {
@@ -6553,7 +6553,7 @@ async function downloadReportFile(kind, format, button = null) {
     const quotedName = disposition.match(/filename="([^"]+)"/i)?.[1];
     const fileName = encodedName
       ? decodeURIComponent(encodedName)
-      : (quotedName || `sentinel-${kind}-${new Date().toISOString().slice(0, 10)}.${format}`);
+      : (quotedName || `noctigarde-${kind}-${new Date().toISOString().slice(0, 10)}.${format}`);
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -6607,7 +6607,7 @@ function spreadsheetClipboardHtml(kind, text) {
     payroll: 'Registre des salaires',
     dossiers: 'Suivi des tickets',
     moderation: 'Registre de modération'
-  }[kind] || 'Rapport Sentinel';
+  }[kind] || 'Rapport Noctigarde';
   const guildName = currentState?.guild?.name || selectedGuildPreview?.name || 'Serveur Discord';
   const generatedAt = new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'long',
@@ -6697,7 +6697,7 @@ function showGoogleSheetsReadyDialog(richFormatting = false) {
   if (status) status.textContent = richFormatting ? 'Style inclus' : 'Copié';
   if (intro) {
     intro.textContent = richFormatting
-      ? 'Le tableau Sentinel et sa mise en forme sont dans ton presse-papiers.'
+      ? 'Le tableau Noctigarde et sa mise en forme sont dans ton presse-papiers.'
       : 'Les données sont dans ton presse-papiers. Il reste trois gestes rapides.';
   }
   if (pasteResult) {
@@ -7347,7 +7347,7 @@ async function selectGuild(guildId, { restored = false } = {}) {
     renderDashboard();
 
     if (!restored) {
-      toast(dashboardErrorMessage('Sentinel is not installed on this server.'), 'error');
+      toast(dashboardErrorMessage('Noctigarde is not installed on this server.'), 'error');
     }
     return false;
   }
@@ -7391,7 +7391,7 @@ async function selectGuild(guildId, { restored = false } = {}) {
 
     if (error.payload?.inviteUrl) {
       const inviteUrl = safeExternalUrl(error.payload.inviteUrl, ['discord.com']);
-      toast('Sentinel doit être autorisé sur ce serveur.', 'error');
+      toast('Noctigarde doit être autorisé sur ce serveur.', 'error');
       if (inviteUrl) {
         window.open(inviteUrl, '_blank', 'noopener');
       }

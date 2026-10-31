@@ -1,4 +1,4 @@
-name: Deploy Sentinel site
+name: Deploy Noctigarde site
 
 on:
   push:

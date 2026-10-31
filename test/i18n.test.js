@@ -39,7 +39,7 @@ test('short dashboard labels and legacy French logs translate at runtime', () =>
   assert.equal(translateValue('Paliers d’avertissement', 'en'), 'Warning thresholds');
   assert.equal(translateValue('Rôles staff existants', 'en'), 'Existing staff roles');
   assert.equal(translateValue('Rôles dossiers existants', 'en'), 'Existing ticket roles');
-  assert.equal(translateValue('Sentinel présent comme membre', 'en'), 'Sentinel present as a member');
+  assert.equal(translateValue('Noctigarde présent comme membre', 'en'), 'Noctigarde present as a member');
   assert.equal(translateValue('Conforme', 'en'), 'Passed');
   assert.equal(translateValue('Contrôle #1682', 'en'), 'Check #1682');
   assert.equal(

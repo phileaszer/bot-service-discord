@@ -59,7 +59,7 @@ async function runDiscordStagingValidation(client, options = {}) {
         || await client.guilds.fetch(config.guildId).catch(() => null);
     if (!guild) throw new Error('Le serveur Discord de préproduction est introuvable.');
     const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-    if (!botMember) throw new Error('Sentinel n’est pas membre du serveur Discord de préproduction.');
+    if (!botMember) throw new Error('Noctigarde n’est pas membre du serveur Discord de préproduction.');
 
     const requiredPermissions = [
         PermissionsBitField.Flags.ViewChannel,
@@ -96,7 +96,7 @@ async function runDiscordStagingValidation(client, options = {}) {
         role = await guild.roles.create({
             name: `sentinel-validation-${suffix}`,
             permissions: [],
-            reason: 'Validation automatique Sentinel avant mise en service'
+            reason: 'Validation automatique Noctigarde avant mise en service'
         });
         checks.push({
             key: 'role-create',
@@ -105,9 +105,9 @@ async function runDiscordStagingValidation(client, options = {}) {
         });
         checks.push({
             key: 'role-hierarchy',
-            label: 'Hiérarchie du rôle Sentinel',
+            label: 'Hiérarchie du rôle Noctigarde',
             ok: botMember.roles.highest.position > role.position,
-            detail: botMember.roles.highest.position > role.position ? null : 'Le rôle Sentinel doit rester au-dessus des rôles gérés.'
+            detail: botMember.roles.highest.position > role.position ? null : 'Le rôle Noctigarde doit rester au-dessus des rôles gérés.'
         });
 
         category = await guild.channels.create({
@@ -125,13 +125,13 @@ async function runDiscordStagingValidation(client, options = {}) {
                     ]
                 }
             ],
-            reason: 'Validation automatique Sentinel avant mise en service'
+            reason: 'Validation automatique Noctigarde avant mise en service'
         });
         validationChannel = await guild.channels.create({
             name: `controle-${suffix}`,
             type: ChannelType.GuildText,
             parent: category.id,
-            reason: 'Validation automatique Sentinel avant mise en service'
+            reason: 'Validation automatique Noctigarde avant mise en service'
         });
         dossierChannel = await guild.channels.create({
             name: `dossier-test-${suffix}`,
@@ -142,17 +142,17 @@ async function runDiscordStagingValidation(client, options = {}) {
                 { id: botMember.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
                 { id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
             ],
-            reason: 'Validation du routage privé des dossiers Sentinel'
+            reason: 'Validation du routage privé des dossiers Noctigarde'
         });
         const testMessage = await validationChannel.send({
             embeds: [new EmbedBuilder()
                 .setColor(0x2dd4bf)
-                .setTitle('Sentinel | Validation de préproduction')
+                .setTitle('Noctigarde | Validation de préproduction')
                 .setDescription('Canal, permissions, embed et envoi Discord validés.')] ,
             allowedMentions: { parse: [] }
         });
         const dossierMessage = await dossierChannel.send({
-            content: 'Dossier privé de validation Sentinel. Aucun membre réel n’est sanctionné.',
+            content: 'Dossier privé de validation Noctigarde. Aucun membre réel n’est sanctionné.',
             allowedMentions: { parse: [] }
         });
         checks.push({ key: 'channel-lifecycle', label: 'Création des salons temporaires', ok: Boolean(validationChannel?.id && category?.id) });
@@ -162,7 +162,7 @@ async function runDiscordStagingValidation(client, options = {}) {
         const originalValidationChannelId = validationChannel.id;
         validationChannel = await recreateChannelForPurge(
             validationChannel,
-            'Validation de la recréation sécurisée Sentinel'
+            'Validation de la recréation sécurisée Noctigarde'
         );
         checks.push({
             key: 'channel-recreation',
@@ -191,25 +191,25 @@ async function runDiscordStagingValidation(client, options = {}) {
             if (!moderationMember.moderatable || moderationMember.communicationDisabledUntilTimestamp > Date.now()) {
                 throw new Error('Le membre de timeout doit être modérable et ne pas avoir de timeout actif.');
             }
-            await moderationMember.timeout(5000, 'Validation automatique Sentinel avant mise en service');
+            await moderationMember.timeout(5000, 'Validation automatique Noctigarde avant mise en service');
             const timedMember = await guild.members.fetch(config.moderationMemberId);
             checks.push({
                 key: 'timeout-live',
                 label: 'Timeout réel sur le compte de préproduction',
                 ok: timedMember.communicationDisabledUntilTimestamp > Date.now()
             });
-            await moderationMember.timeout(null, 'Fin de validation automatique Sentinel');
+            await moderationMember.timeout(null, 'Fin de validation automatique Noctigarde');
 
             const banTargetMember = await guild.members.fetch(config.banTargetId).catch(() => null);
             if (banTargetMember) throw new Error('La cible de bannissement de préproduction doit être un compte de test absent du serveur.');
             await guild.members.ban(config.banTargetId, {
                 deleteMessageSeconds: 0,
-                reason: 'Validation automatique Sentinel avant mise en service'
+                reason: 'Validation automatique Noctigarde avant mise en service'
             });
             temporaryBanApplied = true;
             const ban = await guild.bans.fetch(config.banTargetId).catch(() => null);
             checks.push({ key: 'ban-live', label: 'Bannissement réel du compte de préproduction', ok: Boolean(ban) });
-            await guild.members.unban(config.banTargetId, 'Fin de validation automatique Sentinel');
+            await guild.members.unban(config.banTargetId, 'Fin de validation automatique Noctigarde');
             temporaryBanApplied = false;
         } else {
             checks.push({
@@ -220,14 +220,14 @@ async function runDiscordStagingValidation(client, options = {}) {
             });
         }
 
-        await deleteSafely(dossierChannel, 'Fin de validation Sentinel');
+        await deleteSafely(dossierChannel, 'Fin de validation Noctigarde');
         dossierChannel = null;
-        await deleteSafely(validationChannel, 'Fin de validation Sentinel');
+        await deleteSafely(validationChannel, 'Fin de validation Noctigarde');
         validationChannel = null;
-        await deleteSafely(category, 'Fin de validation Sentinel');
+        await deleteSafely(category, 'Fin de validation Noctigarde');
         category = null;
         const roleId = role.id;
-        await deleteSafely(role, 'Fin de validation Sentinel');
+        await deleteSafely(role, 'Fin de validation Noctigarde');
         role = null;
         const deletedRole = await guild.roles.fetch(roleId).catch(() => null);
         checks.push({ key: 'role-delete', label: 'Suppression et réparation du rôle temporaire', ok: !deletedRole });
@@ -241,15 +241,15 @@ async function runDiscordStagingValidation(client, options = {}) {
         return { skipped: false, guildId: guild.id, checks };
     } finally {
         if (moderationMember?.communicationDisabledUntilTimestamp > Date.now()) {
-            await moderationMember.timeout(null, 'Nettoyage de validation Sentinel').catch(() => null);
+            await moderationMember.timeout(null, 'Nettoyage de validation Noctigarde').catch(() => null);
         }
         if (temporaryBanApplied && config.banTargetId) {
-            await guild.members.unban(config.banTargetId, 'Nettoyage de validation Sentinel').catch(() => null);
+            await guild.members.unban(config.banTargetId, 'Nettoyage de validation Noctigarde').catch(() => null);
         }
-        await deleteSafely(dossierChannel, 'Nettoyage de validation Sentinel');
-        await deleteSafely(validationChannel, 'Nettoyage de validation Sentinel');
-        await deleteSafely(category, 'Nettoyage de validation Sentinel');
-        await deleteSafely(role, 'Nettoyage de validation Sentinel');
+        await deleteSafely(dossierChannel, 'Nettoyage de validation Noctigarde');
+        await deleteSafely(validationChannel, 'Nettoyage de validation Noctigarde');
+        await deleteSafely(category, 'Nettoyage de validation Noctigarde');
+        await deleteSafely(role, 'Nettoyage de validation Noctigarde');
     }
 }
 

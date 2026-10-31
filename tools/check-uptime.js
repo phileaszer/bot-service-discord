@@ -2,7 +2,7 @@
 
 function validateStatusPayload(payload) {
     if (!payload || payload.ok !== true || payload.status?.dashboardOnline !== true) {
-        throw new Error('Le dashboard Sentinel ne confirme pas son état opérationnel.');
+        throw new Error('Le dashboard Noctigarde ne confirme pas son état opérationnel.');
     }
     if (payload.status.botOnline !== true) {
         throw new Error('Le dashboard répond, mais le bot Discord est hors ligne.');
@@ -21,8 +21,8 @@ async function sendAlert(webhookUrl, message) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-            username: 'Sentinel Surveillance',
-            content: `Alerte Sentinel : ${String(message).slice(0, 1500)}`,
+            username: 'Noctigarde Surveillance',
+            content: `Alerte Noctigarde : ${String(message).slice(0, 1500)}`,
             allowed_mentions: { parse: [] }
         }),
         signal: AbortSignal.timeout(10000)
@@ -35,16 +35,16 @@ async function checkUptime(options = {}) {
     const url = options.url || process.env.SENTINEL_HEALTHCHECK_URL;
     if (!url) throw new Error('SENTINEL_HEALTHCHECK_URL est obligatoire.');
     const response = await fetch(url, {
-        headers: { accept: 'application/json', 'user-agent': 'Sentinel-Uptime/1.0' },
+        headers: { accept: 'application/json', 'user-agent': 'Noctigarde-Uptime/1.0' },
         signal: AbortSignal.timeout(15000)
     });
-    if (!response.ok) throw new Error(`Le contrôle Sentinel a répondu ${response.status}.`);
+    if (!response.ok) throw new Error(`Le contrôle Noctigarde a répondu ${response.status}.`);
     return validateStatusPayload(await response.json());
 }
 
 if (require.main === module) {
     checkUptime()
-        .then(status => console.log(`Sentinel opérationnel : ${status.guildCount} serveur(s), ${status.incidents} incident(s).`))
+        .then(status => console.log(`Noctigarde opérationnel : ${status.guildCount} serveur(s), ${status.incidents} incident(s).`))
         .catch(async error => {
             console.error(`Contrôle externe échoué : ${error.message}`);
             await sendAlert(process.env.SENTINEL_ALERT_WEBHOOK_URL, error.message)

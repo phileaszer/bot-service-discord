@@ -1,6 +1,6 @@
-# Préparation PostgreSQL de Sentinel
+# Préparation PostgreSQL de Noctigarde
 
-Sentinel reste volontairement sur SQLite tant qu'une seule instance écrit dans la base. Le passage à PostgreSQL devient pertinent avant l'activation de plusieurs réplicas Railway ou lorsque les écritures concurrentes deviennent fréquentes.
+Noctigarde reste volontairement sur SQLite tant qu'une seule instance écrit dans la base. Le passage à PostgreSQL devient pertinent avant l'activation de plusieurs réplicas Railway ou lorsque les écritures concurrentes deviennent fréquentes.
 
 ## Garde-fous déjà prêts
 

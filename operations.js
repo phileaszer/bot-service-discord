@@ -609,11 +609,11 @@ function spreadsheetClipboardCell(value) {
 
 function createReportDocument({
     title,
-    subtitle = 'Rapport administratif Sentinel',
+    subtitle = 'Rapport administratif Noctigarde',
     metadata = [],
     sectionTitle = 'Données du rapport',
     description = '',
-    confidentiality = 'Document interne Sentinel',
+    confidentiality = 'Document interne Noctigarde',
     columns,
     rows,
     format

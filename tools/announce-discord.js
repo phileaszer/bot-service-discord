@@ -28,12 +28,12 @@ const CHANNELS = {
         en: '🧾｜release-notes'
     },
     status: {
-        fr: '📌｜statut-sentinel',
-        en: '📌｜sentinel-status'
+        fr: '📌｜statut-noctigarde',
+        en: '📌｜noctigarde-status'
     }
 };
 
-const DEFAULT_PING_ROLE_NAME = '📡 Sentinel | Annonces';
+const DEFAULT_PING_ROLE_NAME = '📡 Noctigarde | Annonces';
 
 function readArgs(argv) {
     const args = {};
@@ -114,8 +114,8 @@ function buildEmbed({ type, title, body, source }) {
         .setDescription(body)
         .setFooter({
             text: source
-                ? `Sentinel - Performance - Securite - Fiabilite - ${source}`
-                : 'Sentinel - Performance - Securite - Fiabilite'
+                ? `Noctigarde - Performance - Securite - Fiabilite - ${source}`
+                : 'Noctigarde - Performance - Securite - Fiabilite'
         })
         .setTimestamp();
 
@@ -237,7 +237,7 @@ async function main() {
     const bodyFr = required(args, 'body-fr');
     const titleEn = normalizeText(args['title-en']);
     const bodyEn = normalizeText(args['body-en']);
-    const source = args.source || 'source staff Sentinel';
+    const source = args.source || 'source staff Noctigarde';
 
     if (args['dry-run']) {
         console.log(JSON.stringify({

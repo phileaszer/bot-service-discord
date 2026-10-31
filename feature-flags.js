@@ -11,7 +11,7 @@ const FEATURE_DEFINITIONS = Object.freeze([
     { key: 'planning-reminders', label: 'Rappels de planning', description: 'Rappels privés et publics avant un créneau.' },
     { key: 'long-service-alerts', label: 'Services trop longs', description: 'Confirmation et clôture automatique des services.' },
     { key: 'ticket-maintenance', label: 'Suivi des tickets', description: 'Rappels de délai et suppression différée des tickets.' },
-    { key: 'official-updates', label: 'Nouveautés officielles', description: 'Distribution et nouvelles tentatives des annonces Sentinel.' },
+    { key: 'official-updates', label: 'Nouveautés officielles', description: 'Distribution et nouvelles tentatives des annonces Noctigarde.' },
     { key: 'status-panels', label: 'Panneaux de statut', description: 'Actualisation automatique des panneaux techniques.' },
     { key: 'repair-scan', label: 'Réparation automatique', description: 'Contrôle quotidien des rôles, salons et références.' }
 ]);
@@ -24,7 +24,7 @@ function nowIso() {
 
 function normalizeKey(value) {
     const key = String(value || '').trim().toLowerCase();
-    if (!FEATURE_KEYS.has(key)) throw new Error('Fonction Sentinel inconnue.');
+    if (!FEATURE_KEYS.has(key)) throw new Error('Fonction Noctigarde inconnue.');
     return key;
 }
 
@@ -81,8 +81,8 @@ function disabledMessage(featureKey, language = 'fr') {
     const flag = getFeatureFlag(featureKey);
     const reason = flag.reason ? ` ${flag.reason}` : '';
     return language === 'en'
-        ? `This Sentinel feature is temporarily paused.${reason}`
-        : `Cette fonction Sentinel est temporairement suspendue.${reason}`;
+        ? `This Noctigarde feature is temporarily paused.${reason}`
+        : `Cette fonction Noctigarde est temporairement suspendue.${reason}`;
 }
 
 module.exports = {

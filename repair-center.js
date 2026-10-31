@@ -67,7 +67,7 @@ async function scanGuildConfiguration(guild, actorUserId = null) {
             issues.push(issue(
                 `custom-embed:${embed.message_id}`,
                 'dead_embed',
-                'Annonce Sentinel introuvable',
+                'Annonce Noctigarde introuvable',
                 `L’annonce « ${embed.title || embed.message_id} » n’existe plus sur Discord.`,
                 true,
                 { channelId: embed.channel_id, messageId: embed.message_id }

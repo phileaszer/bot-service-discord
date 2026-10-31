@@ -109,7 +109,7 @@ function createProfessionalPdf({
     metadata = [],
     sections = [],
     generatedAt = new Date(),
-    confidentiality = 'Document interne Sentinel'
+    confidentiality = 'Document interne Noctigarde'
 }) {
     const normalizedSections = (Array.isArray(sections) ? sections : []).map((section, index) => ({
         title: cleanText(section.title || `Section ${index + 1}`),
@@ -147,7 +147,7 @@ function createProfessionalPdf({
         fillRect(width - 106, 0, 106, 3, COLORS.pink);
         fillRect(margin, firstPage ? 22 : 17, 27, 27, COLORS.cyan);
         text('S', margin + 9, firstPage ? 27 : 22, { size: 13, bold: true, color: COLORS.navy });
-        text('SENTINEL', margin + 39, firstPage ? 19 : 15, { size: 9, bold: true, color: COLORS.cyan });
+        text('NOCTIGARDE', margin + 39, firstPage ? 19 : 15, { size: 9, bold: true, color: COLORS.cyan });
         text(firstPage ? title : `${title} - suite`, margin + 39, firstPage ? 35 : 31, {
             size: firstPage ? 18 : 12,
             bold: true,
@@ -294,7 +294,7 @@ function createProfessionalPdf({
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
 
-    let output = '%PDF-1.4\n%Sentinel\n';
+    let output = '%PDF-1.4\n%Noctigarde\n';
     const offsets = [0];
     objects.forEach((object, index) => {
         offsets.push(Buffer.byteLength(output, 'latin1'));

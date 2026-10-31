@@ -1,4 +1,4 @@
-name: Sentinel uptime
+name: Noctigarde uptime
 
 on:
   schedule:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sentinel-uptime
+  group: noctigarde-uptime
   cancel-in-progress: true
 
 jobs:
@@ -27,6 +27,6 @@ jobs:
 
       - name: Check dashboard and Discord bot
         env:
-          SENTINEL_HEALTHCHECK_URL: https://bot-service-discord-production.up.railway.app/api/status
+          SENTINEL_HEALTHCHECK_URL: https://dashboard.noctigarde.fr/api/status
           SENTINEL_ALERT_WEBHOOK_URL: ${{ secrets.SENTINEL_ALERT_WEBHOOK_URL }}
         run: node tools/check-uptime.js

@@ -76,7 +76,7 @@ test('dashboard sections use persistent internal summaries instead of one long p
 test('the public stability patch note uses short user-facing sentences', () => {
     const database = read('database/database.js');
     assert.match(database, /sentinel-stability-security-2026-10-27/);
-    assert.match(database, /Sentinel redémarre plus vite\./);
+    assert.match(database, /Noctigarde redémarre plus vite\./);
     assert.match(database, /Les accès sensibles sont mieux protégés\./);
     assert.doesNotMatch(database, /sentinel-stability-security-2026-10-27[\s\S]{0,2400}PostgreSQL/);
 });
@@ -89,21 +89,21 @@ test('an overdue dossier receives only one successful reminder', () => {
     assert.match(source, /if \(reminderSent\) \{\s*markDossierReminder\(guild\.id, dossier\.channelId\)/);
 });
 
-test('the site control room lists every installed Sentinel server', () => {
+test('the site control room lists every installed Noctigarde server', () => {
     const frontend = read('site/dashboard.js');
     assert.match(frontend, /function founderGuildInventoryPanel\(\)/);
     assert.match(frontend, /\.filter\(\(guild\) => guild\.installed\)/);
-    assert.match(frontend, /aria-label="Serveurs Sentinel"/);
+    assert.match(frontend, /aria-label="Serveurs Noctigarde"/);
     assert.match(frontend, /data-founder-guild-search/);
     assert.match(frontend, /data-select-guild="\$\{escapeHtml\(guild\.id\)\}"/);
     assert.match(frontend, /\{ id: 'servers', label: 'Serveurs'/);
 });
 
-test('every site page receives the public Sentinel creator credit', () => {
+test('every site page receives the public Noctigarde creator credit', () => {
     const theme = read('site/theme.js');
     assert.match(theme, /function ensureCreatorCredit\(\)/);
     assert.match(theme, /Fantomenale/);
-    assert.match(theme, /Créatrice de Sentinel/);
+    assert.match(theme, /Créatrice de Noctigarde/);
     assert.doesNotMatch(theme, /515991628448792604/);
     assert.doesNotMatch(theme, /discord\.com\/users/);
     assert.match(theme, /document\.body\.append\(footer\)/);

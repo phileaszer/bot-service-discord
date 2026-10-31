@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'sentinel-shell-20261020-1';
+const CACHE_NAME = 'noctigarde-shell-20261031-1';
 const SHELL = [
   './',
   './index.html',
@@ -10,7 +10,7 @@ const SHELL = [
   './theme.js',
   './i18n.js',
   './auth.js',
-  './assets/sentinel-mark.png'
+  './assets/noctigarde-mark.png'
 ];
 
 self.addEventListener('install', event => {

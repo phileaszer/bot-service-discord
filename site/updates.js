@@ -1,5 +1,5 @@
 (() => {
-  const RAILWAY_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
+  const RAILWAY_ORIGIN = 'https://dashboard.noctigarde.fr';
   const endpoint = window.location.hostname.endsWith('railway.app')
     || ['127.0.0.1', 'localhost'].includes(window.location.hostname)
     ? '/api/updates'
@@ -18,7 +18,7 @@
     { key: 'tickets', fr: 'Tickets', en: 'Tickets', terms: ['ticket', 'dossier', 'support', 'private case'] },
     { key: 'security', fr: 'Sécurité', en: 'Security', terms: ['sécurité', 'sûreté', 'modération', 'sanction', 'auto-modération', 'security', 'safety', 'moderation', 'punished'] },
     { key: 'announcements', fr: 'Annonces', en: 'Announcements', terms: ['annonce', 'publication', 'salon des nouveautés', 'announcement', 'update channel'] },
-    { key: 'sentinel', fr: 'Sentinel', en: 'Sentinel', terms: ['démonstration', 'abonnement', 'premium', 'demonstration', 'subscription', 'paid'] }
+    { key: 'sentinel', fr: 'Noctigarde', en: 'Noctigarde', terms: ['démonstration', 'abonnement', 'premium', 'demonstration', 'subscription', 'paid'] }
   ];
 
   function currentLanguage() {
@@ -191,7 +191,7 @@
     article.id = updateAnchor(update);
     article.className = `official-update-entry ${latest ? 'is-featured is-open' : 'is-archived'}`;
     meta.className = 'official-update-meta';
-    label.textContent = language === 'en' ? 'Sentinel update' : 'Mise à jour Sentinel';
+    label.textContent = language === 'en' ? 'Noctigarde update' : 'Mise à jour Noctigarde';
     number.className = 'official-update-number';
     number.textContent = language === 'en' ? `Patch notes #${patchNumber}` : `Patchnote n°${patchNumber}`;
     date.dateTime = update.publishedAt || update.createdAt || '';

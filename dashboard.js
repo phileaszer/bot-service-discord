@@ -76,8 +76,9 @@ const ALLOWED_RETURN_PATHS = new Set([
     '/nouveautes',
     '/nouveautes.html'
 ]);
-const DEFAULT_DASHBOARD_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
-const PUBLIC_SITE_ORIGIN = 'https://phileaszer.github.io';
+const DEFAULT_DASHBOARD_ORIGIN = 'https://dashboard.noctigarde.fr';
+const PUBLIC_SITE_ORIGIN = 'https://noctigarde.fr';
+const LEGACY_PUBLIC_SITE_ORIGIN = 'https://phileaszer.github.io';
 const TRUSTED_INLINE_THEME_SCRIPT_HASH = "'sha256-Uu777sEy6oOiMQiWxnehxOXPt2q3s3srNqyZMOTy+Mg='";
 const CSRF_HEADER = 'x-sentinel-csrf';
 const STORED_SECRET_PREFIX = 'enc:v1:';
@@ -192,7 +193,7 @@ function getDashboardPermissionLabel(permissionFlag, language = 'fr') {
 }
 
 function getBotRoleName(guild) {
-    return guild?.members?.me?.roles?.highest?.name || 'Sentinel';
+    return guild?.members?.me?.roles?.highest?.name || 'Noctigarde';
 }
 
 function getDashboardBotPermissionFix(guild, permissionFlag, language = 'fr') {
@@ -201,10 +202,10 @@ function getDashboardBotPermissionFix(guild, permissionFlag, language = 'fr') {
     const botRoleName = getBotRoleName(guild);
 
     if (lang === 'en') {
-        return `Add the “${permission}” permission to the Sentinel role (${botRoleName}), then try again.`;
+        return `Add the “${permission}” permission to the Noctigarde role (${botRoleName}), then try again.`;
     }
 
-    return `Ajoute la permission “${permission}” au rôle Sentinel (${botRoleName}), puis réessaie.`;
+    return `Ajoute la permission “${permission}” au rôle Noctigarde (${botRoleName}), puis réessaie.`;
 }
 
 function getDashboardUserPermissionFix(permissionFlag, language = 'fr') {
@@ -212,16 +213,16 @@ function getDashboardUserPermissionFix(permissionFlag, language = 'fr') {
     const permission = getDashboardPermissionLabel(permissionFlag, lang);
 
     if (lang === 'en') {
-        return `Give your Discord role the “${permission}” permission, or add your role to Sentinel allowed roles.`;
+        return `Give your Discord role the “${permission}” permission, or add your role to Noctigarde allowed roles.`;
     }
 
-    return `Donne la permission “${permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Sentinel.`;
+    return `Donne la permission “${permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Noctigarde.`;
 }
 
 function getDashboardTextChannelFix(language = 'fr') {
     return getErrorLanguage(language) === 'en'
-        ? 'Choose a text channel that still exists and is visible to Sentinel.'
-        : 'Choisis un salon texte encore présent et visible par Sentinel.';
+        ? 'Choose a text channel that still exists and is visible to Noctigarde.'
+        : 'Choisis un salon texte encore présent et visible par Noctigarde.';
 }
 
 function getDashboardChannelPermissionFix(channel, permissionFlag, language = 'fr') {
@@ -232,26 +233,26 @@ function getDashboardChannelPermissionFix(channel, permissionFlag, language = 'f
 
     if (permissionFlag === PermissionsBitField.Flags.ViewChannel) {
         return lang === 'en'
-            ? `Allow Sentinel to view ${channelLabel}.`
-            : `Autorise Sentinel à voir ${channelLabel}.`;
+            ? `Allow Noctigarde to view ${channelLabel}.`
+            : `Autorise Noctigarde à voir ${channelLabel}.`;
     }
 
     if (permissionFlag === PermissionsBitField.Flags.SendMessages) {
         return lang === 'en'
-            ? `Allow Sentinel to send messages in ${channelLabel}.`
-            : `Autorise Sentinel à envoyer des messages dans ${channelLabel}.`;
+            ? `Allow Noctigarde to send messages in ${channelLabel}.`
+            : `Autorise Noctigarde à envoyer des messages dans ${channelLabel}.`;
     }
 
     if (permissionFlag === PermissionsBitField.Flags.EmbedLinks) {
         return lang === 'en'
-            ? `Allow Sentinel to embed links in ${channelLabel}.`
-            : `Ajoute la permission “Intégrer des liens” à Sentinel dans ${channelLabel}.`;
+            ? `Allow Noctigarde to embed links in ${channelLabel}.`
+            : `Ajoute la permission “Intégrer des liens” à Noctigarde dans ${channelLabel}.`;
     }
 
     if (permissionFlag === PermissionsBitField.Flags.ReadMessageHistory) {
         return lang === 'en'
-            ? `Allow Sentinel to read message history in ${channelLabel}.`
-            : `Autorise Sentinel à voir les anciens messages dans ${channelLabel}.`;
+            ? `Allow Noctigarde to read message history in ${channelLabel}.`
+            : `Autorise Noctigarde à voir les anciens messages dans ${channelLabel}.`;
     }
 
     return getDashboardBotPermissionFix(channel?.guild, permissionFlag, lang);
@@ -262,7 +263,7 @@ function requireBotChannelPermissions(guild, channel, permissionFlags, language 
     const missingPermission = permissionFlags.find(permissionFlag => !permissions?.has(permissionFlag));
 
     if (missingPermission) {
-        throw createHttpError(403, 'Sentinel cannot use the selected channel.', {
+        throw createHttpError(403, 'Noctigarde cannot use the selected channel.', {
             missingPermission: getDashboardPermissionLabel(missingPermission, language),
             fix: getDashboardChannelPermissionFix(channel, missingPermission, language)
         });
@@ -433,6 +434,7 @@ function shouldUseSecureCookies(req) {
 function getAllowedPublicOrigins() {
     return new Set([
         PUBLIC_SITE_ORIGIN,
+        LEGACY_PUBLIC_SITE_ORIGIN,
         getConfiguredDashboardOrigin(),
         ...splitConfiguredList(process.env.DASHBOARD_ALLOWED_CORS_ORIGINS)
             .map(value => safeUrl(value)?.origin)
@@ -658,7 +660,7 @@ function addDashboardAuditLog({ guild, actor, body, status, summary }) {
         status,
         targetType,
         targetId,
-        truncateText(summary || 'Action dashboard Sentinel.', 800),
+        truncateText(summary || 'Action dashboard Noctigarde.', 800),
         JSON.stringify(details),
         'dashboard',
         nowIso()
@@ -698,14 +700,14 @@ function addSiteAccessAuditLog({ session, body, status, summary, kind }) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         guildId || 'site',
-        guildId ? null : 'Régie Sentinel',
+        guildId ? null : 'Régie Noctigarde',
         session?.user?.id || 'unknown',
         truncateText(session?.user?.username || session?.user?.globalName || null, 200),
         truncateText(`${kind}_${operation}_${target}`, 500),
         status,
         target,
         targetId,
-        truncateText(summary || 'Action protégée Sentinel.', 800),
+        truncateText(summary || 'Action protégée Noctigarde.', 800),
         JSON.stringify({ kind, operation, target }),
         'site',
         nowIso()
@@ -980,7 +982,7 @@ async function requireSitePanelAccess(ctx, session) {
 
     if (!access.canViewSitePanel) {
         if (access.staffAssignment && !access.discordStaffRole) {
-            throw createHttpError(403, 'A Sentinel Discord staff role is required for site staff access.');
+            throw createHttpError(403, 'A Noctigarde Discord staff role is required for site staff access.');
         }
 
         throw createHttpError(403, 'Site staff access is required.');
@@ -1116,9 +1118,14 @@ function getSafeReturnTo(req, value) {
         const parsed = new URL(truncateText(String(value), 1000), baseUrl);
         const base = new URL(baseUrl);
         const isSameOrigin = parsed.origin === base.origin;
-        const isGithubPages = parsed.hostname.toLowerCase() === 'phileaszer.github.io';
+        const returnHostname = parsed.hostname.toLowerCase();
+        const isPublicSite = [
+            'noctigarde.fr',
+            'www.noctigarde.fr',
+            'phileaszer.github.io'
+        ].includes(returnHostname);
 
-        if (!isSameOrigin && !isGithubPages) {
+        if (!isSameOrigin && !isPublicSite) {
             return `${baseUrl}/dashboard`;
         }
 
@@ -1550,7 +1557,7 @@ function buildContentSecurityPolicy(req) {
         "frame-ancestors 'none'",
         `script-src 'self' ${TRUSTED_INLINE_THEME_SCRIPT_HASH}`,
         "style-src 'self'",
-        `img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://phileaszer.github.io${objectStorageOrigin ? ` ${objectStorageOrigin}` : ''}`,
+        `img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://noctigarde.fr https://phileaszer.github.io${objectStorageOrigin ? ` ${objectStorageOrigin}` : ''}`,
         "font-src 'self' data:",
         `connect-src 'self' ${DEFAULT_DASHBOARD_ORIGIN} ${getConfiguredDashboardOrigin()}`,
         "form-action 'self' https://discord.com",
@@ -1648,7 +1655,7 @@ function streamPrivateFile(res, file) {
     }));
     const stream = fs.createReadStream(file.fullPath);
     stream.on('error', error => {
-        console.error('Erreur lecture archive Sentinel :', error);
+        console.error('Erreur lecture archive Noctigarde :', error);
         res.destroy(error);
     });
     stream.pipe(res);
@@ -1690,7 +1697,7 @@ function streamPublicEmbedMedia(req, res, media) {
     }
 
     media.body.on?.('error', error => {
-        console.error('Erreur lecture media embed Sentinel :', error);
+        console.error('Erreur lecture media embed Noctigarde :', error);
         res.destroy(error);
     });
     media.body.pipe(res);
@@ -2027,7 +2034,7 @@ async function getDashboardAccess(ctx, session, guildId) {
         || await ctx.client.guilds.fetch(guildId).catch(() => null);
 
     if (!guild) {
-        throw createHttpError(403, 'Sentinel is not installed on this server.', {
+        throw createHttpError(403, 'Noctigarde is not installed on this server.', {
             code: 'BOT_NOT_INSTALLED',
             inviteUrl: getInviteUrl(ctx, guildId)
         });
@@ -2058,7 +2065,7 @@ function requireSession(req) {
 
 function requireCommandAccess(ctx, member) {
     if (!member || !ctx.helpers.hasCommandRoleAccess(member)) {
-        throw createHttpError(403, 'You do not have permission to manage Sentinel on this server.');
+        throw createHttpError(403, 'You do not have permission to manage Noctigarde on this server.');
     }
 }
 
@@ -2068,7 +2075,7 @@ function requireDossierAccess(ctx, member) {
         : ctx.helpers.hasCommandRoleAccess(member);
 
     if (!member || !canManageDossier) {
-        throw createHttpError(403, 'You do not have permission to manage Sentinel dossiers on this server.');
+        throw createHttpError(403, 'You do not have permission to manage Noctigarde dossiers on this server.');
     }
 }
 
@@ -2083,7 +2090,7 @@ function requireModerationAccess(ctx, member, permissionFlag, language = 'fr') {
 
 function requireBotPermission(guild, permissionFlag, language = 'fr') {
     if (!guild.members.me?.permissions.has(permissionFlag)) {
-        throw createHttpError(403, 'Sentinel does not have the required Discord permission.', {
+        throw createHttpError(403, 'Noctigarde does not have the required Discord permission.', {
             missingPermission: getDashboardPermissionLabel(permissionFlag, language),
             fix: getDashboardBotPermissionFix(guild, permissionFlag, language)
         });
@@ -2116,8 +2123,8 @@ function applyDashboardPremiumQuota(quota, advanced = false) {
 function formatDashboardCustomEmbedQuota(ctx, guildId, language = 'fr', member = null, advanced = false) {
     if (advanced) {
         return language === 'en'
-            ? 'Unlimited Sentinel embed access.'
-            : 'Accès illimité aux embeds Sentinel.';
+            ? 'Unlimited Noctigarde embed access.'
+            : 'Accès illimité aux embeds Noctigarde.';
     }
 
     return ctx.helpers.formatCustomEmbedQuota(guildId, language, member);
@@ -2132,7 +2139,7 @@ async function requireAdvanced(ctx, guildId, member = null, session = null) {
     const hasAccess = await hasDashboardAdvancedAccess(ctx, guildId, member, session);
 
     if (!hasAccess) {
-        throw createHttpError(403, 'This Sentinel action is not available on this server.');
+        throw createHttpError(403, 'This Noctigarde action is not available on this server.');
     }
 }
 
@@ -2202,19 +2209,19 @@ async function manageCreatorSiteStaffAccess(ctx, session, body) {
         }
 
         if (!roleState.guild) {
-            throw createHttpError(503, 'The Sentinel Discord server is unavailable.');
+            throw createHttpError(503, 'The Noctigarde Discord server is unavailable.');
         }
 
         if (roleState.requiredRoleIds.length === 0) {
-            throw createHttpError(409, 'No Sentinel Discord staff role is configured.');
+            throw createHttpError(409, 'No Noctigarde Discord staff role is configured.');
         }
 
         if (!roleState.member) {
-            throw createHttpError(403, 'The user must join the Sentinel Discord server before receiving site staff access.');
+            throw createHttpError(403, 'The user must join the Noctigarde Discord server before receiving site staff access.');
         }
 
         if (!roleState.hasRequiredRole) {
-            throw createHttpError(403, 'The user must have a Sentinel Discord staff role before receiving site staff access.');
+            throw createHttpError(403, 'The user must have a Noctigarde Discord staff role before receiving site staff access.');
         }
 
         saveUserProfile({
@@ -2440,45 +2447,45 @@ function buildPermissionDiagnostics(ctx, guild, config) {
     const checks = [
         permissionCheck(
             'ban',
-            'Sentinel peut bannir',
+            'Noctigarde peut bannir',
             has(PermissionsBitField.Flags.BanMembers),
-            'Ajoute la permission “Bannir des membres” au rôle Sentinel.'
+            'Ajoute la permission “Bannir des membres” au rôle Noctigarde.'
         ),
         permissionCheck(
             'timeout',
-            'Sentinel peut timeout',
+            'Noctigarde peut timeout',
             has(PermissionsBitField.Flags.ModerateMembers),
-            'Ajoute la permission “Exclure temporairement des membres” au rôle Sentinel.'
+            'Ajoute la permission “Exclure temporairement des membres” au rôle Noctigarde.'
         ),
         permissionCheck(
             'kick',
-            'Sentinel peut expulser',
+            'Noctigarde peut expulser',
             has(PermissionsBitField.Flags.KickMembers),
-            'Ajoute la permission “Expulser des membres” au rôle Sentinel.'
+            'Ajoute la permission “Expulser des membres” au rôle Noctigarde.'
         ),
         permissionCheck(
             'purge',
-            'Sentinel peut purger',
+            'Noctigarde peut purger',
             has(PermissionsBitField.Flags.ManageMessages),
-            'Ajoute la permission “Gérer les messages” au rôle Sentinel.'
+            'Ajoute la permission “Gérer les messages” au rôle Noctigarde.'
         ),
         permissionCheck(
             'manageChannels',
-            'Sentinel peut créer des salons',
+            'Noctigarde peut créer des salons',
             has(PermissionsBitField.Flags.ManageChannels),
-            'Ajoute la permission “Gérer les salons” au rôle Sentinel.'
+            'Ajoute la permission “Gérer les salons” au rôle Noctigarde.'
         ),
         permissionCheck(
             'attachFiles',
-            'Sentinel peut joindre des fichiers',
+            'Noctigarde peut joindre des fichiers',
             has(PermissionsBitField.Flags.AttachFiles),
-            'Ajoute la permission “Joindre des fichiers” au rôle Sentinel pour les comptes rendus.'
+            'Ajoute la permission “Joindre des fichiers” au rôle Noctigarde pour les comptes rendus.'
         ),
         permissionCheck(
             'manageRoles',
-            'Sentinel peut gérer les rôles',
+            'Noctigarde peut gérer les rôles',
             canManageRoles,
-            'Ajoute la permission “Gérer les rôles” au rôle Sentinel.'
+            'Ajoute la permission “Gérer les rôles” au rôle Noctigarde.'
         ),
         permissionCheck(
             'autoRole',
@@ -2494,11 +2501,11 @@ function buildPermissionDiagnostics(ctx, guild, config) {
         ),
         {
             id: 'roleOrder',
-            label: 'Rôle Sentinel trop bas',
+            label: 'Rôle Noctigarde trop bas',
             ok: !serviceRoleTooHigh,
             value: serviceRoleTooHigh ? 'Oui' : 'Non',
             fix: serviceRoleTooHigh
-                ? `Monte le rôle Sentinel au-dessus du rôle “${serviceRole.name}”.`
+                ? `Monte le rôle Noctigarde au-dessus du rôle “${serviceRole.name}”.`
                 : null,
             detail: serviceRole ? `Rôle de service : ${serviceRole.name}` : null
         },
@@ -2508,7 +2515,7 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             ok: !autoRoleTooHigh,
             value: autoRoleTooHigh ? 'Oui' : 'Non',
             fix: autoRoleTooHigh
-                ? `Monte le rôle Sentinel au-dessus du rôle “${autoRole.name}”.`
+                ? `Monte le rôle Noctigarde au-dessus du rôle “${autoRole.name}”.`
                 : null,
             detail: autoRole ? `Rôle automatique : ${autoRole.name}` : null
         },
@@ -2517,7 +2524,7 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             'Salon de logs accessible',
             logChannelWritable,
             logChannel
-                ? `Autorise Sentinel à voir et écrire dans #${logChannel.name}.`
+                ? `Autorise Noctigarde à voir et écrire dans #${logChannel.name}.`
                 : 'Le salon de logs est optionnel, mais recommandé.'
         ),
         permissionCheck(
@@ -2525,7 +2532,7 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             'État technique accessible',
             statusChannelWritable,
             statusChannel
-                ? `Autorise Sentinel à voir, écrire et intégrer des liens dans #${statusChannel.name}.`
+                ? `Autorise Noctigarde à voir, écrire et intégrer des liens dans #${statusChannel.name}.`
                 : (config.statusChannelId
                     ? 'Choisis un autre salon statut accessible.'
                     : 'Le panneau d’état technique est optionnel.')
@@ -2535,10 +2542,10 @@ function buildPermissionDiagnostics(ctx, guild, config) {
             'Salon des nouveautés accessible',
             updatesChannelWritable,
             updatesChannel
-                ? `Autorise Sentinel à voir, écrire et intégrer des liens dans #${updatesChannel.name}.`
+                ? `Autorise Noctigarde à voir, écrire et intégrer des liens dans #${updatesChannel.name}.`
                 : (config.updatesChannelId
                     ? 'Choisis un autre salon des nouveautés accessible.'
-                    : 'Choisis le salon obligatoire qui recevra les annonces officielles Sentinel.')
+                    : 'Choisis le salon obligatoire qui recevra les annonces officielles Noctigarde.')
         )
     ];
 
@@ -2787,12 +2794,12 @@ async function buildGuildState(ctx, guild, session = null, options = {}) {
         {
             id: 'staff',
             label: 'Accès des responsables',
-            detail: 'Au moins un rôle Discord peut gérer Sentinel.',
+            detail: 'Au moins un rôle Discord peut gérer Noctigarde.',
             complete: commandRoleIds.some(roleId => guild.roles.cache.has(roleId))
         },
         {
             id: 'updates',
-            label: 'Nouveautés Sentinel',
+            label: 'Nouveautés Noctigarde',
             detail: 'Un salon reçoit les annonces officielles du bot.',
             complete: Boolean(config.updatesChannelId && guild.channels.cache.has(config.updatesChannelId) && config.statusUpdatesEnabled)
         }
@@ -3163,7 +3170,7 @@ async function automodAction(ctx, guild, actor, body, session = null) {
     const hasPremiumPatch = Object.keys(body || {}).some(key => AUTOMOD_PREMIUM_BODY_KEYS.has(key));
 
     if (hasPremiumPatch && !advanced) {
-        throw createHttpError(403, 'This Sentinel action is not available on this server.');
+        throw createHttpError(403, 'This Noctigarde action is not available on this server.');
     }
 
     if (action === 'set-automod-settings') {
@@ -3398,11 +3405,11 @@ async function moderationAction(ctx, guild, actor, body, session = null) {
         } catch (error) {
             if (error?.status) throw error;
             if (error?.purgeBusy) {
-                throw createHttpError(409, 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+                throw createHttpError(409, 'Un nettoyage Noctigarde est déjà en cours dans ce salon.');
             }
             if (error?.channelFreezeFailed) {
-                throw createHttpError(409, 'Sentinel n’a pas pu figer les publications dans ce salon.', {
-                    fix: 'Vérifie la permission « Gérer les salons » et la position du rôle Sentinel, puis réessaie.'
+                throw createHttpError(409, 'Noctigarde n’a pas pu figer les publications dans ce salon.', {
+                    fix: 'Vérifie la permission « Gérer les salons » et la position du rôle Noctigarde, puis réessaie.'
                 });
             }
             if (error?.archiveFailed) {
@@ -3617,7 +3624,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         if (!sentMessage) {
-            throw createHttpError(403, 'Sentinel cannot send this embed in the selected channel.', {
+            throw createHttpError(403, 'Noctigarde cannot send this embed in the selected channel.', {
                 fix: getDashboardChannelPermissionFix(channel, PermissionsBitField.Flags.SendMessages, language)
             });
         }
@@ -3625,7 +3632,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, sentMessage.id, actor.id, data);
         await ctx.helpers.syncCustomEmbedMedia?.(sentMessage, body, language);
 
-        return `Embed Sentinel envoye dans #${channel.name}. ID : ${sentMessage.id}. ${formatDashboardCustomEmbedQuota(ctx, guild.id, language, actor, advanced)}`;
+        return `Embed Noctigarde envoye dans #${channel.name}. ID : ${sentMessage.id}. ${formatDashboardCustomEmbedQuota(ctx, guild.id, language, actor, advanced)}`;
     }
 
     const messageId = String(body.messageId || '').trim();
@@ -3656,7 +3663,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         if (record) {
             ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
         }
-        throw createHttpError(404, 'Sentinel embed not found.');
+        throw createHttpError(404, 'Noctigarde embed not found.');
     }
 
     if (!record) {
@@ -3665,7 +3672,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
             : null;
 
         if (!data) {
-            throw createHttpError(404, 'Sentinel embed not found.');
+            throw createHttpError(404, 'Noctigarde embed not found.');
         }
 
         ctx.helpers.addCustomEmbedRecord(guild.id, channel.id, message.id, actor.id, data);
@@ -3681,7 +3688,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         ctx.helpers.deleteCustomEmbedRecord(guild.id, messageId);
-        return `Embed Sentinel ${messageId} supprime.`;
+        return `Embed Noctigarde ${messageId} supprime.`;
     }
 
     if (action === 'custom-embed-edit') {
@@ -3775,7 +3782,7 @@ async function customEmbedAction(ctx, guild, actor, body, session = null) {
         }
 
         ctx.helpers.updateCustomEmbedRecord(guild.id, messageId, data);
-        return `Embed Sentinel ${messageId} modifie.`;
+        return `Embed Noctigarde ${messageId} modifie.`;
     }
 
     throw createHttpError(400, 'Unknown custom embed action.');
@@ -3837,7 +3844,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
 
-        return `Bureau d'accueil Sentinel publie ou mis a jour dans #${channel.name}.`;
+        return `Bureau d'accueil Noctigarde publie ou mis a jour dans #${channel.name}.`;
     }
 
     if (action === 'add-dossier-role' || action === 'remove-dossier-role') {
@@ -3889,13 +3896,13 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
     if (action === 'dossier-close') {
         const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
-            throw createHttpError(400, 'This channel is not a Sentinel dossier.');
+            throw createHttpError(400, 'This channel is not a Noctigarde dossier.');
         }
 
         const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
 
         if (!dossier) {
-            throw createHttpError(404, 'Dossier Sentinel introuvable dans le registre.');
+            throw createHttpError(404, 'Dossier Noctigarde introuvable dans le registre.');
         }
 
         requireRecordAccess(dossier);
@@ -3910,13 +3917,13 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
         const advanced = await hasDashboardAdvancedAccess(ctx, guild.id, actor, session);
         await ctx.helpers.closeDossierChannel(channel, actor.user, language, { reason, resolution, advanced });
 
-        return `Dossier Sentinel clôturé, archivé et conservé temporairement : #${channel.name}.`;
+        return `Dossier Noctigarde clôturé, archivé et conservé temporairement : #${channel.name}.`;
     }
 
     if (action === 'dossier-status') {
         const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
-            throw createHttpError(400, 'This channel is not a Sentinel dossier.');
+            throw createHttpError(400, 'This channel is not a Noctigarde dossier.');
         }
 
         const currentDossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
@@ -3945,7 +3952,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
     if (action === 'dossier-claim') {
         const channel = getTextChannel(guild, body.channelId, language);
         if (!String(channel.topic || '').startsWith('sentinel-dossier:') && !String(channel.topic || '').startsWith('sentinel-ticket:')) {
-            throw createHttpError(400, 'This channel is not a Sentinel dossier.');
+            throw createHttpError(400, 'This channel is not a Noctigarde dossier.');
         }
 
         requireRecordAccess(ctx.helpers.getDossierByChannel(guild.id, channel.id));
@@ -3959,7 +3966,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
             throw createDiscordActionError(error, guild, PermissionsBitField.Flags.SendMessages, language);
         }
 
-        return `Dossier Sentinel pris en charge${dossier?.id ? ` : #${dossier.id}` : ''}.`;
+        return `Dossier Noctigarde pris en charge${dossier?.id ? ` : #${dossier.id}` : ''}.`;
     }
 
     if (action === 'dossier-reopen') {
@@ -3968,7 +3975,7 @@ async function dossierAction(ctx, guild, actor, body, session = null) {
         const dossier = ctx.helpers.getDossierByChannel(guild.id, channel.id);
         requireRecordAccess(dossier);
         await ctx.helpers.reopenDossierChannel(guild, channel, actor.user, language, { advanced: true });
-        return `Dossier Sentinel réouvert : #${channel.name}.`;
+        return `Dossier Noctigarde réouvert : #${channel.name}.`;
     }
 
     if (action === 'set-dossier-questions' || action === 'set-dossier-sla') {
@@ -4057,11 +4064,11 @@ async function executeGlobalCriticalAction(ctx, request) {
         let message;
         if (request.actionType === 'restore-backup') {
             const restore = await ctx.helpers.restoreManagedDatabaseBackup(request.payload.fileName);
-            message = `Restauration de ${restore.backupFile} préparée. Copie de sécurité : ${restore.safetyBackupFile}. Sentinel va redémarrer.`;
+            message = `Restauration de ${restore.backupFile} préparée. Copie de sécurité : ${restore.safetyBackupFile}. Noctigarde va redémarrer.`;
         } else if (request.actionType === 'official-update') {
             const requester = await ctx.client.users.fetch(request.requestedByUserId).catch(() => ({
                 id: request.requestedByUserId,
-                username: 'Fondatrice Sentinel'
+                username: 'Fondatrice Noctigarde'
             }));
             const result = await ctx.helpers.publishOfficialStatusUpdate({
                 ...request.payload,
@@ -4096,7 +4103,7 @@ async function publishCommunitySuggestion(ctx, guild, member, suggestion, channe
             .setDescription(suggestion.body)
             .addFields(
                 { name: 'Soutien de la communauté', value: `${suggestion.score} point(s) · ${suggestion.voteCount} vote(s)`, inline: true },
-                { name: 'Réponse officielle', value: suggestion.staffResponse || 'Cette proposition a été retenue par l’équipe Sentinel.', inline: false }
+                { name: 'Réponse officielle', value: suggestion.staffResponse || 'Cette proposition a été retenue par l’équipe Noctigarde.', inline: false }
             )
             .setFooter({ text: `Suggestion #${suggestion.id}` })
             .setTimestamp()]
@@ -4140,7 +4147,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             const role = guild.roles.cache.get(form.targetRoleId);
             if (!target || !role) throw createHttpError(400, 'Le membre ou le rôle prévu pour cette candidature est introuvable.');
             try {
-                await target.roles.add(role, `Candidature Sentinel #${application.id} acceptée par ${member.id}`);
+                await target.roles.add(role, `Candidature Noctigarde #${application.id} acceptée par ${member.id}`);
             } catch (error) {
                 throw createDiscordActionError(error, guild, PermissionsBitField.Flags.ManageRoles, language, target);
             }
@@ -4151,7 +4158,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
             await targetUser.send({
                 embeds: [new EmbedBuilder()
                     .setColor(reviewed.status === 'accepted' ? 0x3DDC97 : (reviewed.status === 'rejected' ? 0xFF5F6D : 0x35D7E5))
-                    .setTitle(`Sentinel | ${reviewed.formTitle || 'Recrutement'}`)
+                    .setTitle(`Noctigarde | ${reviewed.formTitle || 'Recrutement'}`)
                     .setDescription(reviewed.staffNote || `Ta candidature passe à l’étape : ${reviewed.status}.`)
                     .addFields({ name: 'État', value: reviewed.status, inline: true })
                     .setTimestamp()]
@@ -4279,8 +4286,8 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         ctx.helpers.updateGuildConfig(guild.id, {
             statusChannelId: channel.id
         });
-        await ctx.helpers.updateSentinelStatusPanel?.(guild);
-        return `État technique Sentinel configuré dans #${channel.name}.`;
+        await ctx.helpers.updateNoctigardeStatusPanel?.(guild);
+        return `État technique Noctigarde configuré dans #${channel.name}.`;
     }
 
     if (action === 'disable-status-channel') {
@@ -4288,7 +4295,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         ctx.helpers.updateGuildConfig(guild.id, {
             statusChannelId: null
         });
-        return 'Salon statut Sentinel désactivé sur ce serveur.';
+        return 'Salon statut Noctigarde désactivé sur ce serveur.';
     }
 
     if (action === 'set-updates-channel') {
@@ -4341,13 +4348,13 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
         const config = ctx.helpers.getGuildConfig(guild.id);
 
         if (enabled && !config.updatesChannelId) {
-            throw createHttpError(400, 'Choisis d’abord un salon des nouveautés Sentinel.');
+            throw createHttpError(400, 'Choisis d’abord un salon des nouveautés Noctigarde.');
         }
 
         ctx.helpers.updateGuildConfig(guild.id, { statusUpdatesEnabled: enabled });
         return enabled
-            ? 'Les nouveautés officielles Sentinel pourront être envoyées dans le salon prévu.'
-            : 'Les nouveautés officielles Sentinel ne seront plus envoyées sur ce serveur.';
+            ? 'Les nouveautés officielles Noctigarde pourront être envoyées dans le salon prévu.'
+            : 'Les nouveautés officielles Noctigarde ne seront plus envoyées sur ce serveur.';
     }
 
     if (action === 'add-command-role' || action === 'remove-command-role') {
@@ -4391,8 +4398,8 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
                     ? ctx.helpers.buildServicePanelPayload(language)
                     : {
                         content: language === 'en'
-                            ? '**Sentinel | Duty desk**\nSecured operations channel. Use the controls below to clock in, clock out, or consult the service registry.'
-                            : '**Sentinel | Bureau de service**\nCanal opérationnel sécurisé. Utilise les contrôles ci-dessous pour prendre ton service, le clôturer ou consulter le registre.',
+                            ? '**Noctigarde | Duty desk**\nSecured operations channel. Use the controls below to clock in, clock out, or consult the service registry.'
+                            : '**Noctigarde | Bureau de service**\nCanal opérationnel sécurisé. Utilise les contrôles ci-dessous pour prendre ton service, le clôturer ou consulter le registre.',
                         embeds: [],
                         components: ctx.helpers.buildServicePanelComponents(language)
                     });
@@ -4714,7 +4721,7 @@ async function runDashboardAction(ctx, guild, member, body, session = null) {
     if (action === 'run-validation') {
         await requireAdvanced(ctx, guild.id, member, session);
         requireCommandAccess(ctx, member);
-        const validation = ctx.helpers.runSentinelGuildValidation(guild, 'dashboard');
+        const validation = ctx.helpers.runNoctigardeGuildValidation(guild, 'dashboard');
         return validation.status === 'passed'
             ? `Validation #${validation.id} réussie.`
             : `Validation #${validation.id} terminée avec des points à corriger.`;
@@ -5237,7 +5244,7 @@ async function handleApi(req, res, ctx, url) {
         const file = ctx.helpers.resolveMaintenanceFile?.(kind, fileName);
 
         if (!file) {
-            throw createHttpError(404, 'Archive Sentinel introuvable.');
+            throw createHttpError(404, 'Archive Noctigarde introuvable.');
         }
 
         streamPrivateFile(res, file);
@@ -5262,12 +5269,12 @@ async function handleApi(req, res, ctx, url) {
                 const scan = await ctx.helpers.scanCustomEmbedMediaOrphans(250);
                 message = `Médias contrôlés : ${scan.checked}, orphelins placés en corbeille : ${scan.orphaned}, purgés : ${scan.purged?.links || 0}.`;
             } else if (action === 'restore-backup') {
-                if (String(body.confirmation || '').trim() !== 'RESTAURER SENTINEL') {
-                    throw createHttpError(400, 'Confirmation invalide. Écris exactement RESTAURER SENTINEL.');
+                if (String(body.confirmation || '').trim() !== 'RESTAURER NOCTIGARDE') {
+                    throw createHttpError(400, 'Confirmation invalide. Écris exactement RESTAURER NOCTIGARDE.');
                 }
                 requireFounderMfa(session, body.mfaCode);
                 const file = ctx.helpers.resolveMaintenanceFile?.('backup', body.fileName);
-                if (!file) throw createHttpError(404, 'Archive Sentinel introuvable.');
+                if (!file) throw createHttpError(404, 'Archive Noctigarde introuvable.');
                 const request = governance.createCriticalAction({
                     scope: 'global',
                     actionType: 'restore-backup',
@@ -5539,7 +5546,7 @@ async function handleApi(req, res, ctx, url) {
 
     if (req.method === 'GET' && url.pathname === '/api/audit/global') {
         if (!isCreatorUser(session.user.id)) {
-            throw createHttpError(403, 'Global audit is reserved for the Sentinel creator.');
+            throw createHttpError(403, 'Global audit is reserved for the Noctigarde creator.');
         }
 
         json(res, 200, {
@@ -5981,7 +5988,7 @@ function startDashboardServer(ctx) {
     dashboardServer.maxRequestsPerSocket = 100;
 
     dashboardServer.listen(port, () => {
-        console.log(`Dashboard Sentinel actif sur le port ${port}`);
+        console.log(`Dashboard Noctigarde actif sur le port ${port}`);
     });
 
     const cleanupTimer = setInterval(cleanupSessions, 60 * 60 * 1000);

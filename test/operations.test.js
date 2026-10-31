@@ -60,7 +60,7 @@ test('active warning count is scoped by server and user', () => {
 test('scheduled announcements remain isolated by server', () => {
     const item = operations.saveScheduledAnnouncement(guildId, userId, {
         channelId: '100000000000000004',
-        title: 'Contrôle Sentinel',
+        title: 'Contrôle Noctigarde',
         description: 'Annonce de validation.',
         color: '#2dd4bf',
         status: 'draft',
@@ -94,7 +94,7 @@ test('scheduled announcement approval requires a second responsible user', () =>
 });
 
 test('report generators produce recognizable XLSX and PDF files', () => {
-    const input = { title: 'Rapport Sentinel', columns: ['Nom', 'Valeur'], rows: [{ Nom: 'Test', Valeur: '42' }] };
+    const input = { title: 'Rapport Noctigarde', columns: ['Nom', 'Valeur'], rows: [{ Nom: 'Test', Valeur: '42' }] };
     assert.equal(operations.REPORT_FORMATS.has('csv'), false);
     assert.throws(() => operations.createReportDocument({ ...input, format: 'csv' }), /Format de rapport invalide/);
     const sheets = operations.createReportDocument({ ...input, format: 'tsv' });
@@ -110,15 +110,15 @@ test('report generators produce recognizable XLSX and PDF files', () => {
     const workbookFiles = unzipSync(xlsx.buffer);
     assert.ok(workbookFiles['xl/workbook.xml']);
     const worksheetXml = strFromU8(workbookFiles['xl/worksheets/sheet1.xml']);
-    assert.match(worksheetXml, /Rapport Sentinel/);
+    assert.match(worksheetXml, /Rapport Noctigarde/);
     assert.match(worksheetXml, /Test/);
     assert.ok(
         worksheetXml.indexOf('<autoFilter ') < worksheetXml.indexOf('<mergeCells '),
         'Excel exige autoFilter avant mergeCells dans une feuille OOXML'
     );
     assert.equal(pdf.buffer.subarray(0, 5).toString('latin1'), '%PDF-');
-    assert.match(pdf.buffer.toString('latin1'), /SENTINEL/);
-    assert.match(pdf.buffer.toString('latin1'), /Rapport Sentinel/);
+    assert.match(pdf.buffer.toString('latin1'), /NOCTIGARDE/);
+    assert.match(pdf.buffer.toString('latin1'), /Rapport Noctigarde/);
     const longPdf = operations.createReportDocument({
         ...input,
         rows: Array.from({ length: 100 }, (_, index) => ({ Nom: `Ligne ${index + 1}`, Valeur: index })),

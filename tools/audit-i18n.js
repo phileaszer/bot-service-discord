@@ -9,8 +9,8 @@ const root = path.resolve(__dirname, '..');
 function loadI18nRuntime() {
   let source = fs.readFileSync(path.join(root, 'site', 'i18n.js'), 'utf8');
   source = source.replace(
-    '  window.SentinelI18n = {',
-    '  globalThis.__sentinelI18nAudit = { en, placeholderEn, translateValue }; return;\n\n  window.SentinelI18n = {'
+    '  window.NoctigardeI18n = {',
+    '  globalThis.__sentinelI18nAudit = { en, placeholderEn, translateValue }; return;\n\n  window.NoctigardeI18n = {'
   );
 
   const context = {
@@ -20,7 +20,7 @@ function loadI18nRuntime() {
   vm.runInNewContext(source, context);
 
   if (!context.__sentinelI18nAudit) {
-    throw new Error('Impossible de charger le moteur de traduction Sentinel.');
+    throw new Error('Impossible de charger le moteur de traduction Noctigarde.');
   }
 
   return context.__sentinelI18nAudit;
@@ -65,7 +65,7 @@ function createAudit() {
   const runtime = loadI18nRuntime();
   const translations = { ...runtime.en, ...runtime.placeholderEn };
   const normalizedTranslations = new Set(Object.keys(translations).map(normalize));
-  const ignored = new Set(['FR', 'EN', 'Sentinel', 'Western', 'Style Sentinel', 'Discord', 'PDF', 'XLSX', 'Salary journal']);
+  const ignored = new Set(['FR', 'EN', 'Noctigarde', 'Western', 'Style Noctigarde', 'Discord', 'PDF', 'XLSX', 'Salary journal']);
 
   function isCandidate(value) {
     if (!value || ignored.has(value)) return false;

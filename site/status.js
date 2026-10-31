@@ -1,5 +1,5 @@
 (() => {
-  const RAILWAY_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
+  const RAILWAY_ORIGIN = 'https://dashboard.noctigarde.fr';
   const STATUS_REFRESH_INTERVAL = 90 * 1000;
   const endpoint = window.location.hostname.endsWith('railway.app')
     ? '/api/status'
@@ -19,7 +19,7 @@
       discordActive: 'Connexion Discord active.',
       dashboardAccessible: 'Dashboard accessible.',
       statusReadFailed: 'Impossible de lire le statut en direct.',
-      dashboardReadFailed: 'La page est ouverte, mais Sentinel ne répond pas au contrôle de statut.',
+      dashboardReadFailed: 'La page est ouverte, mais Noctigarde ne répond pas au contrôle de statut.',
       noIncidents: 'Aucun incident connu pour le moment.',
       noMaintenance: 'Aucune maintenance annoncée actuellement.'
     },
@@ -33,7 +33,7 @@
       discordActive: 'Discord connection active.',
       dashboardAccessible: 'Dashboard accessible.',
       statusReadFailed: 'Unable to read the live status.',
-      dashboardReadFailed: 'The page is open, but Sentinel is not responding to the status check.',
+      dashboardReadFailed: 'The page is open, but Noctigarde is not responding to the status check.',
       noIncidents: 'No known incident right now.',
       noMaintenance: 'No maintenance announced right now.'
     }

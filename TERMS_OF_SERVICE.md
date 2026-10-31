@@ -2,21 +2,21 @@
 
 Dernière mise à jour : 7 octobre 2026
 
-En utilisant Sentinel, vous acceptez les présentes conditions.
+En utilisant Noctigarde, vous acceptez les présentes conditions.
 
 ## Objet
 
-Sentinel est un bot Discord qui aide les serveurs à gérer les prises de service, la modération, les dossiers privés de support, les annonces et certaines actions depuis un dashboard web.
+Noctigarde est un bot Discord qui aide les serveurs à gérer les prises de service, la modération, les dossiers privés de support, les annonces et certaines actions depuis un dashboard web.
 
 ## Version de démonstration et évolution tarifaire
 
-La version actuelle de Sentinel est mise à disposition comme démonstration publique, sans abonnement ni prélèvement actif. Cette phase sert à tester le service en conditions réelles et à préparer son fonctionnement définitif.
+La version actuelle de Noctigarde est mise à disposition comme démonstration publique, sans abonnement ni prélèvement actif. Cette phase sert à tester le service en conditions réelles et à préparer son fonctionnement définitif.
 
-Certaines fonctions avancées de Sentinel pourront devenir payantes ultérieurement. Il n’est pas prévu de rendre l’ensemble du site ou toutes les fonctions payants : une partie gratuite restera accessible. Les fonctions concernées, les tarifs, le calendrier et les conditions applicables seront annoncés clairement avant toute activation d’une offre payante. L’utilisation de la version actuelle ne constitue pas une souscription et n’autorise aucun prélèvement futur automatique.
+Certaines fonctions avancées de Noctigarde pourront devenir payantes ultérieurement. Il n’est pas prévu de rendre l’ensemble du site ou toutes les fonctions payants : une partie gratuite restera accessible. Les fonctions concernées, les tarifs, le calendrier et les conditions applicables seront annoncés clairement avant toute activation d’une offre payante. L’utilisation de la version actuelle ne constitue pas une souscription et n’autorise aucun prélèvement futur automatique.
 
 ## Utilisation du service
 
-Sentinel est fourni tel quel. Le service peut être modifié, interrompu, limité ou indisponible à tout moment pour des raisons techniques, de maintenance, de sécurité ou d'abus.
+Noctigarde est fourni tel quel. Le service peut être modifié, interrompu, limité ou indisponible à tout moment pour des raisons techniques, de maintenance, de sécurité ou d'abus.
 
 Les propriétaires et équipes de gestion des serveurs Discord restent responsables :
 
@@ -26,11 +26,11 @@ Les propriétaires et équipes de gestion des serveurs Discord restent responsab
 - de l'information de leurs membres ;
 - du respect des règles Discord et des lois applicables.
 
-Sentinel ne doit pas être utilisé pour harceler, contourner les règles de Discord, collecter des informations sensibles ou automatiser des actions abusives.
+Noctigarde ne doit pas être utilisé pour harceler, contourner les règles de Discord, collecter des informations sensibles ou automatiser des actions abusives.
 
 ## Données
 
-Sentinel peut enregistrer des données nécessaires à son fonctionnement, notamment des identifiants Discord, des paramètres de serveur, des temps de service, des sanctions, des dossiers/tickets, des annonces, des sessions dashboard et des journaux d'audit.
+Noctigarde peut enregistrer des données nécessaires à son fonctionnement, notamment des identifiants Discord, des paramètres de serveur, des temps de service, des sanctions, des dossiers/tickets, des annonces, des sessions dashboard et des journaux d'audit.
 
 Le détail des données collectées, de leur utilisation et de leur conservation est décrit dans la Politique de confidentialité.
 
@@ -38,17 +38,17 @@ Le détail des données collectées, de leur utilisation et de leur conservation
 
 Certaines fonctionnalités nécessitent des permissions Discord, comme gérer les rôles, envoyer des messages, modérer les membres, bannir, expulser ou gérer des salons.
 
-Si les permissions ou la hiérarchie des rôles sont mal configurées, certaines actions peuvent échouer. Sentinel ne peut pas agir au-dessus des limites imposées par Discord.
+Si les permissions ou la hiérarchie des rôles sont mal configurées, certaines actions peuvent échouer. Noctigarde ne peut pas agir au-dessus des limites imposées par Discord.
 
 ## Responsabilité
 
-L'éditeur de Sentinel ne pourra pas être tenu responsable des pertes de données, erreurs de configuration, interruptions de service, sanctions mal utilisées, conflits de permissions ou dommages indirects liés à l'utilisation du bot.
+L'éditeur de Noctigarde ne pourra pas être tenu responsable des pertes de données, erreurs de configuration, interruptions de service, sanctions mal utilisées, conflits de permissions ou dommages indirects liés à l'utilisation du bot.
 
-Il est recommandé de vérifier régulièrement la configuration du serveur et de ne pas utiliser Sentinel pour stocker des informations sensibles.
+Il est recommandé de vérifier régulièrement la configuration du serveur et de ne pas utiliser Noctigarde pour stocker des informations sensibles.
 
 ## Suspension
 
-L'accès à Sentinel peut être suspendu ou limité en cas d'abus, de comportement malveillant, de risque de sécurité, de non-respect des présentes conditions ou de contrainte technique.
+L'accès à Noctigarde peut être suspendu ou limité en cas d'abus, de comportement malveillant, de risque de sécurité, de non-respect des présentes conditions ou de contrainte technique.
 
 ## Modifications
 
@@ -56,7 +56,7 @@ Ces conditions peuvent être modifiées à tout moment. La version publiée sur 
 
 ## Contact
 
-Pour toute question, utilisez le serveur support ou les moyens de contact indiqués sur le site de Sentinel.
+Pour toute question, utilisez le serveur support ou les moyens de contact indiqués sur le site de Noctigarde.
 
 ---
 
@@ -64,21 +64,21 @@ Pour toute question, utilisez le serveur support ou les moyens de contact indiqu
 
 Last updated: October 7, 2026
 
-By using Sentinel, you agree to these terms.
+By using Noctigarde, you agree to these terms.
 
 ## Purpose
 
-Sentinel is a Discord bot that helps servers manage duty tracking, moderation, private support tickets, announcements and selected actions from a web dashboard.
+Noctigarde is a Discord bot that helps servers manage duty tracking, moderation, private support tickets, announcements and selected actions from a web dashboard.
 
 ## Demonstration version and future pricing
 
-The current Sentinel release is provided as a public demonstration, with no active subscription or charge. This phase is used to test the service in real conditions and prepare its final operation.
+The current Noctigarde release is provided as a public demonstration, with no active subscription or charge. This phase is used to test the service in real conditions and prepare its final operation.
 
-Some advanced Sentinel features may become paid features later. The entire website and all features are not intended to become paid: a free part of Sentinel will remain available. The affected features, pricing, timing, and applicable terms will be announced clearly before any paid offering is activated. Using the current version does not create a subscription and does not authorize any automatic future charge.
+Some advanced Noctigarde features may become paid features later. The entire website and all features are not intended to become paid: a free part of Noctigarde will remain available. The affected features, pricing, timing, and applicable terms will be announced clearly before any paid offering is activated. Using the current version does not create a subscription and does not authorize any automatic future charge.
 
 ## Use of the service
 
-Sentinel is provided as is. The service may be changed, interrupted, limited or unavailable at any time for technical, maintenance, security or abuse-related reasons.
+Noctigarde is provided as is. The service may be changed, interrupted, limited or unavailable at any time for technical, maintenance, security or abuse-related reasons.
 
 Server owners and management teams remain responsible for:
 
@@ -88,11 +88,11 @@ Server owners and management teams remain responsible for:
 - informing their members;
 - following Discord rules and applicable laws.
 
-Sentinel must not be used to harass others, bypass Discord rules, collect sensitive information or automate abusive actions.
+Noctigarde must not be used to harass others, bypass Discord rules, collect sensitive information or automate abusive actions.
 
 ## Data
 
-Sentinel may store data required for its features, including Discord IDs, server settings, duty times, moderation cases, tickets, announcements, dashboard sessions and audit logs.
+Noctigarde may store data required for its features, including Discord IDs, server settings, duty times, moderation cases, tickets, announcements, dashboard sessions and audit logs.
 
 The collected data, its use and retention are described in the Privacy Policy.
 
@@ -100,17 +100,17 @@ The collected data, its use and retention are described in the Privacy Policy.
 
 Some features require Discord permissions, such as managing roles, sending messages, moderating members, banning, kicking or managing channels.
 
-If permissions or role hierarchy are incorrectly configured, some actions may fail. Sentinel cannot bypass limits enforced by Discord.
+If permissions or role hierarchy are incorrectly configured, some actions may fail. Noctigarde cannot bypass limits enforced by Discord.
 
 ## Liability
 
-The publisher of Sentinel cannot be held responsible for data loss, configuration mistakes, service interruptions, misuse of moderation actions, permission conflicts or indirect damages related to the bot.
+The publisher of Noctigarde cannot be held responsible for data loss, configuration mistakes, service interruptions, misuse of moderation actions, permission conflicts or indirect damages related to the bot.
 
-Servers should regularly verify their configuration and should not use Sentinel to store sensitive information.
+Servers should regularly verify their configuration and should not use Noctigarde to store sensitive information.
 
 ## Suspension
 
-Access to Sentinel may be suspended or limited in case of abuse, malicious behavior, security risk, violation of these terms or technical constraints.
+Access to Noctigarde may be suspended or limited in case of abuse, malicious behavior, security risk, violation of these terms or technical constraints.
 
 ## Changes
 
@@ -118,4 +118,4 @@ These terms may be updated at any time. The version published in this repository
 
 ## Contact
 
-For questions, use the support server or the contact methods listed on the Sentinel website.
+For questions, use the support server or the contact methods listed on the Noctigarde website.

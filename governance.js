@@ -141,7 +141,7 @@ function beginFounderMfaSetup(userId, accountLabel = null) {
         now
     );
     const label = String(accountLabel || userId).slice(0, 80);
-    const otpauthUri = `otpauth://totp/${encodeURIComponent(`Sentinel:${label}`)}?secret=${secret}&issuer=Sentinel&algorithm=SHA1&digits=6&period=30`;
+    const otpauthUri = `otpauth://totp/${encodeURIComponent(`Noctigarde:${label}`)}?secret=${secret}&issuer=Noctigarde&algorithm=SHA1&digits=6&period=30`;
     return { secret, recoveryCodes, otpauthUri };
 }
 

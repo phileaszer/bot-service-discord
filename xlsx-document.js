@@ -38,8 +38,8 @@ function createWorksheet({ title, subtitle, columns, rows }) {
         return Math.min(Math.max(longest + 3, 12), 42);
     });
     const cols = widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join('');
-    const titleRow = `<row r="1" ht="28" customHeight="1">${inlineCell('A1', title || 'Rapport Sentinel', 1)}</row>`;
-    const subtitleRow = `<row r="2" ht="20" customHeight="1">${inlineCell('A2', subtitle || 'Rapport administratif Sentinel', 3)}</row>`;
+    const titleRow = `<row r="1" ht="28" customHeight="1">${inlineCell('A1', title || 'Rapport Noctigarde', 1)}</row>`;
+    const subtitleRow = `<row r="2" ht="20" customHeight="1">${inlineCell('A2', subtitle || 'Rapport administratif Noctigarde', 3)}</row>`;
     const headingCells = safeColumns.map((column, index) => inlineCell(`${columnName(index)}${headerRow}`, column, 2)).join('');
     const headingRow = `<row r="${headerRow}" ht="24" customHeight="1">${headingCells}</row>`;
     const dataRows = safeRows.map((row, rowIndex) => {
@@ -84,13 +84,13 @@ function createXlsxDocument({ title, subtitle, columns, rows }) {
 </Relationships>`),
         'docProps/core.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${xmlEscape(title || 'Rapport Sentinel')}</dc:title><dc:creator>Sentinel</dc:creator><cp:lastModifiedBy>Sentinel</cp:lastModifiedBy>
+  <dc:title>${xmlEscape(title || 'Rapport Noctigarde')}</dc:title><dc:creator>Noctigarde</dc:creator><cp:lastModifiedBy>Noctigarde</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">${createdAt}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${createdAt}</dcterms:modified>
 </cp:coreProperties>`),
         'docProps/app.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Sentinel</Application></Properties>`),
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Noctigarde</Application></Properties>`),
         'xl/workbook.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sentinel" sheetId="1" r:id="rId1"/></sheets></workbook>`),
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Noctigarde" sheetId="1" r:id="rId1"/></sheets></workbook>`),
         'xl/_rels/workbook.xml.rels': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>

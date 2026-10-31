@@ -30,9 +30,9 @@ function getAdvancedGuildId() {
 }
 
 const publicCommands = [
-    command('aide', 'help', 'Affiche le guide de demarrage de Sentinel.', 'Shows the Sentinel getting started guide.'),
+    command('aide', 'help', 'Affiche le guide de demarrage de Noctigarde.', 'Shows the Noctigarde getting started guide.'),
 
-    command('dashboard', 'dashboard', 'Donne le lien du dashboard web Sentinel.', 'Shows the Sentinel web dashboard link.'),
+    command('dashboard', 'dashboard', 'Donne le lien du dashboard web Noctigarde.', 'Shows the Noctigarde web dashboard link.'),
 
     command('support', 'support', 'Affiche les liens utiles et le serveur support.', 'Shows useful links and the support server.'),
 
@@ -466,13 +466,13 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('embed', 'embed', 'Cree ou modifie une annonce embed Sentinel.', 'Creates or edits a Sentinel announcement embed.')
+    command('embed', 'embed', 'Cree ou modifie une annonce embed Noctigarde.', 'Creates or edits a Noctigarde announcement embed.')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('creer')
                 .setNameLocalizations(en('create'))
-                .setDescription('Cree une annonce embed sous l identite de Sentinel')
-                .setDescriptionLocalizations(en('Creates an announcement embed under Sentinel identity'))
+                .setDescription('Cree une annonce embed sous l identite de Noctigarde')
+                .setDescriptionLocalizations(en('Creates an announcement embed under Noctigarde identity'))
                 .addChannelOption(option =>
                     option
                         .setName('salon')
@@ -542,8 +542,8 @@ const publicCommands = [
             subcommand
                 .setName('modifier')
                 .setNameLocalizations(en('edit'))
-                .setDescription('Modifie un embed Sentinel existant sans consommer de quota')
-                .setDescriptionLocalizations(en('Edits an existing Sentinel embed without using quota'))
+                .setDescription('Modifie un embed Noctigarde existant sans consommer de quota')
+                .setDescriptionLocalizations(en('Edits an existing Noctigarde embed without using quota'))
                 .addChannelOption(option =>
                     option
                         .setName('salon')
@@ -556,8 +556,8 @@ const publicCommands = [
                 .addStringOption(option =>
                     option
                         .setName('message_id')
-                        .setDescription('ID du message embed Sentinel')
-                        .setDescriptionLocalizations(en('Sentinel embed message ID'))
+                        .setDescription('ID du message embed Noctigarde')
+                        .setDescriptionLocalizations(en('Noctigarde embed message ID'))
                         .setRequired(true)
                 )
                 .addStringOption(option =>
@@ -612,8 +612,8 @@ const publicCommands = [
             subcommand
                 .setName('supprimer')
                 .setNameLocalizations(en('delete'))
-                .setDescription('Supprime un embed Sentinel et libere son emplacement')
-                .setDescriptionLocalizations(en('Deletes a Sentinel embed and frees its slot'))
+                .setDescription('Supprime un embed Noctigarde et libere son emplacement')
+                .setDescriptionLocalizations(en('Deletes a Noctigarde embed and frees its slot'))
                 .addChannelOption(option =>
                     option
                         .setName('salon')
@@ -626,13 +626,13 @@ const publicCommands = [
                 .addStringOption(option =>
                     option
                         .setName('message_id')
-                        .setDescription('ID du message embed Sentinel')
-                        .setDescriptionLocalizations(en('Sentinel embed message ID'))
+                        .setDescription('ID du message embed Noctigarde')
+                        .setDescriptionLocalizations(en('Noctigarde embed message ID'))
                         .setRequired(true)
                 )
         ),
 
-    command('dossier-panel', 'ticket-panel', 'Publie le bureau d accueil des dossiers Sentinel.', 'Publishes the Sentinel dossier reception panel.')
+    command('dossier-panel', 'ticket-panel', 'Publie le bureau d accueil des dossiers Noctigarde.', 'Publishes the Noctigarde dossier reception panel.')
         .addChannelOption(option =>
             option
                 .setName('salon')
@@ -643,7 +643,7 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('dossier-roles', 'ticket-roles', 'Configure les roles responsables des dossiers Sentinel.', 'Configures Sentinel dossier manager roles.')
+    command('dossier-roles', 'ticket-roles', 'Configure les roles responsables des dossiers Noctigarde.', 'Configures Noctigarde dossier manager roles.')
         .addStringOption(option =>
             option
                 .setName('action')
@@ -664,9 +664,9 @@ const publicCommands = [
                 .setRequired(false)
         ),
 
-    command('dossier-prendre', 'ticket-claim', 'Prend en charge le dossier Sentinel du salon actuel.', 'Takes over the current Sentinel dossier.'),
+    command('dossier-prendre', 'ticket-claim', 'Prend en charge le dossier Noctigarde du salon actuel.', 'Takes over the current Noctigarde dossier.'),
 
-    command('dossier-statut', 'ticket-status', 'Modifie le statut du dossier Sentinel du salon actuel.', 'Updates the current Sentinel dossier status.')
+    command('dossier-statut', 'ticket-status', 'Modifie le statut du dossier Noctigarde du salon actuel.', 'Updates the current Noctigarde dossier status.')
         .addStringOption(option =>
             option
                 .setName('statut')
@@ -682,11 +682,11 @@ const publicCommands = [
                 )
         ),
 
-    command('dossier-fermer', 'close-ticket', 'Cloture le dossier Sentinel du salon actuel.', 'Closes the current Sentinel dossier.'),
+    command('dossier-fermer', 'close-ticket', 'Cloture le dossier Noctigarde du salon actuel.', 'Closes the current Noctigarde dossier.'),
 
-    command('dossier-reouvrir', 'reopen-ticket', 'Reouvre un dossier Sentinel encore conserve.', 'Reopens a retained Sentinel dossier.'),
+    command('dossier-reouvrir', 'reopen-ticket', 'Reouvre un dossier Noctigarde encore conserve.', 'Reopens a retained Noctigarde dossier.'),
 
-    command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Sentinel actuel.', 'Adds a participant to the current Sentinel dossier.')
+    command('dossier-ajouter', 'ticket-add', 'Ajoute un intervenant au dossier Noctigarde actuel.', 'Adds a participant to the current Noctigarde dossier.')
         .addUserOption(option =>
             option
                 .setName('membre')
@@ -696,7 +696,7 @@ const publicCommands = [
                 .setRequired(true)
         ),
 
-    command('dossier-retirer', 'ticket-remove', 'Retire un intervenant du dossier Sentinel actuel.', 'Removes a participant from the current Sentinel dossier.')
+    command('dossier-retirer', 'ticket-remove', 'Retire un intervenant du dossier Noctigarde actuel.', 'Removes a participant from the current Noctigarde dossier.')
         .addUserOption(option =>
             option
                 .setName('membre')
@@ -706,7 +706,7 @@ const publicCommands = [
                 .setRequired(true)
         ),
 
-    command('dossier-compte-rendu', 'ticket-transcript', 'Genere le compte rendu du dossier Sentinel actuel.', 'Generates the current Sentinel dossier written record.'),
+    command('dossier-compte-rendu', 'ticket-transcript', 'Genere le compte rendu du dossier Noctigarde actuel.', 'Generates the current Noctigarde dossier written record.'),
 
     command('reset-heures', 'reset-hours', 'Reinitialise les heures de service d un membre.', 'Resets a member service hours.')
         .addUserOption(option =>
@@ -746,9 +746,9 @@ const advancedCommands = [
 
     command('sync-service', 'sync-service', 'Repare les incoherences entre la base et le role de service.', 'Repairs inconsistencies between the database and service role.'),
 
-    command('sync-sentinel', 'sync-sentinel', 'Synchronise les salons, roles et panneaux Sentinel.', 'Synchronizes Sentinel channels, roles and panels.'),
+    command('sync-noctigarde', 'sync-noctigarde', 'Synchronise les salons, roles et panneaux Noctigarde.', 'Synchronizes Noctigarde channels, roles and panels.'),
 
-    command('maj-sentinel', 'sentinel-update', 'Indique ou preparer une annonce officielle securisee.', 'Shows where to prepare a secured official update.'),
+    command('maj-noctigarde', 'noctigarde-update', 'Indique ou preparer une annonce officielle securisee.', 'Shows where to prepare a secured official update.'),
 
     command('reset-heures-all', 'reset-hours-all', 'Reinitialise toutes les heures de service.', 'Resets all service hours.'),
 
@@ -986,14 +986,14 @@ const globalCommands = Array.from(
     try {
         const advancedGuildId = getAdvancedGuildId();
 
-        console.log('Enregistrement global de toutes les commandes Sentinel...');
+        console.log('Enregistrement global de toutes les commandes Noctigarde...');
 
         await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
             { body: globalCommands.map(item => item.toJSON()) }
         );
 
-        console.log(`${globalCommands.length} commandes Sentinel enregistrees globalement.`);
+        console.log(`${globalCommands.length} commandes Noctigarde enregistrees globalement.`);
 
         if (advancedGuildId) {
             console.log('Suppression des anciens doublons propres au serveur configure...');
@@ -1010,8 +1010,8 @@ const globalCommands = Array.from(
                 console.log('Les anciennes commandes locales ont ete retirees.');
             } catch (error) {
                 if (error.code === 50001) {
-                    console.warn('Impossible de nettoyer les anciennes commandes locales : Sentinel n a pas acces au serveur GUILD_ID configure.');
-                    console.warn('Invite Sentinel comme bot sur ce serveur, puis relance npm run deploy:commands.');
+                    console.warn('Impossible de nettoyer les anciennes commandes locales : Noctigarde n a pas acces au serveur GUILD_ID configure.');
+                    console.warn('Invite Noctigarde comme bot sur ce serveur, puis relance npm run deploy:commands.');
                 } else {
                     throw error;
                 }

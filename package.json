@@ -1,5 +1,5 @@
 {
-  "name": "sentinel",
+  "name": "noctigarde",
   "version": "1.0.0",
   "description": "Bot Discord bilingue pour services, modération, dossiers et dashboard web.",
   "private": true,
@@ -24,7 +24,7 @@
   },
   "keywords": [
     "discord",
-    "sentinel",
+    "noctigarde",
     "moderation",
     "dashboard",
     "service",

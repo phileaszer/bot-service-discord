@@ -141,7 +141,7 @@ async function restoreDatabase(fileName) {
     }
 
     console.log(`Base restauree depuis : ${backupPath}`);
-    console.log('Redemarre Sentinel pour utiliser la base restauree.');
+    console.log('Redemarre Noctigarde pour utiliser la base restauree.');
 }
 
 const backupFileName = process.argv[2];

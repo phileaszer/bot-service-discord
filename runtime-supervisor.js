@@ -167,7 +167,7 @@ function createRuntimeSupervisor(options = {}) {
                 if (recoveryCount < failureThreshold) return;
                 resolveIncident(incidentId, {
                     actorUserId: 'sentinel-watchdog',
-                    note: 'Rétablissement automatique confirmé par plusieurs contrôles Sentinel.'
+                    note: 'Rétablissement automatique confirmé par plusieurs contrôles Noctigarde.'
                 });
                 healthIncidents.delete(key);
                 healthRecoveries.delete(key);
@@ -197,7 +197,7 @@ function createRuntimeSupervisor(options = {}) {
             gatewayStatus: Number(client?.ws?.status ?? -1),
             gatewayPingMs: Number(client?.ws?.ping || 0)
         });
-        recordHealthCheck('dashboard', Boolean(dashboardServer?.listening), 'Le dashboard Sentinel n’écoute plus les requêtes.');
+        recordHealthCheck('dashboard', Boolean(dashboardServer?.listening), 'Le dashboard Noctigarde n’écoute plus les requêtes.');
 
         try {
             checkDatabase?.();

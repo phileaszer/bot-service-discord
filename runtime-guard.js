@@ -66,7 +66,7 @@ function mapIncident(row) {
 }
 
 function reportIncident(source, error, context = {}, severity = 'error') {
-    const message = cleanText(error?.message || error || 'Erreur Sentinel inconnue', 1000);
+    const message = cleanText(error?.message || error || 'Erreur Noctigarde inconnue', 1000);
     const sourcePrefix = String(error?.code || '').startsWith('SQLITE_')
         ? 'sqlite'
         : (error?.rawError || error?.requestBody ? 'discord' : null);

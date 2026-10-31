@@ -204,7 +204,7 @@ function createGuildDataExport(guild, format = 'pdf') {
     return {
         buffer: createProfessionalPdf({
             title: 'Rapport des données du serveur',
-            subtitle: 'Copie lisible des informations conservées par Sentinel',
+            subtitle: 'Copie lisible des informations conservées par Noctigarde',
             metadata: [
                 { label: 'Serveur', value: guild.name || guild.id },
                 { label: 'Identifiant', value: guild.id },
@@ -258,7 +258,7 @@ function createMemberDataExport(userId, format = 'pdf') {
     const recordCount = Object.values(queries).reduce((total, rows) => total + rows.length, 0);
     return {
         buffer: createProfessionalPdf({
-            title: 'Rapport personnel Sentinel',
+            title: 'Rapport personnel Noctigarde',
             subtitle: 'Copie lisible des informations associées à ton compte',
             metadata: [
                 { label: 'Compte Discord', value: userId },

@@ -6,23 +6,23 @@
   const labels = {
     fr: {
       actionWestern: 'Style Western',
-      actionSentinel: 'Style Sentinel',
-      currentSentinel: 'Style actuel : Sentinel futuriste. Cliquer pour passer au style Western.',
-      currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Sentinel.',
-      creatorRole: 'Créatrice de Sentinel',
+      actionNoctigarde: 'Style Noctigarde',
+      currentNoctigarde: 'Style actuel : Noctigarde futuriste. Cliquer pour passer au style Western.',
+      currentWestern: 'Style actuel : Western RP. Cliquer pour revenir au style Noctigarde.',
+      creatorRole: 'Créatrice de Noctigarde',
       skipContent: 'Aller au contenu principal',
       releaseTitle: 'Version de démonstration publique',
-      releaseMessage: 'Sentinel est actuellement accessible gratuitement afin que les communautés puissent l’essayer. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
+      releaseMessage: 'Noctigarde est actuellement accessible gratuitement afin que les communautés puissent l’essayer. À l’avenir, seules certaines options avancées pourront devenir payantes ; une partie gratuite restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
     },
     en: {
       actionWestern: 'Western style',
-      actionSentinel: 'Sentinel style',
-      currentSentinel: 'Current style: futuristic Sentinel. Click to switch to Western style.',
-      currentWestern: 'Current style: Western RP. Click to switch back to Sentinel style.',
-      creatorRole: 'Creator of Sentinel',
+      actionNoctigarde: 'Noctigarde style',
+      currentNoctigarde: 'Current style: futuristic Noctigarde. Click to switch to Western style.',
+      currentWestern: 'Current style: Western RP. Click to switch back to Noctigarde style.',
+      creatorRole: 'Creator of Noctigarde',
       skipContent: 'Skip to main content',
       releaseTitle: 'Public demonstration version',
-      releaseMessage: 'Sentinel is currently available at no cost so communities can try it. Some advanced features may become paid later, but a free part will remain available. No subscription or charge is active today, and the details will be announced before any change.'
+      releaseMessage: 'Noctigarde is currently available at no cost so communities can try it. Some advanced features may become paid later, but a free part will remain available. No subscription or charge is active today, and the details will be announced before any change.'
     }
   };
 
@@ -75,12 +75,12 @@
     const isWestern = theme === WESTERN_THEME;
 
     document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
-      button.textContent = isWestern ? text.actionSentinel : text.actionWestern;
+      button.textContent = isWestern ? text.actionNoctigarde : text.actionWestern;
       button.dataset.currentTheme = theme;
       button.classList.toggle('is-western', isWestern);
       button.setAttribute('aria-pressed', String(isWestern));
-      button.setAttribute('aria-label', isWestern ? text.currentWestern : text.currentSentinel);
-      button.title = isWestern ? text.currentWestern : text.currentSentinel;
+      button.setAttribute('aria-label', isWestern ? text.currentWestern : text.currentNoctigarde);
+      button.title = isWestern ? text.currentWestern : text.currentNoctigarde;
     });
   }
 
@@ -187,7 +187,7 @@
         identity.append(brand);
       } else {
         const brandName = document.createElement('span');
-        brandName.textContent = 'Sentinel';
+        brandName.textContent = 'Noctigarde';
         identity.append(brandName);
       }
       footer.prepend(identity);
@@ -197,7 +197,7 @@
     credit.className = 'creator-credit';
     credit.dataset.creatorCredit = 'true';
     credit.dataset.i18nIgnore = 'true';
-    credit.setAttribute('aria-label', 'Fantomenale, créatrice de Sentinel');
+    credit.setAttribute('aria-label', 'Fantomenale, créatrice de Noctigarde');
     credit.innerHTML = `
       <strong>Fantomenale</strong>
       <small data-creator-role></small>
@@ -238,7 +238,7 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'button button-small button-ghost install-sentinel-button';
-    button.dataset.installSentinel = 'true';
+    button.dataset.installNoctigarde = 'true';
     button.textContent = pageLanguage() === 'en' ? 'Install' : 'Installer';
     button.addEventListener('click', async () => {
       if (!deferredInstallPrompt) return;
@@ -278,7 +278,7 @@
     if (skipLink) skipLink.textContent = labels[pageLanguage()].skipContent;
   });
 
-  window.SentinelTheme = {
+  window.NoctigardeTheme = {
     set: saveTheme,
     toggle: toggleTheme,
     current: readTheme

@@ -225,7 +225,7 @@ function buildFrozenPermissionOverwrites(channel, original) {
     return overwrites;
 }
 
-async function freezeChannelForPurge(channel, original, reason = 'Gel temporaire avant archivage Sentinel') {
+async function freezeChannelForPurge(channel, original, reason = 'Gel temporaire avant archivage Noctigarde') {
     if (!channel?.permissionOverwrites?.set) {
         const error = new TypeError('Discord permission overwrites cannot be frozen for this channel.');
         error.channelFreezeFailed = true;
@@ -236,7 +236,7 @@ async function freezeChannelForPurge(channel, original, reason = 'Gel temporaire
     return frozen;
 }
 
-async function restoreChannelPermissions(channel, original, reason = 'Restauration après archivage Sentinel interrompu') {
+async function restoreChannelPermissions(channel, original, reason = 'Restauration après archivage Noctigarde interrompu') {
     if (!channel?.permissionOverwrites?.set) return false;
     await channel.permissionOverwrites.set(original, reason);
     return true;
@@ -250,7 +250,7 @@ function hasSameMessageIds(first, second) {
 
 async function recreateChannelForPurge(
     channel,
-    reason = 'Vidage complet Sentinel après archive vérifiée',
+    reason = 'Vidage complet Noctigarde après archive vérifiée',
     originalPermissionOverwrites = null,
     verifyBeforeDelete = null
 ) {
@@ -295,7 +295,7 @@ async function recreateChannelForPurge(
         return replacement;
     } catch (error) {
         if (replacement && typeof replacement.delete === 'function') {
-            await replacement.delete('Annulation du vidage complet Sentinel').catch(() => {});
+            await replacement.delete('Annulation du vidage complet Noctigarde').catch(() => {});
         }
 
         error.channelReplacementFailed = true;

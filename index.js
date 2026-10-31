@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
@@ -50,7 +50,7 @@ const {
     optimizeEmbedImage
 } = require('./database/object-storage');
 const { uploadVerifiedBackup } = require('./database/offsite-backup');
-const { syncSentinelServer } = require('./server-sync');
+const { syncNoctigardeServer } = require('./server-sync');
 const { startDashboardServer } = require('./dashboard');
 const operations = require('./operations');
 const governance = require('./governance');
@@ -93,7 +93,7 @@ const client = new Client({
 });
 
 const SENTINEL_REFERENCE_GUILD_ID = '1512509939044712569';
-// Every Sentinel server receives the complete feature set. There is no paid access tier.
+// Every Noctigarde server receives the complete feature set. There is no paid access tier.
 const ADVANCED_FEATURES_FREE = true;
 const DEBUG_INTERACTIONS = String(process.env.DEBUG_INTERACTIONS || '').toLowerCase() === 'true';
 const FREE_DOSSIER_PANEL_LIMIT = 1;
@@ -179,6 +179,7 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'ping',
     'diagnostic',
     'sync-service',
+    'sync-noctigarde',
     'sync-sentinel',
     'reset-heures-all',
     'reset-hours-all',
@@ -200,6 +201,8 @@ const ADVANCED_COMMAND_NAMES = new Set([
     'slowmode',
     'paie-ajustement',
     'payroll-adjustment',
+    'maj-noctigarde',
+    'noctigarde-update',
     'maj-sentinel',
     'sentinel-update',
     'dossier-reouvrir',
@@ -211,7 +214,7 @@ const ADVANCED_TEXT_COMMANDS = [
     /^!ping$/i,
     /^!diagnostic$/i,
     /^!sync-service$/i,
-    /^!sync-sentinel$/i,
+    /^!sync-(?:noctigarde|sentinel)$/i,
     /^!(reset-heures-all|reset-hours-all)$/i,
     /^!(resume-service|summary)$/i,
     /^!(paie-ajustement|payroll-adjustment)\b/i
@@ -234,8 +237,8 @@ const CUSTOM_EMBED_UPLOAD_MIMES = new Map([
     ['image/gif', 'gif'],
     ['image/webp', 'webp']
 ]);
-const DEFAULT_DASHBOARD_URL = 'https://bot-service-discord-production.up.railway.app';
-const DEFAULT_PUBLIC_SITE_URL = 'https://phileaszer.github.io/bot-service-discord/';
+const DEFAULT_DASHBOARD_URL = 'https://dashboard.noctigarde.fr';
+const DEFAULT_PUBLIC_SITE_URL = 'https://noctigarde.fr/';
 const SUPPORT_SERVER_URL = 'https://discord.gg/jzPqcUdVns';
 const CREATOR_USER_IDS = new Set(
     String(process.env.SENTINEL_CREATOR_USER_ID || process.env.CREATOR_USER_ID || '')
@@ -243,9 +246,9 @@ const CREATOR_USER_IDS = new Set(
         .map(value => value.trim())
         .filter(value => /^\d{17,20}$/.test(value))
 );
-const REFERENCE_SERVICE_ROLE_NAME = '🟢 Sentinel | En service';
+const REFERENCE_SERVICE_ROLE_NAME = '🟢 Noctigarde | En service';
 const REFERENCE_LOG_CHANNEL_NAMES = ['📂｜logs'];
-const REFERENCE_AUTO_ROLE_NAME = '◌ Sentinel | Nouveau';
+const REFERENCE_AUTO_ROLE_NAME = '◌ Noctigarde | Nouveau';
 const SERVER_PRESET_IDS = new Set(['standard', 'rp-modern', 'western', 'staff', 'community']);
 const DATABASE_FILE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'service.db');
 const DATABASE_BACKUP_ENABLED = String(process.env.DATABASE_BACKUP_ENABLED || 'true').toLowerCase() !== 'false';
@@ -297,8 +300,8 @@ const DATABASE_AUDIT_RETENTION_DAYS = Math.max(
 const DATABASE_INCREMENTAL_VACUUM_ENABLED = String(
     process.env.DATABASE_INCREMENTAL_VACUUM_ENABLED || 'true'
 ).toLowerCase() !== 'false';
-let lastSentinelServerSync = null;
-let lastSentinelServerSyncResult = null;
+let lastNoctigardeServerSync = null;
+let lastNoctigardeServerSyncResult = null;
 let lastDatabaseBackup = null;
 let lastDatabaseMaintenance = null;
 let lastDatabaseBackupFailure = null;
@@ -361,16 +364,16 @@ const I18N = {
     fr: {
         requestedBy: 'Demandé par',
         brand: 'Performance - Sécurité - Fiabilité',
-        installRequired: 'Sentinel doit etre ajoute comme bot sur ce serveur pour fonctionner.',
-        installRequiredNoInvite: 'Sentinel doit etre ajoute comme bot sur ce serveur pour fonctionner. Verifie que le lien d invitation contient les scopes bot et applications.commands.',
+        installRequired: 'Noctigarde doit etre ajoute comme bot sur ce serveur pour fonctionner.',
+        installRequiredNoInvite: 'Noctigarde doit etre ajoute comme bot sur ce serveur pour fonctionner. Verifie que le lien d invitation contient les scopes bot et applications.commands.',
         installCommandsOnly: 'Le lien utilise a probablement installe uniquement les commandes.',
-        reinvite: 'Reinvite Sentinel avec ce lien : {inviteUrl}',
+        reinvite: 'Reinvite Noctigarde avec ce lien : {inviteUrl}',
         unavailable: 'Cette commande n’est pas disponible sur ce serveur pour le moment.',
-        bootstrapRoles: 'Aucun role configure. En amorcage, le proprietaire, les administrateurs et les membres avec Gerer le serveur ou Gerer les roles peuvent configurer Sentinel.',
+        bootstrapRoles: 'Aucun role configure. En amorcage, le proprietaire, les administrateurs et les membres avec Gerer le serveur ou Gerer les roles peuvent configurer Noctigarde.',
         accessDenied: '❌ Tu n’as pas accès à cette commande.\nSi aucun rôle de gestion n’est encore configuré, un membre avec `Administrateur`, `Gérer le serveur` ou `Gérer les rôles` peut lancer `/config-permissions action:ajouter role:@role`.',
         languageSet: '✅ La langue de ce serveur est maintenant le français.',
         languageSetEn: '✅ La langue de ce serveur est maintenant l’anglais.',
-        languageChooseTitle: 'Sentinel | Choix de la langue',
+        languageChooseTitle: 'Noctigarde | Choix de la langue',
         languageChooseDescription: 'Choisis la langue de ce serveur. Ce choix est propre a ce serveur et ne change pas les autres serveurs.',
         languageFrench: 'Français',
         languageEnglish: 'English',
@@ -382,31 +385,31 @@ const I18N = {
         autoRoleSet: '✅ Le rôle automatique d’arrivée a été configuré sur {role}. Les nouveaux membres le recevront automatiquement.',
         autoRoleDisabled: '✅ Le rôle automatique d’arrivée est désactivé sur ce serveur.',
         autoRoleCurrent: 'Rôle automatique d’arrivée : {role}',
-        autoRoleNotManageable: '❌ Sentinel ne peut pas donner ce rôle. Vérifie que Sentinel a `Gérer les rôles` et que son rôle Discord est placé au-dessus de {role}.',
+        autoRoleNotManageable: '❌ Noctigarde ne peut pas donner ce rôle. Vérifie que Noctigarde a `Gérer les rôles` et que son rôle Discord est placé au-dessus de {role}.',
         autoRoleManagedDenied: '❌ Ce rôle est géré par une intégration Discord et ne peut pas être donné automatiquement.',
         autoRoleAssignedLog: '🛡️ Rôle automatique donné à {member} : {role}.',
         autoRoleFailedLog: '⚠️ Impossible de donner le rôle automatique à {member} : {role}. Vérifie la permission `Gérer les rôles` et la hiérarchie des rôles.',
         invalidChannelId: '❌ ID de salon invalide.',
-        channelNotText: '❌ Choisis un salon texte encore présent et visible par Sentinel.',
+        channelNotText: '❌ Choisis un salon texte encore présent et visible par Noctigarde.',
         logChannelSet: '✅ Le salon de logs a été configuré sur {channel}.',
         statusChannelCurrent: 'État technique : {channel}\nSalon des nouveautés : {updatesChannel}\nDiffusion officielle : **{updates}**\nRôle mentionné : {pingRole}.',
-        statusChannelSet: '✅ Le panneau d’état Sentinel sera maintenu dans {channel}.',
-        statusChannelDisabled: '✅ Le salon statut Sentinel est désactivé sur ce serveur.',
-        statusUpdatesChannelSet: '✅ Les annonces officielles Sentinel seront publiées dans {channel}.',
+        statusChannelSet: '✅ Le panneau d’état Noctigarde sera maintenu dans {channel}.',
+        statusChannelDisabled: '✅ Le salon statut Noctigarde est désactivé sur ce serveur.',
+        statusUpdatesChannelSet: '✅ Les annonces officielles Noctigarde seront publiées dans {channel}.',
         statusUpdatesTested: '✅ Message de test envoyé dans {channel}.',
-        statusUpdatesEnabled: '✅ Les nouveautés officielles Sentinel seront publiées dans le salon prévu à cet effet.',
-        statusUpdatesDisabled: '✅ Les nouveautés officielles Sentinel ne seront plus publiées sur ce serveur.',
+        statusUpdatesEnabled: '✅ Les nouveautés officielles Noctigarde seront publiées dans le salon prévu à cet effet.',
+        statusUpdatesDisabled: '✅ Les nouveautés officielles Noctigarde ne seront plus publiées sur ce serveur.',
         statusUpdatesRoleSet: '✅ {role} sera mentionné lors des prochaines annonces officielles.',
         statusUpdatesRoleDisabled: '✅ Aucun rôle ne sera mentionné lors des annonces officielles.',
         statusChannelRequired: '❌ Choisis un salon pour cette action.',
         statusUpdatesChannelRequired: '❌ Choisis d’abord le salon des nouveautés avec `/config-statut action:Définir le salon des nouveautés salon:#salon`.',
-        officialUpdateDenied: '❌ Cette commande est réservée à la créatrice de Sentinel.',
-        officialUpdateSent: '✅ Mise à jour officielle publiée. Serveur Sentinel : **{referenceCount}** salon(s). Serveurs abonnés : **{subscriberCount}** salon(s).',
+        officialUpdateDenied: '❌ Cette commande est réservée à la créatrice de Noctigarde.',
+        officialUpdateSent: '✅ Mise à jour officielle publiée. Serveur Noctigarde : **{referenceCount}** salon(s). Serveurs abonnés : **{subscriberCount}** salon(s).',
         officialUpdateNoTarget: '❌ Aucun salon de nouveautés disponible pour publier cette mise à jour.',
         payRateInvalid: '❌ Montant horaire invalide. Exemple : `/config-paie montant:500 devise:$`.',
         paySettingsUpdated: '✅ Salaires configurés : **{rate}** par heure.',
         payRoleSettingsUpdated: '✅ Taux configuré pour {role} : **{rate}** par heure.',
-        payRoleSettingsRemoved: '✅ Le taux spécifique de {role} a été retiré. Sentinel utilisera le taux global si aucun autre rôle ne correspond.',
+        payRoleSettingsRemoved: '✅ Le taux spécifique de {role} a été retiré. Noctigarde utilisera le taux global si aucun autre rôle ne correspond.',
         payAdjustmentInvalid: '❌ Ajustement invalide. Indique un membre, un type, un montant positif et une raison courte.',
         payAdjustmentAdded: '✅ Ajustement ajouté pour {member} : **{amount}** ({type}).',
         payrollArchived: '✅ Salaires archivés pour la semaine **{weekStart} → {weekEnd}**. Total : **{amount}**.',
@@ -434,17 +437,17 @@ const I18N = {
         resetGuildDone: '✅ Toutes les heures de service de ce serveur ont été réinitialisées.',
         noServiceRole: '❌ Aucun rôle de service n’est configuré sur ce serveur.\nUtilise `/config-role` pour en définir un.',
         serviceRoleEveryoneDenied: '❌ Le rôle de service ne peut pas être `@everyone`.\nChoisis un vrai rôle avec `/config-role`, puis réessaie.',
-        serviceRoleManagedDenied: '❌ Sentinel ne peut pas gérer le rôle de service {role}, car il est contrôlé par une intégration Discord.\nChoisis un rôle classique avec `/config-role`, puis réessaie.',
-        serviceRoleMissingManageRoles: '❌ Sentinel ne peut pas gérer le rôle de service, car il n’a pas la permission `Gérer les rôles`.\nAjoute cette permission au rôle Sentinel, puis réessaie.',
-        serviceRoleTooHigh: '❌ Sentinel ne peut pas gérer le rôle de service {role}, car ce rôle est placé trop haut.\nMonte le rôle {botRole} au-dessus de {role} dans les réglages Discord, puis réessaie.',
+        serviceRoleManagedDenied: '❌ Noctigarde ne peut pas gérer le rôle de service {role}, car il est contrôlé par une intégration Discord.\nChoisis un rôle classique avec `/config-role`, puis réessaie.',
+        serviceRoleMissingManageRoles: '❌ Noctigarde ne peut pas gérer le rôle de service, car il n’a pas la permission `Gérer les rôles`.\nAjoute cette permission au rôle Noctigarde, puis réessaie.',
+        serviceRoleTooHigh: '❌ Noctigarde ne peut pas gérer le rôle de service {role}, car ce rôle est placé trop haut.\nMonte le rôle {botRole} au-dessus de {role} dans les réglages Discord, puis réessaie.',
         serviceLeftLog: '🔴 {member} a quitté son service.\n⏱️ Durée : **{duration}**\n📊 Total : **{total}**',
         serviceLeft: '🔴 Tu as quitté ton service.\n⏱️ Durée de cette session : **{duration}**',
         serviceStartedLog: '🟢 {member} a pris son service.',
         serviceStarted: '🟢 Tu as pris ton service.',
         serviceAlreadyStarted: '🟢 Tu es déjà en service.',
         serviceNotStarted: '🔴 Tu n’es pas en service pour le moment.',
-        serviceError: '❌ Sentinel n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
-        servicePanelTitle: 'Sentinel | Bureau de service',
+        serviceError: '❌ Noctigarde n’a pas pu modifier ton service.\nVérifie les permissions du bot ou lance `/diagnostic` pour voir quoi corriger.',
+        servicePanelTitle: 'Noctigarde | Bureau de service',
         servicePanelDescription: '`Registre opérationnel`\nDéclare ta prise de poste, clôture ton service ou consulte les agents déjà déployés.\nChaque action ajuste ton badge de service et archive la présence dans le registre.',
         servicePanelStartName: 'Ouverture de service',
         servicePanelStartValue: '🟢 Active ton badge et inscrit ton départ dans le registre.',
@@ -452,7 +455,7 @@ const I18N = {
         servicePanelEndValue: '🔴 Ferme ton service, retire le badge et consigne la durée.',
         servicePanelRegistryName: 'Registre vivant',
         servicePanelRegistryValue: '📊 `Ma fiche` affiche ton relevé. `Déploiement` montre les agents actuellement sur le terrain.',
-        servicePanelFooter: 'Bureau Sentinel - registre de présence',
+        servicePanelFooter: 'Bureau Noctigarde - registre de présence',
         showMyHoursLabel: 'Ma fiche',
         activeLabel: 'Déploiement',
         toggleLabel: 'Service',
@@ -461,7 +464,7 @@ const I18N = {
         confirm: 'Confirmer',
         cancel: 'Annuler',
         buttonCooldown: '⏳ Action déjà en cours. Réessaie dans **{time}**.',
-        confirmationTitle: '⚠️ Confirmation Sentinel',
+        confirmationTitle: '⚠️ Confirmation Noctigarde',
         confirmationBody: '**Action :** {action}\n**Cible :** {target}\n{details}\n\nConfirme seulement si tout est correct. Cette confirmation expire dans 2 minutes.',
         confirmationNotForYou: '❌ Cette confirmation ne t’est pas destinée.',
         confirmationExpired: '⏳ Confirmation expirée. Relance la commande si nécessaire.',
@@ -472,12 +475,12 @@ const I18N = {
         confirmKick: 'Expulsion',
         confirmResetUser: 'Réinitialisation des heures',
         confirmDossierClose: 'Clôture du dossier',
-        serviceLogStartTitle: 'Sentinel | Prise de service',
-        serviceLogEndTitle: 'Sentinel | Fin de service',
-        serviceLogLongTitle: 'Sentinel | Service prolongé',
+        serviceLogStartTitle: 'Noctigarde | Prise de service',
+        serviceLogEndTitle: 'Noctigarde | Fin de service',
+        serviceLogLongTitle: 'Noctigarde | Service prolongé',
         serviceLogLongDescription: '{member} est en service depuis **{duration}**.',
         serviceLogLongHint: 'Une confirmation privée lui a été envoyée avec le choix de continuer ou de terminer.',
-        serviceLogLongDeliveryFailed: 'Le message privé n’a pas pu être remis. Sentinel réessaiera automatiquement.',
+        serviceLogLongDeliveryFailed: 'Le message privé n’a pas pu être remis. Noctigarde réessaiera automatiquement.',
         serviceLogTarget: 'Agent',
         serviceLogSource: 'Source',
         serviceLogDuration: 'Durée',
@@ -485,15 +488,15 @@ const I18N = {
         serviceLogStartedAt: 'Début',
         serviceLogSourceDiscord: 'Discord',
         serviceLogSourceDashboard: 'Console',
-        staffLogTitle: 'Sentinel | Journal',
-        helpTitle: 'Sentinel | Briefing',
-        helpDescription: 'Commence ici. Ce briefing explique comment ouvrir le poste Sentinel, préparer les grades et tenir le registre.',
+        staffLogTitle: 'Noctigarde | Journal',
+        helpTitle: 'Noctigarde | Briefing',
+        helpDescription: 'Commence ici. Ce briefing explique comment ouvrir le poste Noctigarde, préparer les grades et tenir le registre.',
         moderationAccessDenied: '❌ Tu n’as pas accès à cette commande de modération.',
-        moderationAccessDeniedSpecific: '❌ Tu ne peux pas lancer cette sanction.\nÀ faire : donne la permission “{permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Sentinel.',
-        moderationBotPermissionMissing: '❌ Sentinel n’a pas la permission Discord nécessaire pour faire cette action.\nOuvre la console > Sécurité > Diagnostic, ou ajoute la permission manquante au rôle Sentinel.',
-        moderationBotPermissionMissingSpecific: '❌ Sentinel ne peut pas faire cette action.\nÀ faire : ajoute la permission “{permission}” au rôle Sentinel, puis réessaie.',
+        moderationAccessDeniedSpecific: '❌ Tu ne peux pas lancer cette sanction.\nÀ faire : donne la permission “{permission}” à ton rôle Discord, ou ajoute ton rôle aux rôles autorisés de Noctigarde.',
+        moderationBotPermissionMissing: '❌ Noctigarde n’a pas la permission Discord nécessaire pour faire cette action.\nOuvre la console > Sécurité > Diagnostic, ou ajoute la permission manquante au rôle Noctigarde.',
+        moderationBotPermissionMissingSpecific: '❌ Noctigarde ne peut pas faire cette action.\nÀ faire : ajoute la permission “{permission}” au rôle Noctigarde, puis réessaie.',
         moderationDiscordRefused: '❌ Discord a refusé l’action.\nÀ faire : {fix}',
-        moderationBotPermissionFix: 'ajoute la permission “{permission}” au rôle Sentinel, puis réessaie.',
+        moderationBotPermissionFix: 'ajoute la permission “{permission}” au rôle Noctigarde, puis réessaie.',
         moderationRoleOrderFix: 'place mon rôle au-dessus de “{role}”, puis réessaie.',
         moderationBanNotFound: '❌ Aucun bannissement Discord n’a été trouvé pour cet ID.\nÀ faire : vérifie l’ID Discord complet, puis réessaie seulement si cette personne est encore bannie.',
         moderationMemberRequired: '❌ Tu dois choisir un membre du serveur.',
@@ -502,10 +505,10 @@ const I18N = {
         moderationReasonDefault: 'Aucune raison indiquée.',
         moderationDurationInvalid: '❌ Durée invalide. Exemples valides : `10m`, `2h`, `7d`.',
         moderationDurationTooLong: '❌ Discord limite les timeouts à 28 jours maximum.',
-        moderationSelfDenied: '❌ Tu ne peux pas te modérer toi-même avec Sentinel.',
-        moderationOwnerDenied: '❌ Sentinel ne peut pas modérer le propriétaire du serveur.',
-        moderationBotDenied: '❌ Sentinel ne peut pas modérer cet utilisateur.',
-        moderationHierarchyDenied: '❌ Le rôle de cette personne est trop haut dans la hiérarchie Discord.\nMonte le rôle Sentinel au-dessus du rôle de cette personne, puis réessaie.',
+        moderationSelfDenied: '❌ Tu ne peux pas te modérer toi-même avec Noctigarde.',
+        moderationOwnerDenied: '❌ Noctigarde ne peut pas modérer le propriétaire du serveur.',
+        moderationBotDenied: '❌ Noctigarde ne peut pas modérer cet utilisateur.',
+        moderationHierarchyDenied: '❌ Le rôle de cette personne est trop haut dans la hiérarchie Discord.\nMonte le rôle Noctigarde au-dessus du rôle de cette personne, puis réessaie.',
         moderationWarned: '✅ {member} a reçu un avertissement. Cas #{caseId}.',
         moderationTimeout: '✅ {member} a été timeout pendant **{duration}**. Cas #{caseId}.',
         moderationUntimeout: '✅ Le timeout de {member} a été retiré. Cas #{caseId}.',
@@ -520,14 +523,14 @@ const I18N = {
         moderationClearAll: '✅ Salon vidé : **{count}** message(s) supprimé(s), anciens messages compris.',
         moderationClearPartial: '⚠️ **{count}** message(s) supprimé(s), mais certains messages n’ont pas pu être retirés. Consulte les logs et vérifie le salon.',
         moderationPurgeAmountRequired: '❌ Utilise `/purge messages` avec un nombre de 1 à 100, ou `/purge tout` pour vider entièrement le salon.',
-        moderationPurgeChannelPermissionMissing: '❌ Sentinel doit pouvoir voir ce salon, consulter son historique et gérer ses messages.',
+        moderationPurgeChannelPermissionMissing: '❌ Noctigarde doit pouvoir voir ce salon, consulter son historique et gérer ses messages.',
         moderationCasesEmpty: 'Aucune sanction enregistrée pour {member}.',
-        moderationFailed: '❌ L’action de modération a échoué.\nVérifie que Sentinel a la bonne permission Discord et que son rôle est placé au-dessus de la cible. Tu peux aussi lancer `/diagnostic`.',
+        moderationFailed: '❌ L’action de modération a échoué.\nVérifie que Noctigarde a la bonne permission Discord et que son rôle est placé au-dessus de la cible. Tu peux aussi lancer `/diagnostic`.',
         moderationNoChannel: '❌ Cette commande doit être utilisée dans un salon textuel.',
-        moderationCasesTitle: 'Sentinel | Sanctions',
-        moderationCaseTitle: 'Sentinel | Cas de modération',
-        moderationProfileTitle: 'Sentinel | Profil modération',
-        moderationLogTitle: 'Sentinel | Modération',
+        moderationCasesTitle: 'Noctigarde | Sanctions',
+        moderationCaseTitle: 'Noctigarde | Cas de modération',
+        moderationProfileTitle: 'Noctigarde | Profil modération',
+        moderationLogTitle: 'Noctigarde | Modération',
         moderationCaseNotFound: '❌ Aucun cas #{caseId} trouvé sur ce serveur.',
         moderationCaseEdited: '✅ Le cas #{caseId} a été modifié.',
         moderationCaseDeleted: '✅ Le cas #{caseId} a été supprimé.',
@@ -539,34 +542,34 @@ const I18N = {
         moderationSlowmodeDone: '🐢 Mode lent défini sur **{duration}** dans {channel}.',
         moderationSlowmodeDisabled: '✅ Mode lent désactivé dans {channel}.',
         moderationSlowmodeTooLong: '❌ Discord limite le mode lent à 6 heures maximum.',
-        customEmbedBotPermissionMissing: '❌ Sentinel doit pouvoir voir le salon, envoyer des messages et intégrer des liens dans {channel}.',
-        customEmbedChannelViewMissing: '❌ Sentinel ne voit pas {channel}.\nÀ faire : autorise Sentinel à voir ce salon.',
-        customEmbedChannelSendMissing: '❌ Sentinel ne peut pas écrire dans {channel}.\nÀ faire : autorise Sentinel à envoyer des messages dans ce salon.',
-        customEmbedChannelEmbedMissing: '❌ Sentinel ne peut pas envoyer d’embed dans {channel}.\nÀ faire : ajoute la permission “Intégrer des liens” à Sentinel dans ce salon.',
-        customEmbedChannelAttachMissing: '❌ Sentinel ne peut pas joindre de fichier dans {channel}.\nÀ faire : ajoute la permission “Joindre des fichiers” à Sentinel dans ce salon.',
-        customEmbedMentionPermissionMissing: '❌ Sentinel ne peut pas mentionner ce rôle.\nÀ faire : rends le rôle mentionnable, ou donne à Sentinel la permission de mentionner les rôles.',
+        customEmbedBotPermissionMissing: '❌ Noctigarde doit pouvoir voir le salon, envoyer des messages et intégrer des liens dans {channel}.',
+        customEmbedChannelViewMissing: '❌ Noctigarde ne voit pas {channel}.\nÀ faire : autorise Noctigarde à voir ce salon.',
+        customEmbedChannelSendMissing: '❌ Noctigarde ne peut pas écrire dans {channel}.\nÀ faire : autorise Noctigarde à envoyer des messages dans ce salon.',
+        customEmbedChannelEmbedMissing: '❌ Noctigarde ne peut pas envoyer d’embed dans {channel}.\nÀ faire : ajoute la permission “Intégrer des liens” à Noctigarde dans ce salon.',
+        customEmbedChannelAttachMissing: '❌ Noctigarde ne peut pas joindre de fichier dans {channel}.\nÀ faire : ajoute la permission “Joindre des fichiers” à Noctigarde dans ce salon.',
+        customEmbedMentionPermissionMissing: '❌ Noctigarde ne peut pas mentionner ce rôle.\nÀ faire : rends le rôle mentionnable, ou donne à Noctigarde la permission de mentionner les rôles.',
         customEmbedInvalidColor: '❌ Couleur invalide. Utilise `rose`, `cyan`, `vert`, `rouge`, `violet` ou un code comme `#ff2d9a`.',
         customEmbedInvalidUrl: '❌ URL invalide pour {field}. Utilise une URL `https://` ou indique `retirer` pendant une modification.',
         customEmbedInvalidUpload: '❌ Image locale invalide. Utilise une image PNG, JPG, WebP ou GIF.',
         customEmbedUploadTooLarge: '❌ Image locale trop lourde. Garde un total maximum de 8 Mo par embed.',
         customEmbedMediaQuotaReached: '❌ Quota d’images atteint pour ce serveur ({used} Mo sur {limit} Mo). Supprime un ancien embed ou libère de l’espace avant de réessayer.',
         customEmbedTooLarge: '❌ Cet embed est trop long. Garde le titre sous 256 caractères, le message sous 4000 caractères et le total sous 6000 caractères.',
-        customEmbedLimitReached: 'Ce serveur peut conserver **{limit}** embeds Sentinel actifs. Tu peux modifier ou supprimer les embeds existants depuis le dashboard.',
-        customEmbedCreated: '✅ Embed Sentinel envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
-        customEmbedEdited: '✅ Embed Sentinel `{messageId}` modifié. Les modifications ne consomment pas de quota.',
-        customEmbedDeleted: '✅ Embed Sentinel `{messageId}` supprimé. Son emplacement est libéré.',
-        customEmbedNotFound: '❌ Aucun embed Sentinel géré ne correspond à cet ID.',
+        customEmbedLimitReached: 'Ce serveur peut conserver **{limit}** embeds Noctigarde actifs. Tu peux modifier ou supprimer les embeds existants depuis le dashboard.',
+        customEmbedCreated: '✅ Embed Noctigarde envoyé dans {channel}. ID du message : `{messageId}`.\n{quota}',
+        customEmbedEdited: '✅ Embed Noctigarde `{messageId}` modifié. Les modifications ne consomment pas de quota.',
+        customEmbedDeleted: '✅ Embed Noctigarde `{messageId}` supprimé. Son emplacement est libéré.',
+        customEmbedNotFound: '❌ Aucun embed Noctigarde géré ne correspond à cet ID.',
         customEmbedNoEditFields: '❌ Indique au moins un champ à modifier : titre, message, couleur, image, miniature ou footer.',
         customEmbedQuotaUnlimited: 'Quota sans limite.',
-        dossierPanelTitle: 'Sentinel | Bureau d’accueil',
-        dossierPanelDescription: '`Accueil confidentiel`\nChoisis la nature de ta demande. Sentinel préparera un espace réservé avec les personnes habilitées et gardera le suivi dans un dossier clair.',
+        dossierPanelTitle: 'Noctigarde | Bureau d’accueil',
+        dossierPanelDescription: '`Accueil confidentiel`\nChoisis la nature de ta demande. Noctigarde préparera un espace réservé avec les personnes habilitées et gardera le suivi dans un dossier clair.',
         dossierPanelAccessName: 'Accueil',
         dossierPanelAccessValue: 'Chaque demande ouvre un espace confidentiel pour échanger avec l’équipe concernée.',
         dossierPanelFollowName: 'Suivi',
         dossierPanelFollowValue: 'Le statut, le référent et le compte rendu restent rattachés au même dossier.',
         dossierPanelBeforeName: 'Avant d’ouvrir',
         dossierPanelBeforeValue: 'Prépare un sujet court et les éléments utiles : faits, personnes concernées, moment, preuves ou contexte.',
-        dossierPanelFooter: 'Sentinel - bureau d’accueil',
+        dossierPanelFooter: 'Noctigarde - bureau d’accueil',
         dossierSupportLabel: 'Assistance',
         dossierReportLabel: 'Signalement',
         dossierRecruitmentLabel: 'Candidature',
@@ -577,43 +580,43 @@ const I18N = {
         dossierModalSubjectPlaceholder: 'Exemple : demande d’assistance administrative',
         dossierModalDescription: 'Description',
         dossierModalDescriptionPlaceholder: 'Explique ta demande avec les détails utiles.',
-        dossierOpenedTitle: 'Sentinel | Dossier ouvert',
+        dossierOpenedTitle: 'Noctigarde | Dossier ouvert',
         dossierAlreadyOpen: 'Tu as déjà un dossier ouvert : {channel}',
         dossierCooldown: '⏳ Attends encore **{time}** avant d’ouvrir un nouveau dossier.',
         dossierPanelCooldown: '⏳ Le panneau vient déjà d’être utilisé. Réessaie dans **{time}**.',
         dossierPanelLimitReached: 'Ce serveur peut conserver **{limit}** panneau de dossiers. Garde ce panneau ou supprime-le avant d’en publier un autre.',
         dossierOpenLimitReached: 'Ce serveur a déjà **{limit}** dossiers ouverts. Ferme un dossier terminé avant d’en ouvrir un autre.',
         dossierCreated: 'Dossier créé : {channel}',
-        dossierNotInDossier: 'Ce bouton doit être utilisé dans un dossier Sentinel.',
+        dossierNotInDossier: 'Ce bouton doit être utilisé dans un dossier Noctigarde.',
         dossierCloseDenied: 'Seul le demandeur ou un membre autorisé peut clôturer ce dossier.',
         dossierClosed: 'Dossier clôturé. Le compte rendu a été transmis, puis l’espace va être fermé.',
         dossierClaimed: 'Dossier pris en charge par {member}.',
         dossierClaimDenied: 'Tu dois avoir un rôle autorisé pour prendre en charge ce dossier.',
         dossierStatusDenied: 'Tu dois avoir un rôle autorisé pour modifier le statut du dossier.',
         dossierStatusUpdated: 'Statut du dossier mis à jour : **{status}**.',
-        dossierRoleAdded: '✅ {role} peut maintenant prendre en charge et gérer les dossiers Sentinel.',
-        dossierRoleRemoved: '✅ {role} ne peut plus prendre en charge les dossiers Sentinel.',
-        dossierRoleList: 'Rôles de dossiers Sentinel :\n{roles}',
-        dossierRoleListEmpty: 'Aucun rôle de dossiers configuré. Les rôles autorisés à gérer Sentinel et les membres avec les permissions Discord adaptées peuvent gérer les dossiers.',
+        dossierRoleAdded: '✅ {role} peut maintenant prendre en charge et gérer les dossiers Noctigarde.',
+        dossierRoleRemoved: '✅ {role} ne peut plus prendre en charge les dossiers Noctigarde.',
+        dossierRoleList: 'Rôles de dossiers Noctigarde :\n{roles}',
+        dossierRoleListEmpty: 'Aucun rôle de dossiers configuré. Les rôles autorisés à gérer Noctigarde et les membres avec les permissions Discord adaptées peuvent gérer les dossiers.',
         dossierAddDone: '✅ {member} a été ajouté comme intervenant du dossier.',
         dossierRemoveDone: '✅ {member} a été retiré du dossier.',
-        dossierCommandOutside: '❌ Cette commande doit être utilisée dans un salon de dossier Sentinel.',
+        dossierCommandOutside: '❌ Cette commande doit être utilisée dans un salon de dossier Noctigarde.',
         dossierTranscriptDone: '✅ Compte rendu préparé.',
-        dossierPanelPublished: '✅ Bureau d’accueil Sentinel publié dans {channel}.'
+        dossierPanelPublished: '✅ Bureau d’accueil Noctigarde publié dans {channel}.'
     },
     en: {
         requestedBy: 'Requested by',
         brand: 'Performance - Security - Reliability',
-        installRequired: 'Sentinel must be added as a bot on this server to work.',
-        installRequiredNoInvite: 'Sentinel must be added as a bot on this server to work. Make sure the invite link contains the bot and applications.commands scopes.',
+        installRequired: 'Noctigarde must be added as a bot on this server to work.',
+        installRequiredNoInvite: 'Noctigarde must be added as a bot on this server to work. Make sure the invite link contains the bot and applications.commands scopes.',
         installCommandsOnly: 'The link used probably installed commands only.',
-        reinvite: 'Reinvite Sentinel with this link: {inviteUrl}',
+        reinvite: 'Reinvite Noctigarde with this link: {inviteUrl}',
         unavailable: 'This command is not available on this server for now.',
-        bootstrapRoles: 'No role configured. During setup, the owner, administrators, and members with Manage Server or Manage Roles can configure Sentinel.',
+        bootstrapRoles: 'No role configured. During setup, the owner, administrators, and members with Manage Server or Manage Roles can configure Noctigarde.',
         accessDenied: '❌ You do not have access to this command.\nIf no management role is configured yet, a member with `Administrator`, `Manage Server`, or `Manage Roles` can run `/config-permissions action:add role:@role`.',
         languageSet: '✅ This server language is now French.',
         languageSetEn: '✅ This server language is now English.',
-        languageChooseTitle: 'Sentinel | Language selection',
+        languageChooseTitle: 'Noctigarde | Language selection',
         languageChooseDescription: 'Choose this server language. This setting is specific to this server and does not affect other servers.',
         languageFrench: 'Français',
         languageEnglish: 'English',
@@ -625,31 +628,31 @@ const I18N = {
         autoRoleSet: '✅ The join auto-role has been set to {role}. New members will receive it automatically.',
         autoRoleDisabled: '✅ The join auto-role is disabled on this server.',
         autoRoleCurrent: 'Join auto-role: {role}',
-        autoRoleNotManageable: '❌ Sentinel cannot assign this role. Make sure Sentinel has `Manage Roles` and its Discord role is above {role}.',
+        autoRoleNotManageable: '❌ Noctigarde cannot assign this role. Make sure Noctigarde has `Manage Roles` and its Discord role is above {role}.',
         autoRoleManagedDenied: '❌ This role is managed by a Discord integration and cannot be assigned automatically.',
         autoRoleAssignedLog: '🛡️ Auto-role assigned to {member}: {role}.',
         autoRoleFailedLog: '⚠️ Could not assign the auto-role to {member}: {role}. Check `Manage Roles` and the role hierarchy.',
         invalidChannelId: '❌ Invalid channel ID.',
-        channelNotText: '❌ Choose a text channel that still exists and is visible to Sentinel.',
+        channelNotText: '❌ Choose a text channel that still exists and is visible to Noctigarde.',
         logChannelSet: '✅ The log channel has been set to {channel}.',
         statusChannelCurrent: 'Technical status: {channel}\nUpdates channel: {updatesChannel}\nOfficial delivery: **{updates}**\nMentioned role: {pingRole}.',
-        statusChannelSet: '✅ The Sentinel status panel will be maintained in {channel}.',
-        statusChannelDisabled: '✅ The Sentinel status channel is disabled on this server.',
-        statusUpdatesChannelSet: '✅ Official Sentinel announcements will be posted in {channel}.',
+        statusChannelSet: '✅ The Noctigarde status panel will be maintained in {channel}.',
+        statusChannelDisabled: '✅ The Noctigarde status channel is disabled on this server.',
+        statusUpdatesChannelSet: '✅ Official Noctigarde announcements will be posted in {channel}.',
         statusUpdatesTested: '✅ Test message sent in {channel}.',
-        statusUpdatesEnabled: '✅ Official Sentinel updates will be posted in the dedicated updates channel.',
-        statusUpdatesDisabled: '✅ Official Sentinel updates will no longer be posted on this server.',
+        statusUpdatesEnabled: '✅ Official Noctigarde updates will be posted in the dedicated updates channel.',
+        statusUpdatesDisabled: '✅ Official Noctigarde updates will no longer be posted on this server.',
         statusUpdatesRoleSet: '✅ {role} will be mentioned for future official announcements.',
         statusUpdatesRoleDisabled: '✅ No role will be mentioned for official announcements.',
         statusChannelRequired: '❌ Choose a channel for this action.',
         statusUpdatesChannelRequired: '❌ First choose an updates channel with `/status-channel`, then select “Set updates channel”.',
-        officialUpdateDenied: '❌ This command is reserved for the Sentinel creator.',
-        officialUpdateSent: '✅ Official update published. Sentinel server: **{referenceCount}** channel(s). Subscribed servers: **{subscriberCount}** channel(s).',
+        officialUpdateDenied: '❌ This command is reserved for the Noctigarde creator.',
+        officialUpdateSent: '✅ Official update published. Noctigarde server: **{referenceCount}** channel(s). Subscribed servers: **{subscriberCount}** channel(s).',
         officialUpdateNoTarget: '❌ No updates channel is available for this announcement.',
         payRateInvalid: '❌ Invalid hourly amount. Example: `/payroll-config hourly_rate:500 currency:$`.',
         paySettingsUpdated: '✅ Salaries configured: **{rate}** per hour.',
         payRoleSettingsUpdated: '✅ Rate configured for {role}: **{rate}** per hour.',
-        payRoleSettingsRemoved: '✅ The specific rate for {role} has been removed. Sentinel will use the global rate if no other role matches.',
+        payRoleSettingsRemoved: '✅ The specific rate for {role} has been removed. Noctigarde will use the global rate if no other role matches.',
         payAdjustmentInvalid: '❌ Invalid adjustment. Provide a member, type, positive amount, and short reason.',
         payAdjustmentAdded: '✅ Adjustment added for {member}: **{amount}** ({type}).',
         payrollArchived: '✅ Salaries archived for **{weekStart} → {weekEnd}**. Total: **{amount}**.',
@@ -677,17 +680,17 @@ const I18N = {
         resetGuildDone: '✅ All service hours on this server have been reset.',
         noServiceRole: '❌ No service role is configured on this server.\nUse `/config-role` to set one.',
         serviceRoleEveryoneDenied: '❌ The service role cannot be `@everyone`.\nChoose a real role with `/config-role`, then try again.',
-        serviceRoleManagedDenied: '❌ Sentinel cannot manage the service role {role}, because it is controlled by a Discord integration.\nChoose a normal role with `/config-role`, then try again.',
-        serviceRoleMissingManageRoles: '❌ Sentinel cannot manage the service role because it does not have the `Manage Roles` permission.\nAdd this permission to the Sentinel role, then try again.',
-        serviceRoleTooHigh: '❌ Sentinel cannot manage the service role {role}, because this role is too high.\nMove {botRole} above {role} in Discord settings, then try again.',
+        serviceRoleManagedDenied: '❌ Noctigarde cannot manage the service role {role}, because it is controlled by a Discord integration.\nChoose a normal role with `/config-role`, then try again.',
+        serviceRoleMissingManageRoles: '❌ Noctigarde cannot manage the service role because it does not have the `Manage Roles` permission.\nAdd this permission to the Noctigarde role, then try again.',
+        serviceRoleTooHigh: '❌ Noctigarde cannot manage the service role {role}, because this role is too high.\nMove {botRole} above {role} in Discord settings, then try again.',
         serviceLeftLog: '🔴 {member} ended their service.\n⏱️ Duration: **{duration}**\n📊 Total: **{total}**',
         serviceLeft: '🔴 You ended your service.\n⏱️ Session duration: **{duration}**',
         serviceStartedLog: '🟢 {member} started their service.',
         serviceStarted: '🟢 You started your service.',
         serviceAlreadyStarted: '🟢 You are already on duty.',
         serviceNotStarted: '🔴 You are not on duty right now.',
-        serviceError: '❌ Sentinel could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
-        servicePanelTitle: 'Sentinel | Duty desk',
+        serviceError: '❌ Noctigarde could not update your service.\nCheck the bot permissions or run `/diagnostic` to see what to fix.',
+        servicePanelTitle: 'Noctigarde | Duty desk',
         servicePanelDescription: '`Operations ledger`\nOpen your duty post, close your service, or inspect agents already deployed.\nEach action updates your duty badge and records presence in the ledger.',
         servicePanelStartName: 'Duty opening',
         servicePanelStartValue: '🟢 Enables your badge and records your departure in the ledger.',
@@ -695,7 +698,7 @@ const I18N = {
         servicePanelEndValue: '🔴 Closes duty, removes the badge, and records the duration.',
         servicePanelRegistryName: 'Live ledger',
         servicePanelRegistryValue: '📊 `My file` shows your record. `Deployment` shows agents currently in the field.',
-        servicePanelFooter: 'Sentinel desk - presence ledger',
+        servicePanelFooter: 'Noctigarde desk - presence ledger',
         showMyHoursLabel: 'My file',
         activeLabel: 'Deployment',
         toggleLabel: 'Duty',
@@ -704,7 +707,7 @@ const I18N = {
         confirm: 'Confirm',
         cancel: 'Cancel',
         buttonCooldown: '⏳ Action already running. Try again in **{time}**.',
-        confirmationTitle: '⚠️ Sentinel confirmation',
+        confirmationTitle: '⚠️ Noctigarde confirmation',
         confirmationBody: '**Action:** {action}\n**Target:** {target}\n{details}\n\nConfirm only if everything is correct. This confirmation expires in 2 minutes.',
         confirmationNotForYou: '❌ This confirmation is not for you.',
         confirmationExpired: '⏳ Confirmation expired. Run the command again if needed.',
@@ -715,12 +718,12 @@ const I18N = {
         confirmKick: 'Kick',
         confirmResetUser: 'Hours reset',
         confirmDossierClose: 'Ticket closure',
-        serviceLogStartTitle: 'Sentinel | Service started',
-        serviceLogEndTitle: 'Sentinel | Service ended',
-        serviceLogLongTitle: 'Sentinel | Long service',
+        serviceLogStartTitle: 'Noctigarde | Service started',
+        serviceLogEndTitle: 'Noctigarde | Service ended',
+        serviceLogLongTitle: 'Noctigarde | Long service',
         serviceLogLongDescription: '{member} has been on duty for **{duration}**.',
         serviceLogLongHint: 'A private confirmation was sent with the choice to continue or end the service.',
-        serviceLogLongDeliveryFailed: 'The direct message could not be delivered. Sentinel will retry automatically.',
+        serviceLogLongDeliveryFailed: 'The direct message could not be delivered. Noctigarde will retry automatically.',
         serviceLogTarget: 'Agent',
         serviceLogSource: 'Source',
         serviceLogDuration: 'Duration',
@@ -728,15 +731,15 @@ const I18N = {
         serviceLogStartedAt: 'Started',
         serviceLogSourceDiscord: 'Discord',
         serviceLogSourceDashboard: 'Dashboard',
-        staffLogTitle: 'Sentinel | Log',
-        helpTitle: 'Sentinel | Getting started',
-        helpDescription: 'Start here. This guide explains how to install Sentinel, choose the server language, configure it, and use it without knowing Discord bots.',
+        staffLogTitle: 'Noctigarde | Log',
+        helpTitle: 'Noctigarde | Getting started',
+        helpDescription: 'Start here. This guide explains how to install Noctigarde, choose the server language, configure it, and use it without knowing Discord bots.',
         moderationAccessDenied: '❌ You do not have access to this moderation command.',
-        moderationAccessDeniedSpecific: '❌ You cannot run this moderation action.\nFix: give your Discord role the “{permission}” permission, or add your role to Sentinel allowed roles.',
-        moderationBotPermissionMissing: '❌ Sentinel does not have the required Discord permission for this action.\nOpen Dashboard > Security > Diagnostic, or add the missing permission to Sentinel role.',
-        moderationBotPermissionMissingSpecific: '❌ Sentinel cannot perform this action.\nFix: add the “{permission}” permission to the Sentinel role, then try again.',
+        moderationAccessDeniedSpecific: '❌ You cannot run this moderation action.\nFix: give your Discord role the “{permission}” permission, or add your role to Noctigarde allowed roles.',
+        moderationBotPermissionMissing: '❌ Noctigarde does not have the required Discord permission for this action.\nOpen Dashboard > Security > Diagnostic, or add the missing permission to Noctigarde role.',
+        moderationBotPermissionMissingSpecific: '❌ Noctigarde cannot perform this action.\nFix: add the “{permission}” permission to the Noctigarde role, then try again.',
         moderationDiscordRefused: '❌ Discord refused the action.\nFix: {fix}',
-        moderationBotPermissionFix: 'add the “{permission}” permission to the Sentinel role, then try again.',
+        moderationBotPermissionFix: 'add the “{permission}” permission to the Noctigarde role, then try again.',
         moderationRoleOrderFix: 'move my role above “{role}”, then try again.',
         moderationBanNotFound: '❌ No Discord ban was found for this ID.\nFix: check the full Discord ID, then try again only if this user is still banned.',
         moderationMemberRequired: '❌ You must choose a server member.',
@@ -745,10 +748,10 @@ const I18N = {
         moderationReasonDefault: 'No reason provided.',
         moderationDurationInvalid: '❌ Invalid duration. Valid examples: `10m`, `2h`, `7d`.',
         moderationDurationTooLong: '❌ Discord limits timeouts to 28 days maximum.',
-        moderationSelfDenied: '❌ You cannot moderate yourself with Sentinel.',
-        moderationOwnerDenied: '❌ Sentinel cannot moderate the server owner.',
-        moderationBotDenied: '❌ Sentinel cannot moderate this user.',
-        moderationHierarchyDenied: '❌ This person role is too high in the Discord hierarchy.\nMove Sentinel role above this person role, then try again.',
+        moderationSelfDenied: '❌ You cannot moderate yourself with Noctigarde.',
+        moderationOwnerDenied: '❌ Noctigarde cannot moderate the server owner.',
+        moderationBotDenied: '❌ Noctigarde cannot moderate this user.',
+        moderationHierarchyDenied: '❌ This person role is too high in the Discord hierarchy.\nMove Noctigarde role above this person role, then try again.',
         moderationWarned: '✅ {member} has been warned. Case #{caseId}.',
         moderationTimeout: '✅ {member} has been timed out for **{duration}**. Case #{caseId}.',
         moderationUntimeout: '✅ Timeout removed from {member}. Case #{caseId}.',
@@ -763,14 +766,14 @@ const I18N = {
         moderationClearAll: '✅ Channel cleared: **{count}** message(s) deleted, including old messages.',
         moderationClearPartial: '⚠️ **{count}** message(s) deleted, but some messages could not be removed. Check the logs and the channel.',
         moderationPurgeAmountRequired: '❌ Use `/clear messages` with a number from 1 to 100, or `/clear all` to clear the entire channel.',
-        moderationPurgeChannelPermissionMissing: '❌ Sentinel must be able to view this channel, read its history, and manage its messages.',
+        moderationPurgeChannelPermissionMissing: '❌ Noctigarde must be able to view this channel, read its history, and manage its messages.',
         moderationCasesEmpty: 'No moderation case recorded for {member}.',
-        moderationFailed: '❌ Moderation action failed.\nCheck that Sentinel has the right Discord permission and that its role is above the target. You can also run `/diagnostic`.',
+        moderationFailed: '❌ Moderation action failed.\nCheck that Noctigarde has the right Discord permission and that its role is above the target. You can also run `/diagnostic`.',
         moderationNoChannel: '❌ This command must be used in a text channel.',
-        moderationCasesTitle: 'Sentinel | Moderation cases',
-        moderationCaseTitle: 'Sentinel | Moderation case',
-        moderationProfileTitle: 'Sentinel | Moderation profile',
-        moderationLogTitle: 'Sentinel | Moderation',
+        moderationCasesTitle: 'Noctigarde | Moderation cases',
+        moderationCaseTitle: 'Noctigarde | Moderation case',
+        moderationProfileTitle: 'Noctigarde | Moderation profile',
+        moderationLogTitle: 'Noctigarde | Moderation',
         moderationCaseNotFound: '❌ No case #{caseId} found on this server.',
         moderationCaseEdited: '✅ Case #{caseId} has been edited.',
         moderationCaseDeleted: '✅ Case #{caseId} has been deleted.',
@@ -782,34 +785,34 @@ const I18N = {
         moderationSlowmodeDone: '🐢 Slowmode set to **{duration}** in {channel}.',
         moderationSlowmodeDisabled: '✅ Slowmode disabled in {channel}.',
         moderationSlowmodeTooLong: '❌ Discord limits slowmode to 6 hours maximum.',
-        customEmbedBotPermissionMissing: '❌ Sentinel must be able to view the channel, send messages, and embed links in {channel}.',
-        customEmbedChannelViewMissing: '❌ Sentinel cannot see {channel}.\nFix: allow Sentinel to view this channel.',
-        customEmbedChannelSendMissing: '❌ Sentinel cannot write in {channel}.\nFix: allow Sentinel to send messages in this channel.',
-        customEmbedChannelEmbedMissing: '❌ Sentinel cannot send embeds in {channel}.\nFix: give Sentinel the “Embed Links” permission in this channel.',
-        customEmbedChannelAttachMissing: '❌ Sentinel cannot attach files in {channel}.\nFix: give Sentinel the “Attach Files” permission in this channel.',
-        customEmbedMentionPermissionMissing: '❌ Sentinel cannot mention this role.\nFix: make the role mentionable, or give Sentinel permission to mention roles.',
+        customEmbedBotPermissionMissing: '❌ Noctigarde must be able to view the channel, send messages, and embed links in {channel}.',
+        customEmbedChannelViewMissing: '❌ Noctigarde cannot see {channel}.\nFix: allow Noctigarde to view this channel.',
+        customEmbedChannelSendMissing: '❌ Noctigarde cannot write in {channel}.\nFix: allow Noctigarde to send messages in this channel.',
+        customEmbedChannelEmbedMissing: '❌ Noctigarde cannot send embeds in {channel}.\nFix: give Noctigarde the “Embed Links” permission in this channel.',
+        customEmbedChannelAttachMissing: '❌ Noctigarde cannot attach files in {channel}.\nFix: give Noctigarde the “Attach Files” permission in this channel.',
+        customEmbedMentionPermissionMissing: '❌ Noctigarde cannot mention this role.\nFix: make the role mentionable, or give Noctigarde permission to mention roles.',
         customEmbedInvalidColor: '❌ Invalid color. Use `pink`, `cyan`, `green`, `red`, `purple`, or a code like `#ff2d9a`.',
         customEmbedInvalidUrl: '❌ Invalid URL for {field}. Use an `https://` URL, or enter `remove` while editing.',
         customEmbedInvalidUpload: '❌ Invalid local image. Use a PNG, JPG, WebP, or GIF image.',
         customEmbedUploadTooLarge: '❌ Local image too large. Keep the total under 8 MB per embed.',
         customEmbedMediaQuotaReached: '❌ This server reached its image quota ({used} MB of {limit} MB). Delete an older embed or free storage before trying again.',
         customEmbedTooLarge: '❌ This embed is too long. Keep the title under 256 characters, the message under 4000 characters, and the total under 6000 characters.',
-        customEmbedLimitReached: 'This server can keep **{limit}** active Sentinel embeds. You can edit or delete existing embeds from the dashboard.',
-        customEmbedCreated: '✅ Sentinel embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
-        customEmbedEdited: '✅ Sentinel embed `{messageId}` edited. Edits do not use quota.',
-        customEmbedDeleted: '✅ Sentinel embed `{messageId}` deleted. Its slot is now available.',
-        customEmbedNotFound: '❌ No managed Sentinel embed matches this ID.',
+        customEmbedLimitReached: 'This server can keep **{limit}** active Noctigarde embeds. You can edit or delete existing embeds from the dashboard.',
+        customEmbedCreated: '✅ Noctigarde embed sent in {channel}. Message ID: `{messageId}`.\n{quota}',
+        customEmbedEdited: '✅ Noctigarde embed `{messageId}` edited. Edits do not use quota.',
+        customEmbedDeleted: '✅ Noctigarde embed `{messageId}` deleted. Its slot is now available.',
+        customEmbedNotFound: '❌ No managed Noctigarde embed matches this ID.',
         customEmbedNoEditFields: '❌ Provide at least one field to edit: title, message, color, image, thumbnail, or footer.',
         customEmbedQuotaUnlimited: 'Unlimited quota.',
-        dossierPanelTitle: 'Sentinel | Reception desk',
-        dossierPanelDescription: '`Confidential reception`\nChoose the nature of your request. Sentinel will prepare a reserved space with authorized personnel and keep the follow-up inside one clear ticket.',
+        dossierPanelTitle: 'Noctigarde | Reception desk',
+        dossierPanelDescription: '`Confidential reception`\nChoose the nature of your request. Noctigarde will prepare a reserved space with authorized personnel and keep the follow-up inside one clear ticket.',
         dossierPanelAccessName: 'Reception',
         dossierPanelAccessValue: 'Each request opens a confidential space for discussion with the assigned team.',
         dossierPanelFollowName: 'Follow-up',
         dossierPanelFollowValue: 'Status, referent, and written record stay attached to the same ticket.',
         dossierPanelBeforeName: 'Before opening',
         dossierPanelBeforeValue: 'Prepare a short subject and the useful elements: facts, people involved, moment, proof, or context.',
-        dossierPanelFooter: 'Sentinel - reception desk',
+        dossierPanelFooter: 'Noctigarde - reception desk',
         dossierSupportLabel: 'Assistance',
         dossierReportLabel: 'Report',
         dossierRecruitmentLabel: 'Application',
@@ -820,29 +823,29 @@ const I18N = {
         dossierModalSubjectPlaceholder: 'Example: administrative assistance request',
         dossierModalDescription: 'Description',
         dossierModalDescriptionPlaceholder: 'Explain your request with useful details.',
-        dossierOpenedTitle: 'Sentinel | Ticket opened',
+        dossierOpenedTitle: 'Noctigarde | Ticket opened',
         dossierAlreadyOpen: 'You already have an open ticket: {channel}',
         dossierCooldown: '⏳ Wait another **{time}** before opening a new ticket.',
         dossierPanelCooldown: '⏳ This panel was just used. Try again in **{time}**.',
         dossierPanelLimitReached: 'This server can keep **{limit}** ticket panel. Keep this panel or delete it before publishing another one.',
         dossierOpenLimitReached: 'This server already has **{limit}** open tickets. Close a completed ticket before opening another one.',
         dossierCreated: 'Ticket created: {channel}',
-        dossierNotInDossier: 'This button must be used inside a Sentinel ticket.',
+        dossierNotInDossier: 'This button must be used inside a Noctigarde ticket.',
         dossierCloseDenied: 'Only the requester or an authorized member can close this ticket.',
         dossierClosed: 'Ticket closed. The written record has been sent, then the space will be sealed.',
         dossierClaimed: 'Ticket taken over by {member}.',
         dossierClaimDenied: 'You need an authorized role to take over this ticket.',
         dossierStatusDenied: 'You need an authorized role to update this ticket status.',
         dossierStatusUpdated: 'Ticket status updated: **{status}**.',
-        dossierRoleAdded: '✅ {role} can now take over and manage Sentinel tickets.',
-        dossierRoleRemoved: '✅ {role} can no longer take over Sentinel tickets.',
-        dossierRoleList: 'Sentinel ticket roles:\n{roles}',
-        dossierRoleListEmpty: 'No ticket role configured. Roles allowed to manage Sentinel and members with suitable Discord permissions can manage tickets.',
+        dossierRoleAdded: '✅ {role} can now take over and manage Noctigarde tickets.',
+        dossierRoleRemoved: '✅ {role} can no longer take over Noctigarde tickets.',
+        dossierRoleList: 'Noctigarde ticket roles:\n{roles}',
+        dossierRoleListEmpty: 'No ticket role configured. Roles allowed to manage Noctigarde and members with suitable Discord permissions can manage tickets.',
         dossierAddDone: '✅ {member} has been added as a ticket participant.',
         dossierRemoveDone: '✅ {member} has been removed from this ticket.',
-        dossierCommandOutside: '❌ This command must be used inside a Sentinel ticket channel.',
+        dossierCommandOutside: '❌ This command must be used inside a Noctigarde ticket channel.',
         dossierTranscriptDone: '✅ Written record prepared.',
-        dossierPanelPublished: '✅ Sentinel reception desk published in {channel}.'
+        dossierPanelPublished: '✅ Noctigarde reception desk published in {channel}.'
     }
 };
 
@@ -901,6 +904,8 @@ function resolveCommandName(commandName) {
         'config-channel': 'config-logs',
         'config-statut': 'config-statut',
         'status-channel': 'config-statut',
+        'maj-noctigarde': 'maj-sentinel',
+        'noctigarde-update': 'maj-sentinel',
         'maj-sentinel': 'maj-sentinel',
         'sentinel-update': 'maj-sentinel',
         'config-paie': 'config-paie',
@@ -931,6 +936,7 @@ function resolveCommandName(commandName) {
         ping: 'ping',
         diagnostic: 'diagnostic',
         'sync-service': 'sync-service',
+        'sync-noctigarde': 'sync-sentinel',
         'sync-sentinel': 'sync-sentinel',
         'reset-heures': 'reset-heures',
         'reset-hours': 'reset-heures',
@@ -1038,7 +1044,7 @@ function getGuildInstallRequiredMessage() {
 
 function buildFooter(requester, language = 'fr') {
     const footer = {
-        text: `Sentinel - ${t(language, 'requestedBy')} ${requester.username}`
+        text: `Noctigarde - ${t(language, 'requestedBy')} ${requester.username}`
     };
 
     if (typeof requester.displayAvatarURL === 'function') {
@@ -1048,7 +1054,7 @@ function buildFooter(requester, language = 'fr') {
     return footer;
 }
 
-function createSentinelEmbed({
+function createNoctigardeEmbed({
     color = SENTINEL_COLORS.primary,
     title,
     description = null,
@@ -1086,29 +1092,29 @@ function buildDashboardEmbed(guild, requester) {
     const dashboardUrl = getDashboardUrl('/dashboard');
     const isEnglish = language === 'en';
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Dashboard' : 'Sentinel | Console',
+        title: isEnglish ? 'Noctigarde | Dashboard' : 'Noctigarde | Console',
         description: isEnglish
             ? [
-                'Open the web dashboard to manage Sentinel from your browser.',
+                'Open the web dashboard to manage Noctigarde from your browser.',
                 '',
                 '`1.` Log in with Discord.',
                 '`2.` Choose the server.',
                 '`3.` Configure service, logs, embeds, moderation, and audit from one place.',
                 '',
-                '**Current release:** public demonstration. No subscription or charge is active today. Some advanced features may become paid later, but a free part of Sentinel will remain available. The details will be announced before any change.',
+                '**Current release:** public demonstration. No subscription or charge is active today. Some advanced features may become paid later, but a free part of Noctigarde will remain available. The details will be announced before any change.',
                 '',
                 dashboardUrl
             ].join('\n')
             : [
-                'Ouvre la console Sentinel pour gérer ton poste depuis le site.',
+                'Ouvre la console Noctigarde pour gérer ton poste depuis le site.',
                 '',
                 '`1.` Connecte-toi avec ton compte.',
                 '`2.` Choisis le serveur.',
                 '`3.` Prépare le service, le registre, les annonces, la sécurité et l’historique au même endroit.',
                 '',
-                '**Version actuelle :** démonstration publique. Aucun abonnement ni prélèvement n’est actif aujourd’hui. Certaines options avancées pourront devenir payantes plus tard, mais une partie gratuite de Sentinel restera disponible. Les détails seront annoncés avant tout changement.',
+                '**Version actuelle :** démonstration publique. Aucun abonnement ni prélèvement n’est actif aujourd’hui. Certaines options avancées pourront devenir payantes plus tard, mais une partie gratuite de Noctigarde restera disponible. Les détails seront annoncés avant tout changement.',
                 '',
                 dashboardUrl
             ].join('\n'),
@@ -1133,9 +1139,9 @@ function buildSupportEmbed(guild, requester) {
     const language = getGuildLanguage(guild.id);
     const dashboardUrl = getDashboardUrl('/dashboard');
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
-        title: language === 'en' ? 'Sentinel | Support' : 'Sentinel | Support',
+        title: language === 'en' ? 'Noctigarde | Support' : 'Noctigarde | Support',
         description: language === 'en'
             ? [
                 'Need help with setup, permissions, service tracking, moderation, embeds, or tickets?',
@@ -1347,7 +1353,7 @@ async function requestSensitiveConfirmation(interaction, {
         language: activeLanguage
     });
 
-    const embed = createSentinelEmbed({
+    const embed = createNoctigardeEmbed({
         color: SENTINEL_COLORS.warning,
         title: t(activeLanguage, 'confirmationTitle'),
         description: t(activeLanguage, 'confirmationBody', {
@@ -1427,7 +1433,7 @@ async function handleSensitiveConfirmationButton(interaction) {
             components: []
         });
     } catch (error) {
-        console.error('Erreur confirmation Sentinel :', error);
+        console.error('Erreur confirmation Noctigarde :', error);
         await interaction.editReply({
             content: error.message || t(confirmation.language, 'serviceError'),
             embeds: [],
@@ -1474,7 +1480,7 @@ async function notifyFounderStorageAlerts(alerts) {
     const payload = {
         embeds: [new EmbedBuilder()
             .setColor(SENTINEL_COLORS.warning)
-            .setTitle('Sentinel | Alerte de conservation')
+            .setTitle('Noctigarde | Alerte de conservation')
             .setDescription(pending.map(alert => `• ${alert.message}`).join('\n'))
             .addFields({
                 name: 'Contrôle',
@@ -1504,8 +1510,8 @@ async function notifyFounderRuntimeIncident(incident) {
     const payload = {
         embeds: [new EmbedBuilder()
             .setColor(incident.severity === 'critical' ? SENTINEL_COLORS.danger : SENTINEL_COLORS.warning)
-            .setTitle(`Sentinel | Incident ${incident.incidentId}`)
-            .setDescription(String(incident.message || 'Erreur technique Sentinel').slice(0, 1500))
+            .setTitle(`Noctigarde | Incident ${incident.incidentId}`)
+            .setDescription(String(incident.message || 'Erreur technique Noctigarde').slice(0, 1500))
             .addFields({ name: 'Origine', value: String(incident.source || 'runtime').slice(0, 1024) })
             .setTimestamp()]
     };
@@ -1606,7 +1612,7 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
                 occurredAt: new Date().toISOString(),
                 message: String(error.message || error).slice(0, 500)
             };
-            console.error('Erreur sauvegarde Sentinel :', error);
+            console.error('Erreur sauvegarde Noctigarde :', error);
         }
 
         const maintenance = runDatabaseMaintenance(db, {
@@ -1653,7 +1659,7 @@ async function runDatabaseStorageCycle(reason = 'auto', { forceBackup = false } 
             ? path.basename(backupPath)
             : 'recente, aucune copie dupliquee';
         console.log([
-            'Entretien stockage Sentinel termine',
+            'Entretien stockage Noctigarde termine',
             `sauvegarde=${backupLabel}`,
             `anciennes copies compressees=${compression.compressedCount}`,
             `sessions expirees=${maintenance.cleanup.expiredSessions}`,
@@ -1696,7 +1702,7 @@ async function reportDatabaseStorageCycleFailure(error) {
         });
         await notifyFounderStorageAlerts(alerts);
     } catch (alertError) {
-        console.error('Erreur alerte stockage Sentinel :', alertError);
+        console.error('Erreur alerte stockage Noctigarde :', alertError);
     }
 }
 
@@ -1782,7 +1788,7 @@ async function verifyManagedDatabaseBackup(fileName) {
     const file = resolveMaintenanceFile('backup', fileName);
 
     if (!file) {
-        throw new Error('Sauvegarde Sentinel introuvable.');
+        throw new Error('Sauvegarde Noctigarde introuvable.');
     }
 
     const check = await verifyDatabaseBackup(file.fullPath);
@@ -1805,7 +1811,7 @@ async function restoreManagedDatabaseBackup(fileName) {
     const file = resolveMaintenanceFile('backup', fileName);
 
     if (!file) {
-        throw new Error('Sauvegarde Sentinel introuvable.');
+        throw new Error('Sauvegarde Noctigarde introuvable.');
     }
 
     const safetyBackup = await createCompressedDatabaseBackup(db, {
@@ -1831,10 +1837,10 @@ async function restoreManagedDatabaseBackup(fileName) {
     };
 }
 
-function getSentinelSyncStatus() {
+function getNoctigardeSyncStatus() {
     return {
-        lastAt: lastSentinelServerSync ? new Date(lastSentinelServerSync).toISOString() : null,
-        result: lastSentinelServerSyncResult || null
+        lastAt: lastNoctigardeServerSync ? new Date(lastNoctigardeServerSync).toISOString() : null,
+        result: lastNoctigardeServerSyncResult || null
     };
 }
 
@@ -1892,7 +1898,7 @@ function isCreatorUser(userId) {
     return Boolean(userId && CREATOR_USER_IDS.has(String(userId)));
 }
 
-function canPublishOfficialSentinelUpdate(interaction) {
+function canPublishOfficialNoctigardeUpdate(interaction) {
     return Boolean(
         interaction?.user?.id
         && (
@@ -2619,7 +2625,7 @@ function hasDossierRoleAccess(member) {
     return getDossierRoleIds(member.guild.id).some(roleId => member.roles.cache.has(roleId));
 }
 
-function hasSentinelStaffRole(member) {
+function hasNoctigardeStaffRole(member) {
     if (!member?.guild?.id || !getStaffRoleGuildIds().includes(String(member.guild.id))) {
         return false;
     }
@@ -2711,7 +2717,7 @@ function hasCommandRoleAccess(member) {
         return true;
     }
 
-    if (hasSentinelStaffRole(member)) {
+    if (hasNoctigardeStaffRole(member)) {
         return true;
     }
 
@@ -3602,7 +3608,7 @@ function getDossierArchiveFile(guildId, dossierId) {
 
     return {
         path: filePath,
-        name: `dossier-sentinel-${dossier.id}.tar.gz`,
+        name: `dossier-noctigarde-${dossier.id}.tar.gz`,
         mimeType: 'application/gzip',
         size: buffer.length,
         dossier
@@ -3721,7 +3727,7 @@ async function reopenDossierChannel(guild, channel, actor, language = 'fr', opti
         ReadMessageHistory: true,
         AttachFiles: true,
         EmbedLinks: true
-    }, { reason: `Réouverture du dossier Sentinel par ${actor.id}` });
+    }, { reason: `Réouverture du dossier Noctigarde par ${actor.id}` });
     await channel.send(language === 'en'
         ? `The ticket has been reopened by ${actor}.`
         : `Le dossier a été réouvert par ${actor}.`);
@@ -3742,7 +3748,7 @@ async function processDossierMaintenance() {
         const channel = guild ? await guild.channels.fetch(dossier.channelId).catch(() => null) : null;
 
         if (channel) {
-            const deleted = await channel.delete('Dossier Sentinel archivé et délai de conservation écoulé')
+            const deleted = await channel.delete('Dossier Noctigarde archivé et délai de conservation écoulé')
                 .then(() => true)
                 .catch(error => {
                     console.error(`Suppression différée dossier #${dossier.id} :`, error);
@@ -5331,24 +5337,24 @@ async function applyWarningEscalation(guild, member, userId, warningCase, langua
 
     const duration = action === 'timeout' ? settings.timeoutSeconds * 1000 : null;
     const reason = language === 'en'
-        ? `Sentinel automatic escalation after ${warningCount} active warnings.`
-        : `Escalade automatique Sentinel après ${warningCount} avertissements actifs.`;
+        ? `Noctigarde automatic escalation after ${warningCount} active warnings.`
+        : `Escalade automatique Noctigarde après ${warningCount} avertissements actifs.`;
     let error = null;
 
     try {
         if (action === 'timeout') {
             if (!member) throw new Error('Le membre n’est plus présent sur le serveur.');
             if (!botHasPermission(guild, PermissionsBitField.Flags.ModerateMembers)) throw new Error('Permission Discord ModerateMembers manquante.');
-            if (!member.moderatable) throw new Error('Le rôle Sentinel est trop bas pour appliquer le timeout.');
+            if (!member.moderatable) throw new Error('Le rôle Noctigarde est trop bas pour appliquer le timeout.');
             await member.timeout(duration, reason);
         } else if (action === 'kick') {
             if (!member) throw new Error('Le membre n’est plus présent sur le serveur.');
             if (!botHasPermission(guild, PermissionsBitField.Flags.KickMembers)) throw new Error('Permission Discord KickMembers manquante.');
-            if (!member.kickable) throw new Error('Le rôle Sentinel est trop bas pour expulser ce membre.');
+            if (!member.kickable) throw new Error('Le rôle Noctigarde est trop bas pour expulser ce membre.');
             await member.kick(reason);
         } else {
             if (!botHasPermission(guild, PermissionsBitField.Flags.BanMembers)) throw new Error('Permission Discord BanMembers manquante.');
-            if (member && !member.bannable) throw new Error('Le rôle Sentinel est trop bas pour bannir ce membre.');
+            if (member && !member.bannable) throw new Error('Le rôle Noctigarde est trop bas pour bannir ce membre.');
             await guild.members.ban(userId, { reason, deleteMessageSeconds: 0 });
         }
     } catch (caught) {
@@ -6084,7 +6090,7 @@ async function applyAutomodAction(message, trigger, settings, premiumActive = fa
     const userId = message.author.id;
     const member = message.member || await message.guild.members.fetch(userId).catch(() => null);
     const action = normalizeAutomodAction(trigger.action, premiumActive);
-    const reason = `Auto-moderation Sentinel - ${trigger.reason}`;
+    const reason = `Auto-moderation Noctigarde - ${trigger.reason}`;
     const durationMs = automodTimeoutDurationMs(settings, premiumActive);
     let deleted = false;
     let sanction = { applied: action === 'log' || action === 'delete', caseData: null };
@@ -6118,7 +6124,7 @@ async function applyAutomodAction(message, trigger, settings, premiumActive = fa
         : null;
 
     if (progressiveAction && automodSeverity(progressiveAction) > automodSeverity(action)) {
-        const progressiveReason = `Escalade auto-moderation Sentinel - ${eventCount} infraction(s) en ${settings.premiumProgressiveWindowMinutes} min`;
+        const progressiveReason = `Escalade auto-moderation Noctigarde - ${eventCount} infraction(s) en ${settings.premiumProgressiveWindowMinutes} min`;
         progressive = {
             action: progressiveAction,
             ...(await applyAutomodSanction(message.guild, member, userId, progressiveAction, progressiveReason, durationMs, language)
@@ -6150,9 +6156,9 @@ async function applyAutomodAction(message, trigger, settings, premiumActive = fa
         logLines.push(`Contenu : ${truncateAutomodText(message.content)}`);
     }
 
-    await sendSentinelStaffLog(message.guild, logLines.join('\n'), {
+    await sendNoctigardeStaffLog(message.guild, logLines.join('\n'), {
         color: SENTINEL_COLORS.warning,
-        title: 'Sentinel | Auto-modération',
+        title: 'Noctigarde | Auto-modération',
         language
     });
 
@@ -6217,14 +6223,14 @@ async function handleAutomodRaid(member) {
     const reason = `${timestamps.length} arrivees en ${settings.premiumRaidWindowSeconds}s`;
     automodRaidBuckets.set(key, [now]);
     addAutomodEvent(member.guild.id, member.id, 'premium_raid', 'log', reason, null, null);
-    await sendSentinelStaffLog(member.guild, [
-        'Alerte anti-raid Sentinel.',
+    await sendNoctigardeStaffLog(member.guild, [
+        'Alerte anti-raid Noctigarde.',
         `Signal : ${reason}`,
         `Derniere arrivee : ${member.user.tag} (${member.id})`,
         'Action : alerte staff uniquement pour eviter un faux positif destructeur.'
     ].join('\n'), {
         color: SENTINEL_COLORS.danger,
-        title: 'Sentinel | Anti-raid',
+        title: 'Noctigarde | Anti-raid',
         language: getGuildLanguage(member.guild.id)
     });
 }
@@ -6246,7 +6252,7 @@ function buildModerationCasesEmbed(member, requester, cases, language = 'fr', us
     const targetLabel = member ? `${member}` : formatUserIdLabel(userId, language);
     const thumbnail = member?.user?.displayAvatarURL();
 
-    const embed = createSentinelEmbed({
+    const embed = createNoctigardeEmbed({
         color: SENTINEL_COLORS.warning,
         title: t(language, 'moderationCasesTitle'),
         description: `${language === 'en' ? 'Target' : 'Cible'} : ${targetLabel}\n\n${lines.join('\n\n')}`,
@@ -6295,7 +6301,7 @@ function buildModerationCaseEmbed(caseRow, requester, language = 'fr') {
         });
     }
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.advanced,
         title: `${t(language, 'moderationCaseTitle')} #${caseRow.id}`,
         requester,
@@ -6315,7 +6321,7 @@ function buildModerationProfileEmbed(member, requester, cases, stats, language =
     const targetLabel = member ? `${member}` : formatUserIdLabel(userId, language);
     const thumbnail = member?.user?.displayAvatarURL();
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.advanced,
         title: t(language, 'moderationProfileTitle'),
         description: `${language === 'en' ? 'Target' : 'Cible'} : ${targetLabel}`,
@@ -6379,7 +6385,7 @@ function buildModerationLogEmbed(guild, requester, caseData, targetLabel, langua
         inline: true
     });
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.danger,
         title: t(language, 'moderationLogTitle'),
         description: `Serveur : **${guild.name}**`,
@@ -6638,7 +6644,7 @@ async function prepareCustomEmbedUploads(input, data, language = 'fr', context =
         try {
             optimized = await optimizeEmbedImage(original.buffer, EMBED_MEDIA_IMAGE_OPTIONS);
         } catch (error) {
-            console.error('Erreur optimisation image embed Sentinel :', error);
+            console.error('Erreur optimisation image embed Noctigarde :', error);
             throw new Error(t(language, 'customEmbedInvalidUpload'));
         }
 
@@ -6655,8 +6661,8 @@ async function prepareCustomEmbedUploads(input, data, language = 'fr', context =
                 attachment: optimized.buffer,
                 name,
                 description: original.slot === 'thumbnail'
-                    ? 'Miniature embed Sentinel'
-                    : 'Image embed Sentinel'
+                    ? 'Miniature embed Noctigarde'
+                    : 'Image embed Noctigarde'
             }
         };
     }));
@@ -7231,13 +7237,13 @@ function buildCustomAnnouncementEmbed(data, language = 'fr') {
         .setTitle(data.title)
         .setDescription(data.description)
         .setFooter({
-            text: data.footer || `Sentinel - ${t(language, 'brand')}`
+            text: data.footer || `Noctigarde - ${t(language, 'brand')}`
         })
         .setTimestamp();
 
     if (brandIcon) {
         embed.setAuthor({
-            name: 'Sentinel',
+            name: 'Noctigarde',
             iconURL: brandIcon
         });
     }
@@ -7393,9 +7399,9 @@ function buildServiceHistoryEmbed(member, requester, userData, sessions, options
         }
     ];
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: userData?.startTime ? SENTINEL_COLORS.success : SENTINEL_COLORS.accent,
-        title: 'Sentinel | Registre agent',
+        title: 'Noctigarde | Registre agent',
         description: `Fiche : ${member}\n${sessionLines.length > 0 ? sessionLines.join('\n') : 'Aucun service consigné.'}`,
         requester,
         thumbnail: member.user.displayAvatarURL()
@@ -7421,17 +7427,17 @@ function findGuildTextChannel(guild, names) {
     ) || null;
 }
 
-function getSentinelStaffLogChannel(guild) {
+function getNoctigardeStaffLogChannel(guild) {
     return findGuildTextChannel(guild, SENTINEL_STAFF_LOG_CHANNELS) || getLogChannel(guild);
 }
 
 function getFallbackRequester() {
     return client.user || {
-        username: 'Sentinel'
+        username: 'Noctigarde'
     };
 }
 
-function buildSentinelStaffLogEmbed(guild, message, {
+function buildNoctigardeStaffLogEmbed(guild, message, {
     color = SENTINEL_COLORS.accent,
     title = null,
     requester = null,
@@ -7439,7 +7445,7 @@ function buildSentinelStaffLogEmbed(guild, message, {
     fields = []
 } = {}) {
     const activeLanguage = language || getGuildLanguage(guild.id);
-    const embed = createSentinelEmbed({
+    const embed = createNoctigardeEmbed({
         color,
         title: title || t(activeLanguage, 'staffLogTitle'),
         description: String(message || '').slice(0, 4096),
@@ -7459,8 +7465,8 @@ function buildSentinelStaffLogEmbed(guild, message, {
     return embed;
 }
 
-async function sendSentinelStaffLog(guild, message, options = {}) {
-    const channel = getSentinelStaffLogChannel(guild);
+async function sendNoctigardeStaffLog(guild, message, options = {}) {
+    const channel = getNoctigardeStaffLogChannel(guild);
 
     if (!channel) {
         return;
@@ -7472,7 +7478,7 @@ async function sendSentinelStaffLog(guild, message, options = {}) {
     }
 
     await channel.send({
-        embeds: [buildSentinelStaffLogEmbed(guild, message, options)]
+        embeds: [buildNoctigardeStaffLogEmbed(guild, message, options)]
     }).catch(() => {});
 }
 
@@ -7536,7 +7542,7 @@ function buildServiceLogEmbed(guild, target, action, {
     const targetLabel = formatServiceLogTarget(target, userId || target?.id, activeLanguage);
     const isEnd = action === 'end';
     const isLong = action === 'long';
-    const embed = createSentinelEmbed({
+    const embed = createNoctigardeEmbed({
         color: isEnd ? SENTINEL_COLORS.warning : (isLong ? SENTINEL_COLORS.danger : SENTINEL_COLORS.success),
         title: isEnd
             ? t(activeLanguage, 'serviceLogEndTitle')
@@ -7601,7 +7607,7 @@ function buildServiceLogEmbed(guild, target, action, {
 }
 
 async function sendServiceLog(guild, target, action, options = {}) {
-    const channel = getLogChannel(guild) || getSentinelStaffLogChannel(guild);
+    const channel = getLogChannel(guild) || getNoctigardeStaffLogChannel(guild);
 
     if (!channel) {
         return;
@@ -7637,19 +7643,19 @@ function buildLongServiceCheckinComponents(service) {
 
 function buildLongServiceCheckinEmbed(guild, user, service, language) {
     const isEnglish = language === 'en';
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.warning,
-        title: isEnglish ? 'Sentinel | Service check' : 'Sentinel | Vérification de service',
+        title: isEnglish ? 'Noctigarde | Service check' : 'Noctigarde | Vérification de service',
         description: isEnglish
             ? [
                 `Your service on **${guild.name}** has been active for **${formatDuration(service.duration)}**.`,
                 '',
-                `Do you want to keep it active? Choose below. Without a manual end, Sentinel will close it automatically after **${LONG_SERVICE_AUTO_CLOSE_HOURS} hours**.`
+                `Do you want to keep it active? Choose below. Without a manual end, Noctigarde will close it automatically after **${LONG_SERVICE_AUTO_CLOSE_HOURS} hours**.`
             ].join('\n')
             : [
                 `Ton service sur **${guild.name}** est actif depuis **${formatDuration(service.duration)}**.`,
                 '',
-                `Souhaites-tu le garder actif ? Choisis ci-dessous. Sans clôture manuelle, Sentinel le terminera automatiquement après **${LONG_SERVICE_AUTO_CLOSE_HOURS} heures**.`
+                `Souhaites-tu le garder actif ? Choisis ci-dessous. Sans clôture manuelle, Noctigarde le terminera automatiquement après **${LONG_SERVICE_AUTO_CLOSE_HOURS} heures**.`
             ].join('\n'),
         requester: user,
         thumbnail: guild.iconURL(),
@@ -7659,9 +7665,9 @@ function buildLongServiceCheckinEmbed(guild, user, service, language) {
 
 function buildAutomaticServiceClosureEmbed(guild, user, result, language) {
     const isEnglish = language === 'en';
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.warning,
-        title: isEnglish ? 'Sentinel | Service ended' : 'Sentinel | Service terminé',
+        title: isEnglish ? 'Noctigarde | Service ended' : 'Noctigarde | Service terminé',
         description: isEnglish
             ? `Your service on **${guild.name}** reached the ${LONG_SERVICE_AUTO_CLOSE_HOURS}-hour limit and was ended automatically. **${formatDuration(result.duration)}** was recorded.`
             : `Ton service sur **${guild.name}** a atteint la limite de ${LONG_SERVICE_AUTO_CLOSE_HOURS} heures et a été terminé automatiquement. Une durée de **${formatDuration(result.duration)}** a été enregistrée.`,
@@ -7754,7 +7760,7 @@ async function checkLongServiceAlerts() {
                     duration: service.duration,
                     startTime: service.startTime,
                     userId: service.userId,
-                    source: 'Sentinel',
+                    source: 'Noctigarde',
                     language,
                     checkinDelivered: delivered
                 });
@@ -7839,7 +7845,7 @@ async function handleLongServiceCheckinButton(interaction) {
         await sendServiceLog(guild, member || interaction.user, 'end', {
             duration: result.duration,
             totalTime: result.totalTime,
-            source: isEnglish ? 'Sentinel private confirmation' : 'Confirmation privée Sentinel',
+            source: isEnglish ? 'Noctigarde private confirmation' : 'Confirmation privée Noctigarde',
             language
         });
         clearLongServiceAlert(parsed.guildId, parsed.userId);
@@ -7856,8 +7862,8 @@ async function handleLongServiceCheckinButton(interaction) {
             serviceCheckins.releaseEnd(parsed.guildId, parsed.userId, parsed.startTime);
             await interaction.editReply({
                 content: isEnglish
-                    ? 'Sentinel could not end this service. It remains active; please try again from the service panel.'
-                    : 'Sentinel n’a pas pu terminer ce service. Il reste actif ; réessaie depuis le panneau de service.',
+                    ? 'Noctigarde could not end this service. It remains active; please try again from the service panel.'
+                    : 'Noctigarde n’a pas pu terminer ce service. Il reste actif ; réessaie depuis le panneau de service.',
                 embeds: [],
                 components: []
             }).catch(() => {});
@@ -7894,8 +7900,8 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
 
     if (!dossier) {
         throw new Error(language === 'en'
-            ? 'This channel is not a Sentinel ticket.'
-            : 'Ce salon n’est pas un dossier Sentinel.');
+            ? 'This channel is not a Noctigarde ticket.'
+            : 'Ce salon n’est pas un dossier Noctigarde.');
     }
     const actorUser = actor.user || actor;
     const actorId = actorUser.id;
@@ -7924,13 +7930,13 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
     if (closedDossier.ownerUserId) {
         await channel.permissionOverwrites.edit(closedDossier.ownerUserId, {
             SendMessages: false
-        }, { reason: 'Dossier Sentinel scellé après archivage confirmé' }).catch(() => {});
+        }, { reason: 'Dossier Noctigarde scellé après archivage confirmé' }).catch(() => {});
 
         const owner = await client.users.fetch(closedDossier.ownerUserId).catch(() => null);
         await owner?.send({
             embeds: [new EmbedBuilder()
                 .setColor(SENTINEL_COLORS.neutral)
-                .setTitle(language === 'en' ? 'Sentinel | Ticket closed' : 'Sentinel | Dossier clôturé')
+                .setTitle(language === 'en' ? 'Noctigarde | Ticket closed' : 'Noctigarde | Dossier clôturé')
                 .setDescription(language === 'en'
                     ? `Your ticket #${closedDossier.id || channel.id} has been closed and safely archived.`
                     : `Ton dossier #${closedDossier.id || channel.id} a été clôturé et archivé.`)
@@ -7942,11 +7948,11 @@ async function closeDossierChannel(channel, actor, language = 'fr', details = {}
         }).catch(() => {});
     }
 
-    await sendSentinelStaffLog(
+    await sendNoctigardeStaffLog(
         channel.guild,
         language === 'en'
-            ? `Sentinel ticket #${closedDossier?.id || channel.id} closed and archived: **${channel.name}** by ${actorUser}.`
-            : `Dossier Sentinel #${closedDossier?.id || channel.id} clôturé et archivé : **${channel.name}** par ${actorUser}.`,
+            ? `Noctigarde ticket #${closedDossier?.id || channel.id} closed and archived: **${channel.name}** by ${actorUser}.`
+            : `Dossier Noctigarde #${closedDossier?.id || channel.id} clôturé et archivé : **${channel.name}** par ${actorUser}.`,
         {
             color: SENTINEL_COLORS.warning,
             requester: actorUser,
@@ -7994,8 +8000,8 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
         if (!hasPurgeChannelPermissions(guild, channel, mode)) {
             throw new Error(mode === 'all'
                 ? (language === 'en'
-                    ? 'Sentinel must also have Manage Channels to recreate this channel.'
-                    : 'Sentinel doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
+                    ? 'Noctigarde must also have Manage Channels to recreate this channel.'
+                    : 'Noctigarde doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
                 : t(language, 'moderationPurgeChannelPermissionMissing'));
         }
 
@@ -8013,13 +8019,13 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
             console.error('Erreur purge confirmee :', error);
             if (error?.purgeBusy) {
                 throw new Error(language === 'en'
-                    ? 'A Sentinel cleanup is already running in this channel.'
-                    : 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+                    ? 'A Noctigarde cleanup is already running in this channel.'
+                    : 'Un nettoyage Noctigarde est déjà en cours dans ce salon.');
             }
             if (error?.channelFreezeFailed) {
                 throw new Error(language === 'en'
-                    ? 'Sentinel could not freeze channel posting. Check Manage Channels and the Sentinel role position.'
-                    : 'Sentinel n’a pas pu figer les publications. Vérifie « Gérer les salons » et la position du rôle Sentinel.');
+                    ? 'Noctigarde could not freeze channel posting. Check Manage Channels and the Noctigarde role position.'
+                    : 'Noctigarde n’a pas pu figer les publications. Vérifie « Gérer les salons » et la position du rôle Noctigarde.');
             }
             if (error?.archiveFailed) {
                 throw new Error(language === 'en'
@@ -8159,15 +8165,15 @@ async function executeSensitiveConfirmation(interaction, confirmation) {
     throw new Error(t(language, 'serviceError'));
 }
 
-function getSentinelGeneralChannel(guild, language) {
+function getNoctigardeGeneralChannel(guild, language) {
     return findGuildTextChannel(guild, SENTINEL_GENERAL_CHANNELS[language] || SENTINEL_GENERAL_CHANNELS.fr);
 }
 
-function getSentinelStatusChannel(guild) {
-    return getSentinelStatusChannels(guild)[0]?.channel || null;
+function getNoctigardeStatusChannel(guild) {
+    return getNoctigardeStatusChannels(guild)[0]?.channel || null;
 }
 
-function getSentinelStatusChannels(guild) {
+function getNoctigardeStatusChannels(guild) {
     const channels = [];
     const seenChannelIds = new Set();
     const addTarget = (channel, language) => {
@@ -8197,7 +8203,7 @@ function getSentinelStatusChannels(guild) {
     return channels;
 }
 
-function getSentinelOfficialUpdateChannels(guild) {
+function getNoctigardeOfficialUpdateChannels(guild) {
     const channels = [];
     const seenChannelIds = new Set();
     const addTarget = (channel, language) => {
@@ -8245,7 +8251,7 @@ function getServiceRoleManageError(guild, role, language = 'fr') {
     }
 
     const botMember = guild.members.me;
-    const botRole = botMember?.roles.highest || 'Sentinel';
+    const botRole = botMember?.roles.highest || 'Noctigarde';
     const canManageRoles = Boolean(botMember?.permissions.has(PermissionsBitField.Flags.ManageRoles));
     const botRoleAbove = Boolean(botMember && botMember.roles.highest.comparePositionTo(role) > 0);
 
@@ -8325,13 +8331,13 @@ async function assignConfiguredAutoRole(member) {
     }
 
     try {
-        await member.roles.add(role, 'Sentinel auto-role on member join');
+        await member.roles.add(role, 'Noctigarde auto-role on member join');
 
         if (logChannel) {
             await logChannel.send(t(language, 'autoRoleAssignedLog', { member, role })).catch(() => {});
         }
     } catch (error) {
-        console.error('Erreur auto-role Sentinel :', error);
+        console.error('Erreur auto-role Noctigarde :', error);
 
         if (logChannel) {
             await logChannel.send(t(language, 'autoRoleFailedLog', { member, role })).catch(() => {});
@@ -8341,10 +8347,10 @@ async function assignConfiguredAutoRole(member) {
 
 function buildMyHoursEmbed(user, userData) {
     if (!userData) {
-        return createSentinelEmbed({
+        return createNoctigardeEmbed({
             color: SENTINEL_COLORS.neutral,
-            title: 'Sentinel | Fiche agent',
-            description: 'Aucun service consigné pour le moment.\nPrends ton service depuis le Bureau Sentinel pour ouvrir ta fiche.',
+            title: 'Noctigarde | Fiche agent',
+            description: 'Aucun service consigné pour le moment.\nPrends ton service depuis le Bureau Noctigarde pour ouvrir ta fiche.',
             requester: user,
             thumbnail: user.displayAvatarURL()
         });
@@ -8377,9 +8383,9 @@ function buildMyHoursEmbed(user, userData) {
         });
     }
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: userData.startTime ? SENTINEL_COLORS.success : SENTINEL_COLORS.danger,
-        title: 'Sentinel | Fiche agent',
+        title: 'Noctigarde | Fiche agent',
         description: `Fiche : ${user}`,
         requester: user,
         thumbnail: user.displayAvatarURL()
@@ -8397,9 +8403,9 @@ function buildMemberHoursEmbed(member, requester, userData) {
         totalTime += Date.now() - userData.startTime;
     }
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: userData.startTime ? SENTINEL_COLORS.success : SENTINEL_COLORS.primary,
-        title: 'Sentinel | Fiche agent',
+        title: 'Noctigarde | Fiche agent',
         description: `Fiche : ${member}`,
         requester,
         thumbnail: member.user.displayAvatarURL()
@@ -8435,9 +8441,9 @@ function buildTopServiceEmbed(requester, classement, options = {}) {
         : '';
     const description = `${lines.join('\n')}${suffix}`;
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.warning,
-        title: 'Sentinel | Registre général',
+        title: 'Noctigarde | Registre général',
         description,
         requester
     })
@@ -8472,9 +8478,9 @@ function buildConfigEmbed(guild, requester) {
     const autoRoleValue = guildConfig.autoRoleId ? `<@&${guildConfig.autoRoleId}>` : 'Désactivé';
     const commandRolesValue = formatCommandRoleList(guild.id);
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.primary,
-        title: 'Sentinel | Configuration',
+        title: 'Noctigarde | Configuration',
         description: `Serveur : **${guild.name}**`,
         requester
     })
@@ -8518,10 +8524,10 @@ function buildConfigEmbed(guild, requester) {
 }
 
 function buildCommandRolesEmbed(guild, requester) {
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.primary,
-        title: 'Sentinel | Accès de gestion',
-        description: 'Ces rôles peuvent configurer Sentinel et gérer les données de service.',
+        title: 'Noctigarde | Accès de gestion',
+        description: 'Ces rôles peuvent configurer Noctigarde et gérer les données de service.',
         requester
     })
         .addFields(
@@ -8554,9 +8560,9 @@ function buildActiveServicesEmbed(requester, activeServices) {
         lines.push(`... et **${hiddenCount}** autre(s) agent(s) en déploiement.`);
     }
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.success,
-        title: 'Sentinel | Déploiement actif',
+        title: 'Noctigarde | Déploiement actif',
         description: lines.join('\n'),
         requester
     })
@@ -8586,9 +8592,9 @@ function buildServiceSummaryEmbed(guild, requester) {
         ? `<@${summary.bestWeekUser.userId}> - **${formatDuration(summary.bestWeekUser.totalTime)}**`
         : 'Aucun agent';
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.advanced,
-        title: 'Sentinel | Rapport de service',
+        title: 'Noctigarde | Rapport de service',
         description: `État du registre de **${guild.name}**.`,
         requester
     })
@@ -8663,9 +8669,9 @@ function buildWeeklyPayrollEmbed(guild, requester, options = {}) {
         ? lines.join('\n')
         : t(language, 'payrollEmpty');
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Weekly salary register' : 'Sentinel | Registre des salaires',
+        title: isEnglish ? 'Noctigarde | Weekly salary register' : 'Noctigarde | Registre des salaires',
         description,
         requester,
         thumbnail: guild.iconURL(),
@@ -8745,9 +8751,9 @@ function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
             ].join('\n');
         });
 
-        return createSentinelEmbed({
+        return createNoctigardeEmbed({
             color: SENTINEL_COLORS.accent,
-            title: isEnglish ? 'Sentinel | Salary archives' : 'Sentinel | Archives des salaires',
+            title: isEnglish ? 'Noctigarde | Salary archives' : 'Noctigarde | Archives des salaires',
             description: lines.join('\n\n'),
             requester,
             thumbnail: guild.iconURL(),
@@ -8776,9 +8782,9 @@ function buildPayrollArchiveHistoryEmbed(guild, requester, weekStart = null) {
             : `... et **${hiddenCount}** autre(s) agent(s).`);
     }
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
-        title: isEnglish ? 'Sentinel | Archived salaries' : 'Sentinel | Salaires archivés',
+        title: isEnglish ? 'Noctigarde | Archived salaries' : 'Noctigarde | Salaires archivés',
         description: lines.join('\n') || (isEnglish ? 'No salary in this archive.' : 'Aucun salaire dans cette archive.'),
         requester,
         thumbnail: guild.iconURL(),
@@ -8915,15 +8921,15 @@ async function buildDiagnosticEmbed(guild, requester) {
     }
 
     if (!botCanManageRoles) {
-        fixes.push('Ajoute `Gérer les rôles` au rôle Sentinel.');
+        fixes.push('Ajoute `Gérer les rôles` au rôle Noctigarde.');
     }
 
     if (!rolePositionOk) {
-        fixes.push('Monte le rôle Sentinel au-dessus du rôle de service.');
+        fixes.push('Monte le rôle Noctigarde au-dessus du rôle de service.');
     }
 
     if (!autoRoleOk && autoRole) {
-        fixes.push('Monte le rôle Sentinel au-dessus du rôle automatique d’arrivée.');
+        fixes.push('Monte le rôle Noctigarde au-dessus du rôle automatique d’arrivée.');
     }
 
     if (!botCanModerate) {
@@ -8947,13 +8953,13 @@ async function buildDiagnosticEmbed(guild, requester) {
     }
 
     if (hasLogIssue) {
-        fixes.push('Vérifie le salon de logs : Sentinel doit le voir et y écrire.');
+        fixes.push('Vérifie le salon de logs : Noctigarde doit le voir et y écrire.');
     }
 
     if (!guildConfig.updatesChannelId) {
         fixes.push('Choisis le salon obligatoire des nouveautés avec `/config-statut`.');
     } else if (!updatesCanSend) {
-        fixes.push('Vérifie le salon des nouveautés : Sentinel doit le voir, y écrire et intégrer des liens.');
+        fixes.push('Vérifie le salon des nouveautés : Noctigarde doit le voir, y écrire et intégrer des liens.');
     } else if (!statusUpdatesReady) {
         fixes.push('Réactive les nouveautés avec `/config-statut action:Recevoir les mises à jour`.');
     }
@@ -8962,9 +8968,9 @@ async function buildDiagnosticEmbed(guild, requester) {
         fixes.push('Lance `/sync-service` pour réparer les incohérences de service.');
     }
 
-    const embed = createSentinelEmbed({
+    const embed = createNoctigardeEmbed({
         color: diagnosticOk ? SENTINEL_COLORS.success : SENTINEL_COLORS.warning,
-        title: 'Sentinel | Diagnostic',
+        title: 'Noctigarde | Diagnostic',
         description: `Contrôle technique de **${guild.name}**.`,
         requester
     })
@@ -8992,7 +8998,7 @@ async function buildDiagnosticEmbed(guild, requester) {
                 value: [
                     diagnosticLine(!guildConfig.autoRoleId || Boolean(autoRole), 'Rôle configuré', autoRole ? `${autoRole}` : 'désactivé ou rôle supprimé'),
                     diagnosticLine(autoRoleOk, 'Attribution possible', autoRole
-                        ? (autoRolePositionOk ? 'OK' : 'le rôle Sentinel doit être au-dessus du rôle automatique')
+                        ? (autoRolePositionOk ? 'OK' : 'le rôle Noctigarde doit être au-dessus du rôle automatique')
                         : 'optionnelle')
                 ].join('\n'),
                 inline: false
@@ -9009,7 +9015,7 @@ async function buildDiagnosticEmbed(guild, requester) {
             {
                 name: 'État technique',
                 value: [
-                    diagnosticLine(statusCanSend, 'Salon accessible à Sentinel', guildConfig.statusChannelId ? `<#${guildConfig.statusChannelId}>` : 'optionnel')
+                    diagnosticLine(statusCanSend, 'Salon accessible à Noctigarde', guildConfig.statusChannelId ? `<#${guildConfig.statusChannelId}>` : 'optionnel')
                 ].join('\n'),
                 inline: false
             },
@@ -9017,7 +9023,7 @@ async function buildDiagnosticEmbed(guild, requester) {
                 name: 'Nouveautés officielles',
                 value: [
                     diagnosticLine(Boolean(guildConfig.updatesChannelId), 'Salon obligatoire configuré', guildConfig.updatesChannelId ? `<#${guildConfig.updatesChannelId}>` : 'à choisir avec `/config-statut`'),
-                    diagnosticLine(updatesCanSend, 'Salon accessible à Sentinel'),
+                    diagnosticLine(updatesCanSend, 'Salon accessible à Noctigarde'),
                     diagnosticLine(statusUpdatesReady, 'Annonces officielles activées')
                 ].join('\n'),
                 inline: false
@@ -9038,7 +9044,7 @@ async function buildDiagnosticEmbed(guild, requester) {
                 inline: false
             },
             {
-                name: 'Dossiers Sentinel',
+                name: 'Dossiers Noctigarde',
                 value: [
                     diagnosticLine(botCanManageChannels, 'Création et gestion des salons privés', botCanManageChannels ? 'OK' : 'ajoute `Gérer les salons`'),
                     `Rôles responsables : ${formatDossierRoleList(guild.id)}`
@@ -9076,17 +9082,17 @@ async function buildDiagnosticEmbed(guild, requester) {
 
 function buildSyncServiceEmbed(requester, result) {
     if (!result.ok && result.reason === 'missing_role') {
-        return createSentinelEmbed({
+        return createNoctigardeEmbed({
             color: SENTINEL_COLORS.danger,
-            title: 'Sentinel | Synchronisation',
+            title: 'Noctigarde | Synchronisation',
             description: 'Impossible de synchroniser : aucun rôle de service n’est configuré. Utilise `/config-role` avant de relancer.',
             requester
         });
     }
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: result.failedRoleRemovals > 0 ? SENTINEL_COLORS.warning : SENTINEL_COLORS.success,
-        title: 'Sentinel | Synchronisation',
+        title: 'Noctigarde | Synchronisation',
         description: 'Les données de service et le rôle Discord ont été remis en cohérence.',
         requester
     })
@@ -9109,14 +9115,14 @@ function buildSyncServiceEmbed(requester, result) {
         );
 }
 
-function buildSyncSentinelEmbed(guild, requester, result) {
+function buildSyncNoctigardeEmbed(guild, requester, result) {
     const description = result.skipped
         ? `Synchronisation ignoree : **${result.reason}**.`
-        : `Structure Sentinel synchronisee pour **${guild.name}**.`;
+        : `Structure Noctigarde synchronisee pour **${guild.name}**.`;
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: result.skipped ? SENTINEL_COLORS.warning : SENTINEL_COLORS.success,
-        title: 'Sentinel | Synchronisation serveur',
+        title: 'Noctigarde | Synchronisation serveur',
         description,
         requester
     }).addFields(
@@ -9133,26 +9139,26 @@ function buildSyncSentinelEmbed(guild, requester, result) {
     );
 }
 
-async function runSentinelServerSync(guild, requester = client.user) {
-    const result = await syncSentinelServer(client, {
+async function runNoctigardeServerSync(guild, requester = client.user) {
+    const result = await syncNoctigardeServer(client, {
         enabled: true,
         guildId: guild.id
     });
 
-    lastSentinelServerSync = Date.now();
-    lastSentinelServerSyncResult = result;
-    await updateSentinelStatusPanel(guild).catch(() => {});
-    await sendSentinelStaffLog(
+    lastNoctigardeServerSync = Date.now();
+    lastNoctigardeServerSyncResult = result;
+    await updateNoctigardeStatusPanel(guild).catch(() => {});
+    await sendNoctigardeStaffLog(
         guild,
         result.skipped
-            ? `⚠️ Synchronisation Sentinel ignoree : **${result.reason}**.`
-            : `✅ Synchronisation Sentinel terminee : **${result.created}** creation(s), **${result.updated}** mise(s) a jour.`
+            ? `⚠️ Synchronisation Noctigarde ignoree : **${result.reason}**.`
+            : `✅ Synchronisation Noctigarde terminee : **${result.created}** creation(s), **${result.updated}** mise(s) a jour.`
     );
 
-    return buildSyncSentinelEmbed(guild, requester, result);
+    return buildSyncNoctigardeEmbed(guild, requester, result);
 }
 
-function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr') {
+function buildNoctigardeStatusEmbed(guild, requester = client.user, language = 'fr') {
     const isEnglish = language === 'en';
     const guildConfig = getGuildConfig(guild.id);
     let databaseOk = true;
@@ -9163,22 +9169,22 @@ function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr
         databaseOk = false;
     }
 
-    const syncText = lastSentinelServerSync
-        ? `<t:${Math.floor(lastSentinelServerSync / 1000)}:R>`
+    const syncText = lastNoctigardeServerSync
+        ? `<t:${Math.floor(lastNoctigardeServerSync / 1000)}:R>`
         : (isEnglish ? 'No relay yet' : 'Aucun relais pour le moment');
-    const syncDetail = lastSentinelServerSyncResult?.skipped
+    const syncDetail = lastNoctigardeServerSyncResult?.skipped
         ? (isEnglish
-            ? `Relay held: ${lastSentinelServerSyncResult.reason}`
-            : `Relais retenu : ${lastSentinelServerSyncResult.reason}`)
-        : lastSentinelServerSyncResult
+            ? `Relay held: ${lastNoctigardeServerSyncResult.reason}`
+            : `Relais retenu : ${lastNoctigardeServerSyncResult.reason}`)
+        : lastNoctigardeServerSyncResult
             ? (isEnglish
-                ? `${lastSentinelServerSyncResult.created} opening(s), ${lastSentinelServerSyncResult.updated} refresh(es)`
-                : `${lastSentinelServerSyncResult.created} ouverture(s), ${lastSentinelServerSyncResult.updated} rafraîchissement(s)`)
+                ? `${lastNoctigardeServerSyncResult.created} opening(s), ${lastNoctigardeServerSyncResult.updated} refresh(es)`
+                : `${lastNoctigardeServerSyncResult.created} ouverture(s), ${lastNoctigardeServerSyncResult.updated} rafraîchissement(s)`)
             : (isEnglish ? 'Standing by' : 'En veille');
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: databaseOk ? SENTINEL_COLORS.success : SENTINEL_COLORS.warning,
-        title: isEnglish ? 'Sentinel | Operations' : 'Sentinel | État opérationnel',
+        title: isEnglish ? 'Noctigarde | Operations' : 'Noctigarde | État opérationnel',
         description: isEnglish
             ? `Operations channel for **${guild.name}**.`
             : `Canal de contrôle opérationnel pour **${guild.name}**.`,
@@ -9186,7 +9192,7 @@ function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr
         language
     }).addFields(
         {
-            name: isEnglish ? 'Sentinel core' : 'Noyau Sentinel',
+            name: isEnglish ? 'Noctigarde core' : 'Noyau Noctigarde',
             value: isEnglish
                 ? `Awake\nSignal: **${client.ws.ping}ms**\nProtocol: \`${SENTINEL_BUILD}\``
                 : `Éveillé\nSignal : **${client.ws.ping}ms**\nProtocole : \`${SENTINEL_BUILD}\``,
@@ -9207,28 +9213,28 @@ function buildSentinelStatusEmbed(guild, requester = client.user, language = 'fr
         {
             name: isEnglish ? 'Technical watch' : 'Veille technique',
             value: isEnglish
-                ? 'This panel is reserved for Sentinel operational status.'
-                : 'Ce panneau est réservé à l’état opérationnel de Sentinel.',
+                ? 'This panel is reserved for Noctigarde operational status.'
+                : 'Ce panneau est réservé à l’état opérationnel de Noctigarde.',
             inline: false
         }
     );
 }
 
-async function updateSentinelStatusPanel(guild) {
+async function updateNoctigardeStatusPanel(guild) {
     await guild.channels.fetch().catch(() => null);
 
-    const targets = getSentinelStatusChannels(guild);
+    const targets = getNoctigardeStatusChannels(guild);
 
     if (targets.length === 0) {
         return;
     }
 
     for (const { channel, language } of targets) {
-        const payload = buildSentinelStatusPayload(guild, language);
+        const payload = buildNoctigardeStatusPayload(guild, language);
         const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
         const botMessages = messages?.filter(message => message.author.id === client.user.id);
         const mixedServicePanel = botMessages?.find(isMixedServiceStatusPanelMessage);
-        const botMessage = botMessages?.find(isSentinelStatusPanelMessage);
+        const botMessage = botMessages?.find(isNoctigardeStatusPanelMessage);
 
         if (mixedServicePanel) {
             await mixedServicePanel.edit(buildServicePanelPayload(language, guild.id)).catch(() => {});
@@ -9243,25 +9249,25 @@ async function updateSentinelStatusPanel(guild) {
     }
 }
 
-async function updateAllSentinelStatusPanels() {
+async function updateAllNoctigardeStatusPanels() {
     for (const guild of client.guilds.cache.values()) {
-        await updateSentinelStatusPanel(guild).catch(error => {
-            console.error('Erreur mise a jour statut Sentinel :', error);
+        await updateNoctigardeStatusPanel(guild).catch(error => {
+            console.error('Erreur mise a jour statut Noctigarde :', error);
         });
     }
 }
 
 function buildOfficialStatusUpdateEmbed({ title, body, requester, language = 'fr' }) {
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
         title,
         description: body,
         requester,
         language
     }).addFields({
-        name: language === 'en' ? 'Sentinel update' : 'Mise à jour Sentinel',
+        name: language === 'en' ? 'Noctigarde update' : 'Mise à jour Noctigarde',
         value: language === 'en'
-            ? 'This message was selected for public update channels by the Sentinel creator.'
+            ? 'This message was selected for public update channels by the Noctigarde creator.'
             : 'Ce message a été choisi par la créatrice pour les salons publics de nouveautés.',
         inline: false
     });
@@ -9564,7 +9570,7 @@ async function distributeLatestPublicOfficialUpdate() {
         if (guild.id === SENTINEL_REFERENCE_GUILD_ID) {
             await guild.channels.fetch().catch(() => null);
             const pingRoleId = getGuildConfig(guild.id).updatesPingRoleId || null;
-            targets = getSentinelOfficialUpdateChannels(guild)
+            targets = getNoctigardeOfficialUpdateChannels(guild)
                 .map(target => ({ guild, ...target, pingRoleId }));
         } else {
             const target = await getConfiguredStatusUpdateTarget(guild).catch(() => null);
@@ -9619,7 +9625,7 @@ async function sendOfficialUpdateTest(guild, requester = client.user) {
     const config = getGuildConfig(guild.id);
 
     if (!config.updatesChannelId) {
-        throw new Error('Choisis d’abord un salon des nouveautés Sentinel.');
+        throw new Error('Choisis d’abord un salon des nouveautés Noctigarde.');
     }
 
     const channel = guild.channels.cache.get(config.updatesChannelId)
@@ -9636,10 +9642,10 @@ async function sendOfficialUpdateTest(guild, requester = client.user) {
     }
 
     await channel.send(getOfficialStatusUpdatePayload({
-        title: language === 'en' ? 'Sentinel | Update channel ready' : 'Sentinel | Salon des nouveautés prêt',
+        title: language === 'en' ? 'Noctigarde | Update channel ready' : 'Noctigarde | Salon des nouveautés prêt',
         body: language === 'en'
-            ? 'The channel is configured correctly. Future official Sentinel announcements will appear here.'
-            : 'Le salon est correctement configuré. Les prochaines annonces officielles Sentinel apparaîtront ici.',
+            ? 'The channel is configured correctly. Future official Noctigarde announcements will appear here.'
+            : 'Le salon est correctement configuré. Les prochaines annonces officielles Noctigarde apparaîtront ici.',
         requester,
         language
     }));
@@ -9672,7 +9678,7 @@ async function publishOfficialStatusUpdate({
     if (referenceGuild) {
         await referenceGuild.channels.fetch().catch(() => null);
 
-        for (const target of getSentinelOfficialUpdateChannels(referenceGuild)) {
+        for (const target of getNoctigardeOfficialUpdateChannels(referenceGuild)) {
             referenceTargets.push({
                 guild: referenceGuild,
                 ...target
@@ -9748,9 +9754,9 @@ function buildTopWeekEmbed(requester, classement) {
         ? `\n\n${classement.length - displayedClassement.length} autre(s) agent(s) consigné(s).`
         : '';
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.advanced,
-        title: 'Sentinel | Registre hebdomadaire',
+        title: 'Noctigarde | Registre hebdomadaire',
         description: `${lines.join('\n')}${suffix}`,
         requester
     })
@@ -9789,7 +9795,7 @@ function buildLanguageButtons(language = 'fr') {
 }
 
 function buildLanguageChoiceEmbed(requester, language = 'fr') {
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
         title: t(language, 'languageChooseTitle'),
         description: t(language, 'languageChooseDescription'),
@@ -9799,11 +9805,11 @@ function buildLanguageChoiceEmbed(requester, language = 'fr') {
 }
 
 function buildServerOnboardingEmbed(guild, requester) {
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.accent,
-        title: 'Sentinel | Premiers pas',
+        title: 'Noctigarde | Premiers pas',
         description: [
-            'Merci d’avoir ouvert l’accès Sentinel. Le noyau est prêt, il reste juste à configurer ton poste.',
+            'Merci d’avoir ouvert l’accès Noctigarde. Le noyau est prêt, il reste juste à configurer ton poste.',
             '',
             '`1.` Choisis la langue du serveur avec les boutons ci-dessous.',
             '`2.` Configure le grade de service avec `/config-role role:@role`.',
@@ -9822,8 +9828,8 @@ function buildServerOnboardingEmbed(guild, requester) {
         {
             name: 'À vérifier',
             value: [
-                'Le grade Sentinel doit être au-dessus du grade de service.',
-                'Sentinel doit pouvoir voir/écrire dans les salons utiles et créer des salons pour les dossiers.',
+                'Le grade Noctigarde doit être au-dessus du grade de service.',
+                'Noctigarde doit pouvoir voir/écrire dans les salons utiles et créer des salons pour les dossiers.',
                 'La console peut aussi guider toute la configuration.'
             ].join('\n'),
             inline: false
@@ -9858,14 +9864,14 @@ function buildLegacyHelpEmbed(guild, requester) {
             {
                 name: 'Installation first',
                 value: [
-                    '**1. Check Sentinel is a real bot**',
-                    'In `Server Settings > Integrations`, Sentinel must have the `Bot` badge.',
+                    '**1. Check Noctigarde is a real bot**',
+                    'In `Server Settings > Integrations`, Noctigarde must have the `Bot` badge.',
                     '',
                     '**2. Create a service role**',
                     'Examples: `On duty`, `Patrol`, `Active agent`.',
                     '',
                     '**3. Role order**',
-                    'The Sentinel role must be above the service role.'
+                    'The Noctigarde role must be above the service role.'
                 ].join('\n'),
                 inline: false
             },
@@ -9906,9 +9912,9 @@ function buildLegacyHelpEmbed(guild, requester) {
                     'Moderation: `/warn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/clear`.',
                     '`/ban` can use a Discord ID when the user is no longer in the server.',
                     '`/mod-cases` shows the latest moderation cases.',
-                    '`/embed create` sends an announcement as Sentinel. Creation and edits are unlimited.',
+                    '`/embed create` sends an announcement as Noctigarde. Creation and edits are unlimited.',
                     'Text aliases: `!warn`, `!timeout`, `!untimeout`, `!kick`, `!ban`, `!clear`, `!mod-cases`.',
-                    'Sentinel checks role hierarchy before applying a sanction.'
+                    'Noctigarde checks role hierarchy before applying a sanction.'
                 ].join('\n'),
                 inline: false
             }
@@ -9921,7 +9927,7 @@ function buildLegacyHelpEmbed(guild, requester) {
                     '`/hours member` or `!hours @member`',
                     '`/top-week` or `!top-week`',
                     '`/summary` or `!summary`',
-                    '`/diagnostic`, `/sync-service`, `/sync-sentinel`, `/ping`',
+                    '`/diagnostic`, `/sync-service`, `/sync-noctigarde`, `/ping`',
                     '`/reset-hours-all` resets every service record after confirmation.',
                     '`/embed create` and `/embed edit` are available without an active-embed quota.',
                     '',
@@ -9935,7 +9941,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             });
         }
 
-        return createSentinelEmbed({
+        return createNoctigardeEmbed({
             color: SENTINEL_COLORS.primary,
             title: t(language, 'helpTitle'),
             description: t(language, 'helpDescription'),
@@ -9947,21 +9953,21 @@ function buildLegacyHelpEmbed(guild, requester) {
     }
 
     const firstSetup = [
-        '**1. Verifie que Sentinel est bien un bot**',
-        'Dans `Parametres du serveur > Integrations`, Sentinel doit avoir le badge `Bot`. Si tu vois seulement `Commandes`, reinvite-le avec le lien officiel.',
+        '**1. Verifie que Noctigarde est bien un bot**',
+        'Dans `Parametres du serveur > Integrations`, Noctigarde doit avoir le badge `Bot`. Si tu vois seulement `Commandes`, reinvite-le avec le lien officiel.',
         '',
         '**2. Cree un role de service**',
         'Exemples : `En service`, `Patrouille`, `Agent actif`.',
         '',
         '**3. Place les roles dans le bon ordre**',
-        'Le role Sentinel doit etre au-dessus du role de service, sinon Discord refuse de donner ou retirer ce role.'
+        'Le role Noctigarde doit etre au-dessus du role de service, sinon Discord refuse de donner ou retirer ce role.'
     ];
     const managementAccess = [
         '**Premier reglage**',
         'Si aucun role de gestion n existe encore, peuvent configurer : proprietaire, `Administrateur`, `Gerer le serveur` ou `Gerer les roles`.',
         '',
         '**Apres le premier reglage**',
-        'Ajoute ton equipe avec `/config-permissions action:ajouter role:@role`. Ensuite, seuls ces roles gerent Sentinel. Le proprietaire garde un acces de secours.'
+        'Ajoute ton equipe avec `/config-permissions action:ajouter role:@role`. Ensuite, seuls ces roles gerent Noctigarde. Le proprietaire garde un acces de secours.'
     ];
     const configurationSteps = [
         '**1. Role de service**',
@@ -9974,7 +9980,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/config-autorole action:definir role:@role` donne un rôle aux nouveaux membres. Utilise `action:desactiver` pour le couper.',
         '',
         '**4. Salon des nouveautés obligatoire**',
-        '`/config-statut action:Définir le salon des nouveautés salon:#salon` active les annonces officielles Sentinel dans un salon dédié.',
+        '`/config-statut action:Définir le salon des nouveautés salon:#salon` active les annonces officielles Noctigarde dans un salon dédié.',
         'Le panneau d’état technique reste optionnel et se configure séparément avec `action:Définir le salon de statut`.',
         '',
         '**5. Verification**',
@@ -9985,14 +9991,14 @@ function buildLegacyHelpEmbed(guild, requester) {
         'Dans le salon ou les membres doivent pointer, envoie `!service-panel`.',
         '',
         '**Utiliser le bureau**',
-        '`Prendre poste` ouvre le service, `Fin de poste` le clôture. Sentinel consigne la durée et met le registre à jour.'
+        '`Prendre poste` ouvre le service, `Fin de poste` le clôture. Noctigarde consigne la durée et met le registre à jour.'
     ];
     const memberUsage = [
         '**Ouvrir son poste**',
-        'Clique sur `Prendre poste`. Sentinel ajoute le grade de service.',
+        'Clique sur `Prendre poste`. Noctigarde ajoute le grade de service.',
         '',
         '**Clôturer son poste**',
-        'Clique sur `Fin de poste`. Sentinel retire le grade et consigne le temps.',
+        'Clique sur `Fin de poste`. Noctigarde retire le grade et consigne le temps.',
         '',
         '**Consulter ses infos**',
         '`/mes-heures`, `/historique-service`, `/en-service`, `/heures`, `/top-service`, `/top-semaine` et `/resume-service` donnent accès au registre complet.'
@@ -10006,7 +10012,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/reset-heures membre` ou `utilisateur_id` - remettre les heures d une personne a zero, meme si elle a quitte le serveur',
         '`/config-paie`, `/paie-semaine`, `/paie-historique`, `/paie-archive` - régler, consulter et archiver les salaires hebdomadaires',
         '`/config-role`, `/config-autorole`, `/config-logs`, `/config-statut`, `/config-permissions`, `/config-voir` - configuration',
-        '`/embed creer` - publier une annonce sous l identite de Sentinel'
+        '`/embed creer` - publier une annonce sous l identite de Noctigarde'
     ];
     const moderationUsage = [
         '`/avertir membre raison` - enregistrer un avertissement',
@@ -10017,8 +10023,8 @@ function buildLegacyHelpEmbed(guild, requester) {
         '`/purge messages nombre:...` - archiver puis supprimer jusqu a 100 messages recents',
         '`/purge tout` - archiver puis vider tous les messages du salon, anciens messages compris',
         '`/sanctions membre ou utilisateur_id` - consulter les dossiers disciplinaires',
-        '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Sentinel',
-        'Sentinel verifie les permissions et la hierarchie des roles avant chaque sanction.'
+        '`/embed creer`, `/embed modifier`, `/embed supprimer` - gerer des annonces embed Noctigarde',
+        'Noctigarde verifie les permissions et la hierarchie des roles avant chaque sanction.'
     ];
     const completeModerationUsage = [
         '`/cas id` - afficher un dossier de moderation precis',
@@ -10037,15 +10043,15 @@ function buildLegacyHelpEmbed(guild, requester) {
         'Toutes les commandes du bot sont ouvertes sur chaque serveur.',
         `Historique consultable jusqu a ${REFERENCE_HISTORY_LIMIT} sessions par demande.`,
         `Classements affiches jusqu a ${REFERENCE_TOP_LIMIT} agents par panneau.`,
-        '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service` et `/sync-sentinel` sont disponibles.',
-        'Embeds Sentinel : creation et modifications illimitees.',
+        '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service` et `/sync-noctigarde` sont disponibles.',
+        'Embeds Noctigarde : creation et modifications illimitees.',
         'Les seules limites restantes sont des limites techniques Discord ou de securite.'
     ];
     const troubleshooting = [
-        'Sentinel ne donne pas le role ? Remonte son role au-dessus du role de service.',
-        'Les logs ne partent pas ? Verifie que Sentinel peut voir et ecrire dans le salon.',
+        'Noctigarde ne donne pas le role ? Remonte son role au-dessus du role de service.',
+        'Les logs ne partent pas ? Verifie que Noctigarde peut voir et ecrire dans le salon.',
         'Commande refusee ? Verifie les roles dans `/config-permissions action:voir`.',
-        'Sentinel n apparait pas dans les membres ? L installation est seulement en `Commandes`, il faut le reinviter comme bot.'
+        'Noctigarde n apparait pas dans les membres ? L installation est seulement en `Commandes`, il faut le reinviter comme bot.'
     ];
     const fields = [
         {
@@ -10084,7 +10090,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             inline: false
         },
         {
-            name: 'Capacités Sentinel',
+            name: 'Capacités Noctigarde',
             value: availableCapacity.join('\n'),
             inline: false
         }
@@ -10099,7 +10105,7 @@ function buildLegacyHelpEmbed(guild, requester) {
             '`/historique-service [membre] [limite]` ou `!historique-service [@membre] [limite]`',
             '`/diagnostic` ou `!diagnostic`',
             '`/sync-service` ou `!sync-service`',
-            '`/sync-sentinel` ou `!sync-sentinel`',
+            '`/sync-noctigarde` ou `!sync-noctigarde`',
             '`/reset-heures-all` ou `!reset-heures-all`',
             '`/ping` ou `!ping`',
             `Historique jusqu a ${REFERENCE_HISTORY_LIMIT} sessions par demande`
@@ -10120,7 +10126,7 @@ function buildLegacyHelpEmbed(guild, requester) {
         }
     );
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.primary,
         title: t(language, 'helpTitle'),
         description: t(language, 'helpDescription'),
@@ -10141,19 +10147,19 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             {
                 id: 'start',
                 label: 'Start here',
-                menuDescription: 'The shortest path to start using Sentinel.',
+                menuDescription: 'The shortest path to start using Noctigarde.',
                 emoji: '👋',
-                title: 'Sentinel | Help',
+                title: 'Noctigarde | Help',
                 description: 'Choose a section in the menu below. Each page is short so the guide stays readable on mobile.',
                 fields: [
                     {
                         name: 'Public demonstration version',
-                        value: 'Sentinel is currently available at no cost for testing. Some advanced features may become paid later, but a free part of Sentinel will remain available. No subscription or charge is active today, and the details will be announced before any change.'
+                        value: 'Noctigarde is currently available at no cost for testing. Some advanced features may become paid later, but a free part of Noctigarde will remain available. No subscription or charge is active today, and the details will be announced before any change.'
                     },
                     {
                         name: 'Recommended order',
                         value: [
-                            '`1.` Invite Sentinel as a real Discord bot.',
+                            '`1.` Invite Noctigarde as a real Discord bot.',
                             '`2.` Choose the server language with `/language`.',
                             '`3.` Set the duty role and log channel.',
                             '`4.` Publish the duty panel with `!service-panel`.'
@@ -10166,7 +10172,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/dashboard` opens the web dashboard.',
                             '`/support` shows support and official links.',
                             '`/diagnostic` checks permissions and role order.',
-                            '`/ping` checks whether Sentinel and its internal data respond.'
+                            '`/ping` checks whether Noctigarde and its internal data respond.'
                         ].join('\n')
                     }
                 ]
@@ -10174,23 +10180,23 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             {
                 id: 'install',
                 label: 'Install',
-                menuDescription: 'Invite Sentinel and check Discord role order.',
+                menuDescription: 'Invite Noctigarde and check Discord role order.',
                 emoji: '🧩',
-                title: 'Sentinel | Install',
-                description: 'Before configuring anything, make sure Discord sees Sentinel as a bot.',
+                title: 'Noctigarde | Install',
+                description: 'Before configuring anything, make sure Discord sees Noctigarde as a bot.',
                 fields: [
                     {
                         name: 'Discord integration',
                         value: [
-                            'In `Server Settings > Integrations`, Sentinel must show the `Bot` badge.',
-                            'If you only see `Commands`, remove the integration and invite Sentinel again with the official link.'
+                            'In `Server Settings > Integrations`, Noctigarde must show the `Bot` badge.',
+                            'If you only see `Commands`, remove the integration and invite Noctigarde again with the official link.'
                         ].join('\n')
                     },
                     {
                         name: 'Role order',
                         value: [
                             'Create a duty role, for example `On duty`, `Patrol`, or `Active agent`.',
-                            'Move the Sentinel role above that duty role, otherwise Discord will refuse role changes.'
+                            'Move the Noctigarde role above that duty role, otherwise Discord will refuse role changes.'
                         ].join('\n')
                     }
                 ]
@@ -10200,8 +10206,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Setup',
                 menuDescription: 'Language, duty role, logs, and staff roles.',
                 emoji: '⚙️',
-                title: 'Sentinel | Server setup',
-                description: 'These commands prepare Sentinel for this server only.',
+                title: 'Noctigarde | Server setup',
+                description: 'These commands prepare Noctigarde for this server only.',
                 fields: [
                     {
                         name: 'Basic setup',
@@ -10210,14 +10216,14 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/config-role role:@role` sets the duty role.',
                             '`/autorole-config` sets or disables the role given to new members automatically.',
                             '`/config-channel channel_id:ID` sets the log channel by ID.',
-                            '`/status-channel` publishes the optional Sentinel status panel.',
+                            '`/status-channel` publishes the optional Noctigarde status panel.',
                             '`/config-view` shows what is configured.'
                         ].join('\n')
                     },
                     {
-                        name: 'Who can manage Sentinel?',
+                        name: 'Who can manage Noctigarde?',
                         value: [
-                            'At the start, owner/admin/manage-server/manage-roles can configure Sentinel.',
+                            'At the start, owner/admin/manage-server/manage-roles can configure Noctigarde.',
                             'Then use `/config-permissions action:add role:@role` to choose the staff roles allowed to manage it.'
                         ].join('\n')
                     }
@@ -10228,7 +10234,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Duty panel',
                 menuDescription: 'Publish and use the duty buttons.',
                 emoji: '🟢',
-                title: 'Sentinel | Duty panel',
+                title: 'Noctigarde | Duty panel',
                 description: 'The panel is a normal text command, not a slash command.',
                 fields: [
                     {
@@ -10236,7 +10242,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         value: [
                             'Go to the channel where members should clock in.',
                             'Send `!service-panel`.',
-                            'Sentinel will post the buttons in that channel.'
+                            'Noctigarde will post the buttons in that channel.'
                         ].join('\n')
                     },
                     {
@@ -10254,8 +10260,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Dashboard',
                 menuDescription: 'Open the web dashboard and manage a server.',
                 emoji: '🖥️',
-                title: 'Sentinel | Dashboard',
-                description: 'The dashboard lets authorized staff manage Sentinel from a browser.',
+                title: 'Noctigarde | Dashboard',
+                description: 'The dashboard lets authorized staff manage Noctigarde from a browser.',
                 fields: [
                     {
                         name: 'Open it',
@@ -10269,7 +10275,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         value: [
                             'Choose a server connected to your Discord account.',
                             'Configure language, duty role, log channel, service panel, embeds, moderation actions, and audit history.',
-                            'If a server asks for authorization, invite Sentinel as a real bot first.'
+                            'If a server asks for authorization, invite Noctigarde as a real bot first.'
                         ].join('\n')
                     }
                 ]
@@ -10277,17 +10283,17 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             {
                 id: 'dossiers',
                 label: 'Tickets',
-                menuDescription: 'Sentinel ticket system with roleplay-friendly wording.',
+                menuDescription: 'Noctigarde ticket system with roleplay-friendly wording.',
                 emoji: '📁',
-                title: 'Sentinel | Tickets',
-                description: 'In Sentinel, a ticket is a reserved request space handled by authorized personnel.',
+                title: 'Noctigarde | Tickets',
+                description: 'In Noctigarde, a ticket is a reserved request space handled by authorized personnel.',
                 fields: [
                     {
                         name: 'How it works',
                         value: [
-                            '`/ticket-panel` publishes the Sentinel reception desk.',
+                            '`/ticket-panel` publishes the Noctigarde reception desk.',
                             'Members choose a type: assistance, report, application, alliance, or request.',
-                            'Sentinel asks for a subject and description, then prepares the reserved space.'
+                            'Noctigarde asks for a subject and description, then prepares the reserved space.'
                         ].join('\n')
                     },
                     {
@@ -10314,9 +10320,9 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             {
                 id: 'commands',
                 label: 'Commands',
-                menuDescription: 'The main Sentinel service commands.',
+                menuDescription: 'The main Noctigarde service commands.',
                 emoji: '📋',
-                title: 'Sentinel | Commands',
+                title: 'Noctigarde | Commands',
                 description: 'The available actions stay visible and simple.',
                 fields: [
                     {
@@ -10340,8 +10346,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                             '`/payroll-mark paid:true member:@member` marks a line as paid or unpaid.',
                             '`/payroll-archive` archives the current week payroll.',
                             '`/autorole-config` manages the role given to new members.',
-                            '`/embed create` sends an announcement as Sentinel.',
-                            'Sentinel embeds can be created and edited without an active-embed quota.'
+                            '`/embed create` sends an announcement as Noctigarde.',
+                            'Noctigarde embeds can be created and edited without an active-embed quota.'
                         ].join('\n')
                     }
                 ]
@@ -10351,8 +10357,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Moderation',
                 menuDescription: 'Warn, timeout, kick, ban by ID, and purge.',
                 emoji: '🛡️',
-                title: 'Sentinel | Moderation',
-                description: 'Sentinel checks Discord permissions and role hierarchy before every sanction.',
+                title: 'Noctigarde | Moderation',
+                description: 'Noctigarde checks Discord permissions and role hierarchy before every sanction.',
                 fields: [
                     {
                         name: 'Moderation actions',
@@ -10366,25 +10372,25 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     },
                     {
                         name: 'Important',
-                        value: 'If an action is refused, check Sentinel role position and Discord permissions.'
+                        value: 'If an action is refused, check Noctigarde role position and Discord permissions.'
                     }
                 ]
             },
             {
                 id: 'limits',
                 label: 'Full access',
-                menuDescription: 'The complete Sentinel feature set available here.',
+                menuDescription: 'The complete Noctigarde feature set available here.',
                 emoji: '⭐',
-                title: 'Sentinel | Full access',
-                description: 'Every Sentinel server has access to the complete command set.',
+                title: 'Noctigarde | Full access',
+                description: 'Every Noctigarde server has access to the complete command set.',
                 fields: [
                         {
                             name: 'Available to everyone',
                             value: [
                                 `History up to ${REFERENCE_HISTORY_LIMIT} sessions per request.`,
                                 `Leaderboards up to ${REFERENCE_TOP_LIMIT} agents.`,
-                                '`/reset-hours-all`, `/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-sentinel` are available.',
-                                'Sentinel embeds: unlimited creation and unlimited edits.'
+                                '`/reset-hours-all`, `/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-noctigarde` are available.',
+                                'Noctigarde embeds: unlimited creation and unlimited edits.'
                             ].join('\n')
                         }
                     ]
@@ -10394,16 +10400,16 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Troubleshooting',
                 menuDescription: 'Quick fixes when something does not work.',
                 emoji: '🛠️',
-                title: 'Sentinel | Troubleshooting',
+                title: 'Noctigarde | Troubleshooting',
                 description: 'Most issues come from invite scopes, role order, or channel permissions.',
                 fields: [
                     {
                         name: 'Quick fixes',
                         value: [
-                            'Sentinel does not give the role? Move Sentinel above the duty role.',
-                            'Logs are not sent? Check that Sentinel can view and write in the log channel.',
+                            'Noctigarde does not give the role? Move Noctigarde above the duty role.',
+                            'Logs are not sent? Check that Noctigarde can view and write in the log channel.',
                             'Command refused? Check `/config-permissions action:list`.',
-                            'Sentinel is not in member list? Reinvite it as a bot, not commands only.'
+                            'Noctigarde is not in member list? Reinvite it as a bot, not commands only.'
                         ].join('\n')
                     }
                 ]
@@ -10416,13 +10422,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Advanced',
                 menuDescription: 'Complete service and security commands.',
                 emoji: '💎',
-                title: 'Sentinel | Advanced commands',
-                description: 'These tools are available on every Sentinel server to authorized staff.',
+                title: 'Noctigarde | Advanced commands',
+                description: 'These tools are available on every Noctigarde server to authorized staff.',
                 fields: [
                     {
                         name: 'Service',
                         value: [
-                            '`/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-hours-all`.',
+                            '`/hours`, `/top-week`, `/summary`, `/diagnostic`, `/sync-service`, `/sync-noctigarde`, `/reset-hours-all`.',
                             '`/embed create` is unlimited here. `/embed edit` is unlimited everywhere.'
                         ].join('\n')
                     },
@@ -10447,17 +10453,17 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             label: 'Briefing',
             menuDescription: 'Le chemin court pour ouvrir le poste.',
             emoji: '🗂️',
-            title: 'Sentinel | Briefing',
+            title: 'Noctigarde | Briefing',
             description: 'Choisis une rubrique dans le registre ci-dessous. Chaque page reste courte pour une lecture rapide.',
             fields: [
                 {
                     name: 'Version de démonstration publique',
-                    value: 'Sentinel est actuellement accessible sans paiement pour être testé en conditions réelles. Certaines options avancées pourront devenir payantes plus tard, mais une partie gratuite de Sentinel restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
+                    value: 'Noctigarde est actuellement accessible sans paiement pour être testé en conditions réelles. Certaines options avancées pourront devenir payantes plus tard, mais une partie gratuite de Noctigarde restera disponible. Aucun abonnement ni prélèvement n’est actif aujourd’hui, et les détails seront annoncés avant tout changement.'
                 },
                 {
                     name: 'Ordre de mise en place',
                     value: [
-                        '`1.` Ouvre l’accès Sentinel avec le lien officiel.',
+                        '`1.` Ouvre l’accès Noctigarde avec le lien officiel.',
                         '`2.` Choisis la langue du poste avec `/config-langue`.',
                         '`3.` Déclare le grade de service et le salon de registre.',
                         '`4.` Installe le Bureau de service avec `!service-panel`.'
@@ -10470,7 +10476,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/dashboard` ouvre la console de gestion.',
                         '`/support` affiche les accès officiels.',
                         '`/diagnostic` vérifie les accès et l’ordre des grades.',
-                        '`/ping` vérifie que Sentinel et ses registres répondent.'
+                        '`/ping` vérifie que Noctigarde et ses registres répondent.'
                     ].join('\n')
                 }
             ]
@@ -10478,23 +10484,23 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
         {
             id: 'install',
             label: 'Arrivée',
-            menuDescription: 'Installer Sentinel et préparer les grades.',
+            menuDescription: 'Installer Noctigarde et préparer les grades.',
             emoji: '🧭',
-            title: 'Sentinel | Mise en place',
-            description: 'Avant d’ouvrir le poste, vérifie que Sentinel est bien présent et placé correctement.',
+            title: 'Noctigarde | Mise en place',
+            description: 'Avant d’ouvrir le poste, vérifie que Noctigarde est bien présent et placé correctement.',
             fields: [
                 {
-                    name: 'Présence Sentinel',
+                    name: 'Présence Noctigarde',
                     value: [
-                        'Dans les intégrations du serveur, Sentinel doit avoir le badge `Bot`.',
-                        'Si tu vois seulement `Commandes`, retire l’accès et réinvite Sentinel avec le lien officiel.'
+                        'Dans les intégrations du serveur, Noctigarde doit avoir le badge `Bot`.',
+                        'Si tu vois seulement `Commandes`, retire l’accès et réinvite Noctigarde avec le lien officiel.'
                     ].join('\n')
                 },
                 {
                     name: 'Ordre des grades',
                     value: [
                         'Crée un grade de service, par exemple `En service`, `Patrouille` ou `Agent actif`.',
-                        'Place le grade Sentinel au-dessus de ce grade, sinon il ne pourra pas l’ajouter ou le retirer.'
+                        'Place le grade Noctigarde au-dessus de ce grade, sinon il ne pourra pas l’ajouter ou le retirer.'
                     ].join('\n')
                 }
             ]
@@ -10504,8 +10510,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             label: 'Régie',
             menuDescription: 'Langue, grades, registre et accès de régie.',
             emoji: '⚙️',
-            title: 'Sentinel | Poste serveur',
-            description: 'Ces commandes préparent le poste Sentinel de ce serveur uniquement.',
+            title: 'Noctigarde | Poste serveur',
+            description: 'Ces commandes préparent le poste Noctigarde de ce serveur uniquement.',
             fields: [
                 {
                     name: 'Réglages du poste',
@@ -10532,7 +10538,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             label: 'Service',
             menuDescription: 'Installer et utiliser le Bureau de service.',
             emoji: '🟢',
-            title: 'Sentinel | Bureau de service',
+            title: 'Noctigarde | Bureau de service',
             description: 'Le bureau se publie dans le salon de pointage choisi.',
             fields: [
                 {
@@ -10540,7 +10546,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     value: [
                         'Va dans le salon où les agents doivent pointer.',
                         'Envoie `!service-panel`.',
-                        'Sentinel y déposera le Bureau de service.'
+                        'Noctigarde y déposera le Bureau de service.'
                     ].join('\n')
                 },
                 {
@@ -10559,8 +10565,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Console',
                 menuDescription: 'Ouvrir la console et gérer un serveur.',
             emoji: '🖥️',
-            title: 'Sentinel | Console',
-            description: 'La console permet aux responsables autorisés de gérer Sentinel depuis le site.',
+            title: 'Noctigarde | Console',
+            description: 'La console permet aux responsables autorisés de gérer Noctigarde depuis le site.',
             fields: [
                 {
                     name: 'Ouvrir la console',
@@ -10574,7 +10580,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                     value: [
                         'Choisir un serveur lié à ton compte.',
                         'Préparer la langue, le grade de service, le grade d’arrivée, le registre, le Bureau de service, les annonces, la sécurité et l’historique.',
-                        'Si un serveur demande une autorisation, ouvre d’abord l’accès Sentinel avec le lien officiel.'
+                        'Si un serveur demande une autorisation, ouvre d’abord l’accès Noctigarde avec le lien officiel.'
                     ].join('\n')
                     }
                 ]
@@ -10584,15 +10590,15 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Dossiers',
                 menuDescription: 'Accueil, demandes, signalements et suivi réservé.',
                 emoji: '📁',
-                title: 'Sentinel | Dossiers',
+                title: 'Noctigarde | Dossiers',
                 description: 'Le Bureau d’accueil reçoit les demandes et les confie aux équipes autorisées.',
                 fields: [
                     {
-                        name: 'Accueil Sentinel',
+                        name: 'Accueil Noctigarde',
                         value: [
-                            '`/dossier-panel` publie le bureau d’accueil Sentinel.',
+                            '`/dossier-panel` publie le bureau d’accueil Noctigarde.',
                             'Les membres choisissent un type : assistance, signalement, candidature, alliance ou requête.',
-                            'Sentinel demande un sujet et une description, puis prépare l’espace réservé.'
+                            'Noctigarde demande un sujet et une description, puis prépare l’espace réservé.'
                         ].join('\n')
                     },
                     {
@@ -10621,7 +10627,7 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 label: 'Répertoire',
             menuDescription: 'Les commandes ouvertes à tous les serveurs.',
             emoji: '📋',
-            title: 'Sentinel | Répertoire',
+            title: 'Noctigarde | Répertoire',
             description: 'Le répertoire garde les actions essentielles, sans noyer les équipes.',
             fields: [
                 {
@@ -10644,8 +10650,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                         '`/paie-historique` retrouve les anciennes archives des salaires.',
                         '`/paie-marquer paye:true membre:@membre` marque un salaire comme versé ou à verser.',
                         '`/config-autorole` gère le rôle donné automatiquement aux nouveaux membres.',
-                        '`/embed creer` publie une annonce sous l’identité de Sentinel.',
-                        'Les créations et modifications d’embeds Sentinel sont disponibles sans quota de formule.'
+                        '`/embed creer` publie une annonce sous l’identité de Noctigarde.',
+                        'Les créations et modifications d’embeds Noctigarde sont disponibles sans quota de formule.'
                     ].join('\n')
                 }
             ]
@@ -10655,8 +10661,8 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             label: 'Sécurité',
             menuDescription: 'Avertissement, silence, expulsion, bannissement et purge.',
             emoji: '🛡️',
-            title: 'Sentinel | Centre de sécurité',
-            description: 'Sentinel vérifie les accès et l’ordre des grades avant chaque mesure.',
+            title: 'Noctigarde | Centre de sécurité',
+            description: 'Noctigarde vérifie les accès et l’ordre des grades avant chaque mesure.',
             fields: [
                 {
                     name: 'Mesures disponibles',
@@ -10670,25 +10676,25 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
                 },
                 {
                     name: 'À contrôler',
-                    value: 'Si une mesure est refusée, vérifie la position du grade Sentinel et les accès du salon.'
+                    value: 'Si une mesure est refusée, vérifie la position du grade Noctigarde et les accès du salon.'
                 }
             ]
         },
         {
             id: 'limits',
             label: 'Accès complet',
-            menuDescription: 'Toutes les fonctions Sentinel disponibles ici.',
+            menuDescription: 'Toutes les fonctions Noctigarde disponibles ici.',
             emoji: '⭐',
-            title: 'Sentinel | Accès complet',
-            description: 'Chaque serveur Sentinel dispose de l’ensemble des fonctions.',
+            title: 'Noctigarde | Accès complet',
+            description: 'Chaque serveur Noctigarde dispose de l’ensemble des fonctions.',
             fields: [
                     {
                         name: 'Disponible pour tous',
                         value: [
                             `Historique jusqu’à ${REFERENCE_HISTORY_LIMIT} services par demande.`,
                             `Classements jusqu’à ${REFERENCE_TOP_LIMIT} agents.`,
-                            '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel` sont disponibles.',
-                            'Embeds Sentinel : création illimitée et modifications illimitées.'
+                            '`/reset-heures-all`, `/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-noctigarde` sont disponibles.',
+                            'Embeds Noctigarde : création illimitée et modifications illimitées.'
                         ].join('\n')
                     }
                 ]
@@ -10698,16 +10704,16 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             label: 'Contrôle',
             menuDescription: 'Les vérifications rapides quand ça bloque.',
             emoji: '🧰',
-            title: 'Sentinel | Contrôle rapide',
+            title: 'Noctigarde | Contrôle rapide',
             description: 'La plupart des blocages viennent de l’accès initial, de l’ordre des grades ou des accès salon.',
             fields: [
                 {
                     name: 'Points à vérifier',
                     value: [
-                        'Sentinel ne donne pas le grade ? Remonte son grade au-dessus du grade de service.',
-                        'Le registre ne reçoit rien ? Vérifie que Sentinel peut voir et écrire dans le salon.',
+                        'Noctigarde ne donne pas le grade ? Remonte son grade au-dessus du grade de service.',
+                        'Le registre ne reçoit rien ? Vérifie que Noctigarde peut voir et écrire dans le salon.',
                         'Commande refusée ? Vérifie `/config-permissions action:voir`.',
-                        'Sentinel n’apparaît pas dans les membres ? Rouvre l’accès avec le lien officiel.'
+                        'Noctigarde n’apparaît pas dans les membres ? Rouvre l’accès avec le lien officiel.'
                     ].join('\n')
                 }
             ]
@@ -10720,13 +10726,13 @@ function buildHelpPageDefinitions(guild, language = 'fr', member = null) {
             label: 'Outils avancés',
             menuDescription: 'Commandes complètes de service et de sécurité.',
             emoji: '🧰',
-            title: 'Sentinel | Outils avancés',
-            description: 'Ces outils sont disponibles sur chaque serveur Sentinel pour les responsables autorisés.',
+            title: 'Noctigarde | Outils avancés',
+            description: 'Ces outils sont disponibles sur chaque serveur Noctigarde pour les responsables autorisés.',
             fields: [
                 {
                     name: 'Registre de service',
                     value: [
-                        '`/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-sentinel`, `/reset-heures-all`.',
+                        '`/heures`, `/top-semaine`, `/resume-service`, `/diagnostic`, `/sync-service`, `/sync-noctigarde`, `/reset-heures-all`.',
                         '`/embed creer` est illimité ici. `/embed modifier` reste illimité partout.'
                     ].join('\n')
                 },
@@ -10763,7 +10769,7 @@ function buildHelpEmbed(guild, requester, pageId = HELP_PAGE_DEFAULT, member = n
         ? `Page ${index + 1}/${pages.length}`
         : `Page ${index + 1}/${pages.length}`;
 
-    return createSentinelEmbed({
+    return createNoctigardeEmbed({
         color: SENTINEL_COLORS.primary,
         title: page.title,
         description: `${page.description}\n\n${pageLabel}`,
@@ -11246,7 +11252,7 @@ function getTextCommandAuditAction(content) {
         return 'sync-service';
     }
 
-    if (/^!sync-sentinel$/i.test(trimmed)) {
+    if (/^!sync-(?:noctigarde|sentinel)$/i.test(trimmed)) {
         return 'sync-sentinel';
     }
 
@@ -11334,13 +11340,13 @@ function addAuditLogEntry({ guild, actor, action, status, targetType = null, tar
             status === 'failed' ? 'failed' : 'success',
             truncateAuditValue(targetType, 50),
             truncateAuditValue(targetId, 100),
-            truncateAuditValue(summary || 'Action Discord Sentinel.', 800),
+            truncateAuditValue(summary || 'Action Discord Noctigarde.', 800),
             JSON.stringify(details || {}),
             source,
             new Date().toISOString()
         );
     } catch (error) {
-        console.error('Erreur audit Sentinel :', error);
+        console.error('Erreur audit Noctigarde :', error);
     }
 }
 
@@ -11373,7 +11379,7 @@ function recordDiscordInteractionAudit(interaction, { status = 'success', summar
         status,
         targetType: target.targetType,
         targetId: target.targetId,
-        summary: summary || `Action Sentinel depuis ${sourceLabel}.`,
+        summary: summary || `Action Noctigarde depuis ${sourceLabel}.`,
         details,
         source: 'discord'
     });
@@ -11400,7 +11406,7 @@ function recordDiscordTextAudit(message, { status = 'success', summary = null } 
         status,
         targetType: target.targetType,
         targetId: target.targetId,
-        summary: summary || 'Action Sentinel depuis une commande texte Discord.',
+        summary: summary || 'Action Noctigarde depuis une commande texte Discord.',
         details: {
             command
         },
@@ -11409,29 +11415,34 @@ function recordDiscordTextAudit(message, { status = 'success', summary = null } 
 }
 
 const SENTINEL_SELF_ROLES = {
-    announcements: '📡 Sentinel | Annonces',
-    maintenance: '🛠 Sentinel | Maintenance',
-    changelog: '🧬 Sentinel | Journal dev',
-    beta: '⚡ Sentinel | Acces anticipe',
-    partner: '💎 Sentinel | Partenaire'
+    announcements: '📡 Noctigarde | Annonces',
+    maintenance: '🛠 Noctigarde | Maintenance',
+    changelog: '🧬 Noctigarde | Journal dev',
+    beta: '⚡ Noctigarde | Acces anticipe',
+    partner: '💎 Noctigarde | Partenaire'
 };
 
 const SENTINEL_LANGUAGE_ROLES = {
-    fr: '🌐 Sentinel | Français',
-    en: '🌐 Sentinel | English'
+    fr: '🌐 Noctigarde | Français',
+    en: '🌐 Noctigarde | English'
 };
 
 const SENTINEL_STAFF_ROLES = [
+    '✦ Noctigarde | Fondateur',
+    '◆ Noctigarde | Administrateur',
+    '◇ Noctigarde | Moderateur',
+    '◇ Noctigarde | Modérateur',
+    '✚ Noctigarde | Support',
+    'Noctigarde | Fondateur',
+    'Noctigarde | Administrateur',
+    'Noctigarde | Moderateur',
+    'Noctigarde | Modérateur',
+    'Noctigarde | Support',
     '✦ Sentinel | Fondateur',
     '◆ Sentinel | Administrateur',
     '◇ Sentinel | Moderateur',
     '◇ Sentinel | Modérateur',
     '✚ Sentinel | Support',
-    'Sentinel | Fondateur',
-    'Sentinel | Administrateur',
-    'Sentinel | Moderateur',
-    'Sentinel | Modérateur',
-    'Sentinel | Support',
     'Co fondateur',
     'Co-fondateur',
     'Fondateur',
@@ -11458,6 +11469,8 @@ const SENTINEL_GENERAL_CHANNELS = {
 };
 
 const SENTINEL_STATUS_CHANNELS = [
+    { name: '📌｜statut-noctigarde', language: 'fr' },
+    { name: '📌｜noctigarde-status', language: 'en' },
     { name: '📌｜statut-sentinel', language: 'fr' },
     { name: '📌｜sentinel-status', language: 'en' }
 ];
@@ -11613,9 +11626,9 @@ async function syncDossierTypePermissions(guild, dossierType, extraRoleIds = [])
                     ManageMessages: true,
                     AttachFiles: true,
                     EmbedLinks: true
-                }, { reason: `Responsables dossiers Sentinel ${type}` });
+                }, { reason: `Responsables dossiers Noctigarde ${type}` });
             } else {
-                await channel.permissionOverwrites.delete(roleId, `Cloisonnement dossiers Sentinel ${type}`).catch(() => {});
+                await channel.permissionOverwrites.delete(roleId, `Cloisonnement dossiers Noctigarde ${type}`).catch(() => {});
             }
         }
 
@@ -11627,7 +11640,7 @@ async function syncDossierTypePermissions(guild, dossierType, extraRoleIds = [])
 
 function buildDossierPanelEmbed(guild, requester, language = 'fr') {
     const theme = communitySuite.getPanelTheme(guild.id, 'tickets');
-    const embed = createSentinelEmbed({
+    const embed = createNoctigardeEmbed({
         color: panelColor(theme, SENTINEL_COLORS.primary),
         title: theme?.title || t(language, 'dossierPanelTitle'),
         description: theme?.description || t(language, 'dossierPanelDescription'),
@@ -11708,8 +11721,8 @@ function hasDossierPanelButtons(message) {
 
 function hasDossierPanelEmbed(message) {
     return Boolean(message?.embeds?.some(embed => (
-        embed?.title === 'Sentinel | Bureau d’accueil'
-        || embed?.title === 'Sentinel | Reception desk'
+        embed?.title === 'Noctigarde | Bureau d’accueil'
+        || embed?.title === 'Noctigarde | Reception desk'
     )));
 }
 
@@ -11769,20 +11782,20 @@ async function publishOrUpdateServicePanel(channel, language = 'fr') {
     return channel.send(payload);
 }
 
-function buildSentinelStatusPayload(guild, language = 'fr') {
+function buildNoctigardeStatusPayload(guild, language = 'fr') {
     return {
         content: '',
-        embeds: [buildSentinelStatusEmbed(guild, client.user, language)],
+        embeds: [buildNoctigardeStatusEmbed(guild, client.user, language)],
         components: []
     };
 }
 
-function hasSentinelStatusEmbed(message) {
+function hasNoctigardeStatusEmbed(message) {
     return Boolean(message?.embeds?.some(embed => (
-        embed?.title === 'Sentinel | Statut'
-        || embed?.title === 'Sentinel | Status'
-        || embed?.title === 'Sentinel | État opérationnel'
-        || embed?.title === 'Sentinel | Operations'
+        embed?.title === 'Noctigarde | Statut'
+        || embed?.title === 'Noctigarde | Status'
+        || embed?.title === 'Noctigarde | État opérationnel'
+        || embed?.title === 'Noctigarde | Operations'
     )));
 }
 
@@ -11805,26 +11818,26 @@ function isServicePanelMessage(message) {
         && (
             hasServicePanelButtons(message)
             || hasServicePanelEmbed(message)
-            || /^\*\*Sentinel \| (Panneau de service|Bureau de service|Duty desk)\*\*/.test(String(message.content || ''))
+            || /^\*\*Noctigarde \| (Panneau de service|Bureau de service|Duty desk)\*\*/.test(String(message.content || ''))
         )
     );
 }
 
 function hasServicePanelEmbed(message) {
     return Boolean(message?.embeds?.some(embed => (
-        embed?.title === 'Sentinel | Bureau de service'
-        || embed?.title === 'Sentinel | Duty desk'
+        embed?.title === 'Noctigarde | Bureau de service'
+        || embed?.title === 'Noctigarde | Duty desk'
     )));
 }
 
 function isMixedServiceStatusPanelMessage(message) {
-    return isServicePanelMessage(message) && hasSentinelStatusEmbed(message);
+    return isServicePanelMessage(message) && hasNoctigardeStatusEmbed(message);
 }
 
-function isSentinelStatusPanelMessage(message) {
+function isNoctigardeStatusPanelMessage(message) {
     return Boolean(
         message?.author?.id === client.user?.id
-        && hasSentinelStatusEmbed(message)
+        && hasNoctigardeStatusEmbed(message)
         && !isServicePanelMessage(message)
     );
 }
@@ -12365,7 +12378,7 @@ function dossierMessageToArchive(message) {
 function buildMessagePurgeTranscript(channel, details, messages, language = 'fr') {
     const header = language === 'en'
         ? [
-            'Sentinel message deletion archive',
+            'Noctigarde message deletion archive',
             `Server: ${channel.guild.name} (${channel.guild.id})`,
             `Channel: #${channel.name} (${channel.id})`,
             `Requested by: ${details.actorTag || details.actorUserId} (${details.actorUserId})`,
@@ -12374,7 +12387,7 @@ function buildMessagePurgeTranscript(channel, details, messages, language = 'fr'
             `Messages: ${messages.length}`
         ]
         : [
-            'Archive Sentinel de suppression de messages',
+            'Archive Noctigarde de suppression de messages',
             `Serveur : ${channel.guild.name} (${channel.guild.id})`,
             `Salon : #${channel.name} (${channel.id})`,
             `Demandé par : ${details.actorTag || details.actorUserId} (${details.actorUserId})`,
@@ -12423,7 +12436,7 @@ async function getMessagePurgeArchiveFile(guildId, archiveId) {
 
     return {
         path: filePath,
-        name: `sentinel-messages-${archive.channelId}-${archive.id}.tar.gz`,
+        name: `noctigarde-messages-${archive.channelId}-${archive.id}.tar.gz`,
         mimeType: 'application/gzip',
         size: Number((await fs.promises.stat(filePath)).size || 0),
         archive
@@ -12561,7 +12574,7 @@ async function archiveMessagePurgeSnapshot(channel, snapshot, actor, language = 
     }
 }
 
-function migrateSentinelChannelReferences(guildId, oldChannelId, newChannelId) {
+function migrateNoctigardeChannelReferences(guildId, oldChannelId, newChannelId) {
     const migrate = db.transaction(() => {
         const managedEmbeds = db.prepare(`
             SELECT message_id
@@ -12642,7 +12655,7 @@ function migrateSentinelChannelReferences(guildId, oldChannelId, newChannelId) {
                     UPDATE official_update_deliveries
                     SET status = 'cancelled', last_error = ?, next_attempt_at = NULL, updated_at = ?
                     WHERE id = ?
-                `).run('Salon remplacé lors d’un vidage complet Sentinel.', new Date().toISOString(), delivery.id);
+                `).run('Salon remplacé lors d’un vidage complet Noctigarde.', new Date().toISOString(), delivery.id);
             } else {
                 db.prepare(`
                     UPDATE official_update_deliveries
@@ -12672,7 +12685,7 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
             await freezeChannelForPurge(
                 channel,
                 originalPermissionOverwrites,
-                `Gel temporaire Sentinel demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`
+                `Gel temporaire Noctigarde demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`
             );
             permissionsFrozen = true;
         } catch (error) {
@@ -12750,7 +12763,7 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
         try {
             replacement = await recreateChannelForPurge(
                 channel,
-                `Vidage complet Sentinel demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`,
+                `Vidage complet Noctigarde demandé par ${options.actor?.tag || options.actor?.id || 'un responsable'}`,
                 originalPermissionOverwrites,
                 async () => {
                     const lastSnapshot = await fetchMessagesForPurge(channel, { mode: 'all' });
@@ -12769,7 +12782,7 @@ async function archiveAndPurgeChannelMessagesUnlocked(channel, options = {}) {
 
         let migrationWarning = null;
         try {
-            migrateSentinelChannelReferences(channel.guild.id, channel.id, replacement.id);
+            migrateNoctigardeChannelReferences(channel.guild.id, channel.id, replacement.id);
         } catch (error) {
             migrationWarning = error.message || String(error);
             console.error('Migration des références après recréation du salon :', error);
@@ -12820,7 +12833,7 @@ async function archiveAndPurgeChannelMessages(channel, options = {}) {
     const operationKey = `${channel.guild.id}:${channel.id}`;
 
     if (activeMessagePurges.has(operationKey)) {
-        const error = new Error('Un nettoyage Sentinel est déjà en cours dans ce salon.');
+        const error = new Error('Un nettoyage Noctigarde est déjà en cours dans ce salon.');
         error.purgeBusy = true;
         throw error;
     }
@@ -12842,7 +12855,7 @@ function buildDossierTranscriptFromMessages(channel, dossier, messages, language
         : null;
     const header = language === 'en'
         ? [
-            `Sentinel ticket #${dossier?.id || 'unknown'}`,
+            `Noctigarde ticket #${dossier?.id || 'unknown'}`,
             `Channel: #${channel.name}`,
             `Requester: ${dossier?.ownerUserId || 'unknown'}`,
             `Type: ${dossier?.type || 'support'}`,
@@ -12856,7 +12869,7 @@ function buildDossierTranscriptFromMessages(channel, dossier, messages, language
             `Generated: ${new Date().toISOString()}`
         ]
         : [
-            `Dossier Sentinel #${dossier?.id || 'inconnu'}`,
+            `Dossier Noctigarde #${dossier?.id || 'inconnu'}`,
             `Salon : #${channel.name}`,
             `Demandeur : ${dossier?.ownerUserId || 'inconnu'}`,
             `Type : ${dossier?.type || 'support'}`,
@@ -12990,7 +13003,7 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     const archive = await archiveDossierChannel(channel, dossier, language);
     const transcriptBuffer = Buffer.from(archive.transcript, 'utf8');
     const compressed = transcriptBuffer.length > 7 * 1024 * 1024;
-    const fileName = `dossier-sentinel-${dossier?.id || channel.id}.txt${compressed ? '.gz' : ''}`;
+    const fileName = `dossier-noctigarde-${dossier?.id || channel.id}.txt${compressed ? '.gz' : ''}`;
     const attachment = new AttachmentBuilder(
         compressed ? zlib.gzipSync(transcriptBuffer, { level: 9 }) : transcriptBuffer,
         { name: fileName }
@@ -13005,7 +13018,7 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     const status = getDossierStatusLabel(dossier?.status || 'open', language);
     const archiveEmbed = new EmbedBuilder()
         .setColor(SENTINEL_COLORS.neutral)
-        .setTitle(language === 'en' ? 'Sentinel | Ticket archive' : 'Sentinel | Archive de dossier')
+        .setTitle(language === 'en' ? 'Noctigarde | Ticket archive' : 'Noctigarde | Archive de dossier')
         .setDescription(language === 'en'
             ? `Written record prepared for ${channel}.`
             : `Compte rendu préparé pour ${channel}.`
@@ -13082,13 +13095,13 @@ async function sendDossierTranscript(channel, dossier, actor, language = 'fr') {
     };
 }
 
-async function handleSentinelSelfRoleButton(interaction) {
+async function handleNoctigardeSelfRoleButton(interaction) {
     const key = interaction.customId.split(':')[1];
     const roleName = SENTINEL_SELF_ROLES[key];
 
     if (!roleName) {
         return interaction.reply({
-            content: 'Role Sentinel inconnu.',
+            content: 'Role Noctigarde inconnu.',
             flags: MessageFlags.Ephemeral
         });
     }
@@ -13119,7 +13132,7 @@ async function handleSentinelSelfRoleButton(interaction) {
     });
 }
 
-async function handleSentinelLanguageButton(interaction) {
+async function handleNoctigardeLanguageButton(interaction) {
     const language = normalizeLanguage(interaction.customId.split(':')[1]);
 
     if (!interaction.inCachedGuild()) {
@@ -13149,7 +13162,7 @@ async function handleSentinelLanguageButton(interaction) {
 
     if (!roleName) {
         return interaction.reply({
-            content: 'Langue Sentinel inconnue.',
+            content: 'Langue Noctigarde inconnue.',
             flags: MessageFlags.Ephemeral
         });
     }
@@ -13161,32 +13174,32 @@ async function handleSentinelLanguageButton(interaction) {
     let selectedRole;
 
     try {
-        ({ member, selectedRole } = await applySentinelLanguageToMember(guild, interaction.user.id, language));
+        ({ member, selectedRole } = await applyNoctigardeLanguageToMember(guild, interaction.user.id, language));
 
-        console.log(`Langue Sentinel appliquee : ${language} pour ${interaction.user.tag} (${interaction.user.id})`);
-        await sendSentinelStaffLog(
+        console.log(`Langue Noctigarde appliquee : ${language} pour ${interaction.user.tag} (${interaction.user.id})`);
+        await sendNoctigardeStaffLog(
             guild,
-            `🌐 Langue Sentinel : ${interaction.user} a choisi **${language === 'fr' ? 'Francais' : 'English'}**.`
+            `🌐 Langue Noctigarde : ${interaction.user} a choisi **${language === 'fr' ? 'Francais' : 'English'}**.`
         );
 
-        const generalChannel = getSentinelGeneralChannel(guild, language);
+        const generalChannel = getNoctigardeGeneralChannel(guild, language);
 
         if (generalChannel) {
             await generalChannel.send(
                 language === 'fr'
-                    ? `Bienvenue ${interaction.user} dans la communaute Sentinel.`
-                    : `Welcome ${interaction.user} to the Sentinel community.`
+                    ? `Bienvenue ${interaction.user} dans la communaute Noctigarde.`
+                    : `Welcome ${interaction.user} to the Noctigarde community.`
             ).catch(() => {});
         }
     } catch (error) {
-        console.error('Erreur bouton langue Sentinel :', error);
+        console.error('Erreur bouton langue Noctigarde :', error);
 
         return interaction.editReply('Je n arrive pas a modifier ton role de langue. Verifie que mon role Discord est bien au-dessus des roles de langue.');
     }
 
     const hasBypassView = member.id === guild.ownerId
         || member.permissions.has(PermissionsBitField.Flags.Administrator)
-        || hasSentinelStaffRole(member);
+        || hasNoctigardeStaffRole(member);
     const baseMessage = language === 'fr'
         ? `Langue configuree : ${selectedRole}.`
         : `Language set: ${selectedRole}.`;
@@ -13200,14 +13213,14 @@ async function handleSentinelLanguageButton(interaction) {
     return interaction.editReply(`${baseMessage} ${visibilityMessage}${hasBypassView ? bypassMessage : ''}`);
 }
 
-async function handleSentinelButtonFailure(interaction, error) {
+async function handleNoctigardeButtonFailure(interaction, error) {
     console.error(`Erreur bouton ${interaction.customId} :`, error);
 
     if (!interaction.isRepliable()) {
         return;
     }
 
-    const content = 'Une erreur est survenue pendant le traitement du bouton Sentinel.';
+    const content = 'Une erreur est survenue pendant le traitement du bouton Noctigarde.';
 
     if (interaction.deferred || interaction.replied) {
         await interaction.editReply(content).catch(() => {});
@@ -13232,7 +13245,7 @@ function isProtectedButtonAction(customId) {
     ].includes(customId);
 }
 
-async function handleSentinelButton(interaction, handler) {
+async function handleNoctigardeButton(interaction, handler) {
     const language = interaction.inGuild() ? getGuildLanguage(interaction.guildId) : 'fr';
 
     if (isProtectedButtonAction(interaction.customId)
@@ -13240,10 +13253,10 @@ async function handleSentinelButton(interaction, handler) {
         return;
     }
 
-    return handler(interaction).catch(error => handleSentinelButtonFailure(interaction, error));
+    return handler(interaction).catch(error => handleNoctigardeButtonFailure(interaction, error));
 }
 
-async function applySentinelLanguageToMember(guild, userId, language) {
+async function applyNoctigardeLanguageToMember(guild, userId, language) {
     await guild.roles.fetch();
 
     const roleName = SENTINEL_LANGUAGE_ROLES[language];
@@ -13270,7 +13283,7 @@ async function applySentinelLanguageToMember(guild, userId, language) {
     return { member, selectedRole };
 }
 
-async function handleSentinelTicketButton(interaction) {
+async function handleNoctigardeTicketButton(interaction) {
     const language = getGuildLanguage(interaction.guild.id);
     const rawType = interaction.customId.startsWith('sentinel_dossier:')
         ? interaction.customId.split(':')[1]
@@ -13350,6 +13363,8 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
     assertOpenDossierQuota(interaction.guild.id, language, interaction.member);
 
     const supportCategory = findCategoryByName(interaction.guild, [
+        '✦ NOCTIGARDE // SUPPORT',
+        'NOCTIGARDE // SUPPORT',
         '✦ SENTINEL // SUPPORT',
         'SENTINEL // SUPPORT',
         interaction.channel?.parent?.name
@@ -13366,7 +13381,7 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
             : (supportCategory?.id || interaction.channel?.parentId || null),
         topic: `sentinel-dossier:${interaction.user.id}:${dossierType}`,
         permissionOverwrites: buildTicketOverwrites(interaction.guild, interaction.member, dossierType),
-        reason: `Creation dossier Sentinel ${dossierType}`
+        reason: `Creation dossier Noctigarde ${dossierType}`
     });
     const dossier = createDossierRecord(
         interaction.guild.id,
@@ -13385,8 +13400,8 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
 
     const description = [
         language === 'en'
-            ? `${interaction.user}, this reserved space is your Sentinel ticket.`
-            : `${interaction.user}, cet espace réservé est ton dossier Sentinel.`,
+            ? `${interaction.user}, this reserved space is your Noctigarde ticket.`
+            : `${interaction.user}, cet espace réservé est ton dossier Noctigarde.`,
         subject
             ? (language === 'en' ? `**Subject:** ${subject}` : `**Sujet :** ${subject}`)
             : null,
@@ -13415,11 +13430,11 @@ async function createDossierFromInteraction(interaction, dossierType, details = 
             advanced: hasAdvancedAccess(interaction.member)
         })
     });
-    await sendSentinelStaffLog(
+    await sendNoctigardeStaffLog(
         interaction.guild,
         language === 'en'
-            ? `📁 Sentinel ticket #${dossier.id} opened: ${ticketChannel} by ${interaction.user} (${dossierType}).`
-            : `📁 Dossier Sentinel #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`
+            ? `📁 Noctigarde ticket #${dossier.id} opened: ${ticketChannel} by ${interaction.user} (${dossierType}).`
+            : `📁 Dossier Noctigarde #${dossier.id} ouvert : ${ticketChannel} par ${interaction.user} (${dossierType}).`
     );
     setCooldown(dossierCreateCooldowns, interaction.guild.id, interaction.user.id, DOSSIER_CREATE_COOLDOWN_MS);
 
@@ -13498,7 +13513,7 @@ async function handleDossierCloseModal(interaction) {
     return true;
 }
 
-async function handleSentinelDossierClaimButton(interaction) {
+async function handleNoctigardeDossierClaimButton(interaction) {
     const language = getGuildLanguage(interaction.guild.id);
     const channel = getDossierChannelFromInteraction(interaction);
 
@@ -13523,11 +13538,11 @@ async function handleSentinelDossierClaimButton(interaction) {
         ? `✅ ${interaction.user} is now the ticket referent.`
         : `✅ ${interaction.user} prend ce dossier en charge.`
     ).catch(() => {});
-    await sendSentinelStaffLog(
+    await sendNoctigardeStaffLog(
         interaction.guild,
         language === 'en'
-            ? `✅ Sentinel ticket #${dossier?.id || channel.id} assigned to ${interaction.user}.`
-            : `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`
+            ? `✅ Noctigarde ticket #${dossier?.id || channel.id} assigned to ${interaction.user}.`
+            : `✅ Dossier Noctigarde #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`
     );
 
     return interaction.reply({
@@ -13567,11 +13582,11 @@ async function handleDossierStatusSelect(interaction) {
         : `📌 ${interaction.user} a mis à jour le statut du dossier : **${label}**.`
     ).catch(() => {});
 
-    await sendSentinelStaffLog(
+    await sendNoctigardeStaffLog(
         interaction.guild,
         language === 'en'
-            ? `📌 Sentinel ticket #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
-            : `📌 Statut du dossier Sentinel #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
+            ? `📌 Noctigarde ticket #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
+            : `📌 Statut du dossier Noctigarde #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
     );
 
     await interaction.reply({
@@ -13581,7 +13596,7 @@ async function handleDossierStatusSelect(interaction) {
     return true;
 }
 
-async function handleSentinelDossierTranscriptButton(interaction) {
+async function handleNoctigardeDossierTranscriptButton(interaction) {
     const language = getGuildLanguage(interaction.guild.id);
     const channel = getDossierChannelFromInteraction(interaction);
 
@@ -13750,11 +13765,11 @@ async function handleDossierInteraction(interaction, commandName, language) {
             ? `✅ ${interaction.user} is now the ticket referent.`
             : `✅ ${interaction.user} prend ce dossier en charge.`
         ).catch(() => {});
-        await sendSentinelStaffLog(
+        await sendNoctigardeStaffLog(
             interaction.guild,
             language === 'en'
-                ? `✅ Sentinel ticket #${dossier?.id || channel.id} assigned to ${interaction.user}.`
-                : `✅ Dossier Sentinel #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`
+                ? `✅ Noctigarde ticket #${dossier?.id || channel.id} assigned to ${interaction.user}.`
+                : `✅ Dossier Noctigarde #${dossier?.id || channel.id} pris en charge par ${interaction.user}.`
         );
 
         await interaction.reply({
@@ -13775,11 +13790,11 @@ async function handleDossierInteraction(interaction, commandName, language) {
             ? `📌 ${interaction.user} updated the ticket status: **${label}**.`
             : `📌 ${interaction.user} a mis à jour le statut du dossier : **${label}**.`
         ).catch(() => {});
-        await sendSentinelStaffLog(
+        await sendNoctigardeStaffLog(
             interaction.guild,
             language === 'en'
-                ? `📌 Sentinel ticket #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
-                : `📌 Statut du dossier Sentinel #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
+                ? `📌 Noctigarde ticket #${dossier?.id || channel.id} status updated to **${label}** by ${interaction.user}.`
+                : `📌 Statut du dossier Noctigarde #${dossier?.id || channel.id} mis à jour sur **${label}** par ${interaction.user}.`
         );
 
         await interaction.reply({
@@ -13825,7 +13840,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
             ReadMessageHistory: true,
             AttachFiles: true,
             EmbedLinks: true
-        }, { reason: `Ajout intervenant dossier Sentinel par ${interaction.user.tag}` });
+        }, { reason: `Ajout intervenant dossier Noctigarde par ${interaction.user.tag}` });
 
         await interaction.reply({
             content: t(language, 'dossierAddDone', { member: user }),
@@ -13850,8 +13865,8 @@ async function handleDossierInteraction(interaction, commandName, language) {
         return true;
     }
 
-    await channel.permissionOverwrites.delete(user.id, `Retrait intervenant dossier Sentinel par ${interaction.user.tag}`).catch(async () => {
-        await channel.permissionOverwrites.edit(user.id, { ViewChannel: false }, { reason: `Retrait intervenant dossier Sentinel par ${interaction.user.tag}` });
+    await channel.permissionOverwrites.delete(user.id, `Retrait intervenant dossier Noctigarde par ${interaction.user.tag}`).catch(async () => {
+        await channel.permissionOverwrites.edit(user.id, { ViewChannel: false }, { reason: `Retrait intervenant dossier Noctigarde par ${interaction.user.tag}` });
     });
 
     await interaction.reply({
@@ -13865,7 +13880,7 @@ async function handleDossierInteraction(interaction, commandName, language) {
     return true;
 }
 
-async function handleSentinelTicketCloseButton(interaction) {
+async function handleNoctigardeTicketCloseButton(interaction) {
     const language = getGuildLanguage(interaction.guild.id);
     const channel = getDossierChannelFromInteraction(interaction);
     const topic = parseDossierChannelTopic(interaction.channel?.topic);
@@ -13890,20 +13905,20 @@ async function handleSentinelTicketCloseButton(interaction) {
     return interaction.showModal(buildDossierCloseModal(channel.id, language));
 }
 
-async function handleSentinelVoteButton(interaction) {
+async function handleNoctigardeVoteButton(interaction) {
     const voteKey = interaction.customId.split(':')[1];
     const labels = SENTINEL_VOTE_LABELS[voteKey];
 
     if (!labels) {
         return interaction.reply({
-            content: 'Vote Sentinel inconnu.',
+            content: 'Vote Noctigarde inconnu.',
             flags: MessageFlags.Ephemeral
         });
     }
 
-    await sendSentinelStaffLog(
+    await sendNoctigardeStaffLog(
         interaction.guild,
-        `🗳 Vote priorite Sentinel : ${interaction.user} a vote **${labels.fr} / ${labels.en}**.`
+        `🗳 Vote priorite Noctigarde : ${interaction.user} a vote **${labels.fr} / ${labels.en}**.`
     );
 
     return interaction.reply({
@@ -14065,8 +14080,8 @@ async function handleModerationInteraction(interaction, commandName, language) {
             await interaction.reply({
                 content: deleteAll
                     ? (language === 'en'
-                        ? 'Sentinel must also have Manage Channels to recreate this channel.'
-                        : 'Sentinel doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
+                        ? 'Noctigarde must also have Manage Channels to recreate this channel.'
+                        : 'Noctigarde doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
                     : t(language, 'moderationPurgeChannelPermissionMissing'),
                 flags: MessageFlags.Ephemeral
             });
@@ -14826,7 +14841,7 @@ async function handleCustomEmbedInteraction(interaction, commandName, language) 
         try {
             sentMessage = await channel.send(buildCustomEmbedPayload(data, roleToPing, language));
         } catch (error) {
-            console.error('Erreur creation embed Sentinel :', error);
+            console.error('Erreur creation embed Noctigarde :', error);
             await interaction.reply({
                 content: t(language, 'customEmbedChannelSendMissing', { channel }),
                 flags: MessageFlags.Ephemeral
@@ -15011,8 +15026,8 @@ async function handleModerationMessage(message, language) {
         if (!hasPurgeChannelPermissions(message.guild, message.channel, deleteAll ? 'all' : 'count')) {
             await message.reply(deleteAll
                 ? (language === 'en'
-                    ? 'Sentinel must also have Manage Channels to recreate this channel.'
-                    : 'Sentinel doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
+                    ? 'Noctigarde must also have Manage Channels to recreate this channel.'
+                    : 'Noctigarde doit aussi avoir la permission « Gérer les salons » pour recréer ce salon.')
                 : t(language, 'moderationPurgeChannelPermissionMissing'));
             return true;
         }
@@ -15043,8 +15058,8 @@ async function handleModerationMessage(message, language) {
             console.error('Erreur purge texte :', error);
             if (error?.purgeBusy) {
                 await message.reply(language === 'en'
-                    ? 'A Sentinel cleanup is already running in this channel.'
-                    : 'Un nettoyage Sentinel est déjà en cours dans ce salon.');
+                    ? 'A Noctigarde cleanup is already running in this channel.'
+                    : 'Un nettoyage Noctigarde est déjà en cours dans ce salon.');
                 return true;
             }
             if (error?.archiveFailed) {
@@ -15356,7 +15371,7 @@ function getGuildReportDataset(guild, kind) {
             title: 'Registre de modération',
             subtitle: 'Historique administratif des décisions de modération',
             sectionTitle: 'Mesures enregistrées',
-            description: 'Actions de modération consignées par Sentinel sur ce serveur.',
+            description: 'Actions de modération consignées par Noctigarde sur ce serveur.',
             metadata: [
                 { label: 'Serveur', value: guild.name },
                 { label: 'Identifiant', value: guild.id },
@@ -15384,7 +15399,7 @@ function createGuildReport(guild, kind, format) {
     return {
         ...document,
         title: dataset.title,
-        fileName: `sentinel-${kind}-${new Date().toISOString().slice(0, 10)}.${document.extension}`
+        fileName: `noctigarde-${kind}-${new Date().toISOString().slice(0, 10)}.${document.extension}`
     };
 }
 
@@ -15446,14 +15461,14 @@ function buildDashboardNotifications(guildId, userId, snapshot = {}) {
         key: 'reports-failed',
         severity: 'danger',
         title: `${failedReports} rapport(s) automatique(s) en échec`,
-        detail: 'Vérifie le salon de destination et les permissions de Sentinel.',
+        detail: 'Vérifie le salon de destination et les permissions de Noctigarde.',
         tab: 'operations'
     });
     for (const alert of systemAlerts) {
         notifications.push({
             key: `system-${alert.key}`,
             severity: Number(alert.level || 0) >= 90 ? 'danger' : 'warning',
-            title: alert.message || 'Alerte de maintenance Sentinel',
+            title: alert.message || 'Alerte de maintenance Noctigarde',
             detail: 'La console fondatrice contient le diagnostic et les actions de maintenance.',
             tab: 'founder'
         });
@@ -15639,7 +15654,7 @@ function simulateGuildOperation(guild, actorUserId, kind, input = {}) {
     return { id, kind, result };
 }
 
-function runSentinelGuildValidation(guild, trigger = 'manual') {
+function runNoctigardeGuildValidation(guild, trigger = 'manual') {
     const warning = operations.getWarningEscalationSettings(guild.id);
     const commandRoleIds = getCommandRoleIds(guild.id);
     const dossierRoleIds = getDossierRoleIds(guild.id);
@@ -15649,13 +15664,13 @@ function runSentinelGuildValidation(guild, trigger = 'manual') {
         { key: 'warning-thresholds', label: 'Paliers d’avertissement', ok: warning.timeoutThreshold > 0 && (!warning.kickThreshold || warning.kickThreshold > warning.timeoutThreshold) && (!warning.banThreshold || warning.banThreshold > Math.max(warning.kickThreshold, warning.timeoutThreshold)) },
         { key: 'command-roles', label: 'Rôles staff existants', ok: missing(commandRoleIds).length === 0, detail: missing(commandRoleIds).join(', ') },
         { key: 'dossier-roles', label: 'Rôles dossiers existants', ok: missing(dossierRoleIds).length === 0, detail: missing(dossierRoleIds).join(', ') },
-        { key: 'bot-member', label: 'Sentinel présent comme membre', ok: Boolean(guild.members.me) }
+        { key: 'bot-member', label: 'Noctigarde présent comme membre', ok: Boolean(guild.members.me) }
     ];
     return operations.addValidationRun(guild.id, trigger, checks);
 }
 
 async function processScheduledOperations() {
-    if (!scheduledOperationsRunner) throw new Error('Le moteur des tâches planifiées Sentinel n’est pas initialisé.');
+    if (!scheduledOperationsRunner) throw new Error('Le moteur des tâches planifiées Noctigarde n’est pas initialisé.');
     return scheduledOperationsRunner.run();
 }
 
@@ -15710,7 +15725,7 @@ async function scanAllGuildConfigurations() {
 
 runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
-    console.log(`Build Sentinel actif : ${SENTINEL_BUILD}`);
+    console.log(`Build Noctigarde actif : ${SENTINEL_BUILD}`);
 
     try {
         await runStartupStagingValidation();
@@ -15838,7 +15853,7 @@ runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), asy
             getReason,
             getServiceRole,
             getServiceSummary,
-            getSentinelSyncStatus,
+            getNoctigardeSyncStatus,
             getSlashCommandStatus,
             getStagingValidationStatus: () => {
                 const config = stagingValidationConfig();
@@ -15890,7 +15905,7 @@ runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), asy
             parseSlowmodeToSeconds,
             prepareCustomEmbedUploads,
             reconcileDossierPanels,
-            runSentinelGuildValidation,
+            runNoctigardeGuildValidation,
             simulateGuildOperation,
             recordDashboardRequestMetric: performanceMonitor.recordDashboardRequest,
             reportIncident: reportRuntimeIncident,
@@ -15926,7 +15941,7 @@ runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), asy
             updateAutomodSettings,
             updateGuildConfig,
             updateCustomEmbedRecord,
-            updateSentinelStatusPanel,
+            updateNoctigardeStatusPanel,
             updateModerationCaseReason,
             updateUserTime,
             upsertTemporaryBan,
@@ -15946,23 +15961,23 @@ runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), asy
 
     try {
         await refreshSlashCommandStatus();
-        const syncResult = await syncSentinelServer(client);
-        lastSentinelServerSync = Date.now();
-        lastSentinelServerSyncResult = syncResult;
+        const syncResult = await syncNoctigardeServer(client);
+        lastNoctigardeServerSync = Date.now();
+        lastNoctigardeServerSyncResult = syncResult;
 
         if (syncResult.skipped) {
-            console.log(`Synchronisation serveur Sentinel ignoree : ${syncResult.reason}`);
+            console.log(`Synchronisation serveur Noctigarde ignoree : ${syncResult.reason}`);
         } else {
-            console.log(`Synchronisation serveur Sentinel terminee : ${syncResult.created} creation(s), ${syncResult.updated} mise(s) a jour.`);
+            console.log(`Synchronisation serveur Noctigarde terminee : ${syncResult.created} creation(s), ${syncResult.updated} mise(s) a jour.`);
         }
 
         const referenceConfig = await ensureReferenceGuildRuntimeConfig();
 
         if (referenceConfig.skipped) {
-            console.log(`Configuration serveur Sentinel ignoree : ${referenceConfig.reason}`);
+            console.log(`Configuration serveur Noctigarde ignoree : ${referenceConfig.reason}`);
         } else {
             console.log([
-                'Configuration serveur Sentinel verifiee',
+                'Configuration serveur Noctigarde verifiee',
                 `role service=${referenceConfig.serviceRole || 'absent'}`,
                 `logs=${referenceConfig.logChannel || 'absent'}`,
                 `auto-role=${referenceConfig.autoRole || 'absent'}`,
@@ -15971,7 +15986,7 @@ runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), asy
             ].join(' | '));
         }
 
-        await runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels);
+        await runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllNoctigardeStatusPanels);
         for (const guild of client.guilds.cache.values()) {
             await repairGuildOfficialUpdateReferences(guild, true).catch(error => {
                 console.error(`Réparation des salons d'annonces ${guild.id} :`, error);
@@ -15980,21 +15995,21 @@ runtimeSupervisor.onceFatal(Events.ClientReady, 'discord:ready', () => ({}), asy
         }
         if (featureFlags.isFeatureEnabled('official-updates')) {
             const officialDistribution = await distributeLatestPublicOfficialUpdate();
-            console.log(`Bulletin public Sentinel vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
+            console.log(`Bulletin public Noctigarde vérifié : ${officialDistribution.delivered}/${officialDistribution.queued} nouvelle(s) livraison(s).`);
         }
         await runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans);
         await runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations);
         await runFeatureBackgroundJob('repair-scan', 'repair-scan', 30 * 60 * 1000, scanAllGuildConfigurations);
         for (const guild of client.guilds.cache.values()) {
-            runSentinelGuildValidation(guild, 'startup');
+            runNoctigardeGuildValidation(guild, 'startup');
         }
     } catch (error) {
-        console.error('Erreur synchronisation serveur Sentinel :', error);
+        console.error('Erreur synchronisation serveur Noctigarde :', error);
         reportRuntimeIncident('startup-sync', error, { phase: 'discord-synchronization' });
     }
 
     runtimeSupervisor.scheduleInterval(() => runPersistentBackgroundJob('slash-command-status', 30 * 60 * 1000, refreshSlashCommandStatus).catch(() => {}), 6 * 60 * 60 * 1000);
-    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllSentinelStatusPanels).catch(() => {}), 5 * 60 * 1000);
+    runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('status-panels', 'status-panels', 4 * 60 * 1000, updateAllNoctigardeStatusPanels).catch(() => {}), 5 * 60 * 1000);
     runtimeSupervisor.scheduleInterval(() => runPersistentBackgroundJob('temporary-bans', 90 * 1000, processExpiredTemporaryBans).catch(() => {}), 60 * 1000);
     runtimeSupervisor.scheduleInterval(() => runPersistentBackgroundJob('scheduled-operations', 10 * 60 * 1000, processScheduledOperations).catch(() => {}), OPERATIONS_INTERVAL_MS);
     runtimeSupervisor.scheduleInterval(() => runFeatureBackgroundJob('official-updates', 'official-update-retries', 4 * 60 * 1000, processOfficialUpdateRetries).catch(() => {}), 5 * 60 * 1000);
@@ -16013,7 +16028,7 @@ client.on(Events.Error, error => {
 client.rest.on(RESTEvents.RateLimited, information => {
     const retryAfterMs = Number(information?.timeToReset || information?.retryAfter || 0);
     if (!information?.global && retryAfterMs < 30_000) return;
-    reportRuntimeIncident('discord:rate-limit', new Error('Discord limite fortement les requêtes Sentinel.'), {
+    reportRuntimeIncident('discord:rate-limit', new Error('Discord limite fortement les requêtes Noctigarde.'), {
         global: Boolean(information?.global),
         retryAfterMs: Math.round(retryAfterMs),
         route: String(information?.route || '').replace(/\d{17,20}/g, ':id').slice(0, 160)
@@ -16025,7 +16040,7 @@ runtimeSupervisor.on(Events.ShardError, 'discord:shard', (error, shardId) => ({ 
 });
 
 client.on(Events.Invalidated, () => {
-    reportRuntimeIncident('discord:invalidated', new Error('La session Discord Sentinel a été invalidée.'), {}, 'critical');
+    reportRuntimeIncident('discord:invalidated', new Error('La session Discord Noctigarde a été invalidée.'), {}, 'critical');
     runtimeSupervisor.shutdown('discord-invalidated', 1);
 });
 
@@ -16063,9 +16078,9 @@ runtimeSupervisor.on(Events.GuildCreate, 'discord:guild-create', guild => ({ gui
 async function notifyGuildConfigurationRepair(guild, description) {
     const language = getGuildLanguage(guild.id);
     const payload = {
-        embeds: [createSentinelEmbed({
+        embeds: [createNoctigardeEmbed({
             color: SENTINEL_COLORS.warning,
-            title: language === 'en' ? 'Sentinel | Configuration repaired' : 'Sentinel | Configuration réparée',
+            title: language === 'en' ? 'Noctigarde | Configuration repaired' : 'Noctigarde | Configuration réparée',
             description,
             requester: client.user,
             language
@@ -16128,8 +16143,8 @@ async function repairGuildOfficialUpdateReferences(guild, notify = false) {
         await notifyGuildConfigurationRepair(
             guild,
             getGuildLanguage(guild.id) === 'en'
-                ? `Sentinel removed an invalid Discord reference: ${repairedEn}. Open the dashboard to choose a new item.`
-                : `Sentinel a retiré une référence Discord devenue invalide : ${repaired}. Ouvre la console pour choisir un nouvel élément.`
+                ? `Noctigarde removed an invalid Discord reference: ${repairedEn}. Open the dashboard to choose a new item.`
+                : `Noctigarde a retiré une référence Discord devenue invalide : ${repaired}. Ouvre la console pour choisir un nouvel élément.`
         );
     }
 
@@ -16219,7 +16234,7 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
         && interaction.customId.startsWith('sentinel_language:')
         && interaction.inGuild()
     ) {
-        return handleSentinelButton(interaction, handleSentinelLanguageButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeLanguageButton);
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('sentinel_service_checkin:')) {
@@ -16307,7 +16322,7 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
         }
 
         if (commandName === 'maj-sentinel') {
-            if (!canPublishOfficialSentinelUpdate(interaction)) {
+            if (!canPublishOfficialNoctigardeUpdate(interaction)) {
                 auditStatus = 'failed';
                 auditSummary = t(language, 'officialUpdateDenied');
 
@@ -16659,7 +16674,7 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
             updateGuildConfig(guildId, configPatch);
 
             if (!['maj-salon', 'updates-channel'].includes(action)) {
-                await updateSentinelStatusPanel(interaction.guild);
+                await updateNoctigardeStatusPanel(interaction.guild);
             }
 
             return interaction.reply({
@@ -17013,13 +17028,13 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             try {
-                const embed = await runSentinelServerSync(interaction.guild, interaction.user);
+                const embed = await runNoctigardeServerSync(interaction.guild, interaction.user);
 
                 return interaction.editReply({ embeds: [embed] });
             } catch (error) {
                 console.error('Erreur sync-sentinel :', error);
 
-                return interaction.editReply('Impossible de synchroniser la structure Sentinel pour le moment.');
+                return interaction.editReply('Impossible de synchroniser la structure Noctigarde pour le moment.');
             }
         }
 
@@ -17319,34 +17334,34 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
     }
 
     if (interaction.customId.startsWith('sentinel_selfrole:')) {
-        return handleSentinelButton(interaction, handleSentinelSelfRoleButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeSelfRoleButton);
     }
 
     if (
         interaction.customId.startsWith('sentinel_dossier:')
         && ['support', 'report', 'recruitment', 'partnership', 'other', 'complaint', 'admin', 'bug'].includes(interaction.customId.split(':')[1])
     ) {
-        return handleSentinelButton(interaction, handleSentinelTicketButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeTicketButton);
     }
 
     if (interaction.customId === 'sentinel_dossier:bug' || interaction.customId === 'sentinel_ticket:create' || interaction.customId === 'sentinel_ticket:bug') {
-        return handleSentinelButton(interaction, handleSentinelTicketButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeTicketButton);
     }
 
     if (interaction.customId === 'sentinel_dossier:claim') {
-        return handleSentinelButton(interaction, handleSentinelDossierClaimButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeDossierClaimButton);
     }
 
     if (interaction.customId === 'sentinel_dossier:transcript') {
-        return handleSentinelButton(interaction, handleSentinelDossierTranscriptButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeDossierTranscriptButton);
     }
 
     if (interaction.customId === 'sentinel_dossier:close' || interaction.customId === 'sentinel_ticket:close') {
-        return handleSentinelButton(interaction, handleSentinelTicketCloseButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeTicketCloseButton);
     }
 
     if (interaction.customId.startsWith('sentinel_vote:')) {
-        return handleSentinelButton(interaction, handleSentinelVoteButton);
+        return handleNoctigardeButton(interaction, handleNoctigardeVoteButton);
     }
 
     const serviceButtonActions = new Set(['toggle_service', 'start_service', 'end_service']);
@@ -17454,7 +17469,7 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
         });
     } catch (error) {
         auditStatus = 'failed';
-        auditSummary = error.message || 'Erreur Discord Sentinel.';
+        auditSummary = error.message || 'Erreur Discord Noctigarde.';
         console.error('Erreur interaction service :', error);
 
         if (!interaction.replied) {
@@ -17466,7 +17481,7 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
     }
     } catch (error) {
         auditStatus = 'failed';
-        auditSummary = error.message || 'Erreur Discord Sentinel.';
+        auditSummary = error.message || 'Erreur Discord Noctigarde.';
         reportRuntimeIncident(
             'discord-interaction',
             error,
@@ -17476,8 +17491,8 @@ runtimeSupervisor.on(Events.InteractionCreate, 'discord:interaction-event', inte
         if (!isUnknownInteractionError(error) && interaction.isRepliable()) {
             const language = getGuildLanguage(interaction.guildId);
             const content = language === 'en'
-                ? 'Sentinel could not complete this action. Please try again.'
-                : 'Sentinel n’a pas pu terminer cette action. Réessaie dans un instant.';
+                ? 'Noctigarde could not complete this action. Please try again.'
+                : 'Noctigarde n’a pas pu terminer cette action. Réessaie dans un instant.';
 
             if (interaction.deferred) {
                 await interaction.editReply({ content, components: [] }).catch(() => {});
@@ -17514,7 +17529,7 @@ runtimeSupervisor.on(Events.MessageDelete, 'discord:message-delete', message => 
         ? message.content.replace(/\s+/g, ' ').slice(0, 400)
         : 'Contenu indisponible';
 
-    await sendSentinelStaffLog(
+    await sendNoctigardeStaffLog(
         message.guild,
         [
             `🧹 Message supprime dans ${message.channel || 'un salon inconnu'}.`,
@@ -17553,7 +17568,7 @@ runtimeSupervisor.on(Events.MessageCreate, 'discord:message-create', message => 
     }
 
     if (/^!sentinel-build$/i.test(content)) {
-        return message.reply(`Build Sentinel actif : \`${SENTINEL_BUILD}\``);
+        return message.reply(`Build Noctigarde actif : \`${SENTINEL_BUILD}\``);
     }
 
     if (/^!(fr|en)$/i.test(content)) {
@@ -17878,21 +17893,21 @@ runtimeSupervisor.on(Events.MessageCreate, 'discord:message-create', message => 
         return message.reply({ embeds: [embed] });
     }
 
-    if (content === '!sync-sentinel') {
+    if (/^!sync-(?:noctigarde|sentinel)$/i.test(content)) {
         if (!hasCommandRoleAccess(message.member)) {
             return message.reply(getCommandRoleAccessDeniedMessage(language));
         }
 
-        const pendingMessage = await message.reply('Synchronisation Sentinel en cours...');
+        const pendingMessage = await message.reply('Synchronisation Noctigarde en cours...');
 
         try {
-            const embed = await runSentinelServerSync(message.guild, message.author);
+            const embed = await runNoctigardeServerSync(message.guild, message.author);
 
             return pendingMessage.edit({ content: null, embeds: [embed] });
         } catch (error) {
             console.error('Erreur sync-sentinel texte :', error);
 
-            return pendingMessage.edit('Impossible de synchroniser la structure Sentinel pour le moment.');
+            return pendingMessage.edit('Impossible de synchroniser la structure Noctigarde pour le moment.');
         }
     }
 
@@ -18008,7 +18023,7 @@ runtimeSupervisor.on(Events.MessageCreate, 'discord:message-create', message => 
     }
     } catch (error) {
         auditStatus = 'failed';
-        auditSummary = error.message || 'Erreur commande texte Sentinel.';
+        auditSummary = error.message || 'Erreur commande texte Noctigarde.';
         throw error;
     } finally {
         recordDiscordTextAudit(message, {

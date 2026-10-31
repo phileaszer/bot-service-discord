@@ -13,7 +13,7 @@ if (databaseDirectory && databaseDirectory !== '.') {
 const pendingRestore = applyPendingDatabaseRestore(databasePath);
 
 if (pendingRestore?.restored) {
-    console.log(`Restauration Sentinel appliquee au demarrage : ${pendingRestore.restoredAt}`);
+    console.log(`Restauration Noctigarde appliquee au demarrage : ${pendingRestore.restoredAt}`);
 }
 
 const db = new Database(databasePath);
@@ -1034,23 +1034,23 @@ db.prepare(`
     VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
 `).run(
     'sentinel-major-update-2026-10-02',
-    'Sentinel | Mise à jour majeure',
+    'Noctigarde | Mise à jour majeure',
     [
         'Le dashboard est plus rapide, plus clair et mieux adapté aux appareils mobiles.',
-        'Toutes les fonctions Sentinel sont accessibles à chaque serveur depuis une interface unique.',
+        'Toutes les fonctions Noctigarde sont accessibles à chaque serveur depuis une interface unique.',
         'Le service, les salaires, les dossiers privés et le Centre de sûreté disposent de nouveaux outils de suivi.',
         'Les images peuvent être importées directement depuis un ordinateur pour les annonces Discord.',
-        'Chaque serveur peut désormais recevoir les annonces officielles Sentinel dans un salon séparé du statut technique.',
+        'Chaque serveur peut désormais recevoir les annonces officielles Noctigarde dans un salon séparé du statut technique.',
         'Le salon peut être testé depuis le dashboard, prévenir un rôle choisi et afficher le suivi des livraisons.',
         'Les annonces manquées sont retentées automatiquement et restent consultables sur la nouvelle page publique Nouveautés.'
     ].join('\n'),
-    'Sentinel | Major update',
+    'Noctigarde | Major update',
     [
         'The dashboard is faster, clearer, and better suited to mobile devices.',
-        'Every Sentinel feature is available to every server from one unified interface.',
+        'Every Noctigarde feature is available to every server from one unified interface.',
         'Duty tracking, RP payroll, private cases, and the Safety Center now provide improved follow-up tools.',
         'Images can be uploaded directly from a computer for Discord announcements.',
-        'Every server can now receive official Sentinel announcements in a channel separate from technical status.',
+        'Every server can now receive official Noctigarde announcements in a channel separate from technical status.',
         'The channel can be tested from the dashboard, notify a selected role, and display delivery tracking.',
         'Missed announcements are retried automatically and remain available on the new public Updates page.'
     ].join('\n'),
@@ -1066,19 +1066,19 @@ db.prepare(`
 `).run(
     [
         'Le dashboard est plus rapide, plus clair et mieux adapté aux appareils mobiles.',
-        'Toutes les fonctions Sentinel sont accessibles à chaque serveur depuis une interface unique.',
+        'Toutes les fonctions Noctigarde sont accessibles à chaque serveur depuis une interface unique.',
         'Le service, les salaires, les dossiers privés et le Centre de sûreté disposent de nouveaux outils de suivi.',
         'Les images peuvent être importées directement depuis un ordinateur pour les annonces Discord.',
-        'Chaque serveur peut désormais recevoir les annonces officielles Sentinel dans un salon séparé du statut technique.',
+        'Chaque serveur peut désormais recevoir les annonces officielles Noctigarde dans un salon séparé du statut technique.',
         'Le salon peut être testé depuis le dashboard, prévenir un rôle choisi et afficher le suivi des livraisons.',
         'Les annonces manquées sont retentées automatiquement et restent consultables sur la nouvelle page publique Nouveautés.'
     ].join('\n'),
     [
         'The dashboard is faster, clearer, and better suited to mobile devices.',
-        'Every Sentinel feature is available to every server from one unified interface.',
+        'Every Noctigarde feature is available to every server from one unified interface.',
         'Duty tracking, RP payroll, private cases, and the Safety Center now provide improved follow-up tools.',
         'Images can be uploaded directly from a computer for Discord announcements.',
-        'Every server can now receive official Sentinel announcements in a channel separate from technical status.',
+        'Every server can now receive official Noctigarde announcements in a channel separate from technical status.',
         'The channel can be tested from the dashboard, notify a selected role, and display delivery tracking.',
         'Missed announcements are retried automatically and remain available on the new public Updates page.'
     ].join('\n')
@@ -1100,18 +1100,18 @@ db.prepare(`
     VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
 `).run(
     'sentinel-public-demo-2026-10-07',
-    'Sentinel | Version de démonstration',
+    'Noctigarde | Version de démonstration',
     [
-        'La version actuelle de Sentinel est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
+        'La version actuelle de Noctigarde est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
         'Elle sert à tester le service en conditions réelles, corriger les problèmes et préparer la suite.',
-        'À l’avenir, seules certaines options avancées pourront devenir payantes. Une partie gratuite de Sentinel restera disponible.',
+        'À l’avenir, seules certaines options avancées pourront devenir payantes. Une partie gratuite de Noctigarde restera disponible.',
         'Aucun abonnement, prélèvement ou achat n’est actif aujourd’hui. Les fonctions concernées, les tarifs et les conditions seront annoncés clairement avant tout changement.'
     ].join('\n'),
-    'Sentinel | Demonstration version',
+    'Noctigarde | Demonstration version',
     [
-        'The current Sentinel release is a public demonstration: every feature is available at no cost during this phase.',
+        'The current Noctigarde release is a public demonstration: every feature is available at no cost during this phase.',
         'It is used to test the service in real conditions, fix issues, and prepare what comes next.',
-        'Only some advanced features may become paid later. A free part of Sentinel will remain available.',
+        'Only some advanced features may become paid later. A free part of Noctigarde will remain available.',
         'No subscription, charge, or purchase is active today. The affected features, pricing, and terms will be announced clearly before any change.'
     ].join('\n'),
     'information officielle',
@@ -1125,15 +1125,15 @@ db.prepare(`
     WHERE public_key = ?
 `).run(
     [
-        'La version actuelle de Sentinel est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
+        'La version actuelle de Noctigarde est une démonstration publique : toutes ses fonctions sont accessibles sans paiement pendant cette phase.',
         'Elle sert à tester le service en conditions réelles, corriger les problèmes et préparer la suite.',
-        'À l’avenir, seules certaines options avancées pourront devenir payantes. Une partie gratuite de Sentinel restera disponible.',
+        'À l’avenir, seules certaines options avancées pourront devenir payantes. Une partie gratuite de Noctigarde restera disponible.',
         'Aucun abonnement, prélèvement ou achat n’est actif aujourd’hui. Les fonctions concernées, les tarifs et les conditions seront annoncés clairement avant tout changement.'
     ].join('\n'),
     [
-        'The current Sentinel release is a public demonstration: every feature is available at no cost during this phase.',
+        'The current Noctigarde release is a public demonstration: every feature is available at no cost during this phase.',
         'It is used to test the service in real conditions, fix issues, and prepare what comes next.',
-        'Only some advanced features may become paid later. A free part of Sentinel will remain available.',
+        'Only some advanced features may become paid later. A free part of Noctigarde will remain available.',
         'No subscription, charge, or purchase is active today. The affected features, pricing, and terms will be announced clearly before any change.'
     ].join('\n'),
     'sentinel-public-demo-2026-10-07'
@@ -1155,15 +1155,15 @@ db.prepare(`
     VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
 `).run(
     'sentinel-public-demo-scope-2026-10-07',
-    'Sentinel | Précision sur la démonstration',
+    'Noctigarde | Précision sur la démonstration',
     [
-        'Sentinel n’a pas vocation à devenir entièrement payant.',
+        'Noctigarde n’a pas vocation à devenir entièrement payant.',
         'À l’avenir, seules certaines options avancées pourront devenir payantes. Le site et les fonctions essentielles conserveront une partie accessible gratuitement.',
         'Aucun abonnement ni prélèvement n’est actif aujourd’hui. Les fonctions concernées et leurs conditions seront annoncées avant tout changement.'
     ].join('\n'),
-    'Sentinel | Demonstration clarification',
+    'Noctigarde | Demonstration clarification',
     [
-        'Sentinel is not intended to become entirely paid.',
+        'Noctigarde is not intended to become entirely paid.',
         'Only some advanced features may become paid later. The website and essential features will keep a part available at no cost.',
         'No subscription or charge is active today. The affected features and their terms will be announced before any change.'
     ].join('\n'),
@@ -1188,7 +1188,7 @@ db.prepare(`
     VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
 `).run(
     'sentinel-dashboard-services-tests-2026-10-09',
-    'Sentinel | Un dashboard plus clair',
+    'Noctigarde | Un dashboard plus clair',
     [
         'Cette mise à jour rend le dashboard plus simple et corrige quelques problèmes gênants.',
         '',
@@ -1200,7 +1200,7 @@ db.prepare(`
         '',
         '## Fin des services oubliés',
         '',
-        'Quand quelqu’un reste en service trop longtemps, Sentinel lui envoie un message privé pour lui demander s’il veut :',
+        'Quand quelqu’un reste en service trop longtemps, Noctigarde lui envoie un message privé pour lui demander s’il veut :',
         '',
         '- continuer son service ;',
         '- terminer son service.',
@@ -1209,7 +1209,7 @@ db.prepare(`
         '',
         '## Plus de spam dans les tickets',
         '',
-        'Sentinel n’envoie plus le même rappel toutes les heures dans un ticket en retard.',
+        'Noctigarde n’envoie plus le même rappel toutes les heures dans un ticket en retard.',
         '',
         'Il envoie maintenant un seul message pour prévenir le staff, puis il s’arrête là.',
         '',
@@ -1226,7 +1226,7 @@ db.prepare(`
         '',
         '## Des résultats faciles à comprendre',
         '',
-        'Après chaque test, Sentinel explique simplement ce qui se passerait :',
+        'Après chaque test, Noctigarde explique simplement ce qui se passerait :',
         '',
         '- la règle détectée ;',
         '- la sanction prévue ;',
@@ -1235,7 +1235,7 @@ db.prepare(`
         '- le montant du salaire ;',
         '- si l’annonce est prête à être envoyée.'
     ].join('\n'),
-    'Sentinel | A clearer dashboard',
+    'Noctigarde | A clearer dashboard',
     [
         'This update makes the dashboard easier to use and fixes a few annoying issues.',
         '',
@@ -1247,7 +1247,7 @@ db.prepare(`
         '',
         '## No more forgotten duty sessions',
         '',
-        'When someone stays on duty for too long, Sentinel sends them a private message asking whether they want to:',
+        'When someone stays on duty for too long, Noctigarde sends them a private message asking whether they want to:',
         '',
         '- stay on duty;',
         '- end their duty session.',
@@ -1256,7 +1256,7 @@ db.prepare(`
         '',
         '## No more ticket reminder spam',
         '',
-        'Sentinel no longer sends the same reminder every hour in an overdue ticket.',
+        'Noctigarde no longer sends the same reminder every hour in an overdue ticket.',
         '',
         'It now sends one message to alert the staff, then stops there.',
         '',
@@ -1273,7 +1273,7 @@ db.prepare(`
         '',
         '## Easy-to-understand results',
         '',
-        'After each test, Sentinel clearly explains what would happen:',
+        'After each test, Noctigarde clearly explains what would happen:',
         '',
         '- the detected rule;',
         '- the planned action;',
@@ -1303,10 +1303,10 @@ db.prepare(`
     VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
 `).run(
     'sentinel-stability-security-2026-10-27',
-    'Sentinel | Plus rapide et plus stable',
+    'Noctigarde | Plus rapide et plus stable',
     [
         '## Stabilité',
-        'Sentinel redémarre plus vite.',
+        'Noctigarde redémarre plus vite.',
         'Le bot revient rapidement après une maintenance.',
         'Les tâches automatiques reprennent correctement.',
         '',
@@ -1327,10 +1327,10 @@ db.prepare(`
         'Les textes français et anglais ont été corrigés.',
         'L’affichage est plus cohérent dans les deux langues.'
     ].join('\n'),
-    'Sentinel | Faster and more stable',
+    'Noctigarde | Faster and more stable',
     [
         '## Stability',
-        'Sentinel now restarts faster.',
+        'Noctigarde now restarts faster.',
         'The bot returns quickly after maintenance.',
         'Automated tasks resume correctly.',
         '',
@@ -1585,7 +1585,7 @@ db.prepare = function monitoredPrepare(sql) {
     });
 };
 
-db.getSentinelPerformance = () => ({
+db.getNoctigardePerformance = () => ({
     ...databasePerformance,
     averageDurationMs: databasePerformance.queryCount
         ? Math.round((databasePerformance.totalDurationMs / databasePerformance.queryCount) * 100) / 100

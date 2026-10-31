@@ -31,7 +31,7 @@
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...(csrfToken && method !== 'GET' ? { 'X-Sentinel-CSRF': csrfToken } : {})
+        ...(csrfToken && method !== 'GET' ? { 'X-Noctigarde-CSRF': csrfToken } : {})
       },
       ...options
     });
@@ -69,7 +69,7 @@
   }
 
   function dossierList(items) {
-    if (!items.length) return emptyMemberState('Aucun ticket ouvert avec Sentinel.');
+    if (!items.length) return emptyMemberState('Aucun ticket ouvert avec Noctigarde.');
     return `<div class="member-list">${items.map(item => `<article><span>Ticket #${escapeHtml(item.id)} · ${escapeHtml(item.type)}</span><strong>${escapeHtml(item.subject || 'Sans sujet')}</strong><small>${escapeHtml(item.status)} · ${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>`;
   }
 
@@ -126,8 +126,8 @@
         if (localStorage.getItem(key)) continue;
         const options = {
           body: `${item.guild.name} · ${notification.detail}`,
-          icon: 'assets/sentinel-mark.png',
-          badge: 'assets/sentinel-mark.png',
+          icon: 'assets/noctigarde-mark.png',
+          badge: 'assets/noctigarde-mark.png',
           tag: key,
           data: { url: 'membre.html' }
         };
@@ -204,10 +204,10 @@
   function render() {
     const guilds = portal?.guilds || [];
     const privacyRequests = portal?.privacyRequests || [];
-    const privacyPanel = `<section class="dashboard-panel member-guild-panel"><div class="panel-heading"><p class="eyebrow">Tes données Sentinel</p><h2>Confidentialité</h2><p class="muted">Télécharge une copie lisible de tes données ou demande leur suppression. Une suppression est toujours contrôlée avant exécution.</p></div><div class="member-detail-grid"><article class="inline-form"><h3>Copie de mes données</h3><p class="muted">Le rapport PDF est prêt à lire. Le fichier JSON contient la copie technique complète.</p><div class="split-actions"><a class="button button-small" href="/api/me/privacy/export?format=pdf">Télécharger le rapport PDF</a><a class="button button-small button-ghost" href="/api/me/privacy/export?format=json">Format technique JSON</a></div></article><article class="inline-form"><h3>Demande de suppression</h3><form data-member-delete><label><span>Motif facultatif</span><textarea name="reason" maxlength="1000" placeholder="Précise les éléments concernés si nécessaire."></textarea></label><button class="button button-small button-ghost" type="submit">Envoyer la demande</button></form>${privacyRequests.length ? `<div class="member-list">${privacyRequests.map(item => `<article><span>${escapeHtml(item.requestKey)}</span><strong>${escapeHtml(item.status === 'pending' ? 'En cours de contrôle' : item.status)}</strong><small>${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>` : ''}</article></div></section>`;
+    const privacyPanel = `<section class="dashboard-panel member-guild-panel"><div class="panel-heading"><p class="eyebrow">Tes données Noctigarde</p><h2>Confidentialité</h2><p class="muted">Télécharge une copie lisible de tes données ou demande leur suppression. Une suppression est toujours contrôlée avant exécution.</p></div><div class="member-detail-grid"><article class="inline-form"><h3>Copie de mes données</h3><p class="muted">Le rapport PDF est prêt à lire. Le fichier JSON contient la copie technique complète.</p><div class="split-actions"><a class="button button-small" href="/api/me/privacy/export?format=pdf">Télécharger le rapport PDF</a><a class="button button-small button-ghost" href="/api/me/privacy/export?format=json">Format technique JSON</a></div></article><article class="inline-form"><h3>Demande de suppression</h3><form data-member-delete><label><span>Motif facultatif</span><textarea name="reason" maxlength="1000" placeholder="Précise les éléments concernés si nécessaire."></textarea></label><button class="button button-small button-ghost" type="submit">Envoyer la demande</button></form>${privacyRequests.length ? `<div class="member-list">${privacyRequests.map(item => `<article><span>${escapeHtml(item.requestKey)}</span><strong>${escapeHtml(item.status === 'pending' ? 'En cours de contrôle' : item.status)}</strong><small>${escapeHtml(formatDate(item.createdAt))}</small></article>`).join('')}</div>` : ''}</article></div></section>`;
     content.innerHTML = privacyPanel + (guilds.length
       ? guilds.map(renderGuild).join('')
-      : '<div class="empty-state"><img src="assets/sentinel-mark.png" alt=""><h2>Aucun registre disponible</h2><p>Ton compte Discord n’est membre d’aucun serveur où Sentinel est installé.</p></div>');
+      : '<div class="empty-state"><img src="assets/noctigarde-mark.png" alt=""><h2>Aucun registre disponible</h2><p>Ton compte Discord n’est membre d’aucun serveur où Noctigarde est installé.</p></div>');
     document.querySelectorAll('[data-preferences]').forEach(form => {
       form.addEventListener('submit', async event => {
         event.preventDefault();
@@ -311,8 +311,8 @@
       attachNotificationControl();
       showNewBrowserNotifications();
     } catch (error) {
-      content.innerHTML = `<div class="empty-state"><img src="assets/sentinel-mark.png" alt=""><h2>Connexion nécessaire</h2><p>Connecte ton compte Discord pour ouvrir ton registre personnel.</p><a class="button" href="/auth/login" data-discord-login>Connexion Discord</a></div>`;
-      window.SentinelAuth?.decorateLoginLinks?.();
+      content.innerHTML = `<div class="empty-state"><img src="assets/noctigarde-mark.png" alt=""><h2>Connexion nécessaire</h2><p>Connecte ton compte Discord pour ouvrir ton registre personnel.</p><a class="button" href="/auth/login" data-discord-login>Connexion Discord</a></div>`;
+      window.NoctigardeAuth?.decorateLoginLinks?.();
     }
   }
 

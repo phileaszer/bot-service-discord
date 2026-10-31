@@ -1,5 +1,5 @@
 (() => {
-  const AUTH_ORIGIN = 'https://bot-service-discord-production.up.railway.app';
+  const AUTH_ORIGIN = 'https://dashboard.noctigarde.fr';
   const PROFILE_STORAGE_KEY = 'sentinel-discord-profile';
   const LANGUAGE_STORAGE_KEY = 'sentinel-site-language';
   const PUBLIC_SITE_BASE_PATH = '/bot-service-discord';
@@ -144,7 +144,7 @@
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(csrfToken ? { 'X-Sentinel-CSRF': csrfToken } : {})
+          ...(csrfToken ? { 'X-Noctigarde-CSRF': csrfToken } : {})
         },
         body: JSON.stringify(patch)
       });
@@ -162,11 +162,11 @@
   function applyStoredLanguage(settings) {
     const language = settings?.siteLanguage;
 
-    if (!language || localStorage.getItem(LANGUAGE_STORAGE_KEY) || !window.SentinelI18n) {
+    if (!language || localStorage.getItem(LANGUAGE_STORAGE_KEY) || !window.NoctigardeI18n) {
       return;
     }
 
-    window.SentinelI18n.setLanguage(language);
+    window.NoctigardeI18n.setLanguage(language);
   }
 
   async function loadSession() {
@@ -354,7 +354,7 @@
     loadSession().finally(() => refreshHeaderMenu?.());
   }
 
-  window.SentinelAuth = {
+  window.NoctigardeAuth = {
     refresh: loadSession,
     saveSettings,
     decorateLoginLinks,

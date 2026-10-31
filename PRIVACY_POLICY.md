@@ -2,11 +2,11 @@
 
 Dernière mise à jour : 7 octobre 2026
 
-Cette politique explique quelles données Sentinel collecte, pourquoi elles sont utilisées et comment elles sont conservées.
+Cette politique explique quelles données Noctigarde collecte, pourquoi elles sont utilisées et comment elles sont conservées.
 
 ## Données collectées
 
-Sentinel collecte uniquement les données nécessaires à son fonctionnement :
+Noctigarde collecte uniquement les données nécessaires à son fonctionnement :
 
 - identifiants Discord des utilisateurs ;
 - identifiants Discord des serveurs ;
@@ -17,7 +17,7 @@ Sentinel collecte uniquement les données nécessaires à son fonctionnement :
 - dossiers/tickets : type, sujet, description, statut, priorité, salon associé, demandeur, intervenants et dates ;
 - comptes rendus ou transcriptions générés volontairement dans les dossiers/tickets ;
 - archives créées avant une suppression de messages demandée par une personne autorisée, avec le contenu concerné, les auteurs, les dates, les références, les mentions, les embeds, les réactions, les composants, les stickers, les pièces jointes et les données de vérification d’intégrité ;
-- annonces créées, brouillons et programmations d’envoi avec les embeds Sentinel ;
+- annonces créées, brouillons et programmations d’envoi avec les embeds Noctigarde ;
 - profil Discord utilisé pour le dashboard : identifiant, nom, avatar et serveurs accessibles ;
 - préférences du site et de notification, comme la langue choisie et les catégories activées ;
 - fréquence choisie pour les résumés Discord et historique technique de leur livraison ;
@@ -27,7 +27,7 @@ Sentinel collecte uniquement les données nécessaires à son fonctionnement :
 
 ## Données non collectées
 
-Sentinel ne collecte pas :
+Noctigarde ne collecte pas :
 
 - les mots de passe ;
 - les numéros de carte, cryptogrammes et coordonnées bancaires ;
@@ -45,7 +45,7 @@ Les données sont utilisées pour :
 - gérer les rôles, logs et permissions du bot ;
 - appliquer et consulter les sanctions ;
 - créer et suivre les dossiers/tickets ;
-- publier, modifier ou programmer des annonces Sentinel ;
+- publier, modifier ou programmer des annonces Noctigarde ;
 - produire des exports et rapports demandés par les responsables autorisés ;
 - présenter à chaque membre connecté son propre espace personnel ;
 - envoyer, uniquement sur demande du membre, un résumé privé quotidien ou hebdomadaire de ses alertes ;
@@ -59,7 +59,7 @@ Les données sont utilisées pour :
 
 Les données ne sont pas vendues.
 
-Elles peuvent transiter par des services techniques nécessaires au fonctionnement de Sentinel, notamment Discord, l'hébergeur du bot, GitHub Pages pour le site public et les services utilisés pour la connexion OAuth.
+Elles peuvent transiter par des services techniques nécessaires au fonctionnement de Noctigarde, notamment Discord, l'hébergeur du bot, GitHub Pages pour le site public et les services utilisés pour la connexion OAuth.
 
 Les données peuvent aussi être communiquées si une obligation légale l'impose.
 
@@ -67,21 +67,21 @@ Les données peuvent aussi être communiquées si une obligation légale l'impos
 
 Les données sont conservées tant que le bot est utilisé sur le serveur concerné ou tant qu'elles sont nécessaires au fonctionnement du service.
 
-Certaines informations peuvent être supprimées ou remises à zéro par les personnes autorisées du serveur avec les commandes prévues par Sentinel.
+Certaines informations peuvent être supprimées ou remises à zéro par les personnes autorisées du serveur avec les commandes prévues par Noctigarde.
 
 Les sessions dashboard expirent automatiquement.
 
-Les archives de messages supprimés sont conservées avec les données du serveur tant que Sentinel y est utilisé ou jusqu’à une demande de suppression autorisée. Leur téléchargement est réservé aux responsables qui disposent de l’accès de modération nécessaire sur le serveur concerné.
+Les archives de messages supprimés sont conservées avec les données du serveur tant que Noctigarde y est utilisé ou jusqu’à une demande de suppression autorisée. Leur téléchargement est réservé aux responsables qui disposent de l’accès de modération nécessaire sur le serveur concerné.
 
 ## Suppression des données
 
-Pour demander la suppression de données liées à un serveur, contactez l'équipe Sentinel via le serveur support ou les moyens de contact indiqués sur le site.
+Pour demander la suppression de données liées à un serveur, contactez l'équipe Noctigarde via le serveur support ou les moyens de contact indiqués sur le site.
 
 Une demande peut nécessiter de vérifier que la personne est autorisée à agir pour le serveur concerné.
 
 ## Sécurité
 
-Les données sont conservées dans l'environnement technique de Sentinel. Des mesures raisonnables sont prises pour limiter l'accès aux données aux besoins du service.
+Les données sont conservées dans l'environnement technique de Noctigarde. Des mesures raisonnables sont prises pour limiter l'accès aux données aux besoins du service.
 
 Aucun système ne peut être garanti comme totalement sécurisé. Il est donc recommandé de ne pas stocker d'informations sensibles dans les raisons de sanctions, les dossiers/tickets, les annonces ou les messages destinés au bot.
 
@@ -91,7 +91,7 @@ Cette politique peut être modifiée à tout moment. La version publiée sur ce 
 
 ## Contact
 
-Pour toute question concernant la confidentialité, utilisez le serveur support ou les moyens de contact indiqués sur le site de Sentinel.
+Pour toute question concernant la confidentialité, utilisez le serveur support ou les moyens de contact indiqués sur le site de Noctigarde.
 
 ---
 
@@ -99,11 +99,11 @@ Pour toute question concernant la confidentialité, utilisez le serveur support 
 
 Last updated: October 7, 2026
 
-This policy explains what data Sentinel collects, why it is used and how it is retained.
+This policy explains what data Noctigarde collects, why it is used and how it is retained.
 
 ## Data collected
 
-Sentinel only collects data required for its features:
+Noctigarde only collects data required for its features:
 
 - Discord user IDs;
 - Discord server IDs;
@@ -114,7 +114,7 @@ Sentinel only collects data required for its features:
 - tickets: type, subject, description, status, priority, related channel, requester, participants and dates;
 - summaries or transcripts voluntarily generated in tickets;
 - archives created before an authorized message deletion, including the affected content, authors, dates, references, mentions, embeds, reactions, components, stickers, attachments and integrity metadata;
-- announcements created with Sentinel embeds;
+- announcements created with Noctigarde embeds;
 - Discord dashboard profile: ID, username, avatar and accessible servers;
 - website preferences, such as selected language;
 - selected Discord digest frequency and technical delivery history;
@@ -123,7 +123,7 @@ Sentinel only collects data required for its features:
 
 ## Data not collected
 
-Sentinel does not collect:
+Noctigarde does not collect:
 
 - passwords;
 - card numbers, security codes, and bank details;
@@ -141,7 +141,7 @@ Data is used to:
 - manage bot roles, logs and permissions;
 - apply and view moderation actions;
 - create and manage tickets;
-- publish or edit Sentinel announcements;
+- publish or edit Noctigarde announcements;
 - send an optional daily or weekly private alert digest requested by the member;
 - provide dashboard login;
 - display servers the connected user can manage;
@@ -153,7 +153,7 @@ Data is used to:
 
 Data is not sold.
 
-It may pass through technical services required for Sentinel to work, including Discord, the bot host, GitHub Pages for the public website, and OAuth login services.
+It may pass through technical services required for Noctigarde to work, including Discord, the bot host, GitHub Pages for the public website, and OAuth login services.
 
 Data may also be disclosed if required by law.
 
@@ -161,21 +161,21 @@ Data may also be disclosed if required by law.
 
 Data is kept as long as the bot is used on the relevant server or as long as it is required for the service to function.
 
-Some data can be deleted or reset by authorized server members using Sentinel commands.
+Some data can be deleted or reset by authorized server members using Noctigarde commands.
 
 Dashboard sessions expire automatically.
 
-Deleted-message archives are kept with the server data while Sentinel is used there or until an authorized deletion request is completed. Downloads are restricted to staff with the required moderation access on the relevant server.
+Deleted-message archives are kept with the server data while Noctigarde is used there or until an authorized deletion request is completed. Downloads are restricted to staff with the required moderation access on the relevant server.
 
 ## Data deletion
 
-To request deletion of data linked to a server, contact the Sentinel team through the support server or the contact methods listed on the website.
+To request deletion of data linked to a server, contact the Noctigarde team through the support server or the contact methods listed on the website.
 
 A request may require verification that the requester is authorized to act for the relevant server.
 
 ## Security
 
-Data is stored in Sentinel's technical environment. Reasonable measures are taken to limit access to what is required for the service.
+Data is stored in Noctigarde's technical environment. Reasonable measures are taken to limit access to what is required for the service.
 
 No system can be guaranteed to be fully secure. Servers should avoid storing sensitive information in moderation reasons, tickets, announcements or messages sent to the bot.
 
@@ -185,4 +185,4 @@ This policy may be updated at any time. The version published in this repository
 
 ## Contact
 
-For privacy questions, use the support server or the contact methods listed on the Sentinel website.
+For privacy questions, use the support server or the contact methods listed on the Noctigarde website.

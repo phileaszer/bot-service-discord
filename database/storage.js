@@ -930,19 +930,19 @@ function evaluateStorageAlerts(db, status, {
 
     return [
         updateStorageAlert(db, 'volume_usage', volumeLevel > 0, volumeLevel,
-            `Le stockage Sentinel atteint ${status.volume.usagePercent} %.`,
+            `Le stockage Noctigarde atteint ${status.volume.usagePercent} %.`,
             { usagePercent: status.volume.usagePercent }),
         updateStorageAlert(db, 'media_usage', mediaLevel > 0, mediaLevel,
             `Le registre local des médias atteint ${mediaUsagePercent} %.`,
             { usagePercent: mediaUsagePercent }),
         updateStorageAlert(db, 'database_growth', metric.growthBytes > growthLimit, 75,
-            'La base Sentinel a grandi anormalement en moins de 24 heures.',
+            'La base Noctigarde a grandi anormalement en moins de 24 heures.',
             { growthBytes: metric.growthBytes, growthLimit }),
         updateStorageAlert(db, 'table_growth', Boolean(fastCategory), 75,
             fastCategory ? `Le registre « ${fastCategory.category} » grandit anormalement vite.` : 'Un registre grandit anormalement vite.',
             fastCategory || {}),
         updateStorageAlert(db, 'performance_degraded', degradedPerformance, 60,
-            'Sentinel a détecté des erreurs de données ou des réponses anormalement lentes.',
+            'Noctigarde a détecté des erreurs de données ou des réponses anormalement lentes.',
             {
                 databaseErrors: Number(databasePerformance.errorCount || 0),
                 dashboardP95Ms: Number(runtimePerformance.dashboard?.p95Ms || 0),
@@ -990,7 +990,7 @@ function getActiveStorageAlerts(db) {
             firstSeenAt: row.first_seen_at,
             lastSeenAt: row.last_seen_at,
             lastNotifiedAt: row.last_notified_at,
-            message: details.message || 'Alerte stockage Sentinel.',
+            message: details.message || 'Alerte stockage Noctigarde.',
             details
         };
     });
@@ -1099,7 +1099,7 @@ function getDatabaseStorageStatus(db, {
         coldArchives: listColdArchives(db, archiveDirectory),
         alerts: getActiveStorageAlerts(db),
         performance: {
-            database: typeof db.getSentinelPerformance === 'function' ? db.getSentinelPerformance() : null,
+            database: typeof db.getNoctigardePerformance === 'function' ? db.getNoctigardePerformance() : null,
             runtime: runtimePerformance
         },
         lastMaintenance,

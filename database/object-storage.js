@@ -134,7 +134,7 @@ function createObjectStorageFromEnv(env = process.env, options = {}) {
         publicUrl,
         async putIfAbsent({ key, body, contentType, metadata = {} }) {
             if (!configured || !client) {
-                throw new Error('Le stockage objet Sentinel n\'est pas configure.');
+                throw new Error('Le stockage objet Noctigarde n\'est pas configure.');
             }
 
             let exists = false;
@@ -385,7 +385,7 @@ function embedMediaObjectKey(contentHash) {
     const hash = String(contentHash || '').toLowerCase();
 
     if (!/^[a-f0-9]{64}$/.test(hash)) {
-        throw new Error('Empreinte media Sentinel invalide.');
+        throw new Error('Empreinte media Noctigarde invalide.');
     }
 
     return `sentinel/embeds/${hash.slice(0, 2)}/${hash}.webp`;
