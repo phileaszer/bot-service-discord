@@ -1362,14 +1362,17 @@ db.prepare(`
         body_fr = REPLACE(body_fr, 'Sentinel', 'Noctigarde'),
         title_en = REPLACE(title_en, 'Sentinel', 'Noctigarde'),
         body_en = REPLACE(body_en, 'Sentinel', 'Noctigarde')
-    WHERE title_fr LIKE '%Sentinel%'
-       OR body_fr LIKE '%Sentinel%'
-       OR title_en LIKE '%Sentinel%'
-       OR body_en LIKE '%Sentinel%'
+    WHERE public_key <> 'noctigarde-new-identity-2026-10-31'
+      AND (
+        title_fr LIKE '%Sentinel%'
+        OR body_fr LIKE '%Sentinel%'
+        OR title_en LIKE '%Sentinel%'
+        OR body_en LIKE '%Sentinel%'
+      )
 `).run();
 
 db.prepare(`
-    INSERT OR IGNORE INTO official_updates (
+    INSERT INTO official_updates (
         public_key,
         title_fr,
         body_fr,
@@ -1382,6 +1385,14 @@ db.prepare(`
         published_at
     )
     VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
+    ON CONFLICT(public_key) DO UPDATE SET
+        title_fr = excluded.title_fr,
+        body_fr = excluded.body_fr,
+        title_en = excluded.title_en,
+        body_en = excluded.body_en,
+        source = excluded.source,
+        is_public = 1,
+        published_at = excluded.published_at
 `).run(
     'noctigarde-new-identity-2026-10-31',
     'Sentinel devient Noctigarde',

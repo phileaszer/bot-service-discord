@@ -81,6 +81,14 @@ test('the public stability patch note uses short user-facing sentences', () => {
     assert.doesNotMatch(database, /sentinel-stability-security-2026-10-27[\s\S]{0,2400}PostgreSQL/);
 });
 
+test('the Noctigarde rebrand announcement keeps the former name after every restart', () => {
+    const database = read('database/database.js');
+    assert.match(database, /noctigarde-new-identity-2026-10-31/);
+    assert.match(database, /Sentinel devient Noctigarde/);
+    assert.match(database, /public_key <> 'noctigarde-new-identity-2026-10-31'/);
+    assert.match(database, /ON CONFLICT\(public_key\) DO UPDATE SET/);
+});
+
 test('an overdue dossier receives only one successful reminder', () => {
     const source = read('index.js');
     assert.match(source, /const reminderAlreadySent = Boolean\(dossier\.lastReminderAt\)/);
