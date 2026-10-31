@@ -1356,6 +1356,77 @@ db.prepare(`
     '2026-10-27T00:00:00.000Z'
 );
 
+db.prepare(`
+    UPDATE official_updates
+    SET title_fr = REPLACE(title_fr, 'Sentinel', 'Noctigarde'),
+        body_fr = REPLACE(body_fr, 'Sentinel', 'Noctigarde'),
+        title_en = REPLACE(title_en, 'Sentinel', 'Noctigarde'),
+        body_en = REPLACE(body_en, 'Sentinel', 'Noctigarde')
+    WHERE title_fr LIKE '%Sentinel%'
+       OR body_fr LIKE '%Sentinel%'
+       OR title_en LIKE '%Sentinel%'
+       OR body_en LIKE '%Sentinel%'
+`).run();
+
+db.prepare(`
+    INSERT OR IGNORE INTO official_updates (
+        public_key,
+        title_fr,
+        body_fr,
+        title_en,
+        body_en,
+        source,
+        created_by_user_id,
+        is_public,
+        created_at,
+        published_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)
+`).run(
+    'noctigarde-new-identity-2026-10-31',
+    'Sentinel devient Noctigarde',
+    [
+        '## Une nouvelle identité',
+        '- Sentinel devient officiellement **Noctigarde**.',
+        '- Un nom plus unique, avec une identité qui lui appartient vraiment.',
+        '- Le site officiel est désormais disponible sur **https://noctigarde.fr**.',
+        '- Le dashboard reste accessible sur **https://dashboard.noctigarde.fr**.',
+        '',
+        '## Pour vos serveurs',
+        '- Vous n’avez rien à réinstaller.',
+        '- Vos réglages, heures, salaires, tickets et sanctions sont conservés.',
+        '- Les commandes et les permissions continuent de fonctionner normalement.',
+        '- Quelques anciennes publications peuvent encore afficher Sentinel pendant la transition.',
+        '',
+        '## On avance ensemble',
+        'Ce changement représente une belle avancée pour le projet. Petit à petit, Noctigarde grandit, se construit et prépare son avenir avec vous.',
+        'N’hésitez pas à partager Noctigarde autour de vous et à en parler sur vos serveurs. Chaque recommandation et chaque partage permettent de soutenir le projet et de le faire connaître.',
+        'Merci de faire partie de cette aventure. On avance ensemble, étape après étape.'
+    ].join('\n'),
+    'Sentinel becomes Noctigarde',
+    [
+        '## A new identity',
+        '- Sentinel is now officially **Noctigarde**.',
+        '- A more unique name with an identity of its own.',
+        '- The official website is now available at **https://noctigarde.fr**.',
+        '- The dashboard remains available at **https://dashboard.noctigarde.fr**.',
+        '',
+        '## For your servers',
+        '- You do not need to reinstall anything.',
+        '- Your settings, duty hours, salaries, tickets, and moderation records are preserved.',
+        '- Commands and permissions continue to work normally.',
+        '- A few older posts may still show Sentinel during the transition.',
+        '',
+        '## Moving forward together',
+        'This change is a great step forward for the project. Little by little, Noctigarde is growing, taking shape, and preparing its future with you.',
+        'Feel free to share Noctigarde and talk about it on your servers. Every recommendation and share helps support the project and make it known.',
+        'Thank you for being part of this journey. We move forward together, one step at a time.'
+    ].join('\n'),
+    'mise à jour officielle',
+    '2026-10-31T13:22:00.000Z',
+    '2026-10-31T13:22:00.000Z'
+);
+
 const dashboardSessionColumns = db.prepare('PRAGMA table_info(dashboard_sessions)').all()
     .map(column => column.name);
 
